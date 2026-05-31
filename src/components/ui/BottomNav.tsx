@@ -22,7 +22,7 @@ export function BottomNav() {
           <Pressable
             key={tab.label}
             style={styles.tab}
-            onPress={() => !focused && router.replace(tab.href)}
+            onPress={() => !focused && router.navigate(tab.href)}
           >
             <Text style={styles.icon}>{tab.icon}</Text>
             <Text style={[styles.label, focused && styles.labelActive]}>{tab.label}</Text>
