@@ -1,7 +1,7 @@
 import React, { createContext, useState, useCallback, useEffect } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import { Session } from '@supabase/supabase-js';
-import { supabase } from '@/services/auth';
+import { getSupabaseClient } from '@/services/auth';
 
 interface AuthContextType {
   session: Session | null;
@@ -27,6 +27,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const initializeSession = async () => {
       try {
         setIsLoading(true);
+        const supabase = getSupabaseClient();
         const {
           data: { session: initialSession },
         } = await supabase.auth.getSession();
@@ -51,6 +52,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     initializeSession();
 
     // Subscribe to auth state changes
+    const supabase = getSupabaseClient();
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, newSession) => {
@@ -75,6 +77,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       setIsSigningIn(true);
       setError(null);
+      const supabase = getSupabaseClient();
       const { error: signInError } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -96,6 +99,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       setIsSigningIn(true);
       setError(null);
+      const supabase = getSupabaseClient();
       const { error: signInError } = await supabase.auth.signInWithOAuth({
         provider: 'apple',
         options: {
@@ -117,6 +121,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       setIsSigningIn(true);
       setError(null);
+      const supabase = getSupabaseClient();
       const { error: signInError } = await supabase.auth.signInWithOAuth({
         provider: 'github',
         options: {
@@ -138,6 +143,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       setIsSigningIn(true);
       setError(null);
+      const supabase = getSupabaseClient();
       const { error: signOutError } = await supabase.auth.signOut();
       if (signOutError) throw signOutError;
       setSession(null);

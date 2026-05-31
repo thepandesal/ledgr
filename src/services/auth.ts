@@ -1,20 +1,35 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 
-// Initialize Supabase client
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
 // Configure web browser for OAuth
 WebBrowser.maybeCompleteAuthSession();
+
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL?.trim() ?? '';
+const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY?.trim() ?? '';
+
+let supabaseClient: SupabaseClient | null = null;
+
+export const getSupabaseClient = () => {
+  if (supabaseClient) {
+    return supabaseClient;
+  }
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error(
+      'Missing Supabase environment variables. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY.'
+    );
+  }
+
+  supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
+  return supabaseClient;
+};
 
 const redirectUrl = Linking.createURL('auth');
 
 export const signInWithGoogle = async () => {
   try {
+    const supabase = getSupabaseClient();
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
@@ -36,6 +51,7 @@ export const signInWithGoogle = async () => {
 
 export const signInWithApple = async () => {
   try {
+    const supabase = getSupabaseClient();
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'apple',
       options: {
@@ -57,6 +73,7 @@ export const signInWithApple = async () => {
 
 export const signInWithGitHub = async () => {
   try {
+    const supabase = getSupabaseClient();
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'github',
       options: {
@@ -78,6 +95,7 @@ export const signInWithGitHub = async () => {
 
 export const signOut = async () => {
   try {
+    const supabase = getSupabaseClient();
     const { error } = await supabase.auth.signOut();
     if (error) {
       throw error;
@@ -90,6 +108,7 @@ export const signOut = async () => {
 
 export const getSession = async () => {
   try {
+    const supabase = getSupabaseClient();
     const {
       data: { session },
       error,
