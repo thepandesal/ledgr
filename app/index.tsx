@@ -10,13 +10,9 @@ export default function Index() {
 
   useEffect(() => {
     if (!loading) {
-      if (session) {
-        router.replace('/(tabs)/spaces');
-      } else {
-        router.replace('/login');
-      }
+      router.replace(session ? '/(tabs)/spaces' : '/login');
     }
-  }, [session, loading]);
+  }, [session, loading, router]);
 
   return (
     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.background }}>

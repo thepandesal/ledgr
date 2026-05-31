@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Platform } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import '../assets/global.css';
 import { useFonts } from 'expo-font';
 import {
   ElmsSans_400Regular,
