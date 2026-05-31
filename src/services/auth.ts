@@ -1,9 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import * as WebBrowser from 'expo-web-browser';
-import * as Linking from 'expo-linking';
-
-// Configure web browser for OAuth
-WebBrowser.maybeCompleteAuthSession();
+import { Platform } from 'react-native';
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL?.trim() ?? '';
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY?.trim() ?? '';
@@ -11,9 +7,7 @@ const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY?.trim() ?? '';
 let supabaseClient: SupabaseClient | null = null;
 
 export const getSupabaseClient = () => {
-  if (supabaseClient) {
-    return supabaseClient;
-  }
+  if (supabaseClient) return supabaseClient;
 
   if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error(
@@ -25,7 +19,9 @@ export const getSupabaseClient = () => {
   return supabaseClient;
 };
 
-const redirectUrl = Linking.createURL('auth');
+const redirectUrl = Platform.OS === 'web'
+  ? `${typeof window !== 'undefined' ? window.location.origin : 'https://ledgr.thepandesal.com'}/auth`
+  : 'ledgr://auth';
 
 export const signInWithGoogle = async () => {
   try {

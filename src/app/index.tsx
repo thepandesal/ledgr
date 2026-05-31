@@ -20,7 +20,7 @@ export default function LoginScreen() {
 
   useEffect(() => {
     if (session && !isLoading) {
-      router.replace('/../src/app/(app)/workspaces');
+      router.replace('/(app)/workspaces');
     }
   }, [session, isLoading, router]);
 

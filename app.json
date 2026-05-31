@@ -7,11 +7,6 @@
     "icon": "./assets/logo.png",
     "scheme": "ledgr",
     "userInterfaceStyle": "automatic",
-    "plugins": [
-      [
-        "expo-auth-session/provider"
-      ]
-    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.ledgr.app"
@@ -50,7 +45,7 @@
       "typedRoutes": true
     },
     "router": {
-      "root": "src"
+      "root": "src/app"
     }
   }
 }

@@ -12,14 +12,14 @@ export default function AuthCallbackScreen() {
         const session = await getSession();
         if (session) {
           // Redirect to main app
-          router.replace('/../src/app/(app)/workspaces');
+          router.replace('/(app)/workspaces');
         } else {
           // Go back to login
-          router.replace('/../src/app/index');
+          router.replace('/');
         }
       } catch (error) {
         console.error('Auth callback error:', error);
-        router.replace('/../src/app/index');
+        router.replace('/');
       }
     };
 
