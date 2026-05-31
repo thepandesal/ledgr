@@ -113,8 +113,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
   },
   logo: {
-    width: 200,
-    height: 200,
+    width: '100%',
+    height: 300,
     marginBottom: Spacing.xl,
   },
   tagline: {
