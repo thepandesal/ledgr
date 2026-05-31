@@ -118,7 +118,7 @@ export const deleteRecording = async (id: string) => {
 export const fetchAccounts = async (userId: string) => {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
-    .from('bank_accounts')
+    .from('accounts')
     .select('*')
     .eq('user_id', userId)
     .order('created_at', { ascending: false });
@@ -139,14 +139,14 @@ export const createAccount = async (account: {
   savings_type?: string;
 }) => {
   const supabase = getSupabaseClient();
-  const { data, error } = await supabase.from('bank_accounts').insert(account).select().single();
+  const { data, error } = await supabase.from('accounts').insert(account).select().single();
   if (error) throw error;
   return data;
 };
 
 export const deleteAccount = async (id: string) => {
   const supabase = getSupabaseClient();
-  const { error } = await supabase.from('bank_accounts').delete().eq('id', id);
+  const { error } = await supabase.from('accounts').delete().eq('id', id);
   if (error) throw error;
 };
 
