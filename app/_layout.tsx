@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { Platform } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
@@ -11,6 +12,7 @@ import {
 import { PlaywriteHU_400Regular } from '@expo-google-fonts/playwrite-hu';
 import * as SplashScreen from 'expo-splash-screen';
 import { Colors } from '../src/constants/theme';
+import { supabase } from '../src/lib/supabase';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -26,6 +28,24 @@ export default function RootLayout() {
   useEffect(() => {
     if (fontsLoaded) SplashScreen.hideAsync();
   }, [fontsLoaded]);
+
+  // Handle OAuth callback on web
+  useEffect(() => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      const hash = window.location.hash;
+      if (hash && hash.includes('access_token')) {
+        const params = new URLSearchParams(hash.substring(1));
+        const accessToken = params.get('access_token');
+        const refreshToken = params.get('refresh_token');
+        if (accessToken && refreshToken) {
+          supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken }).then(() => {
+            // Clean up the URL
+            window.history.replaceState(null, '', window.location.pathname);
+          });
+        }
+      }
+    }
+  }, []);
 
   if (!fontsLoaded) return null;
 
