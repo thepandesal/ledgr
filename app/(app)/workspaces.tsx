@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,21 +13,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Fonts, Spacing, BorderRadius } from '@/constants/theme';
 import { useAuth } from '@/hooks/useAuth';
 import { fetchWorkspaces } from '@/services/db';
-import { useEffect } from 'react';
 
 interface Workspace {
   id: string;
   name: string;
-  memberCount: number;
   currency: string;
-  role: 'Owner' | 'Editor' | 'Viewer';
+  role: string;
 }
-
-
 
 export default function WorkspacesScreen() {
   const router = useRouter();
-  const { session, signOut } = useAuth();
+  const { session } = useAuth();
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -42,16 +38,17 @@ export default function WorkspacesScreen() {
   }, [session?.user?.id]);
 
   const renderWorkspace = ({ item }: { item: Workspace }) => (
-    <TouchableOpacity style={styles.card} activeOpacity={0.7} onPress={() => router.push(`/(app)/${item.id}?name=${item.name}&currency=${item.currency}`)}>
+    <TouchableOpacity 
+      style={styles.card} 
+      activeOpacity={0.7} 
+      onPress={() => router.push(`/(app)/${item.id}?name=${item.name}&currency=${item.currency}` as any)}
+    >
       <View style={styles.cardIcon}>
         <Ionicons name="grid" size={22} color={Colors.primary} />
       </View>
       <View style={styles.cardInfo}>
         <Text style={styles.cardName}>{item.name}</Text>
         <View style={styles.cardMeta}>
-          <Ionicons name="people-outline" size={13} color={Colors.textMuted} />
-          <Text style={styles.cardMetaText}>{item.memberCount} members</Text>
-          <Text style={styles.cardMetaDot}>·</Text>
           <Text style={styles.cardMetaText}>{item.currency}</Text>
           <Text style={styles.cardMetaDot}>·</Text>
           <Text style={styles.cardRole}>{item.role}</Text>
@@ -68,19 +65,9 @@ export default function WorkspacesScreen() {
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>Spaces</Text>
-        <View style={styles.headerRight}>
-  const [PENDING_INVITES] = useState(0);
-            <TouchableOpacity style={styles.inviteBadge}>
-              <Ionicons name="mail-outline" size={18} color={Colors.primary} />
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{PENDING_INVITES}</Text>
-              </View>
-            </TouchableOpacity>
-          )}
-          <TouchableOpacity style={styles.avatar} onPress={() => router.push('/(app)/profile')}>
-            <Text style={styles.avatarText}>{userInitial}</Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity style={styles.avatar} onPress={() => router.push('/(app)/profile' as any)}>
+          <Text style={styles.avatarText}>{userInitial}</Text>
+        </TouchableOpacity>
       </View>
 
       {/* List */}
@@ -99,7 +86,11 @@ export default function WorkspacesScreen() {
       />
 
       {/* FAB */}
-      <TouchableOpacity style={styles.fab} activeOpacity={0.85} onPress={() => router.push('/(app)/create-workspace')}>
+      <TouchableOpacity 
+        style={styles.fab} 
+        activeOpacity={0.85} 
+        onPress={() => router.push('/(app)/create-workspace' as any)}
+      >
         <Ionicons name="add" size={28} color={Colors.white} />
       </TouchableOpacity>
     </SafeAreaView>
@@ -125,32 +116,6 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.bodyBold,
     fontSize: 24,
     color: Colors.text,
-    fontWeight: '700',
-  },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-  },
-  inviteBadge: {
-    position: 'relative',
-    padding: 4,
-  },
-  badge: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    backgroundColor: Colors.error,
-    borderRadius: 99,
-    minWidth: 16,
-    height: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  badgeText: {
-    color: Colors.white,
-    fontSize: 10,
-    fontFamily: Fonts.bodyBold,
     fontWeight: '700',
   },
   avatar: {
