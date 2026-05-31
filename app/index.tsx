@@ -54,7 +54,7 @@ export default function LoginScreen() {
     <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       {/* Logo */}
       <Image
-        source={require('../../assets/logo.png')}
+        source={require('../assets/logo.png')}
         style={styles.logo}
         resizeMode="contain"
       />
