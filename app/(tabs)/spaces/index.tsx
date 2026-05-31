@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, Text, Pressable, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, Pressable, FlatList, TextInput, Modal, StyleSheet, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '../../../src/lib/supabase';
 import { Colors, Fonts, Spacing, BorderRadius } from '../../../src/constants/theme';
@@ -10,9 +10,15 @@ interface Space {
   default_currency: string;
 }
 
+const CURRENCIES = ['PHP', 'USD', 'EUR', 'JPY', 'GBP', 'AUD', 'SGD', 'KRW', 'THB', 'MYR'];
+
 export default function SpacesScreen() {
   const [spaces, setSpaces] = useState<Space[]>([]);
   const [loading, setLoading] = useState(true);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [spaceName, setSpaceName] = useState('');
+  const [currency, setCurrency] = useState('PHP');
+  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     fetchSpaces();
@@ -22,46 +28,58 @@ export default function SpacesScreen() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    const { data } = await supabase
+    const { data: owned } = await supabase
       .from('workspaces')
       .select('*')
-      .or(`owner_id.eq.${user.id},id.in.(${await getMemberWorkspaceIds(user.id)})`);
+      .eq('owner_id', user.id);
 
-    setSpaces(data || []);
+    const { data: memberships } = await supabase
+      .from('workspace_members')
+      .select('workspace_id')
+      .eq('user_id', user.id)
+      .eq('status', 'approved');
+
+    let memberSpaces: Space[] = [];
+    if (memberships && memberships.length > 0) {
+      const ids = memberships.map(m => m.workspace_id);
+      const { data } = await supabase.from('workspaces').select('*').in('id', ids);
+      memberSpaces = data || [];
+    }
+
+    const all = [...(owned || []), ...memberSpaces];
+    const unique = all.filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
+    setSpaces(unique);
     setLoading(false);
   };
 
-  const getMemberWorkspaceIds = async (userId: string) => {
-    const { data } = await supabase
-      .from('workspace_members')
-      .select('workspace_id')
-      .eq('user_id', userId)
-      .eq('status', 'approved');
-    return (data || []).map(m => m.workspace_id).join(',') || '00000000-0000-0000-0000-000000000000';
-  };
-
   const createSpace = async () => {
+    if (!spaceName.trim()) return;
+    setCreating(true);
+
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) { setCreating(false); return; }
 
     const { data, error } = await supabase
       .from('workspaces')
-      .insert({ name: 'New Space', owner_id: user.id, default_currency: 'PHP' })
+      .insert({ name: spaceName.trim(), owner_id: user.id, default_currency: currency })
       .select()
       .single();
 
     if (data) {
-      // Add owner as member
       await supabase.from('workspace_members').insert({
         workspace_id: data.id,
         user_id: user.id,
         role: 'owner',
         status: 'approved',
       });
-      // Seed default categories
       await supabase.rpc('seed_default_categories', { p_user_id: user.id, p_workspace_id: data.id });
       setSpaces([...spaces, data]);
     }
+
+    setSpaceName('');
+    setCurrency('PHP');
+    setCreating(false);
+    setModalVisible(false);
   };
 
   if (loading) {
@@ -93,11 +111,59 @@ export default function SpacesScreen() {
           </View>
         }
         ListFooterComponent={
-          <Pressable style={styles.addButton} onPress={createSpace}>
+          <Pressable style={styles.addButton} onPress={() => setModalVisible(true)}>
             <Text style={styles.addButtonText}>+ Create Space</Text>
           </Pressable>
         }
       />
+
+      {/* Create Space Modal */}
+      <Modal visible={modalVisible} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Create a Space</Text>
+
+            <Text style={styles.label}>Space Name</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="e.g. Household, Trip to Japan"
+              placeholderTextColor={Colors.textMuted}
+              value={spaceName}
+              onChangeText={setSpaceName}
+            />
+
+            <Text style={styles.label}>Default Currency</Text>
+            <View style={styles.currencyGrid}>
+              {CURRENCIES.map((c) => (
+                <Pressable
+                  key={c}
+                  style={[styles.currencyChip, currency === c && styles.currencyChipActive]}
+                  onPress={() => setCurrency(c)}
+                >
+                  <Text style={[styles.currencyText, currency === c && styles.currencyTextActive]}>
+                    {c}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <View style={styles.modalActions}>
+              <Pressable style={styles.cancelButton} onPress={() => setModalVisible(false)}>
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.createButton, (!spaceName.trim() || creating) && { opacity: 0.5 }]}
+                onPress={createSpace}
+                disabled={!spaceName.trim() || creating}
+              >
+                <Text style={styles.createButtonText}>
+                  {creating ? 'Creating...' : 'Create'}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -136,4 +202,64 @@ const styles = StyleSheet.create({
     marginTop: Spacing.sm,
   },
   addButtonText: { fontFamily: Fonts.bodySemiBold, fontSize: 15, color: Colors.white },
+  // Modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    padding: Spacing.lg,
+  },
+  modalContent: {
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.lg,
+  },
+  modalTitle: { fontFamily: Fonts.header, fontSize: 22, color: Colors.text, marginBottom: Spacing.lg },
+  label: {
+    fontFamily: Fonts.bodySemiBold,
+    fontSize: 13,
+    color: Colors.textMuted,
+    textTransform: 'uppercase',
+    marginBottom: Spacing.xs,
+    marginTop: Spacing.md,
+  },
+  input: {
+    fontFamily: Fonts.body,
+    fontSize: 15,
+    color: Colors.text,
+    backgroundColor: Colors.background,
+    borderRadius: BorderRadius.sm,
+    padding: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  currencyGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.xs },
+  currencyChip: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.background,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  currencyChipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  currencyText: { fontFamily: Fonts.body, fontSize: 13, color: Colors.text },
+  currencyTextActive: { color: Colors.white },
+  modalActions: { flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.lg },
+  cancelButton: {
+    flex: 1,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    alignItems: 'center',
+    backgroundColor: Colors.background,
+  },
+  cancelButtonText: { fontFamily: Fonts.bodySemiBold, fontSize: 15, color: Colors.text },
+  createButton: {
+    flex: 1,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    alignItems: 'center',
+    backgroundColor: Colors.primary,
+  },
+  createButtonText: { fontFamily: Fonts.bodySemiBold, fontSize: 15, color: Colors.white },
 });
