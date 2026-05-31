@@ -10,8 +10,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Fonts, Spacing, BorderRadius } from '@/constants/theme';
-import { useAuth } from '@/hooks/useAuth';
+import { fetchWorkspaces } from '@/services/db';
 
 interface Workspace {
   id: string;
@@ -21,18 +20,23 @@ interface Workspace {
   role: 'Owner' | 'Editor' | 'Viewer';
 }
 
-const MOCK_WORKSPACES: Workspace[] = [
-  { id: '1', name: 'Household', memberCount: 3, currency: 'PHP', role: 'Owner' },
-  { id: '2', name: 'Trip to Japan', memberCount: 5, currency: 'JPY', role: 'Editor' },
-];
 
-const PENDING_INVITES = 2;
 
 export default function WorkspacesScreen() {
   const router = useRouter();
   const { session, signOut } = useAuth();
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const userInitial = session?.user?.email?.[0]?.toUpperCase() ?? '?';
+
+  useEffect(() => {
+    if (!session?.user?.id) return;
+    fetchWorkspaces(session.user.id)
+      .then(setWorkspaces)
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, [session?.user?.id]);
 
   const renderWorkspace = ({ item }: { item: Workspace }) => (
     <TouchableOpacity style={styles.card} activeOpacity={0.7} onPress={() => router.push(`/(app)/${item.id}?name=${item.name}&currency=${item.currency}`)}>
@@ -78,7 +82,7 @@ export default function WorkspacesScreen() {
 
       {/* List */}
       <FlatList
-        data={MOCK_WORKSPACES}
+        data={workspaces}
         keyExtractor={(item) => item.id}
         renderItem={renderWorkspace}
         contentContainerStyle={styles.list}

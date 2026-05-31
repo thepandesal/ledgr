@@ -6,11 +6,16 @@ export const fetchWorkspaces = async (userId: string) => {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from('workspace_members')
-    .select('role, workspaces(id, name, currency, created_at)')
+    .select('role, workspaces(id, name, default_currency, created_at)')
     .eq('user_id', userId)
     .eq('status', 'approved');
   if (error) throw error;
-  return (data ?? []).map((row: any) => ({ ...row.workspaces, role: row.role }));
+  return (data ?? []).map((row: any) => ({ 
+    id: row.workspaces.id,
+    name: row.workspaces.name,
+    currency: row.workspaces.default_currency,
+    role: row.role.charAt(0).toUpperCase() + row.role.slice(1)
+  }));
 };
 
 export const createWorkspace = async (userId: string, name: string, currency: string) => {
