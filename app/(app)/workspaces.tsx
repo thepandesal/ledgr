@@ -35,7 +35,7 @@ export default function WorkspacesScreen() {
   const userInitial = session?.user?.email?.[0]?.toUpperCase() ?? '?';
 
   const renderWorkspace = ({ item }: { item: Workspace }) => (
-    <TouchableOpacity style={styles.card} activeOpacity={0.7}>
+    <TouchableOpacity style={styles.card} activeOpacity={0.7} onPress={() => router.push(`/(app)/${item.id}?name=${item.name}&currency=${item.currency}`)}>
       <View style={styles.cardIcon}>
         <Ionicons name="grid" size={22} color={Colors.primary} />
       </View>
@@ -70,7 +70,7 @@ export default function WorkspacesScreen() {
               </View>
             </TouchableOpacity>
           )}
-          <TouchableOpacity style={styles.avatar} onPress={signOut}>
+          <TouchableOpacity style={styles.avatar} onPress={() => router.push('/(app)/profile')}>
             <Text style={styles.avatarText}>{userInitial}</Text>
           </TouchableOpacity>
         </View>

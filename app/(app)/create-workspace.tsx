@@ -9,10 +9,13 @@ import {
   ScrollView,
   ActivityIndicator,
   Platform,
+  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Fonts, Spacing, BorderRadius } from '@/constants/theme';
+import { getSession } from '@/services/auth';
+import { createWorkspace } from '@/services/db';
 
 const CURRENCIES = ['PHP', 'USD', 'EUR', 'JPY', 'GBP', 'AUD', 'SGD', 'CAD'];
 
@@ -25,11 +28,15 @@ export default function CreateWorkspaceScreen() {
   const handleCreate = async () => {
     if (!name.trim()) return;
     setLoading(true);
-    // TODO: Supabase insert
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      const { session } = await getSession();
+      if (!session?.user?.id) throw new Error('Not authenticated');
+      const workspace = await createWorkspace(session.user.id, name.trim(), currency);
       router.back();
-    }, 800);
+    } catch (error: any) {
+      Alert.alert('Error', error.message);
+      setLoading(false);
+    }
   };
 
   return (
