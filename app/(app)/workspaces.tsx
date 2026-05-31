@@ -8,7 +8,7 @@ import {
   SafeAreaView,
   StatusBar,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Fonts, Spacing, BorderRadius } from '@/constants/theme';
 import { useAuth } from '@/hooks/useAuth';
@@ -29,13 +29,24 @@ export default function WorkspacesScreen() {
 
   const userInitial = session?.user?.email?.[0]?.toUpperCase() ?? '?';
 
-  useEffect(() => {
+  const load = () => {
     if (!session?.user?.id) return;
+    setLoading(true);
     fetchWorkspaces(session.user.id)
       .then(setWorkspaces)
       .catch(console.error)
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    load();
   }, [session?.user?.id]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      load();
+    }, [session?.user?.id])
+  );
 
   const renderWorkspace = ({ item }: { item: Workspace }) => (
     <TouchableOpacity 

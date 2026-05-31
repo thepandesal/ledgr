@@ -32,6 +32,7 @@ export default function CreateWorkspaceScreen() {
     try {
       if (!session?.user?.id) throw new Error('Not authenticated');
       await createWorkspace(session.user.id, name.trim(), currency);
+      setLoading(false);
       router.back();
     } catch (error: any) {
       Alert.alert('Error', error.message ?? 'Failed to create workspace');
