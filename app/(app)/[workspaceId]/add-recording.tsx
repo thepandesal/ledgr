@@ -35,7 +35,8 @@ export default function AddRecordingScreen() {
     setLoading(true);
     setError('');
     try {
-      await createRecording({
+      if (!session?.user?.id) throw new Error('Not authenticated');
+      await createRecording(session.user.id, {
         workspace_id: workspaceId!,
         name: recName.trim(),
         type,

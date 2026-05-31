@@ -113,7 +113,7 @@ export const fetchRecordings = async (workspaceId: string) => {
   return data ?? [];
 };
 
-export const createRecording = async (recording: {
+export const createRecording = async (userId: string, recording: {
   workspace_id: string;
   name: string;
   type: string;
@@ -125,7 +125,10 @@ export const createRecording = async (recording: {
   recurring_frequency?: string;
 }) => {
   const supabase = getSupabaseClient();
-  const { data, error } = await supabase.from('recordings').insert(recording).select().single();
+  const { data, error } = await supabase.from('recordings').insert({
+    ...recording,
+    user_id: userId,
+  }).select().single();
   if (error) throw error;
   return data;
 };
