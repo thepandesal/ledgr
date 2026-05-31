@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Text, View, Pressable, Image } from 'react-native';
+import { Text, View, Pressable, Platform } from 'react-native';
 import { Colors, Fonts } from '../../src/constants/theme';
 
 function TabIcon({ label, focused }: { label: string; focused: boolean }) {
@@ -58,10 +58,15 @@ export default function TabLayout() {
           borderTopColor: Colors.border,
           height: 70,
           paddingBottom: 10,
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
         },
         tabBarShowLabel: false,
         tabBarActiveTintColor: Colors.primary,
         tabBarInactiveTintColor: Colors.textMuted,
+        ...(Platform.OS !== 'web' ? { animation: 'shift' } : {}),
       }}
     >
       <Tabs.Screen

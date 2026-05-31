@@ -98,7 +98,7 @@ export default function SpacesScreen() {
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ padding: Spacing.md }}
         renderItem={({ item }) => (
-          <Pressable style={styles.card} onPress={() => router.push(`/workspace/${item.id}`)}>
+          <Pressable style={styles.card} onPress={() => router.push(`/(tabs)/spaces/workspace/${item.id}`)}>
             <Text style={styles.cardTitle}>{item.name}</Text>
             <Text style={styles.cardSub}>{item.default_currency}</Text>
           </Pressable>

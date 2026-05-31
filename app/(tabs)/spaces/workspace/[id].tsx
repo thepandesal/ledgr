@@ -1,27 +1,25 @@
 import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
-import { Colors, Fonts, Spacing, BorderRadius } from '../../src/constants/theme';
+import { Colors, Fonts, Spacing, BorderRadius } from '../../../../src/constants/theme';
 
 export default function WorkspaceDashboard() {
   const { id } = useLocalSearchParams();
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ padding: Spacing.md }}>
+    <ScrollView style={styles.container} contentContainerStyle={{ padding: Spacing.md, paddingBottom: 90 }}>
       <Text style={styles.pageHeader}>Dashboard</Text>
 
-      {/* Stats */}
       <View style={styles.statsRow}>
         <View style={styles.statCard}>
-          <Text style={styles.statValue}>₱12,450</Text>
+          <Text style={styles.statValue}>₱0</Text>
           <Text style={styles.statLabel}>Spent this month</Text>
         </View>
         <View style={styles.statCard}>
-          <Text style={styles.statValue}>2</Text>
+          <Text style={styles.statValue}>0</Text>
           <Text style={styles.statLabel}>Due soon</Text>
         </View>
       </View>
 
-      {/* Quick Actions */}
       <Text style={styles.sectionTitle}>Quick Actions</Text>
       <View style={styles.actionsRow}>
         <Pressable style={styles.actionButton}>
