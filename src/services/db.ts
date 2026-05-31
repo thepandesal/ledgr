@@ -106,7 +106,7 @@ export const fetchRecordings = async (workspaceId: string) => {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from('recordings')
-    .select('*')
+    .select()
     .eq('workspace_id', workspaceId)
     .order('date', { ascending: false });
   if (error) throw error;
@@ -145,7 +145,7 @@ export const fetchAccounts = async (userId: string) => {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from('accounts')
-    .select('*')
+    .select()
     .eq('user_id', userId)
     .order('created_at', { ascending: false });
   if (error) throw error;
@@ -182,7 +182,7 @@ export const fetchReceipts = async (workspaceId: string) => {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from('receipts')
-    .select('*')
+    .select()
     .eq('workspace_id', workspaceId)
     .order('created_at', { ascending: false });
   if (error) throw error;
@@ -236,7 +236,7 @@ export const fetchNotifications = async (userId: string) => {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from('notifications')
-    .select('*')
+    .select()
     .eq('user_id', userId)
     .order('created_at', { ascending: false });
   if (error) throw error;
