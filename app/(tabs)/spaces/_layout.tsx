@@ -6,7 +6,7 @@ export default function SpacesLayout() {
     <Stack
       screenOptions={{
         headerShown: false,
-        animation: 'slide_from_right',
+        animation: 'ios',
         contentStyle: { backgroundColor: Colors.background },
       }}
     />

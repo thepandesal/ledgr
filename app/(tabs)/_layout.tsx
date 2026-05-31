@@ -1,4 +1,4 @@
-import { View, Pressable, Text, StyleSheet, Platform } from 'react-native';
+import { View, Pressable, Text, StyleSheet } from 'react-native';
 import { Stack } from 'expo-router';
 import { Colors, Fonts } from '../../src/constants/theme';
 import { BottomNav } from '../../src/components/ui';
@@ -21,7 +21,7 @@ export default function TabLayout() {
           headerTitleStyle: { fontFamily: Fonts.header, fontSize: 20, color: Colors.text },
           headerRight: () => <ProfileButton />,
           contentStyle: { backgroundColor: Colors.background },
-          animation: Platform.OS !== 'web' ? 'slide_from_right' : 'none',
+          animation: 'ios',
         }}
       >
         <Stack.Screen name="spaces/index" options={{ title: 'Spaces' }} />
