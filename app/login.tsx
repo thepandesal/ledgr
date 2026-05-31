@@ -1,66 +1,74 @@
 import { View, Text, Pressable, Image, StyleSheet, Platform } from 'react-native';
-import { makeRedirectUri } from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import { supabase } from '../src/lib/supabase';
 import { Colors, Fonts, Spacing, BorderRadius } from '../src/constants/theme';
 
 WebBrowser.maybeCompleteAuthSession();
 
+function getRedirectUri() {
+  if (Platform.OS === 'web') {
+    return typeof window !== 'undefined' ? window.location.origin : 'https://ledgr.thepandesal.com';
+  }
+  return 'ledgr://';
+}
+
 export default function LoginScreen() {
-  const redirectUri = makeRedirectUri({ path: '/(tabs)/spaces' });
-
   const handleGoogleSignIn = async () => {
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: redirectUri,
-        skipBrowserRedirect: Platform.OS !== 'web',
-      },
-    });
+    const redirectTo = getRedirectUri();
 
-    if (error) {
-      console.error('Google sign-in error:', error.message);
+    if (Platform.OS === 'web') {
+      await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo },
+      });
       return;
     }
 
-    if (Platform.OS !== 'web' && data?.url) {
-      const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUri);
-      if (result.type === 'success' && result.url) {
-        const url = new URL(result.url);
-        const params = new URLSearchParams(url.hash.substring(1));
-        const accessToken = params.get('access_token');
-        const refreshToken = params.get('refresh_token');
-        if (accessToken && refreshToken) {
-          await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
-        }
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo, skipBrowserRedirect: true },
+    });
+
+    if (error || !data?.url) return;
+
+    const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+    if (result.type === 'success' && result.url) {
+      const url = new URL(result.url);
+      const params = new URLSearchParams(url.hash.substring(1));
+      const accessToken = params.get('access_token');
+      const refreshToken = params.get('refresh_token');
+      if (accessToken && refreshToken) {
+        await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
       }
     }
   };
 
   const handleAppleSignIn = async () => {
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: 'apple',
-      options: {
-        redirectTo: redirectUri,
-        skipBrowserRedirect: Platform.OS !== 'web',
-      },
-    });
+    const redirectTo = getRedirectUri();
 
-    if (error) {
-      console.error('Apple sign-in error:', error.message);
+    if (Platform.OS === 'web') {
+      await supabase.auth.signInWithOAuth({
+        provider: 'apple',
+        options: { redirectTo },
+      });
       return;
     }
 
-    if (Platform.OS !== 'web' && data?.url) {
-      const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUri);
-      if (result.type === 'success' && result.url) {
-        const url = new URL(result.url);
-        const params = new URLSearchParams(url.hash.substring(1));
-        const accessToken = params.get('access_token');
-        const refreshToken = params.get('refresh_token');
-        if (accessToken && refreshToken) {
-          await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
-        }
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'apple',
+      options: { redirectTo, skipBrowserRedirect: true },
+    });
+
+    if (error || !data?.url) return;
+
+    const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+    if (result.type === 'success' && result.url) {
+      const url = new URL(result.url);
+      const params = new URLSearchParams(url.hash.substring(1));
+      const accessToken = params.get('access_token');
+      const refreshToken = params.get('refresh_token');
+      if (accessToken && refreshToken) {
+        await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
       }
     }
   };
