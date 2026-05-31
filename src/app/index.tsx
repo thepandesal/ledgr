@@ -20,7 +20,7 @@ export default function LoginScreen() {
 
   useEffect(() => {
     if (session && !isLoading) {
-      router.replace('/(app)/workspaces');
+      router.replace('/../src/app/(app)/workspaces');
     }
   }, [session, isLoading, router]);
 
@@ -54,7 +54,7 @@ export default function LoginScreen() {
     <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       {/* Logo */}
       <Image
-        source={require('@/assets/logo.png')}
+        source={require('../../assets/logo.png')}
         style={styles.logo}
         resizeMode="contain"
       />
