@@ -10,7 +10,10 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { Colors, Fonts, Spacing, BorderRadius } from '@/constants/theme';
+import { useAuth } from '@/hooks/useAuth';
 import { fetchWorkspaces } from '@/services/db';
+import { useEffect } from 'react';
 
 interface Workspace {
   id: string;
@@ -66,7 +69,7 @@ export default function WorkspacesScreen() {
       <View style={styles.header}>
         <Text style={styles.title}>Spaces</Text>
         <View style={styles.headerRight}>
-          {PENDING_INVITES > 0 && (
+  const [PENDING_INVITES] = useState(0);
             <TouchableOpacity style={styles.inviteBadge}>
               <Ionicons name="mail-outline" size={18} color={Colors.primary} />
               <View style={styles.badge}>
