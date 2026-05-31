@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from 'expo-router';
 import { Colors, Fonts, Spacing, BorderRadius } from '@/constants/theme';
 import { useAuth } from '@/hooks/useAuth';
 import { fetchAccounts, deleteAccount } from '@/services/db';
@@ -25,16 +26,44 @@ export default function AccountsScreen() {
   const [loading, setLoading] = useState(true);
 
   const load = () => {
-    if (!session?.user?.id) return;
-    fetchAccounts(session.user.id).then(setAccounts).catch(console.error).finally(() => setLoading(false));
+    if (!session?.user?.id) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    fetchAccounts(session.user.id)
+      .then((data) => {
+        setAccounts(data ?? []);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error('Error loading accounts:', err);
+        setAccounts([]);
+        setLoading(false);
+      });
   };
 
-  useEffect(() => { load(); }, [session?.user?.id]);
+  useEffect(() => {
+    load();
+  }, [session?.user?.id]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      load();
+    }, [session?.user?.id])
+  );
 
   const handleDelete = (id: string) => {
     Alert.alert('Delete Account', 'Are you sure?', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: async () => { await deleteAccount(id); load(); } },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          await deleteAccount(id);
+          load();
+        },
+      },
     ]);
   };
 
