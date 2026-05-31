@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { Colors, Fonts, Spacing, BorderRadius } from '@/constants/theme';
 import { useAuth } from '@/hooks/useAuth';
 import { fetchAccounts, deleteAccount } from '@/services/db';
@@ -21,6 +21,7 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 export default function AccountsScreen() {
+  const router = useRouter();
   const { session } = useAuth();
   const [accounts, setAccounts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -120,7 +121,7 @@ export default function AccountsScreen() {
           }
         />
       )}
-      <TouchableOpacity style={styles.fab}>
+      <TouchableOpacity style={styles.fab} onPress={() => router.push('/(app)/add-account' as any)}>
         <Ionicons name="add" size={28} color={Colors.white} />
       </TouchableOpacity>
     </View>

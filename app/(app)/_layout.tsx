@@ -59,6 +59,7 @@ export default function AppLayout() {
       />
       <Tabs.Screen name="create-workspace" options={{ href: null }} />
       <Tabs.Screen name="profile" options={{ href: null }} />
+      <Tabs.Screen name="add-account" options={{ href: null }} />
       <Tabs.Screen name="[workspaceId]" options={{ href: null }} />
     </Tabs>
   );
