@@ -1,5 +1,4 @@
 import React, { createContext, useState, useCallback, useEffect } from 'react';
-import * as SecureStore from 'expo-secure-store';
 import { Session } from '@supabase/supabase-js';
 import { getSupabaseClient } from '@/services/auth';
 
@@ -34,11 +33,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         if (initialSession) {
           setSession(initialSession);
-          // Store session token for persistence
-          await SecureStore.setItemAsync(
-            'auth_session',
-            JSON.stringify(initialSession)
-          );
         }
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to load session';
@@ -57,14 +51,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, newSession) => {
       setSession(newSession);
-      if (newSession) {
-        await SecureStore.setItemAsync(
-          'auth_session',
-          JSON.stringify(newSession)
-        );
-      } else {
-        await SecureStore.deleteItemAsync('auth_session');
-      }
       setError(null);
     });
 
@@ -147,7 +133,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { error: signOutError } = await supabase.auth.signOut();
       if (signOutError) throw signOutError;
       setSession(null);
-      await SecureStore.deleteItemAsync('auth_session');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Sign-out failed';
       setError(errorMessage);
