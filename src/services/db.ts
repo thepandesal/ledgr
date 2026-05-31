@@ -15,15 +15,33 @@ export const fetchWorkspaces = async (userId: string) => {
 
 export const createWorkspace = async (userId: string, name: string, currency: string) => {
   const supabase = getSupabaseClient();
+  
+  // First ensure profile exists
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('id', userId)
+    .single();
+  
+  if (profileError || !profile) {
+    // Create profile if it doesn't exist
+    await supabase.from('profiles').insert({ id: userId }).select().single();
+  }
+  
+  // Now create workspace
   const { data: ws, error: wsError } = await supabase
     .from('workspaces')
-    .insert({ name, currency, owner_id: userId })
+    .insert({ name, default_currency: currency, owner_id: userId })
     .select()
     .single();
+  
   if (wsError) throw wsError;
+  
+  // Add user as owner member
   const { error: memError } = await supabase
     .from('workspace_members')
     .insert({ workspace_id: ws.id, user_id: userId, role: 'owner', status: 'approved' });
+  
   if (memError) throw memError;
   return ws;
 };
