@@ -92,7 +92,7 @@ export default function WorkspacesScreen() {
       />
 
       {/* FAB */}
-      <TouchableOpacity style={styles.fab} activeOpacity={0.85}>
+      <TouchableOpacity style={styles.fab} activeOpacity={0.85} onPress={() => router.push('/(app)/create-workspace')}>
         <Ionicons name="add" size={28} color={Colors.white} />
       </TouchableOpacity>
     </SafeAreaView>
