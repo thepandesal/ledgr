@@ -48,6 +48,9 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "router": {
+      "root": "src"
     }
   }
 }
