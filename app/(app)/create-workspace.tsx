@@ -14,13 +14,14 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Fonts, Spacing, BorderRadius } from '@/constants/theme';
-import { getSession } from '@/services/auth';
+import { useAuth } from '@/hooks/useAuth';
 import { createWorkspace } from '@/services/db';
 
 const CURRENCIES = ['PHP', 'USD', 'EUR', 'JPY', 'GBP', 'AUD', 'SGD', 'CAD'];
 
 export default function CreateWorkspaceScreen() {
   const router = useRouter();
+  const { session } = useAuth();
   const [name, setName] = useState('');
   const [currency, setCurrency] = useState('PHP');
   const [loading, setLoading] = useState(false);
@@ -29,12 +30,11 @@ export default function CreateWorkspaceScreen() {
     if (!name.trim()) return;
     setLoading(true);
     try {
-      const { session } = await getSession();
       if (!session?.user?.id) throw new Error('Not authenticated');
-      const workspace = await createWorkspace(session.user.id, name.trim(), currency);
+      await createWorkspace(session.user.id, name.trim(), currency);
       router.back();
     } catch (error: any) {
-      Alert.alert('Error', error.message);
+      Alert.alert('Error', error.message ?? 'Failed to create workspace');
       setLoading(false);
     }
   };
