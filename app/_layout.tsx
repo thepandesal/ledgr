@@ -35,7 +35,7 @@ export default function RootLayout() {
 
   if (!fontsLoaded || !ready) {
     return (
-      <View style={{ flex: 1, backgroundColor: '#1c1d1d', justifyContent: 'center', alignItems: 'center' }}>
+      <View style={{ flex: 1, backgroundColor: '#f5f5f5', justifyContent: 'center', alignItems: 'center' }}>
         <ActivityIndicator color="#00bf63" />
       </View>
     );
@@ -47,7 +47,7 @@ export default function RootLayout() {
         headerShown: false,
         animation: 'slide_from_right',
         animationDuration: 250,
-        contentStyle: { backgroundColor: '#1c1d1d' },
+        contentStyle: { backgroundColor: '#f5f5f5' },
       }}
     >
       <Stack.Screen name="index" options={{ animation: 'none' }} />

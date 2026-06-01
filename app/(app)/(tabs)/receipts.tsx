@@ -12,8 +12,8 @@ export default function ReceiptsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#1c1d1d' },
+  container: { flex: 1, backgroundColor: '#f5f5f5' },
   content: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
   emoji: { fontSize: 48 },
-  text: { fontFamily: 'DMSans_400Regular', fontSize: 18, color: 'rgba(255,255,255,0.6)' },
+  text: { fontFamily: 'DMSans_400Regular', fontSize: 18, color: '#8a8a8a' },
 });

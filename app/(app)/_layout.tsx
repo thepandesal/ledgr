@@ -6,7 +6,7 @@ export default function AppLayout() {
       screenOptions={{
         headerShown: false,
         animation: 'slide_from_right',
-        contentStyle: { backgroundColor: '#1c1d1d' },
+        contentStyle: { backgroundColor: '#f5f5f5' },
       }}
     >
       <Stack.Screen name="(tabs)" options={{ animation: 'none' }} />

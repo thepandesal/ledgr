@@ -46,11 +46,7 @@ export default function TabsLayout() {
     if (key === activeTabRef.current) return;
     activeTabRef.current = key;
     slideAnims[key].setValue(width);
-    Animated.timing(slideAnims[key], {
-      toValue: 0,
-      duration: 280,
-      useNativeDriver: false,
-    }).start();
+    Animated.timing(slideAnims[key], { toValue: 0, duration: 280, useNativeDriver: false }).start();
     setActiveTab(key);
   };
 
@@ -60,32 +56,20 @@ export default function TabsLayout() {
         {TABS.map(tab => (
           <Animated.View
             key={tab.key}
-            style={[
-              styles.screen,
-              {
-                transform: [{ translateX: slideAnims[tab.key] }],
-                zIndex: activeTab === tab.key ? 10 : 1,
-              },
-            ]}
+            style={[styles.screen, { transform: [{ translateX: slideAnims[tab.key] }], zIndex: activeTab === tab.key ? 10 : 1 }]}
             pointerEvents={activeTab === tab.key ? 'auto' : 'none'}
           >
             {SCREENS[tab.key]}
           </Animated.View>
         ))}
       </View>
-
       <SafeAreaView style={styles.navSafeArea}>
         <View style={styles.nav}>
           {TABS.map(tab => {
             const isActive = activeTab === tab.key;
             return (
-              <TouchableOpacity
-                key={tab.key}
-                style={styles.navItem}
-                onPress={() => switchTab(tab.key)}
-                activeOpacity={0.7}
-              >
-                <Ionicons name={tab.icon as any} size={22} color={isActive ? '#00bf63' : 'rgba(255,255,255,0.4)'} />
+              <TouchableOpacity key={tab.key} style={styles.navItem} onPress={() => switchTab(tab.key)} activeOpacity={0.7}>
+                <Ionicons name={tab.icon as any} size={22} color={isActive ? '#00bf63' : '#b0b0b0'} />
                 <Text style={[styles.navLabel, isActive && styles.navLabelActive]}>{tab.label}</Text>
               </TouchableOpacity>
             );
@@ -97,24 +81,12 @@ export default function TabsLayout() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#1c1d1d' },
+  container: { flex: 1, backgroundColor: '#f5f5f5' },
   content: { flex: 1, position: 'relative' },
-  screen: {
-    position: 'absolute',
-    top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: '#1c1d1d',
-  },
-  navSafeArea: {
-    backgroundColor: '#1c1d1d',
-    borderTopWidth: 1,
-    borderTopColor: '#2a2b2b',
-  },
-  nav: {
-    flexDirection: 'row',
-    paddingVertical: 10,
-    paddingBottom: 12,
-  },
+  screen: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#f5f5f5' },
+  navSafeArea: { backgroundColor: '#ffffff', borderTopWidth: 1, borderTopColor: '#e8e8e8' },
+  nav: { flexDirection: 'row', paddingVertical: 10, paddingBottom: 12 },
   navItem: { flex: 1, alignItems: 'center', gap: 4 },
-  navLabel: { fontFamily: 'DMSans_400Regular', fontSize: 10, color: 'rgba(255,255,255,0.4)' },
+  navLabel: { fontFamily: 'DMSans_400Regular', fontSize: 10, color: '#b0b0b0' },
   navLabelActive: { color: '#00bf63', fontFamily: 'DMSans_600SemiBold' },
 });

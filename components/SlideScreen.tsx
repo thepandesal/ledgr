@@ -48,7 +48,7 @@ export default function SlideScreen({ children }: { children: React.ReactNode })
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1c1d1d',
+    backgroundColor: '#f5f5f5',
     position: 'absolute',
     top: 0,
     left: 0,
