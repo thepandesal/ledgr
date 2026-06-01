@@ -40,12 +40,22 @@ export default function SpacesScreen() {
   const [selectedIcon, setSelectedIcon] = useState(ICONS[0]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [userId, setUserId] = useState('');
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) setUserName(user.user_metadata?.full_name ?? '');
+      if (user) {
+        setUserName(user.user_metadata?.full_name ?? '');
+        setUserId(user.id);
+        loadSpaces(user.id);
+      }
     });
   }, []);
+
+  const loadSpaces = async (uid: string) => {
+    const { data } = await supabase.from('spaces').select().eq('user_id', uid).order('created_at');
+    if (data) setSpaces(data);
+  };
 
   const openModal = () => {
     setSpaceName('');
@@ -55,16 +65,21 @@ export default function SpacesScreen() {
     setModalVisible(true);
   };
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (!spaceName.trim()) { setError('Name is required.'); return; }
     setLoading(true);
-    const newSpace: Space = {
-      id: Date.now().toString(),
+    const { data, error: insertError } = await supabase.from('spaces').insert({
+      user_id: userId,
       name: spaceName.trim(),
       color: selectedColor,
       icon: selectedIcon,
-    };
-    setSpaces((prev) => [...prev, newSpace]);
+    }).select().single();
+    if (insertError) {
+      setError(insertError.message);
+      setLoading(false);
+      return;
+    }
+    setSpaces((prev) => [...prev, data]);
     setLoading(false);
     setModalVisible(false);
   };
