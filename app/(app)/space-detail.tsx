@@ -1,6 +1,6 @@
 import {
   View, Text, StyleSheet, TouchableOpacity, Modal, TextInput,
-  SafeAreaView, Animated, Dimensions, FlatList, ActivityIndicator, Alert,
+  SafeAreaView, Animated, Dimensions, FlatList, ActivityIndicator,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -31,6 +31,9 @@ export default function SpaceDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [dateInputVal, setDateInputVal] = useState('');
+  const [confirmModal, setConfirmModal] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState('');
+  const [pendingDeleteName, setPendingDeleteName] = useState('');
 
   useEffect(() => {
     Animated.timing(slideAnim, { toValue: 0, duration: 280, useNativeDriver: false }).start();
@@ -50,21 +53,15 @@ export default function SpaceDetailScreen() {
   };
 
   const handleDelete = (id: string, recName: string) => {
-    if (typeof window !== 'undefined') {
-      if (window.confirm(`Delete "${recName}"?`)) {
-        supabase.from('recordings').delete().eq('id', id).then(() => {
-          setRecordings(prev => prev.filter(r => r.id !== id));
-        });
-      }
-    } else {
-      Alert.alert('Delete Recording', `Delete "${recName}"?`, [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: async () => {
-          await supabase.from('recordings').delete().eq('id', id);
-          setRecordings(prev => prev.filter(r => r.id !== id));
-        }},
-      ]);
-    }
+    setPendingDeleteId(id);
+    setPendingDeleteName(recName);
+    setConfirmModal(true);
+  };
+
+  const confirmDelete = async () => {
+    await supabase.from('recordings').delete().eq('id', pendingDeleteId);
+    setRecordings(prev => prev.filter(r => r.id !== pendingDeleteId));
+    setConfirmModal(false);
   };
 
   const handleDateInputSubmit = () => {
@@ -211,6 +208,26 @@ export default function SpaceDetailScreen() {
           <Text style={styles.fabText}>add recording</Text>
         </TouchableOpacity>
       </SafeAreaView>
+
+      {/* Confirm Delete Modal */}
+      <Modal visible={confirmModal} transparent animationType="fade" onRequestClose={() => setConfirmModal(false)}>
+        <View style={styles.pickerOverlay}>
+          <View style={styles.pickerBox}>
+            <Text style={styles.pickerTitle}>delete recording</Text>
+            <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 14, color: '#8a8a8a', marginBottom: 4 }}>
+              Delete "{pendingDeleteName}"? This cannot be undone.
+            </Text>
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 8 }}>
+              <TouchableOpacity style={[styles.pickerBtn, { flex: 1, backgroundColor: '#f5f5f5' }]} onPress={() => setConfirmModal(false)}>
+                <Text style={[styles.pickerBtnText, { color: '#8a8a8a' }]}>cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.pickerBtn, { flex: 1, backgroundColor: '#e74c3c' }]} onPress={confirmDelete}>
+                <Text style={styles.pickerBtnText}>delete</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <Modal visible={showDatePicker} transparent animationType="fade" onRequestClose={() => setShowDatePicker(false)}>
         <TouchableOpacity style={styles.pickerOverlay} activeOpacity={1} onPress={() => setShowDatePicker(false)}>
