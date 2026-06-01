@@ -1,38 +1,66 @@
-import { View, Text, Image, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native';
-import { useRouter } from 'expo-router';
+import { View, Text, Image, TouchableOpacity, StyleSheet, SafeAreaView, ActivityIndicator } from 'react-native';
+import { createClient } from '@supabase/supabase-js';
+import { useState } from 'react';
+
+const supabase = createClient(
+  process.env.EXPO_PUBLIC_SUPABASE_URL!,
+  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 export default function LoginScreen() {
-  const router = useRouter();
+  const [loading, setLoading] = useState<'google' | 'apple' | null>(null);
+
+  const signIn = async (provider: 'google' | 'apple') => {
+    setLoading(provider);
+    await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo: typeof window !== 'undefined' ? `${window.location.origin}/spaces` : 'ledgr://spaces',
+      },
+    });
+    setLoading(null);
+  };
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.inner}>
-        <Image
-          source={require('../assets/logo.png')}
-          style={styles.logo}
-          resizeMode="contain"
-        />
+        <View style={styles.logoWrap}>
+          <Image
+            source={require('../assets/logo.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
+        </View>
 
         <Text style={styles.tagline}>
-          track your money{' '}
-          <Text style={styles.taglineBold}>the right way.</Text>
+          track your money <Text style={styles.taglineBold}>the right way.</Text>
         </Text>
 
         <View style={styles.buttons}>
           <TouchableOpacity
             style={styles.button}
             activeOpacity={0.8}
-            onPress={() => router.replace('/spaces')}
+            onPress={() => signIn('google')}
+            disabled={loading !== null}
           >
-            <Text style={styles.buttonText}>Continue with Google</Text>
+            {loading === 'google' ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.buttonText}>Continue with Google</Text>
+            )}
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.button}
             activeOpacity={0.8}
-            onPress={() => router.replace('/spaces')}
+            onPress={() => signIn('apple')}
+            disabled={loading !== null}
           >
-            <Text style={styles.buttonText}>Continue with Apple</Text>
+            {loading === 'apple' ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.buttonText}>Continue with Apple</Text>
+            )}
           </TouchableOpacity>
         </View>
       </View>
@@ -50,20 +78,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 24,
+    gap: 0,
+  },
+  logoWrap: {
+    width: '100%',
+    alignItems: 'center',
   },
   logo: {
     width: '90%',
-    height: undefined,
-    aspectRatio: 1,
-    marginBottom: 8,
+    height: 320,
   },
   tagline: {
     fontFamily: 'DMSans_400Regular',
     fontSize: 15,
     color: 'rgba(255,255,255,0.6)',
     textAlign: 'center',
-    marginTop: 8,
-    marginBottom: 24,
+    marginTop: 4,
+    marginBottom: 28,
   },
   taglineBold: {
     fontFamily: 'DMSans_700Bold',
