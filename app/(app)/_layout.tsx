@@ -15,14 +15,14 @@ export default function AppLayout() {
           backgroundColor: Colors.surface,
           borderTopColor: Colors.border,
           borderTopWidth: 1,
-          height: Platform.OS === 'web' ? 64 : 84,
-          paddingBottom: Platform.OS === 'web' ? 10 : 26,
+          height: Platform.OS === 'web' ? 75 : 95,
+          paddingBottom: Platform.OS === 'web' ? 14 : 32,
           paddingTop: 8,
         },
         tabBarLabelStyle: {
-          fontSize: 10,
+          fontSize: 9,
           fontFamily: Fonts.body,
-          marginTop: 2,
+          marginTop: 4,
         },
         tabBarIconStyle: {
           marginBottom: 0,

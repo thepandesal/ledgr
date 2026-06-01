@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,8 @@ import {
   FlatList,
   SafeAreaView,
   StatusBar,
+  Modal,
+  Animated,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -26,11 +28,17 @@ export default function WorkspacesScreen() {
   const { session } = useAuth();
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [loading, setLoading] = useState(true);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [selectedWorkspace, setSelectedWorkspace] = useState<Workspace | null>(null);
+  const [fadeAnim] = useState(new Animated.Value(0));
 
   const userInitial = session?.user?.email?.[0]?.toUpperCase() ?? '?';
 
   const load = () => {
-    if (!session?.user?.id) return;
+    if (!session?.user?.id) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     fetchWorkspaces(session.user.id)
       .then(setWorkspaces)
@@ -48,10 +56,41 @@ export default function WorkspacesScreen() {
     }, [session?.user?.id])
   );
 
+  const openModal = (workspace: Workspace) => {
+    setSelectedWorkspace(workspace);
+    setModalVisible(true);
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const closeModal = () => {
+    Animated.timing(fadeAnim, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      setModalVisible(false);
+      setSelectedWorkspace(null);
+    });
+  };
+
+  const handleEdit = () => {
+    closeModal();
+    // TODO: Navigate to edit workspace
+  };
+
+  const handleDelete = () => {
+    closeModal();
+    // TODO: Delete workspace
+  };
+
   const renderWorkspace = ({ item }: { item: Workspace }) => (
-    <TouchableOpacity 
-      style={styles.card} 
-      activeOpacity={0.7} 
+    <TouchableOpacity
+      style={styles.card}
+      activeOpacity={0.7}
       onPress={() => router.push(`/(app)/${item.id}?name=${item.name}&currency=${item.currency}` as any)}
     >
       <View style={styles.cardIcon}>
@@ -65,7 +104,12 @@ export default function WorkspacesScreen() {
           <Text style={styles.cardRole}>{item.role}</Text>
         </View>
       </View>
-      <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
+      <TouchableOpacity
+        style={styles.menuBtn}
+        onPress={() => openModal(item)}
+      >
+        <Ionicons name="ellipsis-vertical" size={18} color={Colors.textMuted} />
+      </TouchableOpacity>
     </TouchableOpacity>
   );
 
@@ -97,13 +141,49 @@ export default function WorkspacesScreen() {
       />
 
       {/* FAB */}
-      <TouchableOpacity 
-        style={styles.fab} 
-        activeOpacity={0.85} 
+      <TouchableOpacity
+        style={styles.fab}
+        activeOpacity={0.85}
         onPress={() => router.push('/(app)/create-workspace' as any)}
       >
         <Ionicons name="add" size={28} color={Colors.white} />
       </TouchableOpacity>
+
+      {/* Modal */}
+      <Modal
+        visible={modalVisible}
+        transparent
+        animationType="none"
+        onRequestClose={closeModal}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={closeModal}
+        >
+          <Animated.View
+            style={[
+              styles.modalContent,
+              { opacity: fadeAnim },
+            ]}
+          >
+            <TouchableOpacity
+              style={styles.modalOption}
+              onPress={handleEdit}
+            >
+              <Ionicons name="pencil-outline" size={18} color={Colors.text} />
+              <Text style={styles.modalOptionText}>Edit</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.modalOption, styles.modalOptionDelete]}
+              onPress={handleDelete}
+            >
+              <Ionicons name="trash-outline" size={18} color={Colors.error} />
+              <Text style={[styles.modalOptionText, styles.modalOptionTextDelete]}>Delete</Text>
+            </TouchableOpacity>
+          </Animated.View>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -196,6 +276,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.primary,
   },
+  menuBtn: {
+    padding: 8,
+  },
   empty: {
     flex: 1,
     alignItems: 'center',
@@ -229,5 +312,37 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 6,
     elevation: 6,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.lg,
+    overflow: 'hidden',
+    minWidth: 150,
+  },
+  modalOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    gap: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  modalOptionDelete: {
+    borderBottomWidth: 0,
+  },
+  modalOptionText: {
+    fontFamily: Fonts.body,
+    fontSize: 15,
+    color: Colors.text,
+  },
+  modalOptionTextDelete: {
+    color: Colors.error,
   },
 });
