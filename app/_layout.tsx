@@ -22,7 +22,10 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (!fontsLoaded) return;
+    let redirected = false;
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (redirected) return;
+      redirected = true;
       if (!session) {
         router.replace('/');
       } else if (!session.user.user_metadata?.full_name) {
