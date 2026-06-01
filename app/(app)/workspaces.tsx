@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Fonts, Spacing, BorderRadius } from '@/constants/theme';
 import { useAuth } from '@/hooks/useAuth';
 import { fetchWorkspaces, deleteWorkspace } from '@/services/db';
+import { getSupabaseClient } from '@/services/auth';
 
 interface Workspace {
   id: string;
@@ -100,9 +101,13 @@ export default function WorkspacesScreen() {
             style: 'destructive',
             onPress: async () => {
               try {
-                await deleteWorkspace(ws.id);
+                console.log('Deleting workspace:', ws.id);
+                const { error } = await getSupabaseClient().from('workspaces').delete().eq('id', ws.id);
+                console.log('Delete error:', error);
+                if (error) throw error;
                 load();
               } catch (e: any) {
+                console.error('Delete failed:', e);
                 Alert.alert('Error', e.message ?? 'Failed to delete workspace');
               }
             },
