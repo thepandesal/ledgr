@@ -141,7 +141,7 @@ export default function SpacesScreen() {
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scroll}>
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <Text style={styles.sectionTitle}>Spaces</Text>
         <View style={styles.grid}>
           {spaces.map(space => (
@@ -170,7 +170,7 @@ export default function SpacesScreen() {
       {/* Create Modal */}
       <Modal visible={createModal} transparent animationType="slide" onRequestClose={() => setCreateModal(false)}>
         <View style={styles.modalOverlay}>
-          <ScrollView contentContainerStyle={styles.modalScroll} keyboardShouldPersistTaps="handled">
+          <ScrollView contentContainerStyle={styles.modalScroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
             <View style={styles.modalContent}>
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>new space</Text>

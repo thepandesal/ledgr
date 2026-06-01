@@ -85,7 +85,7 @@ export default function AccountsScreen() {
         <Text style={styles.title}>Accounts</Text>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scroll}>
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.grid}>
           {accounts.map(account => (
             <View key={account.id} style={[styles.accountBtn, { backgroundColor: account.color }]}>

@@ -129,7 +129,7 @@ export default function AddRecordingScreen() {
           <View style={{ width: 32 }} />
         </View>
 
-        <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
           <Text style={styles.label}>recording name</Text>

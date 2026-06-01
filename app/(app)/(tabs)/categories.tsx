@@ -104,7 +104,7 @@ export default function CategoriesScreen() {
         <Text style={styles.title}>Categories</Text>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scroll}>
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.list}>
           {categories.map(cat => (
             <View key={cat.id} style={[styles.catBtn, { backgroundColor: cat.color }]}>
