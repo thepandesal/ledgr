@@ -1,22 +1,20 @@
 {
   "name": "ledgr",
   "version": "1.0.0",
-  "main": "index.ts",
+  "main": "expo-router/entry",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web"
+  },
   "dependencies": {
-    "@expo-google-fonts/elms-sans": "^0.4.1",
-    "@expo-google-fonts/playwrite-hu": "^0.4.1",
-    "@expo/vector-icons": "^15.1.1",
-    "@react-native-async-storage/async-storage": "^3.1.1",
+    "@expo/vector-icons": "^14.0.0",
     "@supabase/supabase-js": "^2.106.2",
     "expo": "~56.0.8",
-    "expo-auth-session": "~56.0.5",
-    "expo-camera": "~56.0.7",
-    "expo-constants": "~56.0.16",
     "expo-font": "~56.0.5",
-    "expo-image-picker": "~56.0.15",
     "expo-linking": "~56.0.13",
     "expo-router": "~56.2.8",
-    "expo-secure-store": "^13.0.2",
     "expo-splash-screen": "~56.0.10",
     "expo-status-bar": "~56.0.4",
     "expo-system-ui": "~56.0.5",
@@ -24,21 +22,14 @@
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.85.3",
-    "react-native-gesture-handler": "~2.31.1",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "4.25.2",
-    "react-native-url-polyfill": "^3.0.0",
-    "react-native-web": "^0.21.2"
+    "react-native-web": "^0.21.2",
+    "@expo-google-fonts/dm-sans": "^0.4.1"
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
     "typescript": "~6.0.3"
-  },
-  "scripts": {
-    "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
-    "web": "expo start --web"
   },
   "private": true
 }

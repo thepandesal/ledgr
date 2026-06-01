@@ -1,168 +1,88 @@
-import React, { useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  Image,
-  TouchableOpacity,
-  ActivityIndicator,
-  Alert,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { View, Text, Image, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Colors, Fonts, Spacing } from '@/constants/theme';
-import { useAuth } from '@/hooks/useAuth';
 
 export default function LoginScreen() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
-  const { session, isLoading, isSigningIn, signInWithGoogle, signInWithApple, error } = useAuth();
-
-  useEffect(() => {
-    if (session && !isLoading) {
-      router.replace('/(app)/workspaces');
-    }
-  }, [session, isLoading, router]);
-
-  const handleGoogleSignIn = async () => {
-    try {
-      await signInWithGoogle();
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Google sign-in failed';
-      Alert.alert('Sign-in Failed', errorMessage);
-    }
-  };
-
-  const handleAppleSignIn = async () => {
-    try {
-      await signInWithApple();
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Apple sign-in failed';
-      Alert.alert('Sign-in Failed', errorMessage);
-    }
-  };
-
-  if (isLoading) {
-    return (
-      <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
-        <ActivityIndicator size="large" color={Colors.primary} />
-      </View>
-    );
-  }
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
-      {/* Logo */}
-      <Image
-        source={require('../assets/logo.png')}
-        style={styles.logo}
-        resizeMode="contain"
-      />
+    <SafeAreaView style={styles.container}>
+      <View style={styles.inner}>
+        <Image
+          source={require('../assets/logo.png')}
+          style={styles.logo}
+          resizeMode="contain"
+        />
 
-      {/* Tagline */}
-      <Text style={styles.tagline}>Your finances, <Text style={styles.taglineAccent}>your way</Text></Text>
+        <Text style={styles.tagline}>
+          track your money{' '}
+          <Text style={styles.taglineBold}>the right way.</Text>
+        </Text>
 
-      {/* Error Message */}
-      {error && (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{error}</Text>
-        </View>
-      )}
-
-      {/* Buttons Container */}
-      <View style={styles.buttonsContainer}>
-        {/* Google Button */}
-        <TouchableOpacity
-          style={styles.button}
-          onPress={handleGoogleSignIn}
-          disabled={isSigningIn}
-          activeOpacity={0.8}
-        >
-          {isSigningIn ? (
-            <ActivityIndicator color={Colors.white} />
-          ) : (
+        <View style={styles.buttons}>
+          <TouchableOpacity
+            style={styles.button}
+            activeOpacity={0.8}
+            onPress={() => router.replace('/spaces')}
+          >
             <Text style={styles.buttonText}>Continue with Google</Text>
-          )}
-        </TouchableOpacity>
+          </TouchableOpacity>
 
-        {/* Apple Button */}
-        <TouchableOpacity
-          style={styles.button}
-          onPress={handleAppleSignIn}
-          disabled={isSigningIn}
-          activeOpacity={0.8}
-        >
-          {isSigningIn ? (
-            <ActivityIndicator color={Colors.white} />
-          ) : (
+          <TouchableOpacity
+            style={styles.button}
+            activeOpacity={0.8}
+            onPress={() => router.replace('/spaces')}
+          >
             <Text style={styles.buttonText}>Continue with Apple</Text>
-          )}
-        </TouchableOpacity>
+          </TouchableOpacity>
+        </View>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
-    justifyContent: 'center',
+    backgroundColor: '#1c1d1d',
+  },
+  inner: {
+    flex: 1,
     alignItems: 'center',
-    paddingHorizontal: Spacing.lg,
+    justifyContent: 'center',
+    paddingHorizontal: 24,
   },
   logo: {
-    width: '100%',
-    height: 300,
-    marginBottom: Spacing.sm,
+    width: '90%',
+    height: undefined,
+    aspectRatio: 1,
   },
   tagline: {
-    fontFamily: Fonts.header,
-    fontSize: 16,
-    fontWeight: '400',
-    color: Colors.text,
+    fontFamily: 'DMSans_400Regular',
+    fontSize: 15,
+    color: 'rgba(255,255,255,0.6)',
     textAlign: 'center',
-    marginBottom: Spacing.lg,
+    marginTop: 12,
+    marginBottom: 36,
   },
-  taglineAccent: {
-    color: Colors.primary,
+  taglineBold: {
+    fontFamily: 'DMSans_700Bold',
+    color: '#ffffff',
   },
-  buttonsContainer: {
+  buttons: {
     width: '100%',
-    gap: Spacing.md,
-    marginTop: 0,
+    gap: 12,
   },
   button: {
-    backgroundColor: Colors.authButton,
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.lg,
-    borderRadius: 50,
-    justifyContent: 'center',
+    backgroundColor: '#2a2b2b',
+    borderRadius: 999,
+    paddingVertical: 15,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#3a3b3b',
   },
   buttonText: {
-    fontFamily: Fonts.bodySemiBold,
-    fontSize: 16,
-    color: Colors.white,
-    fontWeight: '600',
-  },
-  errorContainer: {
-    backgroundColor: Colors.error,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: 8,
-    marginBottom: Spacing.lg,
-    width: '100%',
-  },
-  errorText: {
-    fontFamily: Fonts.body,
-    fontSize: 14,
-    color: Colors.white,
-    textAlign: 'center',
+    fontFamily: 'DMSans_600SemiBold',
+    fontSize: 15,
+    color: '#ffffff',
   },
 });

@@ -6,40 +6,14 @@
     "orientation": "portrait",
     "icon": "./assets/logo.png",
     "scheme": "ledgr",
-    "userInterfaceStyle": "automatic",
-    "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.ledgr.app"
-    },
-    "android": {
-      "adaptiveIcon": {
-        "backgroundColor": "#00bf63",
-        "foregroundImage": "./assets/logo.png"
-      },
-      "package": "com.ledgr.app"
-    },
+    "userInterfaceStyle": "dark",
     "web": {
       "favicon": "./assets/logo.png",
       "bundler": "metro"
     },
     "plugins": [
       "expo-router",
-      "expo-status-bar",
-      "expo-web-browser",
-      "expo-font",
-      "expo-splash-screen",
-      [
-        "expo-camera",
-        {
-          "cameraPermission": "Allow Ledgr to access your camera for receipt capture."
-        }
-      ],
-      [
-        "expo-image-picker",
-        {
-          "photosPermission": "Allow Ledgr to access your photos for receipt upload."
-        }
-      ]
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true
