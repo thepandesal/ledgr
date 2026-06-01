@@ -1,18 +1,23 @@
 import { Animated, Dimensions, StyleSheet } from 'react-native';
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
+import { useFocusEffect } from 'expo-router';
+import { useCallback } from 'react';
 
 const { width } = Dimensions.get('window');
 
 export default function SlideScreen({ children }: { children: React.ReactNode }) {
   const slideAnim = useRef(new Animated.Value(width)).current;
 
-  useEffect(() => {
-    Animated.timing(slideAnim, {
-      toValue: 0,
-      duration: 280,
-      useNativeDriver: false,
-    }).start();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      slideAnim.setValue(width);
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 280,
+        useNativeDriver: false,
+      }).start();
+    }, [])
+  );
 
   return (
     <Animated.View style={[styles.container, { transform: [{ translateX: slideAnim }] }]}>
