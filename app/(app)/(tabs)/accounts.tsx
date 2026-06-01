@@ -2,14 +2,9 @@ import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView,
   Modal, TextInput, ActivityIndicator, Alert, Animated,
 } from 'react-native';
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '../../../src/lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
-
-const supabase = createClient(
-  process.env.EXPO_PUBLIC_SUPABASE_URL!,
-  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!
-);
 
 const PASTEL_COLORS = [
   '#FFB3B3', '#FFD9B3', '#FFFAB3', '#B3FFB3', '#B3FFE0',

@@ -1,13 +1,8 @@
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '../src/lib/supabase';
 import SlideScreen from '../components/SlideScreen';
-
-const supabase = createClient(
-  process.env.EXPO_PUBLIC_SUPABASE_URL!,
-  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!
-);
 
 export default function OnboardingScreen() {
   const router = useRouter();
