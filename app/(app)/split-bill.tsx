@@ -79,7 +79,12 @@ export default function SplitBillScreen() {
   const handlePersonInput = (val: string) => {
     setNewPerson(val);
     if (val.trim()) {
-      setPersonSuggestions(allContacts.filter(c => c.toLowerCase().includes(val.toLowerCase()) && !people.some(p => p.name === c)));
+      setPersonSuggestions(
+        allContacts.filter(c =>
+          c.toLowerCase().includes(val.toLowerCase()) &&
+          !people.some(p => p.name.toLowerCase() === c.toLowerCase())
+        )
+      );
     } else {
       setPersonSuggestions([]);
     }
@@ -105,6 +110,9 @@ export default function SplitBillScreen() {
 
   const addItem = async () => {
     if (!newItemName.trim() || !newItemAmount) return;
+    const itemAmt = parseFloat(newItemAmount);
+    if (isNaN(itemAmt) || itemAmt <= 0) return;
+    if (itemAmt > available) return;
     const sid = await ensureSplit();
     const { data } = await supabase.from('bill_split_items').insert({ split_id: sid, name: toTitleCase(newItemName), amount: parseFloat(newItemAmount) }).select('id, name, amount').single();
     if (data) setItems(prev => [...prev, { id: data.id, name: data.name, amount: String(data.amount), assignments: [] }]);
@@ -157,6 +165,8 @@ export default function SplitBillScreen() {
   });
 
   const unassignedTotal = items.reduce((sum, item) => sum + (item.assignments.length === 0 ? parseFloat(item.amount) : 0), 0);
+  const itemsTotal = items.reduce((sum, item) => sum + parseFloat(item.amount), 0);
+  const available = parseFloat(amount) - itemsTotal;
 
   return (
     <Animated.View style={[styles.container, { transform: [{ translateX: slideAnim }] }]}>
@@ -222,7 +232,12 @@ export default function SplitBillScreen() {
             )}
 
             {/* Items */}
-            <Text style={styles.sectionTitle}>items</Text>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>items</Text>
+              <Text style={[styles.availableText, available < 0 && { color: '#e74c3c' }]}>
+                {available >= 0 ? `${available.toLocaleString('en-US', { minimumFractionDigits: 2 })} available` : `over by ${Math.abs(available).toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+              </Text>
+            </View>
             {items.map((item, idx) => {
               const assignedNames = people.filter(p => item.assignments.includes(p.id)).map(p => p.name);
               return (
@@ -245,7 +260,7 @@ export default function SplitBillScreen() {
             <View style={styles.addRow}>
               <TextInput style={[styles.input, { flex: 2 }]} placeholder="item name" placeholderTextColor="#b0b0b0" value={newItemName} onChangeText={setNewItemName} />
               <TextInput style={[styles.input, { flex: 1, marginLeft: 8 }]} placeholder="amount" placeholderTextColor="#b0b0b0" value={newItemAmount} onChangeText={setNewItemAmount} keyboardType="decimal-pad" />
-              <TouchableOpacity style={styles.addBtn} onPress={addItem}>
+              <TouchableOpacity style={[styles.addBtn, (available <= 0 || !newItemName.trim() || !newItemAmount) && styles.addBtnDisabled]} onPress={addItem} disabled={available <= 0 || !newItemName.trim() || !newItemAmount}>
                 <Ionicons name="add" size={20} color="#fff" />
               </TouchableOpacity>
             </View>
@@ -335,6 +350,9 @@ const styles = StyleSheet.create({
   totalLabel: { fontFamily: 'DMSans_400Regular', fontSize: 12, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: 0.5 },
   totalAmount: { fontFamily: 'DMSans_700Bold', fontSize: 28, color: '#ffffff', marginTop: 4 },
   sectionTitle: { fontFamily: 'DMSans_700Bold', fontSize: 14, color: '#1c1d1d', marginTop: 8, marginBottom: 4 },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8, marginBottom: 4 },
+  availableText: { fontFamily: 'DMSans_600SemiBold', fontSize: 13, color: '#00bf63' },
+  addBtnDisabled: { opacity: 0.4 },
   peopleRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
   personChip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#ffffff', borderRadius: 999, paddingVertical: 6, paddingHorizontal: 12, borderWidth: 1, borderColor: '#e8e8e8' },
   personChipText: { fontFamily: 'DMSans_600SemiBold', fontSize: 13, color: '#1c1d1d' },
