@@ -5,12 +5,14 @@ import SpacesScreen from './spaces';
 import AccountsScreen from './accounts';
 import BillSplitScreen from './bill-split';
 import ReceiptsScreen from './receipts';
+import CategoriesScreen from './categories';
 
 const { width } = Dimensions.get('window');
 
 const TABS = [
   { key: 'spaces', label: 'Spaces', icon: 'grid' },
   { key: 'accounts', label: 'Accounts', icon: 'wallet-outline' },
+  { key: 'categories', label: 'Categories', icon: 'pricetag-outline' },
   { key: 'bill-split', label: 'Bill Split', icon: 'people-outline' },
   { key: 'receipts', label: 'Receipts', icon: 'receipt-outline' },
 ];
@@ -19,12 +21,14 @@ const MemoSpaces = memo(SpacesScreen);
 const MemoAccounts = memo(AccountsScreen);
 const MemoBillSplit = memo(BillSplitScreen);
 const MemoReceipts = memo(ReceiptsScreen);
+const MemoCategories = memo(CategoriesScreen);
 
 const SCREENS: Record<string, React.ReactNode> = {
   spaces: <MemoSpaces />,
   accounts: <MemoAccounts />,
   'bill-split': <MemoBillSplit />,
   receipts: <MemoReceipts />,
+  categories: <MemoCategories />,
 };
 
 export default function TabsLayout() {
@@ -33,6 +37,7 @@ export default function TabsLayout() {
   const slideAnims = useRef<Record<string, Animated.Value>>({
     spaces: new Animated.Value(0),
     accounts: new Animated.Value(width),
+    categories: new Animated.Value(width),
     'bill-split': new Animated.Value(width),
     receipts: new Animated.Value(width),
   }).current;

@@ -28,6 +28,14 @@ interface Space {
   name: string;
   color: string;
   icon: string;
+  default_category_id?: string;
+}
+
+interface Category {
+  id: string;
+  name: string;
+  color: string;
+  icon: string;
 }
 
 export default function SpacesScreen() {
@@ -41,6 +49,11 @@ export default function SpacesScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [userId, setUserId] = useState('');
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [useDefaultCategory, setUseDefaultCategory] = useState(false);
+  const [categoryInput, setCategoryInput] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+  const [categorySuggestions, setCategorySuggestions] = useState<Category[]>([]);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -48,6 +61,7 @@ export default function SpacesScreen() {
         setUserName(user.user_metadata?.full_name ?? '');
         setUserId(user.id);
         loadSpaces(user.id);
+        loadCategories(user.id);
       }
     });
   }, []);
@@ -57,12 +71,30 @@ export default function SpacesScreen() {
     if (data) setSpaces(data);
   };
 
+  const loadCategories = async (uid: string) => {
+    const { data } = await supabase.from('categories').select().eq('user_id', uid).order('name');
+    if (data) setCategories(data);
+  };
+
   const openModal = () => {
     setSpaceName('');
     setSelectedColor(PASTEL_COLORS[0]);
     setSelectedIcon(ICONS[0]);
     setError('');
+    setUseDefaultCategory(false);
+    setSelectedCategory(null);
+    setCategoryInput('');
     setModalVisible(true);
+  };
+
+  const handleCategoryInput = (val: string) => {
+    setCategoryInput(val);
+    setSelectedCategory(null);
+    if (val.trim()) {
+      setCategorySuggestions(categories.filter(c => c.name.toLowerCase().includes(val.toLowerCase())));
+    } else {
+      setCategorySuggestions([]);
+    }
   };
 
   const handleCreate = async () => {
@@ -73,6 +105,7 @@ export default function SpacesScreen() {
       name: spaceName.trim(),
       color: selectedColor,
       icon: selectedIcon,
+      default_category_id: useDefaultCategory && selectedCategory ? selectedCategory.id : null,
     }).select().single();
     if (insertError) {
       setError(insertError.message);
@@ -173,6 +206,58 @@ export default function SpacesScreen() {
               <Text style={styles.previewText}>{spaceName || 'my space'}</Text>
             </View>
 
+            <Text style={styles.label}>default category</Text>
+            <View style={styles.toggleRow}>
+              <Text style={styles.toggleLabel}>use a default category?</Text>
+              <TouchableOpacity
+                style={[styles.toggleBtn, useDefaultCategory && styles.toggleBtnActive]}
+                onPress={() => { setUseDefaultCategory(!useDefaultCategory); setSelectedCategory(null); setCategoryInput(''); }}
+              >
+                <Text style={[styles.toggleBtnText, useDefaultCategory && styles.toggleBtnTextActive]}>
+                  {useDefaultCategory ? 'yes' : 'no'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {useDefaultCategory && (
+              selectedCategory ? (
+                <View style={styles.bankBadgeRow}>
+                  <View style={[styles.bankBadge, { backgroundColor: selectedCategory.color }]}>
+                    <Ionicons name={selectedCategory.icon as any} size={14} color="#1c1d1d" />
+                    <Text style={styles.bankBadgeText}>{selectedCategory.name}</Text>
+                    <TouchableOpacity onPress={() => setSelectedCategory(null)} style={styles.bankBadgeX}>
+                      <Ionicons name="close" size={14} color="#1c1d1d" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ) : (
+                <>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="search categories..."
+                    placeholderTextColor="rgba(255,255,255,0.3)"
+                    value={categoryInput}
+                    onChangeText={handleCategoryInput}
+                  />
+                  {categorySuggestions.length > 0 && (
+                    <View style={styles.suggestions}>
+                      {categorySuggestions.map(c => (
+                        <TouchableOpacity key={c.id} style={styles.suggestion} onPress={() => { setSelectedCategory(c); setCategoryInput(''); setCategorySuggestions([]); }}>
+                          <View style={[styles.catDot, { backgroundColor: c.color }]}>
+                            <Ionicons name={c.icon as any} size={12} color="#1c1d1d" />
+                          </View>
+                          <Text style={styles.suggestionText}>{c.name}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+                  {categoryInput.trim() !== '' && categorySuggestions.length === 0 && (
+                    <Text style={styles.noResults}>no categories found</Text>
+                  )}
+                </>
+              )
+            )}
+
             <TouchableOpacity
               style={[styles.createBtn, !spaceName.trim() && styles.createBtnDisabled]}
               onPress={handleCreate}
@@ -242,4 +327,19 @@ const styles = StyleSheet.create({
   createBtn: { backgroundColor: '#00bf63', borderRadius: 999, paddingVertical: 15, alignItems: 'center', marginTop: 20 },
   createBtnDisabled: { opacity: 0.4 },
   createBtnText: { fontFamily: 'DMSans_600SemiBold', fontSize: 15, color: '#ffffff' },
+  toggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },
+  toggleLabel: { fontFamily: 'DMSans_400Regular', fontSize: 14, color: 'rgba(255,255,255,0.7)' },
+  toggleBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999, borderWidth: 1, borderColor: '#3a3b3b', backgroundColor: '#2a2b2b' },
+  toggleBtnActive: { backgroundColor: '#00bf63', borderColor: '#00bf63' },
+  toggleBtnText: { fontFamily: 'DMSans_600SemiBold', fontSize: 13, color: 'rgba(255,255,255,0.5)' },
+  toggleBtnTextActive: { color: '#ffffff' },
+  bankBadgeRow: { flexDirection: 'row', marginTop: 8 },
+  bankBadge: { flexDirection: 'row', alignItems: 'center', borderRadius: 999, paddingVertical: 8, paddingHorizontal: 14, gap: 6 },
+  bankBadgeText: { fontFamily: 'DMSans_600SemiBold', fontSize: 14, color: '#1c1d1d' },
+  bankBadgeX: { padding: 2 },
+  suggestions: { backgroundColor: '#2a2b2b', borderRadius: 12, marginTop: 4, overflow: 'hidden', borderWidth: 1, borderColor: '#3a3b3b' },
+  suggestion: { paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#3a3b3b', flexDirection: 'row', alignItems: 'center', gap: 10 },
+  suggestionText: { fontFamily: 'DMSans_400Regular', fontSize: 14, color: '#ffffff' },
+  catDot: { width: 24, height: 24, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+  noResults: { fontFamily: 'DMSans_400Regular', fontSize: 13, color: 'rgba(255,255,255,0.3)', marginTop: 8, textAlign: 'center' },
 });
