@@ -6,11 +6,6 @@ import AccountsScreen from './accounts';
 import BillSplitScreen from './bill-split';
 import ReceiptsScreen from './receipts';
 
-const MemoSpaces = memo(SpacesScreen);
-const MemoAccounts = memo(AccountsScreen);
-const MemoBillSplit = memo(BillSplitScreen);
-const MemoReceipts = memo(ReceiptsScreen);
-
 const { width } = Dimensions.get('window');
 
 const TABS = [
@@ -20,10 +15,21 @@ const TABS = [
   { key: 'receipts', label: 'Receipts', icon: 'receipt-outline' },
 ];
 
+const MemoSpaces = memo(SpacesScreen);
+const MemoAccounts = memo(AccountsScreen);
+const MemoBillSplit = memo(BillSplitScreen);
+const MemoReceipts = memo(ReceiptsScreen);
+
+const SCREENS: Record<string, React.ReactNode> = {
+  spaces: <MemoSpaces />,
+  accounts: <MemoAccounts />,
+  'bill-split': <MemoBillSplit />,
+  receipts: <MemoReceipts />,
+};
+
 export default function TabsLayout() {
   const [activeTab, setActiveTab] = useState('spaces');
   const activeTabRef = useRef('spaces');
-
   const slideAnims = useRef<Record<string, Animated.Value>>({
     spaces: new Animated.Value(0),
     accounts: new Animated.Value(width),
@@ -34,14 +40,12 @@ export default function TabsLayout() {
   const switchTab = (key: string) => {
     if (key === activeTabRef.current) return;
     activeTabRef.current = key;
-
     slideAnims[key].setValue(width);
     Animated.timing(slideAnims[key], {
       toValue: 0,
       duration: 280,
       useNativeDriver: false,
     }).start();
-
     setActiveTab(key);
   };
 
@@ -60,10 +64,7 @@ export default function TabsLayout() {
             ]}
             pointerEvents={activeTab === tab.key ? 'auto' : 'none'}
           >
-            {tab.key === 'spaces' && <MemoSpaces />}
-            {tab.key === 'accounts' && <MemoAccounts />}
-            {tab.key === 'bill-split' && <MemoBillSplit />}
-            {tab.key === 'receipts' && <MemoReceipts />}
+            {SCREENS[tab.key]}
           </Animated.View>
         ))}
       </View>
