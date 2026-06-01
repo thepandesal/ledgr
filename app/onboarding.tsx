@@ -30,9 +30,6 @@ export default function OnboardingScreen() {
       });
       if (updateError) throw updateError;
 
-      // Also upsert into profiles table
-      await supabase.from('profiles').upsert({ id: user.id, display_name: name.trim() });
-
       router.replace('/spaces');
     } catch (e: any) {
       setError(e.message ?? 'Something went wrong.');
