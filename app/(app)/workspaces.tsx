@@ -62,16 +62,16 @@ export default function WorkspacesScreen() {
     setModalVisible(true);
     Animated.timing(fadeAnim, {
       toValue: 1,
-      duration: 300,
-      useNativeDriver: true,
+      duration: 200,
+      useNativeDriver: false,
     }).start();
   };
 
   const closeModal = () => {
     Animated.timing(fadeAnim, {
       toValue: 0,
-      duration: 300,
-      useNativeDriver: true,
+      duration: 200,
+      useNativeDriver: false,
     }).start(() => {
       setModalVisible(false);
       setSelectedWorkspace(null);
@@ -86,27 +86,30 @@ export default function WorkspacesScreen() {
   };
 
   const handleDelete = () => {
-    closeModal();
     if (!selectedWorkspace) return;
-    Alert.alert(
-      'Delete Space',
-      `Are you sure you want to delete "${selectedWorkspace.name}"? This cannot be undone.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteWorkspace(selectedWorkspace.id);
-              load();
-            } catch (e: any) {
-              Alert.alert('Error', e.message ?? 'Failed to delete workspace');
-            }
+    const ws = selectedWorkspace;
+    closeModal();
+    setTimeout(() => {
+      Alert.alert(
+        'Delete Space',
+        `Are you sure you want to delete "${ws.name}"? This cannot be undone.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                await deleteWorkspace(ws.id);
+                load();
+              } catch (e: any) {
+                Alert.alert('Error', e.message ?? 'Failed to delete workspace');
+              }
+            },
           },
-        },
-      ]
-    );
+        ]
+      );
+    }, 300);
   };
 
   const renderWorkspace = ({ item }: { item: Workspace }) => (
