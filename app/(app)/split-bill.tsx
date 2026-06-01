@@ -9,6 +9,9 @@ import { supabase } from '../../src/lib/supabase';
 
 const { width } = Dimensions.get('window');
 
+const toTitleCase = (str: string) =>
+  str.trim().replace(/\w\S*/g, w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+
 export default function SplitBillScreen() {
   const { recordingId, recordingName, amount } = useLocalSearchParams<{ recordingId: string; recordingName: string; amount: string }>();
   const router = useRouter();
@@ -18,21 +21,31 @@ export default function SplitBillScreen() {
   const [people, setPeople] = useState<{ id: string; name: string }[]>([]);
   const [items, setItems] = useState<{ id: string; name: string; amount: string; assignments: string[] }[]>([]);
   const [newPerson, setNewPerson] = useState('');
+  const [personSuggestions, setPersonSuggestions] = useState<string[]>([]);
+  const [allContacts, setAllContacts] = useState<string[]>([]);
   const [newItemName, setNewItemName] = useState('');
   const [newItemAmount, setNewItemAmount] = useState('');
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [assignModal, setAssignModal] = useState(false);
   const [assigningItemIdx, setAssigningItemIdx] = useState(-1);
   const [deleteModal, setDeleteModal] = useState(false);
+  const [userId, setUserId] = useState('');
 
   useEffect(() => {
     Animated.timing(slideAnim, { toValue: 0, duration: 280, useNativeDriver: false }).start();
-    loadSplit();
+    init();
   }, []);
 
-  const loadSplit = async () => {
+  const init = async () => {
     setLoading(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      setUserId(user.id);
+      // Load contacts
+      const { data: contacts } = await supabase.from('contacts').select('name').eq('user_id', user.id).order('name');
+      if (contacts) setAllContacts(contacts.map((c: any) => c.name));
+    }
+    // Load existing split
     const { data: split } = await supabase.from('bill_splits').select('id').eq('recording_id', recordingId).single();
     if (split) {
       setSplitId(split.id);
@@ -57,12 +70,31 @@ export default function SplitBillScreen() {
     return data!.id;
   };
 
-  const addPerson = async () => {
-    if (!newPerson.trim()) return;
+  const saveContact = async (name: string) => {
+    if (!userId || allContacts.includes(name)) return;
+    await supabase.from('contacts').upsert({ user_id: userId, name }, { onConflict: 'name' });
+    setAllContacts(prev => [...prev, name].sort());
+  };
+
+  const handlePersonInput = (val: string) => {
+    setNewPerson(val);
+    if (val.trim()) {
+      setPersonSuggestions(allContacts.filter(c => c.toLowerCase().includes(val.toLowerCase()) && !people.some(p => p.name === c)));
+    } else {
+      setPersonSuggestions([]);
+    }
+  };
+
+  const addPerson = async (nameOverride?: string) => {
+    const raw = nameOverride ?? newPerson;
+    if (!raw.trim()) return;
+    const name = toTitleCase(raw);
     const sid = await ensureSplit();
-    const { data } = await supabase.from('bill_split_people').insert({ split_id: sid, name: newPerson.trim() }).select('id, name').single();
+    const { data } = await supabase.from('bill_split_people').insert({ split_id: sid, name }).select('id, name').single();
     if (data) setPeople(prev => [...prev, data]);
+    await saveContact(name);
     setNewPerson('');
+    setPersonSuggestions([]);
   };
 
   const removePerson = async (id: string) => {
@@ -74,7 +106,7 @@ export default function SplitBillScreen() {
   const addItem = async () => {
     if (!newItemName.trim() || !newItemAmount) return;
     const sid = await ensureSplit();
-    const { data } = await supabase.from('bill_split_items').insert({ split_id: sid, name: newItemName.trim(), amount: parseFloat(newItemAmount) }).select('id, name, amount').single();
+    const { data } = await supabase.from('bill_split_items').insert({ split_id: sid, name: toTitleCase(newItemName), amount: parseFloat(newItemAmount) }).select('id, name, amount').single();
     if (data) setItems(prev => [...prev, { id: data.id, name: data.name, amount: String(data.amount), assignments: [] }]);
     setNewItemName(''); setNewItemAmount('');
   };
@@ -114,7 +146,6 @@ export default function SplitBillScreen() {
     setSplitId(''); setPeople([]); setItems([]); setDeleteModal(false);
   };
 
-  // Breakdown calculation
   const breakdown = people.map(person => {
     let total = 0;
     items.forEach(item => {
@@ -125,7 +156,6 @@ export default function SplitBillScreen() {
     return { ...person, total };
   });
 
-  const assignedTotal = items.reduce((sum, item) => sum + (item.assignments.length > 0 ? parseFloat(item.amount) : 0), 0);
   const unassignedTotal = items.reduce((sum, item) => sum + (item.assignments.length === 0 ? parseFloat(item.amount) : 0), 0);
 
   return (
@@ -149,7 +179,6 @@ export default function SplitBillScreen() {
         {loading ? <ActivityIndicator color="#00bf63" style={{ marginTop: 40 }} /> : (
           <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
-            {/* Total */}
             <View style={styles.totalCard}>
               <Text style={styles.totalLabel}>total amount</Text>
               <Text style={styles.totalAmount}>{parseFloat(amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
@@ -168,11 +197,29 @@ export default function SplitBillScreen() {
               ))}
             </View>
             <View style={styles.addRow}>
-              <TextInput style={[styles.input, { flex: 1 }]} placeholder="add a person..." placeholderTextColor="#b0b0b0" value={newPerson} onChangeText={setNewPerson} returnKeyType="done" onSubmitEditing={addPerson} />
-              <TouchableOpacity style={styles.addBtn} onPress={addPerson}>
+              <TextInput
+                style={[styles.input, { flex: 1 }]}
+                placeholder="add a person..."
+                placeholderTextColor="#b0b0b0"
+                value={newPerson}
+                onChangeText={handlePersonInput}
+                returnKeyType="done"
+                onSubmitEditing={() => addPerson()}
+              />
+              <TouchableOpacity style={styles.addBtn} onPress={() => addPerson()}>
                 <Ionicons name="add" size={20} color="#fff" />
               </TouchableOpacity>
             </View>
+            {personSuggestions.length > 0 && (
+              <View style={styles.suggestions}>
+                {personSuggestions.map(s => (
+                  <TouchableOpacity key={s} style={styles.suggestion} onPress={() => addPerson(s)}>
+                    <Ionicons name="person-outline" size={14} color="#8a8a8a" />
+                    <Text style={styles.suggestionText}>{s}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
 
             {/* Items */}
             <Text style={styles.sectionTitle}>items</Text>
@@ -232,9 +279,7 @@ export default function SplitBillScreen() {
       <Modal visible={assignModal} transparent animationType="fade" onRequestClose={() => setAssignModal(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
-            <Text style={styles.modalTitle}>
-              {assigningItemIdx >= 0 ? items[assigningItemIdx]?.name : ''}
-            </Text>
+            <Text style={styles.modalTitle}>{assigningItemIdx >= 0 ? items[assigningItemIdx]?.name : ''}</Text>
             <Text style={styles.modalSub}>who does this belong to?</Text>
             <TouchableOpacity style={styles.assignAllBtn} onPress={assignAll}>
               <Text style={styles.assignAllText}>assign to everyone</Text>
@@ -242,7 +287,7 @@ export default function SplitBillScreen() {
             {people.map(p => {
               const isAssigned = assigningItemIdx >= 0 && items[assigningItemIdx]?.assignments.includes(p.id);
               return (
-                <TouchableOpacity key={p.id} style={[styles.personRow, isAssigned && styles.personRowActive]} onPress={() => toggleAssign(p.id)}>
+                <TouchableOpacity key={p.id} style={styles.personRow} onPress={() => toggleAssign(p.id)}>
                   <Text style={[styles.personRowText, isAssigned && styles.personRowTextActive]}>{p.name}</Text>
                   {isAssigned && <Ionicons name="checkmark" size={18} color="#00bf63" />}
                 </TouchableOpacity>
@@ -255,7 +300,7 @@ export default function SplitBillScreen() {
         </View>
       </Modal>
 
-      {/* Delete Confirm Modal */}
+      {/* Delete Modal */}
       <Modal visible={deleteModal} transparent animationType="fade" onRequestClose={() => setDeleteModal(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
@@ -296,6 +341,9 @@ const styles = StyleSheet.create({
   addRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   input: { backgroundColor: '#ffffff', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontFamily: 'DMSans_400Regular', fontSize: 14, color: '#1c1d1d', borderWidth: 1, borderColor: '#e8e8e8' },
   addBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#00bf63', justifyContent: 'center', alignItems: 'center' },
+  suggestions: { backgroundColor: '#ffffff', borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: '#e8e8e8' },
+  suggestion: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#f5f5f5' },
+  suggestionText: { fontFamily: 'DMSans_400Regular', fontSize: 14, color: '#1c1d1d' },
   itemCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ffffff', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: '#e8e8e8' },
   itemLeft: { flex: 1 },
   itemName: { fontFamily: 'DMSans_600SemiBold', fontSize: 14, color: '#1c1d1d' },
@@ -316,7 +364,6 @@ const styles = StyleSheet.create({
   assignAllBtn: { backgroundColor: '#f0fdf4', borderRadius: 10, paddingVertical: 10, alignItems: 'center', borderWidth: 1, borderColor: '#00bf63' },
   assignAllText: { fontFamily: 'DMSans_600SemiBold', fontSize: 13, color: '#00bf63' },
   personRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#f5f5f5' },
-  personRowActive: { },
   personRowText: { fontFamily: 'DMSans_400Regular', fontSize: 15, color: '#1c1d1d' },
   personRowTextActive: { fontFamily: 'DMSans_600SemiBold', color: '#00bf63' },
   doneBtn: { backgroundColor: '#00bf63', borderRadius: 999, paddingVertical: 12, alignItems: 'center', marginTop: 4 },
