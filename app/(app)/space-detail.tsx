@@ -1,5 +1,5 @@
 import {
-  View, Text, StyleSheet, TouchableOpacity, ScrollView,
+  View, Text, StyleSheet, TouchableOpacity, Modal, TextInput,
   SafeAreaView, Animated, Dimensions, FlatList, ActivityIndicator,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -11,8 +11,6 @@ const { width } = Dimensions.get('window');
 
 type ViewMode = 'daily' | 'weekly' | 'monthly';
 
-const RECORDING_TYPES = ['expense', 'income', 'savings', 'receivable', 'payable'];
-
 const TYPE_CONFIG: Record<string, { color: string; sign: string; label: string }> = {
   expense:    { color: '#e74c3c', sign: '-', label: 'Expense' },
   income:     { color: '#00bf63', sign: '+', label: 'Income' },
@@ -20,10 +18,6 @@ const TYPE_CONFIG: Record<string, { color: string; sign: string; label: string }
   receivable: { color: '#e74c3c', sign: '-', label: 'Receivable' },
   payable:    { color: '#00bf63', sign: '+', label: 'Payable' },
 };
-
-function formatDate(date: Date) {
-  return date.toISOString().split('T')[0];
-}
 
 function addDays(date: Date, days: number) {
   const d = new Date(date);
@@ -44,6 +38,8 @@ export default function SpaceDetailScreen() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [recordings, setRecordings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [dateInputVal, setDateInputVal] = useState('');
 
   useEffect(() => {
     Animated.timing(slideAnim, { toValue: 0, duration: 280, useNativeDriver: false }).start();
@@ -68,10 +64,15 @@ export default function SpaceDetailScreen() {
     Animated.timing(slideAnim, { toValue: width, duration: 250, useNativeDriver: false }).start(() => router.back());
   };
 
-  // Daily view: today ± 3 days
-  const dailyDates = Array.from({ length: 7 }, (_, i) => addDays(selectedDate, i - 3));
+  const handleDateInputSubmit = () => {
+    const parsed = new Date(dateInputVal);
+    if (!isNaN(parsed.getTime())) {
+      setSelectedDate(parsed);
+      setShowDatePicker(false);
+      setDateInputVal('');
+    }
+  };
 
-  // Filter recordings for selected date (daily) or range
   const filteredRecordings = recordings.filter(r => {
     const rDate = new Date(r.transaction_date);
     if (viewMode === 'daily') return isSameDay(rDate, selectedDate);
@@ -100,7 +101,9 @@ export default function SpaceDetailScreen() {
           <View style={[styles.spaceTag, { backgroundColor: color ?? '#FFB3B3' }]}>
             <Text style={styles.spaceTagText}>{name}</Text>
           </View>
-          <View style={{ width: 32 }} />
+          <TouchableOpacity onPress={() => { setDateInputVal(''); setShowDatePicker(true); }} style={styles.calendarBtn}>
+            <Ionicons name="calendar-outline" size={20} color="rgba(255,255,255,0.6)" />
+          </TouchableOpacity>
         </View>
 
         {/* Summary */}
@@ -136,10 +139,10 @@ export default function SpaceDetailScreen() {
           ))}
         </View>
 
-        {/* Daily Date Picker */}
+        {/* Daily Date Chips */}
         {viewMode === 'daily' && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.datePicker}>
-            {dailyDates.map((date, i) => {
+          <View style={styles.dateChipsRow}>
+            {Array.from({ length: 7 }, (_, i) => addDays(selectedDate, i - 3)).map((date, i) => {
               const isSelected = isSameDay(date, selectedDate);
               const isToday = isSameDay(date, new Date());
               return (
@@ -158,10 +161,10 @@ export default function SpaceDetailScreen() {
                 </TouchableOpacity>
               );
             })}
-          </ScrollView>
+          </View>
         )}
 
-        {/* Weekly/Monthly navigation */}
+        {/* Weekly/Monthly Nav */}
         {viewMode !== 'daily' && (
           <View style={styles.navRow}>
             <TouchableOpacity onPress={() => {
@@ -206,7 +209,7 @@ export default function SpaceDetailScreen() {
                         <Ionicons name={item.categories.icon} size={12} color="#1c1d1d" />
                       </View>
                     )}
-                    <View>
+                    <View style={{ flex: 1 }}>
                       <Text style={styles.recordingName}>{item.name}</Text>
                       <Text style={styles.recordingMeta}>
                         {cfg.label} · {new Date(item.transaction_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
@@ -229,7 +232,7 @@ export default function SpaceDetailScreen() {
           />
         )}
 
-        {/* Add Recording FAB */}
+        {/* FAB */}
         <TouchableOpacity
           style={styles.fab}
           onPress={() => router.push({ pathname: '/(app)/add-recording', params: { spaceId, spaceName: name } } as any)}
@@ -239,6 +242,28 @@ export default function SpaceDetailScreen() {
           <Text style={styles.fabText}>add recording</Text>
         </TouchableOpacity>
       </SafeAreaView>
+
+      {/* Date Picker Modal */}
+      <Modal visible={showDatePicker} transparent animationType="fade" onRequestClose={() => setShowDatePicker(false)}>
+        <TouchableOpacity style={styles.pickerOverlay} activeOpacity={1} onPress={() => setShowDatePicker(false)}>
+          <View style={styles.pickerBox}>
+            <Text style={styles.pickerTitle}>jump to date</Text>
+            <TextInput
+              style={styles.pickerInput}
+              placeholder="YYYY-MM-DD"
+              placeholderTextColor="rgba(255,255,255,0.3)"
+              value={dateInputVal}
+              onChangeText={setDateInputVal}
+              autoFocus
+              returnKeyType="go"
+              onSubmitEditing={handleDateInputSubmit}
+            />
+            <TouchableOpacity style={styles.pickerBtn} onPress={handleDateInputSubmit}>
+              <Text style={styles.pickerBtnText}>go</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </Animated.View>
   );
 }
@@ -248,6 +273,7 @@ const styles = StyleSheet.create({
   inner: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14 },
   backBtn: { width: 32 },
+  calendarBtn: { width: 32, alignItems: 'flex-end' },
   spaceTag: { borderRadius: 999, paddingHorizontal: 16, paddingVertical: 6 },
   spaceTagText: { fontFamily: 'DMSans_700Bold', fontSize: 14, color: '#1c1d1d' },
   summary: { flexDirection: 'row', marginHorizontal: 20, backgroundColor: '#242525', borderRadius: 16, padding: 16, marginBottom: 16 },
@@ -260,13 +286,13 @@ const styles = StyleSheet.create({
   viewTabActive: { backgroundColor: '#00bf63' },
   viewTabText: { fontFamily: 'DMSans_400Regular', fontSize: 13, color: 'rgba(255,255,255,0.4)' },
   viewTabTextActive: { fontFamily: 'DMSans_600SemiBold', color: '#fff' },
-  datePicker: { paddingHorizontal: 20, gap: 8, marginBottom: 12 },
-  dateChip: { alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, backgroundColor: '#242525', minWidth: 52 },
+  dateChipsRow: { flexDirection: 'row', paddingHorizontal: 20, marginBottom: 12, gap: 4 },
+  dateChip: { flex: 1, alignItems: 'center', paddingVertical: 6, borderRadius: 10, backgroundColor: '#242525' },
   dateChipSelected: { backgroundColor: '#00bf63' },
-  dateChipDay: { fontFamily: 'DMSans_400Regular', fontSize: 11, color: 'rgba(255,255,255,0.5)' },
-  dateChipNum: { fontFamily: 'DMSans_700Bold', fontSize: 18, color: '#fff' },
+  dateChipDay: { fontFamily: 'DMSans_400Regular', fontSize: 9, color: 'rgba(255,255,255,0.5)' },
+  dateChipNum: { fontFamily: 'DMSans_700Bold', fontSize: 14, color: '#fff' },
   dateChipTextSelected: { color: '#fff' },
-  todayDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: '#00bf63', marginTop: 2 },
+  todayDot: { width: 3, height: 3, borderRadius: 2, backgroundColor: '#00bf63', marginTop: 1 },
   todayDotSelected: { backgroundColor: '#fff' },
   navRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, marginBottom: 12 },
   navLabel: { fontFamily: 'DMSans_600SemiBold', fontSize: 14, color: '#fff' },
@@ -281,4 +307,10 @@ const styles = StyleSheet.create({
   emptyText: { fontFamily: 'DMSans_400Regular', fontSize: 14, color: 'rgba(255,255,255,0.3)' },
   fab: { position: 'absolute', bottom: 24, right: 20, backgroundColor: '#00bf63', borderRadius: 999, paddingVertical: 14, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', gap: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 8 },
   fabText: { fontFamily: 'DMSans_600SemiBold', fontSize: 14, color: '#fff' },
+  pickerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' },
+  pickerBox: { backgroundColor: '#242525', borderRadius: 20, padding: 24, width: '80%', gap: 12 },
+  pickerTitle: { fontFamily: 'DMSans_700Bold', fontSize: 16, color: '#fff', marginBottom: 4 },
+  pickerInput: { backgroundColor: '#2a2b2b', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, fontFamily: 'DMSans_400Regular', fontSize: 15, color: '#fff', borderWidth: 1, borderColor: '#3a3b3b' },
+  pickerBtn: { backgroundColor: '#00bf63', borderRadius: 999, paddingVertical: 12, alignItems: 'center' },
+  pickerBtnText: { fontFamily: 'DMSans_600SemiBold', fontSize: 14, color: '#fff' },
 });
