@@ -1,4 +1,4 @@
-import { Stack, useRouter, useSegments } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { useFonts, DMSans_400Regular, DMSans_500Medium, DMSans_600SemiBold, DMSans_700Bold } from '@expo-google-fonts/dm-sans';
 import { View, ActivityIndicator } from 'react-native';
 import { useEffect, useState } from 'react';
@@ -18,28 +18,20 @@ export default function RootLayout() {
   });
 
   const router = useRouter();
-  const segments = useSegments();
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
+    if (!fontsLoaded) return;
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!fontsLoaded) return;
-
       if (!session) {
         router.replace('/');
-        setReady(true);
-        return;
-      }
-
-      const name = session.user.user_metadata?.full_name;
-      if (!name) {
+      } else if (!session.user.user_metadata?.full_name) {
         router.replace('/onboarding');
       } else {
-        router.replace('/spaces');
+        router.replace('/(tabs)/spaces');
       }
       setReady(true);
     });
-
     return () => subscription.unsubscribe();
   }, [fontsLoaded]);
 
@@ -52,6 +44,18 @@ export default function RootLayout() {
   }
 
   return (
-    <Stack screenOptions={{ headerShown: false }} />
+    <Stack
+      screenOptions={{
+        headerShown: false,
+        animation: 'slide_from_right',
+        animationDuration: 250,
+        contentStyle: { backgroundColor: '#1c1d1d' },
+      }}
+    >
+      <Stack.Screen name="index" options={{ animation: 'none' }} />
+      <Stack.Screen name="onboarding" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="(tabs)" options={{ animation: 'none' }} />
+      <Stack.Screen name="space-detail" options={{ animation: 'slide_from_right' }} />
+    </Stack>
   );
 }

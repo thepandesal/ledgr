@@ -23,13 +23,6 @@ const ICONS = [
   'car-outline', 'musical-notes-outline',
 ];
 
-const NAV_ITEMS = [
-  { label: 'Spaces', icon: 'grid', route: '/spaces' },
-  { label: 'Accounts', icon: 'wallet-outline', route: '/cooking' },
-  { label: 'Bill Split', icon: 'people-outline', route: '/cooking' },
-  { label: 'Receipts', icon: 'receipt-outline', route: '/cooking' },
-];
-
 interface Space {
   id: string;
   name: string;
@@ -91,45 +84,25 @@ export default function SpacesScreen() {
       <ScrollView contentContainerStyle={styles.scroll}>
         <Text style={styles.sectionTitle}>Spaces</Text>
 
-        {/* Space list */}
-        <View style={styles.list}>
+        <View style={styles.grid}>
           {spaces.map((space) => (
             <TouchableOpacity
               key={space.id}
-              style={[styles.spaceBtn, { backgroundColor: space.color }]}
+              style={[styles.spaceCard, { backgroundColor: space.color }]}
               activeOpacity={0.8}
               onPress={() => router.push('/space-detail')}
             >
-              <Ionicons name={space.icon as any} size={16} color="#1c1d1d" style={{ marginRight: 8 }} />
-              <Text style={styles.spaceBtnText}>{space.name}</Text>
+              <Ionicons name={space.icon as any} size={20} color="#1c1d1d" />
+              <Text style={styles.spaceCardText}>{space.name}</Text>
             </TouchableOpacity>
           ))}
 
-          {/* Add a space */}
-          <TouchableOpacity style={styles.addBtn} activeOpacity={0.8} onPress={openModal}>
-            <Ionicons name="add" size={16} color="rgba(255,255,255,0.5)" style={{ marginRight: 6 }} />
-            <Text style={styles.addBtnText}>add a space</Text>
+          <TouchableOpacity style={styles.addCard} activeOpacity={0.8} onPress={openModal}>
+            <Ionicons name="add" size={24} color="rgba(255,255,255,0.4)" />
+            <Text style={styles.addCardText}>add a space</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
-
-      {/* Bottom Nav */}
-      <View style={styles.bottomNav}>
-        {NAV_ITEMS.map((item) => {
-          const isActive = item.route === '/spaces';
-          return (
-            <TouchableOpacity
-              key={item.label}
-              style={styles.navItem}
-              onPress={() => router.push(item.route as any)}
-              activeOpacity={0.7}
-            >
-              <Ionicons name={item.icon as any} size={22} color={isActive ? '#00bf63' : 'rgba(255,255,255,0.4)'} />
-              <Text style={[styles.navLabel, isActive && styles.navLabelActive]}>{item.label}</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
 
       {/* Create Space Modal */}
       <Modal visible={modalVisible} transparent animationType="slide" onRequestClose={() => setModalVisible(false)}>
@@ -142,7 +115,6 @@ export default function SpacesScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* Name */}
             <Text style={styles.label}>name</Text>
             <TextInput
               style={[styles.input, error ? styles.inputError : null]}
@@ -156,7 +128,6 @@ export default function SpacesScreen() {
             <Text style={styles.charCount}>{spaceName.length}/15</Text>
             {error ? <Text style={styles.error}>{error}</Text> : null}
 
-            {/* Color */}
             <Text style={styles.label}>color</Text>
             <View style={styles.colorRow}>
               {PASTEL_COLORS.map((color) => (
@@ -168,7 +139,6 @@ export default function SpacesScreen() {
               ))}
             </View>
 
-            {/* Icon */}
             <Text style={styles.label}>icon</Text>
             <View style={styles.iconRow}>
               {ICONS.map((icon) => (
@@ -182,10 +152,10 @@ export default function SpacesScreen() {
               ))}
             </View>
 
-            {/* Preview */}
+            <Text style={styles.label}>preview</Text>
             <View style={[styles.preview, { backgroundColor: selectedColor }]}>
-              <Ionicons name={selectedIcon as any} size={16} color="#1c1d1d" style={{ marginRight: 8 }} />
-              <Text style={styles.previewText}>{spaceName || 'preview'}</Text>
+              <Ionicons name={selectedIcon as any} size={20} color="#1c1d1d" />
+              <Text style={styles.previewText}>{spaceName || 'my space'}</Text>
             </View>
 
             <TouchableOpacity
@@ -205,114 +175,53 @@ export default function SpacesScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#1c1d1d' },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-  },
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16 },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  avatarFallback: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: '#2a2b2b',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  avatarFallback: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#2a2b2b', justifyContent: 'center', alignItems: 'center' },
   greeting: { fontFamily: 'DMSans_400Regular', fontSize: 16, color: 'rgba(255,255,255,0.6)' },
   greetingName: { fontFamily: 'DMSans_700Bold', color: '#ffffff' },
-  scroll: { paddingHorizontal: 20, paddingBottom: 100 },
+  scroll: { paddingHorizontal: 20, paddingBottom: 40 },
   sectionTitle: { fontFamily: 'DMSans_700Bold', fontSize: 22, color: '#ffffff', marginBottom: 16 },
-  list: { gap: 10 },
-  spaceBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 999,
-    paddingVertical: 14,
-    paddingHorizontal: 20,
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  spaceCard: {
+    width: '47%',
+    borderRadius: 16,
+    padding: 16,
+    minHeight: 100,
+    justifyContent: 'space-between',
   },
-  spaceBtnText: { fontFamily: 'DMSans_600SemiBold', fontSize: 15, color: '#1c1d1d' },
-  addBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  spaceCardText: { fontFamily: 'DMSans_700Bold', fontSize: 14, color: '#1c1d1d', marginTop: 8 },
+  addCard: {
+    width: '47%',
+    borderRadius: 16,
+    padding: 16,
+    minHeight: 100,
     justifyContent: 'center',
-    borderRadius: 999,
-    paddingVertical: 14,
-    paddingHorizontal: 20,
+    alignItems: 'center',
     backgroundColor: '#2a2b2b',
     borderWidth: 1,
     borderColor: '#3a3b3b',
+    gap: 6,
   },
-  addBtnText: { fontFamily: 'DMSans_400Regular', fontSize: 15, color: 'rgba(255,255,255,0.4)' },
-  bottomNav: {
-    flexDirection: 'row',
-    backgroundColor: '#1c1d1d',
-    borderTopWidth: 1,
-    borderTopColor: '#2a2b2b',
-    paddingVertical: 10,
-    paddingBottom: 16,
-  },
-  navItem: { flex: 1, alignItems: 'center', gap: 4 },
-  navLabel: { fontFamily: 'DMSans_400Regular', fontSize: 10, color: 'rgba(255,255,255,0.4)' },
-  navLabelActive: { color: '#00bf63', fontFamily: 'DMSans_600SemiBold' },
-
-  // Modal
+  addCardText: { fontFamily: 'DMSans_400Regular', fontSize: 12, color: 'rgba(255,255,255,0.4)' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
-  modalContent: {
-    backgroundColor: '#242525',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 24,
-    paddingBottom: 40,
-  },
+  modalContent: { backgroundColor: '#242525', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   modalTitle: { fontFamily: 'DMSans_700Bold', fontSize: 18, color: '#ffffff' },
-  label: { fontFamily: 'DMSans_600SemiBold', fontSize: 12, color: 'rgba(255,255,255,0.5)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
-  input: {
-    backgroundColor: '#2a2b2b',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 13,
-    fontFamily: 'DMSans_400Regular',
-    fontSize: 15,
-    color: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#3a3b3b',
-  },
+  label: { fontFamily: 'DMSans_600SemiBold', fontSize: 11, color: 'rgba(255,255,255,0.5)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 16 },
+  input: { backgroundColor: '#2a2b2b', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 13, fontFamily: 'DMSans_400Regular', fontSize: 15, color: '#ffffff', borderWidth: 1, borderColor: '#3a3b3b' },
   inputError: { borderColor: '#e74c3c' },
-  charCount: { fontFamily: 'DMSans_400Regular', fontSize: 11, color: 'rgba(255,255,255,0.3)', textAlign: 'right', marginTop: 4, marginBottom: 16 },
-  error: { fontFamily: 'DMSans_400Regular', fontSize: 13, color: '#e74c3c', marginBottom: 8 },
-  colorRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 20 },
+  charCount: { fontFamily: 'DMSans_400Regular', fontSize: 11, color: 'rgba(255,255,255,0.3)', textAlign: 'right', marginTop: 4 },
+  error: { fontFamily: 'DMSans_400Regular', fontSize: 13, color: '#e74c3c', marginTop: 4 },
+  colorRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   colorDot: { width: 30, height: 30, borderRadius: 15 },
   colorDotSelected: { borderWidth: 3, borderColor: '#ffffff' },
-  iconRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 20 },
-  iconBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: '#2a2b2b',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#3a3b3b',
-  },
+  iconRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  iconBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#2a2b2b', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#3a3b3b' },
   iconBtnSelected: { backgroundColor: '#ffffff', borderColor: '#ffffff' },
-  preview: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 999,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    marginBottom: 20,
-  },
-  previewText: { fontFamily: 'DMSans_600SemiBold', fontSize: 15, color: '#1c1d1d' },
-  createBtn: {
-    backgroundColor: '#00bf63',
-    borderRadius: 999,
-    paddingVertical: 15,
-    alignItems: 'center',
-  },
+  preview: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 16, padding: 16, marginTop: 4 },
+  previewText: { fontFamily: 'DMSans_700Bold', fontSize: 14, color: '#1c1d1d' },
+  createBtn: { backgroundColor: '#00bf63', borderRadius: 999, paddingVertical: 15, alignItems: 'center', marginTop: 20 },
   createBtnDisabled: { opacity: 0.4 },
   createBtnText: { fontFamily: 'DMSans_600SemiBold', fontSize: 15, color: '#ffffff' },
 });
