@@ -1,6 +1,6 @@
 import { View, TouchableOpacity, Text, StyleSheet, Animated, Dimensions, SafeAreaView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef } from 'react';
 import SpacesScreen from './spaces';
 import AccountsScreen from './accounts';
 import BillSplitScreen from './bill-split';
@@ -15,25 +15,10 @@ const TABS = [
   { key: 'receipts', label: 'Receipts', icon: 'receipt-outline' },
 ];
 
-function TabScreen({ children, isActive, slideAnim }: { children: React.ReactNode; isActive: boolean; slideAnim: Animated.Value }) {
-  return (
-    <Animated.View
-      style={[
-        styles.screen,
-        {
-          transform: [{ translateX: slideAnim }],
-          zIndex: isActive ? 10 : 0,
-          pointerEvents: isActive ? 'auto' : 'none',
-        } as any,
-      ]}
-    >
-      {children}
-    </Animated.View>
-  );
-}
-
 export default function TabsLayout() {
   const [activeTab, setActiveTab] = useState('spaces');
+  const activeTabRef = useRef('spaces');
+
   const slideAnims = useRef<Record<string, Animated.Value>>({
     spaces: new Animated.Value(0),
     accounts: new Animated.Value(width),
@@ -41,38 +26,43 @@ export default function TabsLayout() {
     receipts: new Animated.Value(width),
   }).current;
 
-  const switchTab = useCallback((key: string) => {
-    if (key === activeTab) return;
+  const switchTab = (key: string) => {
+    if (key === activeTabRef.current) return;
+    activeTabRef.current = key;
 
-    // Slide new tab in from right
     slideAnims[key].setValue(width);
     Animated.timing(slideAnims[key], {
       toValue: 0,
-      duration: 300,
+      duration: 280,
       useNativeDriver: false,
     }).start();
 
     setActiveTab(key);
-  }, [activeTab]);
+  };
 
   return (
     <View style={styles.container}>
       <View style={styles.content}>
-        <TabScreen isActive={activeTab === 'spaces'} slideAnim={slideAnims['spaces']}>
-          <SpacesScreen />
-        </TabScreen>
-        <TabScreen isActive={activeTab === 'accounts'} slideAnim={slideAnims['accounts']}>
-          <AccountsScreen />
-        </TabScreen>
-        <TabScreen isActive={activeTab === 'bill-split'} slideAnim={slideAnims['bill-split']}>
-          <BillSplitScreen />
-        </TabScreen>
-        <TabScreen isActive={activeTab === 'receipts'} slideAnim={slideAnims['receipts']}>
-          <ReceiptsScreen />
-        </TabScreen>
+        {TABS.map(tab => (
+          <Animated.View
+            key={tab.key}
+            style={[
+              styles.screen,
+              {
+                transform: [{ translateX: slideAnims[tab.key] }],
+                zIndex: activeTab === tab.key ? 10 : 1,
+              },
+            ]}
+            pointerEvents={activeTab === tab.key ? 'auto' : 'none'}
+          >
+            {tab.key === 'spaces' && <SpacesScreen />}
+            {tab.key === 'accounts' && <AccountsScreen />}
+            {tab.key === 'bill-split' && <BillSplitScreen />}
+            {tab.key === 'receipts' && <ReceiptsScreen />}
+          </Animated.View>
+        ))}
       </View>
 
-      {/* Custom Bottom Nav */}
       <SafeAreaView style={styles.navSafeArea}>
         <View style={styles.nav}>
           {TABS.map(tab => {
