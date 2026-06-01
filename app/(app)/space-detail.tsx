@@ -10,19 +10,11 @@ export default function SpaceDetailScreen() {
   const slideAnim = useRef(new Animated.Value(width)).current;
 
   useEffect(() => {
-    Animated.timing(slideAnim, {
-      toValue: 0,
-      duration: 280,
-      useNativeDriver: false,
-    }).start();
+    Animated.timing(slideAnim, { toValue: 0, duration: 280, useNativeDriver: false }).start();
   }, []);
 
   const handleBack = () => {
-    Animated.timing(slideAnim, {
-      toValue: width,
-      duration: 250,
-      useNativeDriver: false,
-    }).start(() => router.back());
+    Animated.timing(slideAnim, { toValue: width, duration: 250, useNativeDriver: false }).start(() => router.back());
   };
 
   return (
@@ -42,37 +34,11 @@ export default function SpaceDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#1c1d1d',
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-  },
+  container: { flex: 1, backgroundColor: '#1c1d1d', position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   inner: { flex: 1 },
-  backBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    padding: 20,
-  },
-  backText: {
-    fontFamily: 'DMSans_400Regular',
-    fontSize: 15,
-    color: 'rgba(255,255,255,0.7)',
-  },
-  content: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 12,
-  },
+  backBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, padding: 20 },
+  backText: { fontFamily: 'DMSans_400Regular', fontSize: 15, color: 'rgba(255,255,255,0.7)' },
+  content: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
   emoji: { fontSize: 48 },
-  text: {
-    fontFamily: 'DMSans_400Regular',
-    fontSize: 18,
-    color: 'rgba(255,255,255,0.6)',
-  },
+  text: { fontFamily: 'DMSans_400Regular', fontSize: 18, color: 'rgba(255,255,255,0.6)' },
 });

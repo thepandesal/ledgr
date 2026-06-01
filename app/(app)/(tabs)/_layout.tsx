@@ -11,15 +11,16 @@ export default function TabsLayout() {
           backgroundColor: '#1c1d1d',
           borderTopColor: '#2a2b2b',
           borderTopWidth: 1,
-          height: Platform.OS === 'web' ? 60 : 85,
-          paddingBottom: Platform.OS === 'web' ? 8 : 28,
-          paddingTop: 8,
+          height: Platform.OS === 'web' ? 72 : 90,
+          paddingBottom: Platform.OS === 'web' ? 14 : 30,
+          paddingTop: 10,
         },
         tabBarActiveTintColor: '#00bf63',
         tabBarInactiveTintColor: 'rgba(255,255,255,0.4)',
         tabBarLabelStyle: {
           fontFamily: 'DMSans_400Regular',
           fontSize: 10,
+          marginTop: 2,
         },
       }}
     >
