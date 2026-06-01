@@ -50,13 +50,21 @@ export default function SpaceDetailScreen() {
   };
 
   const handleDelete = (id: string, recName: string) => {
-    Alert.alert('Delete Recording', `Delete "${recName}"?`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: async () => {
-        await supabase.from('recordings').delete().eq('id', id);
-        setRecordings(prev => prev.filter(r => r.id !== id));
-      }},
-    ]);
+    if (typeof window !== 'undefined') {
+      if (window.confirm(`Delete "${recName}"?`)) {
+        supabase.from('recordings').delete().eq('id', id).then(() => {
+          setRecordings(prev => prev.filter(r => r.id !== id));
+        });
+      }
+    } else {
+      Alert.alert('Delete Recording', `Delete "${recName}"?`, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: async () => {
+          await supabase.from('recordings').delete().eq('id', id);
+          setRecordings(prev => prev.filter(r => r.id !== id));
+        }},
+      ]);
+    }
   };
 
   const handleDateInputSubmit = () => {
