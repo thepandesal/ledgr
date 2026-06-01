@@ -105,7 +105,7 @@ export default function SpacesScreen() {
               key={space.id}
               style={[styles.spaceCard, { backgroundColor: space.color }]}
               activeOpacity={0.8}
-              onPress={() => router.push('/space-detail')}
+              onPress={() => router.push({ pathname: '/(app)/space-detail', params: { name: space.name, color: space.color, icon: space.icon } })}
             >
               <Ionicons name={space.icon as any} size={20} color="#1c1d1d" />
               <Text style={styles.spaceCardText}>{space.name}</Text>

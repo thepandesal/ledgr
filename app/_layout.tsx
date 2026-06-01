@@ -28,7 +28,7 @@ export default function RootLayout() {
       } else if (!session.user.user_metadata?.full_name) {
         router.replace('/onboarding');
       } else {
-        router.replace('/(tabs)/spaces');
+        router.replace('/(app)/(tabs)/spaces');
       }
       setReady(true);
     });
@@ -54,8 +54,7 @@ export default function RootLayout() {
     >
       <Stack.Screen name="index" options={{ animation: 'none' }} />
       <Stack.Screen name="onboarding" options={{ animation: 'slide_from_right' }} />
-      <Stack.Screen name="(tabs)" options={{ animation: 'none' }} />
-      <Stack.Screen name="space-detail" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="(app)" options={{ animation: 'none' }} />
     </Stack>
   );
 }
