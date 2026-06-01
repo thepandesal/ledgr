@@ -30,8 +30,6 @@ export default function AddRecordingScreen() {
   const [amount, setAmount] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [notes, setNotes] = useState('');
-  const [categoryId, setCategoryId] = useState('');
-  const [accountId, setAccountId] = useState('');
   const [categories, setCategories] = useState<any[]>([]);
   const [accounts, setAccounts] = useState<any[]>([]);
   const [isRecurring, setIsRecurring] = useState(false);
@@ -40,6 +38,16 @@ export default function AddRecordingScreen() {
   const [recurringDate, setRecurringDate] = useState('1');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // Category picker
+  const [categoryInput, setCategoryInput] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<any>(null);
+  const [categorySuggestions, setCategorySuggestions] = useState<any[]>([]);
+
+  // Account picker
+  const [accountInput, setAccountInput] = useState('');
+  const [selectedAccount, setSelectedAccount] = useState<any>(null);
+  const [accountSuggestions, setAccountSuggestions] = useState<any[]>([]);
 
   const isLoanType = type === 'receivable' || type === 'payable';
 
@@ -63,6 +71,18 @@ export default function AddRecordingScreen() {
     Animated.timing(slideAnim, { toValue: width, duration: 250, useNativeDriver: false }).start(() => router.back());
   };
 
+  const handleCategoryInput = (val: string) => {
+    setCategoryInput(val);
+    setSelectedCategory(null);
+    setCategorySuggestions(val.trim() ? categories.filter(c => c.name.toLowerCase().includes(val.toLowerCase())) : []);
+  };
+
+  const handleAccountInput = (val: string) => {
+    setAccountInput(val);
+    setSelectedAccount(null);
+    setAccountSuggestions(val.trim() ? accounts.filter(a => a.account_name.toLowerCase().includes(val.toLowerCase())) : []);
+  };
+
   const handleSave = async () => {
     if (!recName.trim() || !amount) { setError('Name and amount are required.'); return; }
     setLoading(true);
@@ -77,8 +97,8 @@ export default function AddRecordingScreen() {
         amount: parseFloat(amount),
         transaction_date: date,
         notes: notes.trim() || null,
-        category_id: categoryId || null,
-        account_id: accountId || null,
+        category_id: selectedCategory?.id || null,
+        account_id: selectedAccount?.id || null,
         is_recurring: isLoanType ? isRecurring : false,
         recurring_frequency: isLoanType && isRecurring ? frequency : null,
         recurring_days: isLoanType && isRecurring && frequency === 'weekly' ? recurringDays : null,
@@ -112,12 +132,10 @@ export default function AddRecordingScreen() {
         <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
-          {/* Name */}
           <Text style={styles.label}>recording name</Text>
           <TextInput style={styles.input} placeholder="e.g. Grocery run" placeholderTextColor="rgba(255,255,255,0.3)"
             value={recName} onChangeText={setRecName} autoFocus />
 
-          {/* Type */}
           <Text style={styles.label}>type</Text>
           <View style={styles.typeRow}>
             {TYPES.map(t => (
@@ -132,60 +150,100 @@ export default function AddRecordingScreen() {
             ))}
           </View>
 
-          {/* Amount */}
           <Text style={styles.label}>amount</Text>
           <View style={styles.amountRow}>
-            <Text style={[styles.amountSign, { color: selectedType.color }]}>{selectedType.key === 'income' || selectedType.key === 'payable' ? '+' : '-'}</Text>
+            <Text style={[styles.amountSign, { color: selectedType.color }]}>
+              {selectedType.key === 'income' || selectedType.key === 'payable' ? '+' : '-'}
+            </Text>
             <TextInput style={[styles.input, styles.amountInput]} placeholder="0.00" placeholderTextColor="rgba(255,255,255,0.3)"
               value={amount} onChangeText={setAmount} keyboardType="decimal-pad" />
           </View>
 
-          {/* Date */}
           <Text style={styles.label}>transaction date</Text>
           <TextInput style={styles.input} placeholder="YYYY-MM-DD" placeholderTextColor="rgba(255,255,255,0.3)"
             value={date} onChangeText={setDate} />
 
-          {/* Category */}
-          {categories.length > 0 && (
-            <>
-              <Text style={styles.label}>category <Text style={styles.optional}>(optional)</Text></Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipScroll}>
-                <TouchableOpacity style={[styles.chip, !categoryId && styles.chipActive]} onPress={() => setCategoryId('')}>
-                  <Text style={[styles.chipText, !categoryId && styles.chipTextActive]}>none</Text>
+          {/* Category dropdown */}
+          <Text style={styles.label}>category <Text style={styles.optional}>(optional)</Text></Text>
+          {selectedCategory ? (
+            <View style={styles.badgeRow}>
+              <View style={[styles.badge, { backgroundColor: selectedCategory.color }]}>
+                <Ionicons name={selectedCategory.icon} size={14} color="#1c1d1d" />
+                <Text style={styles.badgeText}>{selectedCategory.name}</Text>
+                <TouchableOpacity onPress={() => { setSelectedCategory(null); setCategoryInput(''); }}>
+                  <Ionicons name="close" size={14} color="#1c1d1d" />
                 </TouchableOpacity>
-                {categories.map(c => (
-                  <TouchableOpacity key={c.id} style={[styles.chip, categoryId === c.id && { backgroundColor: c.color, borderColor: c.color }]} onPress={() => setCategoryId(c.id)}>
-                    <Ionicons name={c.icon} size={12} color={categoryId === c.id ? '#1c1d1d' : 'rgba(255,255,255,0.5)'} />
-                    <Text style={[styles.chipText, categoryId === c.id && { color: '#1c1d1d', fontFamily: 'DMSans_600SemiBold' }]}>{c.name}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
+              </View>
+            </View>
+          ) : (
+            <>
+              <TextInput
+                style={styles.input}
+                placeholder="search categories..."
+                placeholderTextColor="rgba(255,255,255,0.3)"
+                value={categoryInput}
+                onChangeText={handleCategoryInput}
+              />
+              {categorySuggestions.length > 0 && (
+                <View style={styles.dropdown}>
+                  {categorySuggestions.map(c => (
+                    <TouchableOpacity key={c.id} style={styles.dropdownItem}
+                      onPress={() => { setSelectedCategory(c); setCategoryInput(''); setCategorySuggestions([]); }}>
+                      <View style={[styles.catDot, { backgroundColor: c.color }]}>
+                        <Ionicons name={c.icon} size={12} color="#1c1d1d" />
+                      </View>
+                      <Text style={styles.dropdownText}>{c.name}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
             </>
           )}
 
-          {/* Account */}
-          {accounts.length > 0 && (
-            <>
-              <Text style={styles.label}>account <Text style={styles.optional}>(optional)</Text></Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipScroll}>
-                <TouchableOpacity style={[styles.chip, !accountId && styles.chipActive]} onPress={() => setAccountId('')}>
-                  <Text style={[styles.chipText, !accountId && styles.chipTextActive]}>none</Text>
+          {/* Account dropdown */}
+          <Text style={styles.label}>account <Text style={styles.optional}>(optional)</Text></Text>
+          {selectedAccount ? (
+            <View style={styles.badgeRow}>
+              <View style={[styles.accountBadge, { backgroundColor: selectedAccount.color }]}>
+                <View style={styles.accountBadgeInfo}>
+                  <Text style={styles.badgeText}>{selectedAccount.account_name}</Text>
+                  <Text style={styles.accountBadgeBank}>{selectedAccount.bank}</Text>
+                </View>
+                <TouchableOpacity onPress={() => { setSelectedAccount(null); setAccountInput(''); }}>
+                  <Ionicons name="close" size={14} color="#1c1d1d" />
                 </TouchableOpacity>
-                {accounts.map(a => (
-                  <TouchableOpacity key={a.id} style={[styles.chip, accountId === a.id && { backgroundColor: a.color, borderColor: a.color }]} onPress={() => setAccountId(a.id)}>
-                    <Text style={[styles.chipText, accountId === a.id && { color: '#1c1d1d', fontFamily: 'DMSans_600SemiBold' }]}>{a.account_name}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
+              </View>
+            </View>
+          ) : (
+            <>
+              <TextInput
+                style={styles.input}
+                placeholder="search accounts..."
+                placeholderTextColor="rgba(255,255,255,0.3)"
+                value={accountInput}
+                onChangeText={handleAccountInput}
+              />
+              {accountSuggestions.length > 0 && (
+                <View style={styles.dropdown}>
+                  {accountSuggestions.map(a => (
+                    <TouchableOpacity key={a.id} style={styles.dropdownItem}
+                      onPress={() => { setSelectedAccount(a); setAccountInput(''); setAccountSuggestions([]); }}>
+                      <View style={[styles.accountColorDot, { backgroundColor: a.color }]} />
+                      <View>
+                        <Text style={styles.dropdownText}>{a.account_name}</Text>
+                        <Text style={styles.dropdownSub}>{a.bank} · {a.account_type}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
             </>
           )}
 
-          {/* Notes */}
           <Text style={styles.label}>notes <Text style={styles.optional}>(optional)</Text></Text>
           <TextInput style={[styles.input, styles.textArea]} placeholder="add a note..." placeholderTextColor="rgba(255,255,255,0.3)"
             value={notes} onChangeText={setNotes} multiline numberOfLines={3} />
 
-          {/* Recurring (only for receivable/payable) */}
           {isLoanType && (
             <>
               <View style={styles.switchRow}>
@@ -266,7 +324,18 @@ const styles = StyleSheet.create({
   amountRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   amountSign: { fontFamily: 'DMSans_700Bold', fontSize: 24 },
   amountInput: { flex: 1 },
-  chipScroll: { gap: 8, paddingBottom: 4 },
+  dropdown: { backgroundColor: '#2a2b2b', borderRadius: 12, marginTop: 4, overflow: 'hidden', borderWidth: 1, borderColor: '#3a3b3b' },
+  dropdownItem: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#3a3b3b' },
+  dropdownText: { fontFamily: 'DMSans_400Regular', fontSize: 14, color: '#fff' },
+  dropdownSub: { fontFamily: 'DMSans_400Regular', fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 1 },
+  catDot: { width: 26, height: 26, borderRadius: 13, justifyContent: 'center', alignItems: 'center' },
+  accountColorDot: { width: 12, height: 12, borderRadius: 6 },
+  badgeRow: { flexDirection: 'row' },
+  badge: { flexDirection: 'row', alignItems: 'center', borderRadius: 999, paddingVertical: 8, paddingHorizontal: 14, gap: 8 },
+  badgeText: { fontFamily: 'DMSans_600SemiBold', fontSize: 14, color: '#1c1d1d' },
+  accountBadge: { flexDirection: 'row', alignItems: 'center', borderRadius: 14, paddingVertical: 10, paddingHorizontal: 16, gap: 10 },
+  accountBadgeInfo: { flex: 1 },
+  accountBadgeBank: { fontFamily: 'DMSans_400Regular', fontSize: 11, color: 'rgba(0,0,0,0.5)', marginTop: 2 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, borderWidth: 1, borderColor: '#3a3b3b', backgroundColor: '#242525' },
   chipActive: { backgroundColor: '#00bf63', borderColor: '#00bf63' },
