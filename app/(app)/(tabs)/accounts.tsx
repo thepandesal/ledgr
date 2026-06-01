@@ -5,7 +5,6 @@ import {
 import { createClient } from '@supabase/supabase-js';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
-import SlideScreen from '../../../components/SlideScreen';
 
 const supabase = createClient(
   process.env.EXPO_PUBLIC_SUPABASE_URL!,
@@ -228,8 +227,7 @@ export default function AccountsScreen() {
   );
 
   return (
-    <SlideScreen>
-      <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Accounts</Text>
       </View>
@@ -305,8 +303,7 @@ export default function AccountsScreen() {
           </Animated.View>
         </TouchableOpacity>
       </Modal>
-      </SafeAreaView>
-    </SlideScreen>
+    </SafeAreaView>
   );
 }
 

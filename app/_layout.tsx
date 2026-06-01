@@ -28,7 +28,7 @@ export default function RootLayout() {
       } else if (!session.user.user_metadata?.full_name) {
         router.replace('/onboarding');
       } else {
-        router.replace('/(app)/(tabs)/spaces');
+        router.replace('/(app)/(tabs)');
       }
       setReady(true);
     });
