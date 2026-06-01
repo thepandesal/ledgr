@@ -26,7 +26,9 @@ function addDays(date: Date, days: number) {
 }
 
 function isSameDay(a: Date, b: Date) {
-  return a.toDateString() === b.toDateString();
+  return a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate();
 }
 
 export default function SpaceDetailScreen() {
@@ -74,7 +76,8 @@ export default function SpaceDetailScreen() {
   };
 
   const filteredRecordings = recordings.filter(r => {
-    const rDate = new Date(r.transaction_date);
+    const parts = r.transaction_date.split('-');
+    const rDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
     if (viewMode === 'daily') return isSameDay(rDate, selectedDate);
     if (viewMode === 'weekly') {
       const start = addDays(selectedDate, -selectedDate.getDay());
