@@ -14,9 +14,9 @@ type ViewMode = 'daily' | 'weekly' | 'monthly';
 const TYPE_CONFIG: Record<string, { color: string; sign: string; label: string }> = {
   expense:    { color: '#e74c3c', sign: '-', label: 'Expense' },
   income:     { color: '#00bf63', sign: '+', label: 'Income' },
-  savings:    { color: '#3498db', sign: '-', label: 'Savings' },
-  receivable: { color: '#e74c3c', sign: '-', label: 'Receivable' },
-  payable:    { color: '#00bf63', sign: '+', label: 'Payable' },
+  savings:    { color: '#3498db', sign: '+', label: 'Savings' },
+  receivable: { color: '#00bf63', sign: '+', label: 'Receivable' },
+  payable:    { color: '#8a8a8a', sign: '⋯', label: 'Payable' },
 };
 
 function addDays(date: Date, days: number) {
@@ -87,8 +87,8 @@ export default function SpaceDetailScreen() {
     return true;
   });
 
-  const totalIncome = filteredRecordings.filter(r => ['income', 'payable'].includes(r.type)).reduce((s, r) => s + Number(r.amount), 0);
-  const totalExpense = filteredRecordings.filter(r => ['expense', 'savings', 'receivable'].includes(r.type)).reduce((s, r) => s + Number(r.amount), 0);
+  const totalIncome = filteredRecordings.filter(r => ['income', 'receivable', 'savings'].includes(r.type)).reduce((s, r) => s + Number(r.amount), 0);
+  const totalExpense = filteredRecordings.filter(r => ['expense'].includes(r.type)).reduce((s, r) => s + Number(r.amount), 0);
 
   return (
     <Animated.View style={[styles.container, { transform: [{ translateX: slideAnim }] }]}>

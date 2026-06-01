@@ -13,8 +13,8 @@ const TYPES = [
   { key: 'expense',    label: 'Expense',    color: '#e74c3c', icon: 'arrow-down-outline' },
   { key: 'income',     label: 'Income',     color: '#00bf63', icon: 'arrow-up-outline' },
   { key: 'savings',    label: 'Savings',    color: '#3498db', icon: 'save-outline' },
-  { key: 'receivable', label: 'Receivable', color: '#e74c3c', icon: 'arrow-undo-outline' },
-  { key: 'payable',    label: 'Payable',    color: '#00bf63', icon: 'arrow-redo-outline' },
+  { key: 'receivable', label: 'Receivable', color: '#00bf63', icon: 'arrow-undo-outline' },
+  { key: 'payable',    label: 'Payable',    color: '#8a8a8a', icon: 'ellipsis-horizontal-outline' },
 ];
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -153,7 +153,7 @@ export default function AddRecordingScreen() {
           <Text style={styles.label}>amount</Text>
           <View style={styles.amountRow}>
             <Text style={[styles.amountSign, { color: selectedType.color }]}>
-              {selectedType.key === 'income' || selectedType.key === 'payable' ? '+' : '-'}
+              {selectedType.key === 'expense' ? '-' : selectedType.key === 'payable' ? '⋯' : '+'}
             </Text>
             <TextInput style={[styles.input, styles.amountInput]} placeholder="0.00" placeholderTextColor="rgba(255,255,255,0.3)"
               value={amount} onChangeText={setAmount} keyboardType="decimal-pad" />
