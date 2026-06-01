@@ -55,14 +55,15 @@ const styles = StyleSheet.create({
     width: '90%',
     height: undefined,
     aspectRatio: 1,
+    marginBottom: 8,
   },
   tagline: {
     fontFamily: 'DMSans_400Regular',
     fontSize: 15,
     color: 'rgba(255,255,255,0.6)',
     textAlign: 'center',
-    marginTop: 12,
-    marginBottom: 36,
+    marginTop: 8,
+    marginBottom: 24,
   },
   taglineBold: {
     fontFamily: 'DMSans_700Bold',
