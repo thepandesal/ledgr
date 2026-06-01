@@ -6,6 +6,7 @@ import { useRouter } from 'expo-router';
 import { createClient } from '@supabase/supabase-js';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
+import SlideScreen from '../../../components/SlideScreen';
 
 const supabase = createClient(
   process.env.EXPO_PUBLIC_SUPABASE_URL!,
@@ -85,7 +86,8 @@ export default function SpacesScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SlideScreen>
+      <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
@@ -184,7 +186,8 @@ export default function SpacesScreen() {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+      </SafeAreaView>
+    </SlideScreen>
   );
 }
 
