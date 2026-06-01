@@ -1,10 +1,15 @@
 import { View, TouchableOpacity, Text, StyleSheet, Animated, Dimensions, SafeAreaView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useState, useRef } from 'react';
+import { useState, useRef, memo } from 'react';
 import SpacesScreen from './spaces';
 import AccountsScreen from './accounts';
 import BillSplitScreen from './bill-split';
 import ReceiptsScreen from './receipts';
+
+const MemoSpaces = memo(SpacesScreen);
+const MemoAccounts = memo(AccountsScreen);
+const MemoBillSplit = memo(BillSplitScreen);
+const MemoReceipts = memo(ReceiptsScreen);
 
 const { width } = Dimensions.get('window');
 
@@ -55,10 +60,10 @@ export default function TabsLayout() {
             ]}
             pointerEvents={activeTab === tab.key ? 'auto' : 'none'}
           >
-            {tab.key === 'spaces' && <SpacesScreen />}
-            {tab.key === 'accounts' && <AccountsScreen />}
-            {tab.key === 'bill-split' && <BillSplitScreen />}
-            {tab.key === 'receipts' && <ReceiptsScreen />}
+            {tab.key === 'spaces' && <MemoSpaces />}
+            {tab.key === 'accounts' && <MemoAccounts />}
+            {tab.key === 'bill-split' && <MemoBillSplit />}
+            {tab.key === 'receipts' && <MemoReceipts />}
           </Animated.View>
         ))}
       </View>
