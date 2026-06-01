@@ -49,7 +49,7 @@ export default function TabsLayout() {
     Animated.timing(slideAnims[key], {
       toValue: 0,
       duration: 300,
-      useNativeDriver: true,
+      useNativeDriver: false,
     }).start();
 
     setActiveTab(key);
