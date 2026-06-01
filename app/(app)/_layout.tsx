@@ -11,6 +11,7 @@ export default function AppLayout() {
     >
       <Stack.Screen name="(tabs)" options={{ animation: 'none' }} />
       <Stack.Screen name="space-detail" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="add-recording" options={{ animation: 'slide_from_right' }} />
     </Stack>
   );
 }

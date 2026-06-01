@@ -154,7 +154,7 @@ export default function SpacesScreen() {
               <TouchableOpacity
                 style={styles.spaceCardMain}
                 activeOpacity={0.8}
-                onPress={() => router.push({ pathname: '/(app)/space-detail', params: { name: space.name, color: space.color, icon: space.icon } })}
+                onPress={() => router.push({ pathname: '/(app)/space-detail', params: { spaceId: space.id, name: space.name, color: space.color } })}
               >
                 <Ionicons name={space.icon as any} size={16} color="#1c1d1d" />
                 <Text style={styles.spaceCardText} numberOfLines={1}>{space.name}</Text>
