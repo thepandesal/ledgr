@@ -60,8 +60,7 @@ export default function LoginScreen() {
       />
 
       {/* Tagline */}
-      <Text style={styles.tagline}>Your finances</Text>
-      <Text style={styles.taglineAccent}>your way</Text>
+      <Text style={styles.tagline}>Your finances, <Text style={styles.taglineAccent}>your way</Text></Text>
 
       {/* Error Message */}
       {error && (
@@ -123,15 +122,10 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     color: Colors.text,
     textAlign: 'center',
-    marginBottom: 0,
+    marginBottom: Spacing.lg,
   },
   taglineAccent: {
-    fontFamily: Fonts.header,
-    fontSize: 16,
-    fontWeight: '400',
     color: Colors.primary,
-    textAlign: 'center',
-    marginBottom: Spacing.lg,
   },
   buttonsContainer: {
     width: '100%',
