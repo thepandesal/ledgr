@@ -9,12 +9,13 @@ import {
   StatusBar,
   Modal,
   Animated,
+  Alert,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Fonts, Spacing, BorderRadius } from '@/constants/theme';
 import { useAuth } from '@/hooks/useAuth';
-import { fetchWorkspaces } from '@/services/db';
+import { fetchWorkspaces, deleteWorkspace } from '@/services/db';
 
 interface Workspace {
   id: string;
@@ -79,12 +80,33 @@ export default function WorkspacesScreen() {
 
   const handleEdit = () => {
     closeModal();
-    // TODO: Navigate to edit workspace
+    if (selectedWorkspace) {
+      router.push(`/(app)/${selectedWorkspace.id}/settings?name=${selectedWorkspace.name}&currency=${selectedWorkspace.currency}` as any);
+    }
   };
 
   const handleDelete = () => {
     closeModal();
-    // TODO: Delete workspace
+    if (!selectedWorkspace) return;
+    Alert.alert(
+      'Delete Space',
+      `Are you sure you want to delete "${selectedWorkspace.name}"? This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteWorkspace(selectedWorkspace.id);
+              load();
+            } catch (e: any) {
+              Alert.alert('Error', e.message ?? 'Failed to delete workspace');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const renderWorkspace = ({ item }: { item: Workspace }) => (
