@@ -28,6 +28,7 @@ export default function SpaceDetailScreen() {
   const [viewMode, setViewMode] = useState<ViewMode>('daily');
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [recordings, setRecordings] = useState<any[]>([]);
+  const [splitIds, setSplitIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [dateInputVal, setDateInputVal] = useState('');
@@ -44,7 +45,11 @@ export default function SpaceDetailScreen() {
   const loadRecordings = async () => {
     setLoading(true);
     const { data } = await supabase.from('recordings').select('*, categories(name, color, icon)').eq('space_id', spaceId).order('transaction_date', { ascending: false });
-    if (data) setRecordings(data);
+    if (data) {
+      setRecordings(data);
+      const { data: splits } = await supabase.from('bill_splits').select('recording_id').in('recording_id', data.map(r => r.id));
+      if (splits) setSplitIds(new Set(splits.map((s: any) => s.recording_id)));
+    }
     setLoading(false);
   };
 
@@ -187,9 +192,17 @@ export default function SpaceDetailScreen() {
                     <Text style={[styles.recordingAmount, { color: cfg.color }]}>
                       {cfg.sign}{Number(item.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </Text>
-                    <TouchableOpacity onPress={() => handleDelete(item.id, item.name)} style={styles.deleteBtn}>
-                      <Ionicons name="trash-outline" size={14} color="#e74c3c" />
-                    </TouchableOpacity>
+                    <View style={styles.recordingActions}>
+                      <TouchableOpacity
+                        onPress={() => router.push({ pathname: '/(app)/split-bill', params: { recordingId: item.id, recordingName: item.name, amount: item.amount } } as any)}
+                        style={styles.actionBtn}
+                      >
+                        <Ionicons name="people-outline" size={14} color={splitIds.has(item.id) ? '#00bf63' : '#b0b0b0'} />
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => handleDelete(item.id, item.name)} style={styles.actionBtn}>
+                        <Ionicons name="trash-outline" size={14} color="#e74c3c" />
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 </View>
               );
@@ -280,7 +293,8 @@ const styles = StyleSheet.create({
   recordingName: { fontFamily: 'DMSans_600SemiBold', fontSize: 14, color: '#1c1d1d' },
   recordingMeta: { fontFamily: 'DMSans_400Regular', fontSize: 11, color: '#b0b0b0', marginTop: 2 },
   recordingAmount: { fontFamily: 'DMSans_700Bold', fontSize: 15 },
-  deleteBtn: { padding: 2 },
+  recordingActions: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  actionBtn: { padding: 2 },
   empty: { alignItems: 'center', paddingTop: 60, gap: 10 },
   emptyText: { fontFamily: 'DMSans_400Regular', fontSize: 14, color: '#b0b0b0' },
   fab: { position: 'absolute', bottom: 24, right: 20, backgroundColor: '#00bf63', borderRadius: 999, paddingVertical: 14, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', gap: 8, shadowColor: '#00bf63', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 8 },
