@@ -1,6 +1,6 @@
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView,
-  TextInput, ActivityIndicator, Switch, Animated, Dimensions,
+  TextInput, ActivityIndicator, Switch, Animated, Dimensions, Modal,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,14 +21,16 @@ const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const FREQUENCIES = ['daily', 'weekly', 'monthly', 'yearly'];
 
 export default function AddRecordingScreen() {
-  const { spaceId, spaceName } = useLocalSearchParams<{ spaceId: string; spaceName: string }>();
+  const { spaceId, spaceName, defaultDate } = useLocalSearchParams<{ spaceId: string; spaceName: string; defaultDate: string }>();
   const router = useRouter();
   const slideAnim = useRef(new Animated.Value(width)).current;
 
   const [recName, setRecName] = useState('');
   const [type, setType] = useState('expense');
   const [amount, setAmount] = useState('');
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(defaultDate ?? new Date().toISOString().split('T')[0]);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [dateInputVal, setDateInputVal] = useState('');
   const [notes, setNotes] = useState('');
   const [categories, setCategories] = useState<any[]>([]);
   const [accounts, setAccounts] = useState<any[]>([]);
@@ -135,7 +137,10 @@ export default function AddRecordingScreen() {
           </View>
 
           <Text style={styles.label}>transaction date</Text>
-          <TextInput style={styles.input} placeholder="YYYY-MM-DD" placeholderTextColor="#b0b0b0" value={date} onChangeText={setDate} />
+          <TouchableOpacity style={styles.dateBtn} onPress={() => { setDateInputVal(date); setShowDatePicker(true); }}>
+            <Ionicons name="calendar-outline" size={18} color="#8a8a8a" />
+            <Text style={styles.dateBtnText}>{date}</Text>
+          </TouchableOpacity>
 
           <Text style={styles.label}>category <Text style={styles.optional}>(optional)</Text></Text>
           {selectedCategory ? (
@@ -246,6 +251,39 @@ export default function AddRecordingScreen() {
           </TouchableOpacity>
         </ScrollView>
       </SafeAreaView>
+
+      {/* Date Picker Modal */}
+      <Modal visible={showDatePicker} transparent animationType="fade" onRequestClose={() => setShowDatePicker(false)}>
+        <View style={styles.pickerOverlay}>
+          <View style={styles.pickerBox}>
+            <Text style={styles.pickerTitle}>pick a date</Text>
+            <TextInput
+              style={styles.pickerInput}
+              placeholder="YYYY-MM-DD"
+              placeholderTextColor="#b0b0b0"
+              value={dateInputVal}
+              onChangeText={setDateInputVal}
+              autoFocus
+              returnKeyType="done"
+              onSubmitEditing={() => {
+                const parsed = new Date(dateInputVal);
+                if (!isNaN(parsed.getTime())) { setDate(dateInputVal); setShowDatePicker(false); }
+              }}
+            />
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <TouchableOpacity style={[styles.pickerBtn, { flex: 1, backgroundColor: '#f5f5f5' }]} onPress={() => setShowDatePicker(false)}>
+                <Text style={[styles.pickerBtnText, { color: '#8a8a8a' }]}>cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.pickerBtn, { flex: 1 }]} onPress={() => {
+                const parsed = new Date(dateInputVal);
+                if (!isNaN(parsed.getTime())) { setDate(dateInputVal); setShowDatePicker(false); }
+              }}>
+                <Text style={styles.pickerBtnText}>set date</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </Animated.View>
   );
 }
@@ -292,4 +330,12 @@ const styles = StyleSheet.create({
   saveBtn: { backgroundColor: '#00bf63', borderRadius: 999, paddingVertical: 15, alignItems: 'center', marginTop: 24 },
   saveBtnDisabled: { opacity: 0.4 },
   saveBtnText: { fontFamily: 'DMSans_600SemiBold', fontSize: 15, color: '#fff' },
+  dateBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#ffffff', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 13, borderWidth: 1, borderColor: '#e8e8e8' },
+  dateBtnText: { fontFamily: 'DMSans_400Regular', fontSize: 15, color: '#1c1d1d' },
+  pickerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'center', alignItems: 'center' },
+  pickerBox: { backgroundColor: '#ffffff', borderRadius: 20, padding: 24, width: '80%', gap: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.1, shadowRadius: 20, elevation: 10 },
+  pickerTitle: { fontFamily: 'DMSans_700Bold', fontSize: 16, color: '#1c1d1d' },
+  pickerInput: { backgroundColor: '#f5f5f5', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, fontFamily: 'DMSans_400Regular', fontSize: 15, color: '#1c1d1d', borderWidth: 1, borderColor: '#e8e8e8' },
+  pickerBtn: { backgroundColor: '#00bf63', borderRadius: 999, paddingVertical: 12, alignItems: 'center' },
+  pickerBtnText: { fontFamily: 'DMSans_600SemiBold', fontSize: 14, color: '#fff' },
 });

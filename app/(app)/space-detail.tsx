@@ -203,7 +203,7 @@ export default function SpaceDetailScreen() {
           />
         )}
 
-        <TouchableOpacity style={styles.fab} onPress={() => router.push({ pathname: '/(app)/add-recording', params: { spaceId, spaceName: name } } as any)} activeOpacity={0.85}>
+        <TouchableOpacity style={styles.fab} onPress={() => router.push({ pathname: '/(app)/add-recording', params: { spaceId, spaceName: name, defaultDate: selectedDate.toISOString().split('T')[0] } } as any)} activeOpacity={0.85}>
           <Ionicons name="add" size={22} color="#fff" />
           <Text style={styles.fabText}>add recording</Text>
         </TouchableOpacity>
