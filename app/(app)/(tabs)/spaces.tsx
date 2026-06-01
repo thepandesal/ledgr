@@ -1,11 +1,11 @@
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  SafeAreaView, Modal, TextInput, ActivityIndicator,
+  SafeAreaView, Modal, TextInput, ActivityIndicator, Alert, Animated,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { createClient } from '@supabase/supabase-js';
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 const supabase = createClient(
   process.env.EXPO_PUBLIC_SUPABASE_URL!,
@@ -42,18 +42,25 @@ export default function SpacesScreen() {
   const router = useRouter();
   const [userName, setUserName] = useState('');
   const [spaces, setSpaces] = useState<Space[]>([]);
-  const [modalVisible, setModalVisible] = useState(false);
+  const [userId, setUserId] = useState('');
+  const [categories, setCategories] = useState<Category[]>([]);
+
+  // Create modal
+  const [createModal, setCreateModal] = useState(false);
   const [spaceName, setSpaceName] = useState('');
   const [selectedColor, setSelectedColor] = useState(PASTEL_COLORS[0]);
   const [selectedIcon, setSelectedIcon] = useState(ICONS[0]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [userId, setUserId] = useState('');
-  const [categories, setCategories] = useState<Category[]>([]);
   const [useDefaultCategory, setUseDefaultCategory] = useState(false);
   const [categoryInput, setCategoryInput] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [categorySuggestions, setCategorySuggestions] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  // Space menu
+  const [menuModal, setMenuModal] = useState(false);
+  const [selectedSpace, setSelectedSpace] = useState<Space | null>(null);
+  const menuFade = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -76,50 +83,60 @@ export default function SpacesScreen() {
     if (data) setCategories(data);
   };
 
-  const openModal = () => {
-    setSpaceName('');
-    setSelectedColor(PASTEL_COLORS[0]);
-    setSelectedIcon(ICONS[0]);
-    setError('');
-    setUseDefaultCategory(false);
-    setSelectedCategory(null);
-    setCategoryInput('');
-    setModalVisible(true);
+  const openCreate = () => {
+    setSpaceName(''); setSelectedColor(PASTEL_COLORS[0]); setSelectedIcon(ICONS[0]);
+    setError(''); setUseDefaultCategory(false); setSelectedCategory(null); setCategoryInput('');
+    setCreateModal(true);
   };
 
   const handleCategoryInput = (val: string) => {
     setCategoryInput(val);
     setSelectedCategory(null);
-    if (val.trim()) {
-      setCategorySuggestions(categories.filter(c => c.name.toLowerCase().includes(val.toLowerCase())));
-    } else {
-      setCategorySuggestions([]);
-    }
+    setCategorySuggestions(val.trim() ? categories.filter(c => c.name.toLowerCase().includes(val.toLowerCase())) : []);
   };
 
   const handleCreate = async () => {
     if (!spaceName.trim()) { setError('Name is required.'); return; }
     setLoading(true);
-    const { data, error: insertError } = await supabase.from('spaces').insert({
-      user_id: userId,
-      name: spaceName.trim(),
-      color: selectedColor,
-      icon: selectedIcon,
+    const { data, error: err } = await supabase.from('spaces').insert({
+      user_id: userId, name: spaceName.trim(), color: selectedColor, icon: selectedIcon,
       default_category_id: useDefaultCategory && selectedCategory ? selectedCategory.id : null,
     }).select().single();
-    if (insertError) {
-      setError(insertError.message);
-      setLoading(false);
-      return;
-    }
-    setSpaces((prev) => [...prev, data]);
+    if (err) { setError(err.message); setLoading(false); return; }
+    setSpaces(prev => [...prev, data]);
     setLoading(false);
-    setModalVisible(false);
+    setCreateModal(false);
+  };
+
+  const openMenu = (space: Space) => {
+    setSelectedSpace(space);
+    setMenuModal(true);
+    Animated.timing(menuFade, { toValue: 1, duration: 200, useNativeDriver: false }).start();
+  };
+
+  const closeMenu = (cb?: () => void) => {
+    Animated.timing(menuFade, { toValue: 0, duration: 150, useNativeDriver: false }).start(() => {
+      setMenuModal(false);
+      cb?.();
+    });
+  };
+
+  const handleDeleteSpace = () => {
+    closeMenu(() => {
+      Alert.alert('Delete Space', `Delete "${selectedSpace?.name}"? This cannot be undone.`, [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete', style: 'destructive', onPress: async () => {
+            await supabase.from('spaces').delete().eq('id', selectedSpace!.id);
+            setSpaces(prev => prev.filter(s => s.id !== selectedSpace!.id));
+          },
+        },
+      ]);
+    });
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <View style={styles.avatarFallback}>
@@ -131,143 +148,142 @@ export default function SpacesScreen() {
 
       <ScrollView contentContainerStyle={styles.scroll}>
         <Text style={styles.sectionTitle}>Spaces</Text>
-
         <View style={styles.grid}>
-          {spaces.map((space) => (
-            <TouchableOpacity
-              key={space.id}
-              style={[styles.spaceCard, { backgroundColor: space.color }]}
-              activeOpacity={0.8}
-              onPress={() => router.push({ pathname: '/(app)/space-detail', params: { name: space.name, color: space.color, icon: space.icon } })}
-            >
-              <Ionicons name={space.icon as any} size={20} color="#1c1d1d" />
-              <Text style={styles.spaceCardText}>{space.name}</Text>
-            </TouchableOpacity>
+          {spaces.map(space => (
+            <View key={space.id} style={[styles.spaceCard, { backgroundColor: space.color }]}>
+              <TouchableOpacity
+                style={styles.spaceCardMain}
+                activeOpacity={0.8}
+                onPress={() => router.push({ pathname: '/(app)/space-detail', params: { name: space.name, color: space.color, icon: space.icon } })}
+              >
+                <Ionicons name={space.icon as any} size={16} color="#1c1d1d" />
+                <Text style={styles.spaceCardText} numberOfLines={1}>{space.name}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => openMenu(space)} style={styles.spaceMenuBtn}>
+                <Ionicons name="ellipsis-vertical" size={14} color="#1c1d1d" />
+              </TouchableOpacity>
+            </View>
           ))}
 
-          <TouchableOpacity style={styles.addCard} activeOpacity={0.8} onPress={openModal}>
+          <TouchableOpacity style={styles.addCard} activeOpacity={0.8} onPress={openCreate}>
             <Ionicons name="add" size={24} color="rgba(255,255,255,0.4)" />
             <Text style={styles.addCardText}>add a space</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
 
-      {/* Create Space Modal */}
-      <Modal visible={modalVisible} transparent animationType="slide" onRequestClose={() => setModalVisible(false)}>
+      {/* Create Modal */}
+      <Modal visible={createModal} transparent animationType="slide" onRequestClose={() => setCreateModal(false)}>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>new space</Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <Ionicons name="close" size={22} color="rgba(255,255,255,0.6)" />
-              </TouchableOpacity>
-            </View>
-
-            <Text style={styles.label}>name</Text>
-            <TextInput
-              style={[styles.input, error ? styles.inputError : null]}
-              placeholder="e.g. Household"
-              placeholderTextColor="rgba(255,255,255,0.3)"
-              value={spaceName}
-              onChangeText={(v) => { setSpaceName(v.slice(0, 15)); setError(''); }}
-              maxLength={15}
-              autoFocus
-            />
-            <Text style={styles.charCount}>{spaceName.length}/15</Text>
-            {error ? <Text style={styles.error}>{error}</Text> : null}
-
-            <Text style={styles.label}>color</Text>
-            <View style={styles.colorRow}>
-              {PASTEL_COLORS.map((color) => (
-                <TouchableOpacity
-                  key={color}
-                  style={[styles.colorDot, { backgroundColor: color }, selectedColor === color && styles.colorDotSelected]}
-                  onPress={() => setSelectedColor(color)}
-                />
-              ))}
-            </View>
-
-            <Text style={styles.label}>icon</Text>
-            <View style={styles.iconRow}>
-              {ICONS.map((icon) => (
-                <TouchableOpacity
-                  key={icon}
-                  style={[styles.iconBtn, selectedIcon === icon && styles.iconBtnSelected]}
-                  onPress={() => setSelectedIcon(icon)}
-                >
-                  <Ionicons name={icon as any} size={20} color={selectedIcon === icon ? '#1c1d1d' : 'rgba(255,255,255,0.6)'} />
+          <ScrollView contentContainerStyle={styles.modalScroll} keyboardShouldPersistTaps="handled">
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>new space</Text>
+                <TouchableOpacity onPress={() => setCreateModal(false)}>
+                  <Ionicons name="close" size={22} color="rgba(255,255,255,0.6)" />
                 </TouchableOpacity>
-              ))}
-            </View>
+              </View>
 
-            <Text style={styles.label}>preview</Text>
-            <View style={[styles.preview, { backgroundColor: selectedColor }]}>
-              <Ionicons name={selectedIcon as any} size={20} color="#1c1d1d" />
-              <Text style={styles.previewText}>{spaceName || 'my space'}</Text>
-            </View>
+              <Text style={styles.label}>name</Text>
+              <TextInput style={[styles.input, error ? styles.inputError : null]} placeholder="e.g. Household"
+                placeholderTextColor="rgba(255,255,255,0.3)" value={spaceName}
+                onChangeText={v => { setSpaceName(v.slice(0, 15)); setError(''); }} maxLength={15} autoFocus />
+              <Text style={styles.charCount}>{spaceName.length}/15</Text>
+              {error ? <Text style={styles.error}>{error}</Text> : null}
 
-            <Text style={styles.label}>default category</Text>
-            <View style={styles.toggleRow}>
-              <Text style={styles.toggleLabel}>use a default category?</Text>
-              <TouchableOpacity
-                style={[styles.toggleBtn, useDefaultCategory && styles.toggleBtnActive]}
-                onPress={() => { setUseDefaultCategory(!useDefaultCategory); setSelectedCategory(null); setCategoryInput(''); }}
-              >
-                <Text style={[styles.toggleBtnText, useDefaultCategory && styles.toggleBtnTextActive]}>
-                  {useDefaultCategory ? 'yes' : 'no'}
-                </Text>
+              <Text style={styles.label}>color</Text>
+              <View style={styles.colorRow}>
+                {PASTEL_COLORS.map(c => (
+                  <TouchableOpacity key={c} style={[styles.colorDot, { backgroundColor: c }, selectedColor === c && styles.colorDotSelected]} onPress={() => setSelectedColor(c)} />
+                ))}
+              </View>
+
+              <Text style={styles.label}>icon</Text>
+              <View style={styles.iconRow}>
+                {ICONS.map(i => (
+                  <TouchableOpacity key={i} style={[styles.iconBtn, selectedIcon === i && styles.iconBtnSelected]} onPress={() => setSelectedIcon(i)}>
+                    <Ionicons name={i as any} size={20} color={selectedIcon === i ? '#1c1d1d' : 'rgba(255,255,255,0.6)'} />
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={styles.label}>preview</Text>
+              <View style={[styles.preview, { backgroundColor: selectedColor }]}>
+                <Ionicons name={selectedIcon as any} size={16} color="#1c1d1d" />
+                <Text style={styles.previewText}>{spaceName || 'my space'}</Text>
+              </View>
+
+              <Text style={styles.label}>default category</Text>
+              <View style={styles.toggleRow}>
+                <Text style={styles.toggleLabel}>use a default category?</Text>
+                <TouchableOpacity
+                  style={[styles.toggleBtn, useDefaultCategory && styles.toggleBtnActive]}
+                  onPress={() => { setUseDefaultCategory(!useDefaultCategory); setSelectedCategory(null); setCategoryInput(''); }}
+                >
+                  <Text style={[styles.toggleBtnText, useDefaultCategory && styles.toggleBtnTextActive]}>
+                    {useDefaultCategory ? 'yes' : 'no'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {useDefaultCategory && (
+                selectedCategory ? (
+                  <View style={styles.badgeRow}>
+                    <View style={[styles.badge, { backgroundColor: selectedCategory.color }]}>
+                      <Ionicons name={selectedCategory.icon as any} size={14} color="#1c1d1d" />
+                      <Text style={styles.badgeText}>{selectedCategory.name}</Text>
+                      <TouchableOpacity onPress={() => setSelectedCategory(null)}>
+                        <Ionicons name="close" size={14} color="#1c1d1d" />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ) : (
+                  <>
+                    <TextInput style={[styles.input, { marginTop: 8 }]} placeholder="search categories..."
+                      placeholderTextColor="rgba(255,255,255,0.3)" value={categoryInput} onChangeText={handleCategoryInput} />
+                    {categorySuggestions.length > 0 && (
+                      <View style={styles.suggestions}>
+                        {categorySuggestions.map(c => (
+                          <TouchableOpacity key={c.id} style={styles.suggestion} onPress={() => { setSelectedCategory(c); setCategoryInput(''); setCategorySuggestions([]); }}>
+                            <View style={[styles.catDot, { backgroundColor: c.color }]}>
+                              <Ionicons name={c.icon as any} size={12} color="#1c1d1d" />
+                            </View>
+                            <Text style={styles.suggestionText}>{c.name}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    )}
+                    {categoryInput.trim() !== '' && categorySuggestions.length === 0 && (
+                      <Text style={styles.noResults}>no categories found</Text>
+                    )}
+                  </>
+                )
+              )}
+
+              <TouchableOpacity style={[styles.createBtn, !spaceName.trim() && styles.createBtnDisabled]}
+                onPress={handleCreate} disabled={loading || !spaceName.trim()} activeOpacity={0.8}>
+                {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.createBtnText}>create space</Text>}
               </TouchableOpacity>
             </View>
-
-            {useDefaultCategory && (
-              selectedCategory ? (
-                <View style={styles.bankBadgeRow}>
-                  <View style={[styles.bankBadge, { backgroundColor: selectedCategory.color }]}>
-                    <Ionicons name={selectedCategory.icon as any} size={14} color="#1c1d1d" />
-                    <Text style={styles.bankBadgeText}>{selectedCategory.name}</Text>
-                    <TouchableOpacity onPress={() => setSelectedCategory(null)} style={styles.bankBadgeX}>
-                      <Ionicons name="close" size={14} color="#1c1d1d" />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              ) : (
-                <>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="search categories..."
-                    placeholderTextColor="rgba(255,255,255,0.3)"
-                    value={categoryInput}
-                    onChangeText={handleCategoryInput}
-                  />
-                  {categorySuggestions.length > 0 && (
-                    <View style={styles.suggestions}>
-                      {categorySuggestions.map(c => (
-                        <TouchableOpacity key={c.id} style={styles.suggestion} onPress={() => { setSelectedCategory(c); setCategoryInput(''); setCategorySuggestions([]); }}>
-                          <View style={[styles.catDot, { backgroundColor: c.color }]}>
-                            <Ionicons name={c.icon as any} size={12} color="#1c1d1d" />
-                          </View>
-                          <Text style={styles.suggestionText}>{c.name}</Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  )}
-                  {categoryInput.trim() !== '' && categorySuggestions.length === 0 && (
-                    <Text style={styles.noResults}>no categories found</Text>
-                  )}
-                </>
-              )
-            )}
-
-            <TouchableOpacity
-              style={[styles.createBtn, !spaceName.trim() && styles.createBtnDisabled]}
-              onPress={handleCreate}
-              disabled={loading || !spaceName.trim()}
-              activeOpacity={0.8}
-            >
-              {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.createBtnText}>create space</Text>}
-            </TouchableOpacity>
-          </View>
+          </ScrollView>
         </View>
+      </Modal>
+
+      {/* Space Menu Modal */}
+      <Modal visible={menuModal} transparent animationType="none" onRequestClose={() => closeMenu()}>
+        <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => closeMenu()}>
+          <Animated.View style={[styles.menuContent, { opacity: menuFade }]}>
+            <TouchableOpacity style={styles.menuItem} onPress={() => closeMenu()}>
+              <Ionicons name="pencil-outline" size={18} color="#fff" />
+              <Text style={styles.menuItemText}>edit</Text>
+            </TouchableOpacity>
+            <View style={styles.menuDivider} />
+            <TouchableOpacity style={styles.menuItem} onPress={handleDeleteSpace}>
+              <Ionicons name="trash-outline" size={18} color="#e74c3c" />
+              <Text style={[styles.menuItemText, { color: '#e74c3c' }]}>delete</Text>
+            </TouchableOpacity>
+          </Animated.View>
+        </TouchableOpacity>
       </Modal>
     </SafeAreaView>
   );
@@ -283,31 +299,14 @@ const styles = StyleSheet.create({
   scroll: { paddingHorizontal: 20, paddingBottom: 40 },
   sectionTitle: { fontFamily: 'DMSans_700Bold', fontSize: 22, color: '#ffffff', marginBottom: 16 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  spaceCard: {
-    width: '47%',
-    borderRadius: 999,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  spaceCardText: { fontFamily: 'DMSans_600SemiBold', fontSize: 14, color: '#1c1d1d' },
-  addCard: {
-    width: '47%',
-    borderRadius: 999,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#2a2b2b',
-    borderWidth: 1,
-    borderColor: '#3a3b3b',
-    gap: 6,
-  },
+  spaceCard: { width: '47%', borderRadius: 999, paddingVertical: 10, paddingLeft: 16, paddingRight: 8, flexDirection: 'row', alignItems: 'center' },
+  spaceCardMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  spaceCardText: { fontFamily: 'DMSans_600SemiBold', fontSize: 13, color: '#1c1d1d', flex: 1 },
+  spaceMenuBtn: { padding: 6 },
+  addCard: { width: '47%', borderRadius: 999, paddingVertical: 14, paddingHorizontal: 16, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', backgroundColor: '#2a2b2b', borderWidth: 1, borderColor: '#3a3b3b', gap: 6 },
   addCardText: { fontFamily: 'DMSans_400Regular', fontSize: 13, color: 'rgba(255,255,255,0.4)' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+  modalScroll: { justifyContent: 'flex-end', flexGrow: 1 },
   modalContent: { backgroundColor: '#242525', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   modalTitle: { fontFamily: 'DMSans_700Bold', fontSize: 18, color: '#ffffff' },
@@ -333,13 +332,17 @@ const styles = StyleSheet.create({
   toggleBtnActive: { backgroundColor: '#00bf63', borderColor: '#00bf63' },
   toggleBtnText: { fontFamily: 'DMSans_600SemiBold', fontSize: 13, color: 'rgba(255,255,255,0.5)' },
   toggleBtnTextActive: { color: '#ffffff' },
-  bankBadgeRow: { flexDirection: 'row', marginTop: 8 },
-  bankBadge: { flexDirection: 'row', alignItems: 'center', borderRadius: 999, paddingVertical: 8, paddingHorizontal: 14, gap: 6 },
-  bankBadgeText: { fontFamily: 'DMSans_600SemiBold', fontSize: 14, color: '#1c1d1d' },
-  bankBadgeX: { padding: 2 },
+  badgeRow: { flexDirection: 'row', marginTop: 8 },
+  badge: { flexDirection: 'row', alignItems: 'center', borderRadius: 999, paddingVertical: 8, paddingHorizontal: 14, gap: 6 },
+  badgeText: { fontFamily: 'DMSans_600SemiBold', fontSize: 14, color: '#1c1d1d' },
   suggestions: { backgroundColor: '#2a2b2b', borderRadius: 12, marginTop: 4, overflow: 'hidden', borderWidth: 1, borderColor: '#3a3b3b' },
   suggestion: { paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#3a3b3b', flexDirection: 'row', alignItems: 'center', gap: 10 },
   suggestionText: { fontFamily: 'DMSans_400Regular', fontSize: 14, color: '#ffffff' },
   catDot: { width: 24, height: 24, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
   noResults: { fontFamily: 'DMSans_400Regular', fontSize: 13, color: 'rgba(255,255,255,0.3)', marginTop: 8, textAlign: 'center' },
+  menuOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+  menuContent: { backgroundColor: '#2a2b2b', borderRadius: 16, overflow: 'hidden', minWidth: 160 },
+  menuItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingVertical: 16 },
+  menuItemText: { fontFamily: 'DMSans_400Regular', fontSize: 15, color: '#ffffff' },
+  menuDivider: { height: 1, backgroundColor: '#3a3b3b' },
 });
