@@ -109,9 +109,6 @@ export default function SpacesScreen() {
           </View>
           <Text style={styles.greeting}>Hey, <Text style={styles.greetingName}>{userName}!</Text></Text>
         </View>
-        <TouchableOpacity style={styles.cameraBtn} activeOpacity={0.7}>
-          <Ionicons name="camera-outline" size={22} color="#1c1d1d" />
-        </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
@@ -251,13 +248,12 @@ export default function SpacesScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f5f5f5' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 28, paddingVertical: 16 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 36, paddingTop: 52, paddingBottom: 16 },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   avatarFallback: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#e8e8e8', justifyContent: 'center', alignItems: 'center' },
-  cameraBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#e8e8e8', justifyContent: 'center', alignItems: 'center' },
   greeting: { fontFamily: 'DMSans_400Regular', fontSize: 16, color: '#8a8a8a' },
   greetingName: { fontFamily: 'DMSans_700Bold', color: '#1c1d1d' },
-  scroll: { paddingHorizontal: 28, paddingBottom: 40, paddingTop: 12 },
+  scroll: { paddingHorizontal: 36, paddingBottom: 40, paddingTop: 12 },
   sectionTitle: { fontFamily: 'Avenelle', fontSize: 36, color: '#1c1d1d', marginBottom: 20 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   spaceCard: { width: '47%', borderRadius: 999, paddingVertical: 10, paddingLeft: 16, paddingRight: 8, flexDirection: 'row', alignItems: 'center', backgroundColor: '#0ccfcf' },
