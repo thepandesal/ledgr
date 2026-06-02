@@ -142,6 +142,12 @@ export default function SpaceDetailScreen() {
   });
   grouped.sort((a, b) => b.dateObj.getTime() - a.dateObj.getTime());
 
+  // Set of dateKeys that have recordings (for dots)
+  const recordingDates = new Set(recordings.map(r => {
+    const parts = r.transaction_date.split('-');
+    return dateKey(new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2])));
+  }));
+
   return (
     <Animated.View style={[styles.container, { transform: [{ translateX: slideAnim }] }]}>
       <SafeAreaView style={styles.inner}>
@@ -228,6 +234,7 @@ export default function SpaceDetailScreen() {
                     </Text>
                     <Text style={[styles.dateChipNum, isSelected && styles.dateChipTextSelected]}>{date.getDate()}</Text>
                     {isToday && <View style={[styles.todayDot, isSelected && styles.todayDotSelected]} />}
+                    {!isToday && recordingDates.has(dateKey(date)) && <View style={styles.entryDot} />}
                   </TouchableOpacity>
                 );
               })}
@@ -245,7 +252,9 @@ export default function SpaceDetailScreen() {
                       {date.toLocaleDateString('en-US', { weekday: 'short' })}
                     </Text>
                     <Text style={[styles.dateChipNum, isToday && styles.dateChipTextSelected]}>{date.getDate()}</Text>
-                    {isToday && <View style={[styles.todayDot, styles.todayDotSelected]} />}
+                    {isToday
+                      ? <View style={[styles.todayDot, styles.todayDotSelected]} />
+                      : recordingDates.has(dateKey(date)) && <View style={styles.entryDot} />}
                   </View>
                 );
               })}
@@ -395,6 +404,7 @@ export default function SpaceDetailScreen() {
                           if (!day) return <View key={`e${i}`} style={styles.calCell} />;
                           const isSelected = viewMode === 'daily' && day === pickerDay;
                           const isToday = isSameDay(new Date(pickerYear, pickerMonth, day), new Date());
+                          const hasEntry = recordingDates.has(dateKey(new Date(pickerYear, pickerMonth, day)));
                           return (
                             <TouchableOpacity
                               key={day}
@@ -402,6 +412,7 @@ export default function SpaceDetailScreen() {
                               onPress={() => setPickerDay(day)}
                             >
                               <Text style={[styles.calCellText, (isSelected || isToday) && styles.calCellTextActive]}>{day}</Text>
+                              {hasEntry && <View style={[styles.calEntryDot, isSelected && styles.calEntryDotSelected]} />}
                             </TouchableOpacity>
                           );
                         })}
@@ -490,8 +501,9 @@ const styles = StyleSheet.create({
   dateChipDay: { fontFamily: 'DMSans_700Bold', fontSize: 11, color: '#b0b0b0' },
   dateChipNum: { fontFamily: 'DMSans_700Bold', fontSize: 20, color: '#1c1d1d', marginTop: 5 },
   dateChipTextSelected: { color: '#fff' },
-  todayDot: { width: 3, height: 3, borderRadius: 2, backgroundColor: '#0ccfcf', marginTop: 3 },
+  todayDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: '#0ccfcf', marginTop: 3 },
   todayDotSelected: { backgroundColor: '#fff' },
+  entryDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: '#0ccfcf', marginTop: 3 },
   list: { paddingHorizontal: 48, paddingBottom: 100, gap: 48 },
   dateGroupLabel: { fontFamily: 'Avenelle', fontSize: 19, color: '#545454', marginBottom: 12, textTransform: 'lowercase' },
   dateGroupItems: { gap: 10 },
@@ -533,4 +545,6 @@ const styles = StyleSheet.create({
   calCellToday: { backgroundColor: '#f0f0f0' },
   calCellText: { fontFamily: 'DMSans_400Regular', fontSize: 13, color: '#425252' },
   calCellTextActive: { fontFamily: 'DMSans_600SemiBold', color: '#fff' },
+  calEntryDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: '#0ccfcf', marginTop: 1 },
+  calEntryDotSelected: { backgroundColor: '#fff' },
 });
