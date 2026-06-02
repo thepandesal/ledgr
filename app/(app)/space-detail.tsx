@@ -1,6 +1,6 @@
 import {
   View, Text, StyleSheet, TouchableOpacity, Modal, TextInput,
-  SafeAreaView, Animated, Dimensions, FlatList, ActivityIndicator,
+  SafeAreaView, Animated, Dimensions, FlatList, ActivityIndicator, Image,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,6 +9,7 @@ import { supabase } from '../../src/lib/supabase';
 
 const { width } = Dimensions.get('window');
 type ViewMode = 'daily' | 'weekly' | 'monthly';
+const MODES: ViewMode[] = ['daily', 'weekly', 'monthly'];
 
 const TYPE_CONFIG: Record<string, { color: string; sign: string; label: string }> = {
   expense:    { color: '#e74c3c', sign: '-', label: 'Expense' },
@@ -29,10 +30,29 @@ const ACCOUNT_VERB: Record<string, string> = {
 function addDays(date: Date, days: number) { const d = new Date(date); d.setDate(d.getDate() + days); return d; }
 function isSameDay(a: Date, b: Date) { return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate(); }
 
+function getDateRangeLabel(viewMode: ViewMode, selectedDate: Date) {
+  if (viewMode === 'daily') {
+    const start = addDays(selectedDate, -3);
+    const end = addDays(selectedDate, 3);
+    const sm = start.toLocaleDateString('en-US', { month: 'long' });
+    const em = end.toLocaleDateString('en-US', { month: 'long' });
+    return sm === em ? sm : `${sm} to ${em}`;
+  }
+  if (viewMode === 'weekly') {
+    const start = addDays(selectedDate, -selectedDate.getDay());
+    const end = addDays(start, 6);
+    const sm = start.toLocaleDateString('en-US', { month: 'long' });
+    const em = end.toLocaleDateString('en-US', { month: 'long' });
+    return sm === em ? sm : `${sm} to ${em}`;
+  }
+  return selectedDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+}
+
 export default function SpaceDetailScreen() {
   const { spaceId, name, color } = useLocalSearchParams<{ spaceId: string; name: string; color: string }>();
   const router = useRouter();
   const slideAnim = useRef(new Animated.Value(width)).current;
+  const circleAnim = useRef(new Animated.Value(0)).current;
   const [viewMode, setViewMode] = useState<ViewMode>('daily');
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [recordings, setRecordings] = useState<any[]>([]);
@@ -44,11 +64,22 @@ export default function SpaceDetailScreen() {
   const [pendingDeleteId, setPendingDeleteId] = useState('');
   const [pendingDeleteName, setPendingDeleteName] = useState('');
 
+  // Tab widths for circle positioning
+  const [tabLayouts, setTabLayouts] = useState<{ x: number; width: number }[]>([]);
+
   useEffect(() => {
-    Animated.timing(slideAnim, { toValue: 0, duration: 280, useNativeDriver: false }).start();
+    Animated.timing(slideAnim, { toValue: 0, duration: 280, useNativeDriver: true }).start();
   }, []);
 
   useEffect(() => { if (spaceId) loadRecordings(); }, [spaceId]);
+
+  useEffect(() => {
+    if (tabLayouts.length === 3) {
+      const idx = MODES.indexOf(viewMode);
+      const target = tabLayouts[idx]?.x ?? 0;
+      Animated.spring(circleAnim, { toValue: target, useNativeDriver: true, tension: 60, friction: 10 }).start();
+    }
+  }, [viewMode, tabLayouts]);
 
   const loadRecordings = async () => {
     setLoading(true);
@@ -65,13 +96,11 @@ export default function SpaceDetailScreen() {
   };
 
   const handleBack = () => {
-    Animated.timing(slideAnim, { toValue: width, duration: 250, useNativeDriver: false }).start(() => router.back());
+    Animated.timing(slideAnim, { toValue: width, duration: 250, useNativeDriver: true }).start(() => router.back());
   };
 
   const handleDelete = (id: string, recName: string) => {
-    setPendingDeleteId(id);
-    setPendingDeleteName(recName);
-    setConfirmModal(true);
+    setPendingDeleteId(id); setPendingDeleteName(recName); setConfirmModal(true);
   };
 
   const confirmDelete = async () => {
@@ -95,23 +124,26 @@ export default function SpaceDetailScreen() {
   });
 
   const totalIncome = filteredRecordings.filter(r => ['income', 'receivable', 'savings'].includes(r.type)).reduce((s, r) => s + Number(r.amount), 0);
-  const totalExpense = filteredRecordings.filter(r => ['expense'].includes(r.type)).reduce((s, r) => s + Number(r.amount), 0);
+  const totalExpense = filteredRecordings.filter(r => r.type === 'expense').reduce((s, r) => s + Number(r.amount), 0);
+
+  const dateRangeLabel = getDateRangeLabel(viewMode, selectedDate);
 
   return (
     <Animated.View style={[styles.container, { transform: [{ translateX: slideAnim }] }]}>
       <SafeAreaView style={styles.inner}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={handleBack} style={styles.backBtn}>
-            <Ionicons name="arrow-back" size={22} color="#8a8a8a" />
-          </TouchableOpacity>
-          <View style={[styles.spaceTag, { backgroundColor: color ?? '#FFB3B3' }]}>
-            <Text style={styles.spaceTagText}>{name}</Text>
-          </View>
-          <TouchableOpacity onPress={() => { setDateInputVal(''); setShowDatePicker(true); }} style={styles.calendarBtn}>
-            <Ionicons name="calendar-outline" size={20} color="#8a8a8a" />
-          </TouchableOpacity>
+
+        {/* Back button */}
+        <TouchableOpacity onPress={handleBack} style={styles.backBtn}>
+          <Ionicons name="arrow-back" size={22} color="#8a8a8a" />
+        </TouchableOpacity>
+
+        {/* Space label + name */}
+        <View style={styles.titleBlock}>
+          <Text style={styles.spacesLabel}>spaces</Text>
+          <Text style={styles.spaceName}>{(name ?? '').toLowerCase()}</Text>
         </View>
 
+        {/* Summary */}
         <View style={styles.summary}>
           <View style={styles.summaryItem}>
             <Text style={styles.summaryLabel}>in</Text>
@@ -131,14 +163,36 @@ export default function SpaceDetailScreen() {
           </View>
         </View>
 
-        <View style={styles.viewTabs}>
-          {(['daily', 'weekly', 'monthly'] as ViewMode[]).map(mode => (
-            <TouchableOpacity key={mode} style={[styles.viewTab, viewMode === mode && styles.viewTabActive]} onPress={() => setViewMode(mode)}>
-              <Text style={[styles.viewTabText, viewMode === mode && styles.viewTabTextActive]}>{mode}</Text>
-            </TouchableOpacity>
-          ))}
+        {/* View mode tabs */}
+        <View style={styles.tabsWrapper}>
+          <View style={styles.tabs}>
+            {MODES.map((mode, idx) => (
+              <TouchableOpacity
+                key={mode}
+                style={styles.tabItem}
+                onPress={() => setViewMode(mode)}
+                onLayout={e => {
+                  const { x, width: w } = e.nativeEvent.layout;
+                  setTabLayouts(prev => { const next = [...prev]; next[idx] = { x, width: w }; return next; });
+                }}
+              >
+                <Text style={[styles.tabText, viewMode === mode && styles.tabTextActive]}>{mode}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          {tabLayouts.length === 3 && (
+            <Animated.Image
+              source={require('../../assets/circle-doodle.png')}
+              style={[styles.circleDoodle, { transform: [{ translateX: circleAnim }] }]}
+              resizeMode="contain"
+            />
+          )}
         </View>
 
+        {/* Date range label */}
+        <Text style={styles.dateRangeLabel}>{dateRangeLabel.toLowerCase()}</Text>
+
+        {/* Daily date chips — portrait style */}
         {viewMode === 'daily' && (
           <View style={styles.dateChipsRow}>
             {Array.from({ length: 7 }, (_, i) => addDays(selectedDate, i - 3)).map((date, i) => {
@@ -146,7 +200,9 @@ export default function SpaceDetailScreen() {
               const isToday = isSameDay(date, new Date());
               return (
                 <TouchableOpacity key={i} style={[styles.dateChip, isSelected && styles.dateChipSelected]} onPress={() => setSelectedDate(date)}>
-                  <Text style={[styles.dateChipDay, isSelected && styles.dateChipTextSelected]}>{date.toLocaleDateString('en-US', { weekday: 'short' })}</Text>
+                  <Text style={[styles.dateChipDay, isSelected && styles.dateChipTextSelected]}>
+                    {date.toLocaleDateString('en-US', { weekday: 'short' })}
+                  </Text>
                   <Text style={[styles.dateChipNum, isSelected && styles.dateChipTextSelected]}>{date.getDate()}</Text>
                   {isToday && <View style={[styles.todayDot, isSelected && styles.todayDotSelected]} />}
                 </TouchableOpacity>
@@ -155,20 +211,27 @@ export default function SpaceDetailScreen() {
           </View>
         )}
 
+        {/* Weekly / Monthly nav */}
         {viewMode !== 'daily' && (
           <View style={styles.navRow}>
-            <TouchableOpacity onPress={() => { const d = new Date(selectedDate); if (viewMode === 'weekly') d.setDate(d.getDate() - 7); else d.setMonth(d.getMonth() - 1); setSelectedDate(d); }}>
+            <TouchableOpacity onPress={() => {
+              const d = new Date(selectedDate);
+              if (viewMode === 'weekly') d.setDate(d.getDate() - 7); else d.setMonth(d.getMonth() - 1);
+              setSelectedDate(d);
+            }}>
               <Ionicons name="chevron-back" size={22} color="#8a8a8a" />
             </TouchableOpacity>
-            <Text style={styles.navLabel}>
-              {viewMode === 'weekly' ? `Week of ${addDays(selectedDate, -selectedDate.getDay()).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : selectedDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-            </Text>
-            <TouchableOpacity onPress={() => { const d = new Date(selectedDate); if (viewMode === 'weekly') d.setDate(d.getDate() + 7); else d.setMonth(d.getMonth() + 1); setSelectedDate(d); }}>
+            <TouchableOpacity onPress={() => {
+              const d = new Date(selectedDate);
+              if (viewMode === 'weekly') d.setDate(d.getDate() + 7); else d.setMonth(d.getMonth() + 1);
+              setSelectedDate(d);
+            }}>
               <Ionicons name="chevron-forward" size={22} color="#8a8a8a" />
             </TouchableOpacity>
           </View>
         )}
 
+        {/* Recordings list */}
         {loading ? (
           <ActivityIndicator color="#00bf63" style={{ marginTop: 40 }} />
         ) : (
@@ -239,13 +302,16 @@ export default function SpaceDetailScreen() {
           />
         )}
 
-        <TouchableOpacity style={styles.fab} onPress={() => router.push({ pathname: '/(app)/add-recording', params: { spaceId, spaceName: name, defaultDate: selectedDate.toISOString().split('T')[0] } } as any)} activeOpacity={0.85}>
+        <TouchableOpacity
+          style={styles.fab}
+          onPress={() => router.push({ pathname: '/(app)/add-recording', params: { spaceId, spaceName: name, defaultDate: selectedDate.toISOString().split('T')[0] } } as any)}
+          activeOpacity={0.85}
+        >
           <Ionicons name="add" size={22} color="#fff" />
           <Text style={styles.fabText}>add recording</Text>
         </TouchableOpacity>
       </SafeAreaView>
 
-      {/* Confirm Delete Modal */}
       <Modal visible={confirmModal} transparent animationType="fade" onRequestClose={() => setConfirmModal(false)}>
         <View style={styles.pickerOverlay}>
           <View style={styles.pickerBox}>
@@ -283,32 +349,32 @@ export default function SpaceDetailScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f5f5f5', position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   inner: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14 },
-  backBtn: { width: 32 },
-  calendarBtn: { width: 32, alignItems: 'flex-end' },
-  spaceTag: { borderRadius: 999, paddingHorizontal: 16, paddingVertical: 6 },
-  spaceTagText: { fontFamily: 'DMSans_700Bold', fontSize: 14, color: '#1c1d1d' },
-  summary: { flexDirection: 'row', marginHorizontal: 20, backgroundColor: '#ffffff', borderRadius: 16, padding: 16, marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 },
+  backBtn: { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 4 },
+  titleBlock: { paddingHorizontal: 24, marginTop: 8, marginBottom: 20 },
+  spacesLabel: { fontFamily: 'Avenelle', fontSize: 13, color: '#929090' },
+  spaceName: { fontFamily: 'Avenelle', fontSize: 40, color: '#0ccfcf', lineHeight: 46 },
+  summary: { flexDirection: 'row', marginHorizontal: 24, backgroundColor: '#ffffff', borderRadius: 16, padding: 16, marginBottom: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 },
   summaryItem: { flex: 1, alignItems: 'center', gap: 4 },
   summaryLabel: { fontFamily: 'DMSans_400Regular', fontSize: 11, color: '#b0b0b0', textTransform: 'uppercase', letterSpacing: 0.5 },
   summaryAmount: { fontFamily: 'DMSans_700Bold', fontSize: 16 },
   summaryDivider: { width: 1, backgroundColor: '#e8e8e8' },
-  viewTabs: { flexDirection: 'row', marginHorizontal: 20, backgroundColor: '#e8e8e8', borderRadius: 12, padding: 4, marginBottom: 12 },
-  viewTab: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 10 },
-  viewTabActive: { backgroundColor: '#00bf63' },
-  viewTabText: { fontFamily: 'DMSans_400Regular', fontSize: 13, color: '#8a8a8a' },
-  viewTabTextActive: { fontFamily: 'DMSans_600SemiBold', color: '#fff' },
-  dateChipsRow: { flexDirection: 'row', paddingHorizontal: 20, marginBottom: 12, gap: 4 },
-  dateChip: { flex: 1, alignItems: 'center', paddingVertical: 6, borderRadius: 10, backgroundColor: '#ffffff' },
-  dateChipSelected: { backgroundColor: '#00bf63' },
-  dateChipDay: { fontFamily: 'DMSans_400Regular', fontSize: 9, color: '#b0b0b0' },
-  dateChipNum: { fontFamily: 'DMSans_700Bold', fontSize: 14, color: '#1c1d1d' },
+  tabsWrapper: { paddingHorizontal: 24, marginBottom: 4 },
+  tabs: { flexDirection: 'row', gap: 24 },
+  tabItem: { paddingVertical: 6 },
+  tabText: { fontFamily: 'DMSans_400Regular', fontSize: 15, color: '#425252' },
+  tabTextActive: { fontFamily: 'DMSans_600SemiBold', color: '#425252' },
+  circleDoodle: { position: 'absolute', width: 70, height: 40, top: -2, pointerEvents: 'none' },
+  dateRangeLabel: { fontFamily: 'Avenelle', fontSize: 18, color: '#1c1d1d', paddingHorizontal: 24, marginBottom: 14, marginTop: 6 },
+  dateChipsRow: { flexDirection: 'row', paddingHorizontal: 24, marginBottom: 16, gap: 6 },
+  dateChip: { flex: 1, alignItems: 'center', paddingVertical: 12, paddingHorizontal: 4, borderRadius: 14, backgroundColor: '#ffffff', minHeight: 60 },
+  dateChipSelected: { backgroundColor: '#0ccfcf' },
+  dateChipDay: { fontFamily: 'DMSans_700Bold', fontSize: 9, color: '#b0b0b0' },
+  dateChipNum: { fontFamily: 'DMSans_700Bold', fontSize: 16, color: '#1c1d1d', marginTop: 4 },
   dateChipTextSelected: { color: '#fff' },
-  todayDot: { width: 3, height: 3, borderRadius: 2, backgroundColor: '#00bf63', marginTop: 1 },
+  todayDot: { width: 3, height: 3, borderRadius: 2, backgroundColor: '#0ccfcf', marginTop: 3 },
   todayDotSelected: { backgroundColor: '#fff' },
-  navRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, marginBottom: 12 },
-  navLabel: { fontFamily: 'DMSans_600SemiBold', fontSize: 14, color: '#1c1d1d' },
-  list: { paddingHorizontal: 20, paddingBottom: 100, gap: 8 },
+  navRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24, marginBottom: 12 },
+  list: { paddingHorizontal: 24, paddingBottom: 100, gap: 8 },
   recordingCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#ffffff', borderRadius: 14, padding: 14, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 1 },
   recordingLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
   recordingRight: { alignItems: 'flex-end', gap: 4 },
@@ -323,7 +389,7 @@ const styles = StyleSheet.create({
   actionBtn: { padding: 2 },
   empty: { alignItems: 'center', paddingTop: 60, gap: 10 },
   emptyText: { fontFamily: 'DMSans_400Regular', fontSize: 14, color: '#b0b0b0' },
-  fab: { position: 'absolute', bottom: 24, right: 20, backgroundColor: '#00bf63', borderRadius: 999, paddingVertical: 14, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', gap: 8, shadowColor: '#00bf63', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 8 },
+  fab: { position: 'absolute', bottom: 24, right: 24, backgroundColor: '#00bf63', borderRadius: 999, paddingVertical: 14, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', gap: 8, shadowColor: '#00bf63', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 8 },
   fabText: { fontFamily: 'DMSans_600SemiBold', fontSize: 14, color: '#fff' },
   pickerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'center', alignItems: 'center' },
   pickerBox: { backgroundColor: '#ffffff', borderRadius: 20, padding: 24, width: '80%', gap: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.1, shadowRadius: 20, elevation: 10 },
