@@ -1,6 +1,6 @@
 import {
   View, Text, StyleSheet, TouchableOpacity, Modal, TextInput,
-  SafeAreaView, Animated, Dimensions, FlatList, ActivityIndicator, Image,
+  SafeAreaView, Animated, Dimensions, FlatList, ActivityIndicator,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -49,22 +49,25 @@ function getDateRangeLabel(viewMode: ViewMode, selectedDate: Date) {
 }
 
 export default function SpaceDetailScreen() {
-  const { spaceId, name, color } = useLocalSearchParams<{ spaceId: string; name: string; color: string }>();
+  const { spaceId, name } = useLocalSearchParams<{ spaceId: string; name: string; color: string }>();
   const router = useRouter();
+
   const slideAnim = useRef(new Animated.Value(width)).current;
   const circleAnim = useRef(new Animated.Value(0)).current;
+  const contentSlide = useRef(new Animated.Value(0)).current;
+
   const [viewMode, setViewMode] = useState<ViewMode>('daily');
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [recordings, setRecordings] = useState<any[]>([]);
   const [splitIds, setSplitIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [dateInputVal, setDateInputVal] = useState('');
   const [confirmModal, setConfirmModal] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState('');
   const [pendingDeleteName, setPendingDeleteName] = useState('');
 
+  // store each tab's x + width measured relative to the tabs row
   const [tabLayouts, setTabLayouts] = useState<{ x: number; width: number }[]>([]);
+  const DOODLE_W = 90;
 
   useEffect(() => {
     Animated.timing(slideAnim, { toValue: 0, duration: 280, useNativeDriver: true }).start();
@@ -72,15 +75,26 @@ export default function SpaceDetailScreen() {
 
   useEffect(() => { if (spaceId) loadRecordings(); }, [spaceId]);
 
+  // animate circle to center over active tab
   useEffect(() => {
-    if (tabLayouts.filter(Boolean).length === 3) {
-      const idx = MODES.indexOf(viewMode);
-      const layout = tabLayouts[idx];
-      if (!layout) return;
-      const target = -(layout.width / 2) - 2;
-      Animated.spring(circleAnim, { toValue: target, useNativeDriver: true, tension: 60, friction: 10 }).start();
-    }
+    if (tabLayouts.filter(Boolean).length < 3) return;
+    const idx = MODES.indexOf(viewMode);
+    const layout = tabLayouts[idx];
+    if (!layout) return;
+    const target = layout.x + layout.width / 2 - DOODLE_W / 2;
+    Animated.spring(circleAnim, { toValue: target, useNativeDriver: true, tension: 70, friction: 12 }).start();
   }, [viewMode, tabLayouts]);
+
+  const switchMode = (next: ViewMode) => {
+    if (next === viewMode) return;
+    const goLeft = MODES.indexOf(next) > MODES.indexOf(viewMode);
+    // slide current content out
+    Animated.timing(contentSlide, { toValue: goLeft ? -width : width, duration: 220, useNativeDriver: true }).start(() => {
+      setViewMode(next);
+      contentSlide.setValue(goLeft ? width : -width);
+      Animated.timing(contentSlide, { toValue: 0, duration: 220, useNativeDriver: true }).start();
+    });
+  };
 
   const loadRecordings = async () => {
     setLoading(true);
@@ -110,11 +124,6 @@ export default function SpaceDetailScreen() {
     setConfirmModal(false);
   };
 
-  const handleDateInputSubmit = () => {
-    const parsed = new Date(dateInputVal);
-    if (!isNaN(parsed.getTime())) { setSelectedDate(parsed); setShowDatePicker(false); setDateInputVal(''); }
-  };
-
   const filteredRecordings = recordings.filter(r => {
     const parts = r.transaction_date.split('-');
     const rDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
@@ -124,166 +133,176 @@ export default function SpaceDetailScreen() {
     return true;
   });
 
-const dateRangeLabel = getDateRangeLabel(viewMode, selectedDate);
+  const weekStart = addDays(selectedDate, -selectedDate.getDay());
+  const dateRangeLabel = getDateRangeLabel(viewMode, selectedDate);
 
   return (
     <Animated.View style={[styles.container, { transform: [{ translateX: slideAnim }] }]}>
       <SafeAreaView style={styles.inner}>
 
-        {/* Back button */}
         <TouchableOpacity onPress={handleBack} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={22} color="#8a8a8a" />
         </TouchableOpacity>
 
-        {/* Space label + name */}
         <View style={styles.titleBlock}>
           <Text style={styles.spacesLabel}>spaces</Text>
           <Text style={styles.spaceName}>{(name ?? '').toLowerCase()}</Text>
         </View>
 
-
-        {/* View mode tabs */}
+        {/* Tabs */}
         <View style={styles.tabsWrapper}>
           <View style={styles.tabs}>
             {MODES.map((mode, idx) => (
-              <View key={mode} style={{ alignItems: 'center' }}>
-                {tabLayouts.filter(Boolean).length === 3 && viewMode === mode && (
-                  <Animated.Image
-                    source={require('../../assets/circle-doodle.png')}
-                    style={[styles.circleDoodle, { transform: [{ translateX: circleAnim }] }]}
-                    resizeMode="contain"
-                    pointerEvents="none"
-                  />
-                )}
-                <TouchableOpacity
-                  style={styles.tabItem}
-                  onPress={() => setViewMode(mode)}
-                  onLayout={e => {
-                    const { x, width: w } = e.nativeEvent.layout;
-                    setTabLayouts(prev => { const next = [...prev]; next[idx] = { x, width: w }; return next; });
-                  }}
-                >
-                  <Text style={[styles.tabText, viewMode === mode && styles.tabTextActive]}>
-                    {mode.charAt(0).toUpperCase() + mode.slice(1)}
-                  </Text>
-                </TouchableOpacity>
-              </View>
+              <TouchableOpacity
+                key={mode}
+                style={styles.tabItem}
+                onPress={() => switchMode(mode)}
+                onLayout={e => {
+                  const { x, width: w } = e.nativeEvent.layout;
+                  setTabLayouts(prev => { const next = [...prev]; next[idx] = { x, width: w }; return next; });
+                }}
+              >
+                <Text style={[styles.tabText, viewMode === mode && styles.tabTextActive]}>
+                  {mode.charAt(0).toUpperCase() + mode.slice(1)}
+                </Text>
+              </TouchableOpacity>
             ))}
+            {tabLayouts.filter(Boolean).length === 3 && (
+              <Animated.Image
+                source={require('../../assets/circle-doodle.png')}
+                style={[styles.circleDoodle, { transform: [{ translateX: circleAnim }] }]}
+                resizeMode="contain"
+                pointerEvents="none"
+              />
+            )}
           </View>
         </View>
 
-        {/* Date range label */}
-        <Text style={styles.dateRangeLabel}>{dateRangeLabel.toLowerCase()}</Text>
+        {/* Animated content area */}
+        <Animated.View style={[styles.contentArea, { transform: [{ translateX: contentSlide }] }]}>
 
-        {/* Daily date chips — portrait style */}
-        {viewMode === 'daily' && (
-          <View style={styles.dateChipsRow}>
-            {Array.from({ length: 7 }, (_, i) => addDays(selectedDate, i - 3)).map((date, i) => {
-              const isSelected = isSameDay(date, selectedDate);
-              const isToday = isSameDay(date, new Date());
-              return (
-                <TouchableOpacity key={i} style={[styles.dateChip, isSelected && styles.dateChipSelected]} onPress={() => setSelectedDate(date)}>
-                  <Text style={[styles.dateChipDay, isSelected && styles.dateChipTextSelected]}>
-                    {date.toLocaleDateString('en-US', { weekday: 'short' })}
-                  </Text>
-                  <Text style={[styles.dateChipNum, isSelected && styles.dateChipTextSelected]}>{date.getDate()}</Text>
-                  {isToday && <View style={[styles.todayDot, isSelected && styles.todayDotSelected]} />}
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        )}
+          {/* Month label */}
+          <Text style={styles.dateRangeLabel}>{dateRangeLabel.toLowerCase()}</Text>
 
-        {/* Weekly / Monthly nav */}
-        {viewMode !== 'daily' && (
-          <View style={styles.navRow}>
-            <TouchableOpacity onPress={() => {
-              const d = new Date(selectedDate);
-              if (viewMode === 'weekly') d.setDate(d.getDate() - 7); else d.setMonth(d.getMonth() - 1);
-              setSelectedDate(d);
-            }}>
-              <Ionicons name="chevron-back" size={22} color="#8a8a8a" />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => {
-              const d = new Date(selectedDate);
-              if (viewMode === 'weekly') d.setDate(d.getDate() + 7); else d.setMonth(d.getMonth() + 1);
-              setSelectedDate(d);
-            }}>
-              <Ionicons name="chevron-forward" size={22} color="#8a8a8a" />
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Recordings list */}
-        {loading ? (
-          <ActivityIndicator color="#00bf63" style={{ marginTop: 40 }} />
-        ) : (
-          <FlatList
-            data={filteredRecordings}
-            keyExtractor={r => r.id}
-            contentContainerStyle={styles.list}
-            showsVerticalScrollIndicator={false}
-            renderItem={({ item }) => {
-              const cfg = TYPE_CONFIG[item.type] ?? { color: '#1c1d1d', sign: '', label: item.type };
-              return (
-                <View style={styles.recordingCard}>
-                  <View style={styles.recordingLeft}>
-                    {item.categories ? (
-                      <View style={[styles.catDot, { backgroundColor: item.categories.color }]}>
-                        <Ionicons name={item.categories.icon} size={12} color="#1c1d1d" />
-                      </View>
-                    ) : (
-                      <View style={[styles.catDot, { backgroundColor: '#e8e8e8' }]}>
-                        <Ionicons name="ellipse-outline" size={12} color="#8a8a8a" />
-                      </View>
-                    )}
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.recordingName}>{item.name}</Text>
-                      <Text style={styles.recordingMeta}>
-                        {cfg.label} · {new Date(item.transaction_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                      </Text>
-                      {item.account ? (
-                        <Text style={styles.recordingAccount}>
-                          {ACCOUNT_VERB[item.type] ?? 'Via'}: {item.account.account_name} · {item.account.bank}
-                        </Text>
-                      ) : null}
-                      {item.notes ? <Text style={styles.recordingNotes} numberOfLines={1}>{item.notes}</Text> : null}
-                      {item.status === 'settled' ? <Text style={styles.settledBadge}>✓ settled</Text> : null}
-                    </View>
-                  </View>
-                  <View style={styles.recordingRight}>
-                    <Text style={[styles.recordingAmount, { color: cfg.color }]}>
-                      {cfg.sign}{Number(item.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+          {/* Daily: 7 date chips */}
+          {viewMode === 'daily' && (
+            <View style={styles.dateChipsRow}>
+              {Array.from({ length: 7 }, (_, i) => addDays(selectedDate, i - 3)).map((date, i) => {
+                const isSelected = isSameDay(date, selectedDate);
+                const isToday = isSameDay(date, new Date());
+                return (
+                  <TouchableOpacity key={i} style={[styles.dateChip, isSelected && styles.dateChipSelected]} onPress={() => setSelectedDate(date)}>
+                    <Text style={[styles.dateChipDay, isSelected && styles.dateChipTextSelected]}>
+                      {date.toLocaleDateString('en-US', { weekday: 'short' })}
                     </Text>
-                    <View style={styles.recordingActions}>
-                      <TouchableOpacity
-                        onPress={() => router.push({ pathname: '/(app)/split-bill', params: { recordingId: item.id, recordingName: item.name, amount: item.amount } } as any)}
-                        style={styles.actionBtn}
-                      >
-                        <Ionicons name="people-outline" size={14} color={splitIds.has(item.id) ? '#00bf63' : '#b0b0b0'} />
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        onPress={() => router.push({ pathname: '/(app)/add-recording', params: { spaceId, spaceName: name, defaultDate: selectedDate.toISOString().split('T')[0], editId: item.id } } as any)}
-                        style={styles.actionBtn}
-                      >
-                        <Ionicons name="pencil-outline" size={14} color="#8a8a8a" />
-                      </TouchableOpacity>
-                      <TouchableOpacity onPress={() => handleDelete(item.id, item.name)} style={styles.actionBtn}>
-                        <Ionicons name="trash-outline" size={14} color="#e74c3c" />
-                      </TouchableOpacity>
+                    <Text style={[styles.dateChipNum, isSelected && styles.dateChipTextSelected]}>{date.getDate()}</Text>
+                    {isToday && <View style={[styles.todayDot, isSelected && styles.todayDotSelected]} />}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
+
+          {/* Weekly: 7 date chips for the week + prev/next arrows */}
+          {viewMode === 'weekly' && (
+            <>
+              <View style={styles.dateChipsRow}>
+                {Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)).map((date, i) => {
+                  const isToday = isSameDay(date, new Date());
+                  return (
+                    <View key={i} style={[styles.dateChip, isToday && styles.dateChipSelected]}>
+                      <Text style={[styles.dateChipDay, isToday && styles.dateChipTextSelected]}>
+                        {date.toLocaleDateString('en-US', { weekday: 'short' })}
+                      </Text>
+                      <Text style={[styles.dateChipNum, isToday && styles.dateChipTextSelected]}>{date.getDate()}</Text>
+                      {isToday && <View style={[styles.todayDot, styles.todayDotSelected]} />}
+                    </View>
+                  );
+                })}
+              </View>
+              <View style={styles.navRow}>
+                <TouchableOpacity onPress={() => setSelectedDate(d => addDays(d, -7))}>
+                  <Ionicons name="chevron-back" size={22} color="#8a8a8a" />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => setSelectedDate(d => addDays(d, 7))}>
+                  <Ionicons name="chevron-forward" size={22} color="#8a8a8a" />
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
+
+          {/* Monthly nav */}
+          {viewMode === 'monthly' && (
+            <View style={styles.navRow}>
+              <TouchableOpacity onPress={() => setSelectedDate(d => { const n = new Date(d); n.setMonth(n.getMonth() - 1); return n; })}>
+                <Ionicons name="chevron-back" size={22} color="#8a8a8a" />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setSelectedDate(d => { const n = new Date(d); n.setMonth(n.getMonth() + 1); return n; })}>
+                <Ionicons name="chevron-forward" size={22} color="#8a8a8a" />
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {loading ? (
+            <ActivityIndicator color="#00bf63" style={{ marginTop: 40 }} />
+          ) : (
+            <FlatList
+              data={filteredRecordings}
+              keyExtractor={r => r.id}
+              contentContainerStyle={styles.list}
+              showsVerticalScrollIndicator={false}
+              renderItem={({ item }) => {
+                const cfg = TYPE_CONFIG[item.type] ?? { color: '#1c1d1d', sign: '', label: item.type };
+                return (
+                  <View style={styles.recordingCard}>
+                    <View style={styles.recordingLeft}>
+                      {item.categories ? (
+                        <View style={[styles.catDot, { backgroundColor: item.categories.color }]}>
+                          <Ionicons name={item.categories.icon} size={12} color="#1c1d1d" />
+                        </View>
+                      ) : (
+                        <View style={[styles.catDot, { backgroundColor: '#e8e8e8' }]}>
+                          <Ionicons name="ellipse-outline" size={12} color="#8a8a8a" />
+                        </View>
+                      )}
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.recordingName}>{item.name}</Text>
+                        <Text style={styles.recordingMeta}>
+                          {cfg.label} · {new Date(item.transaction_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </Text>
+                        {item.account ? <Text style={styles.recordingAccount}>{ACCOUNT_VERB[item.type] ?? 'Via'}: {item.account.account_name} · {item.account.bank}</Text> : null}
+                        {item.notes ? <Text style={styles.recordingNotes} numberOfLines={1}>{item.notes}</Text> : null}
+                        {item.status === 'settled' ? <Text style={styles.settledBadge}>✓ settled</Text> : null}
+                      </View>
+                    </View>
+                    <View style={styles.recordingRight}>
+                      <Text style={[styles.recordingAmount, { color: cfg.color }]}>
+                        {cfg.sign}{Number(item.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      </Text>
+                      <View style={styles.recordingActions}>
+                        <TouchableOpacity onPress={() => router.push({ pathname: '/(app)/split-bill', params: { recordingId: item.id, recordingName: item.name, amount: item.amount } } as any)} style={styles.actionBtn}>
+                          <Ionicons name="people-outline" size={14} color={splitIds.has(item.id) ? '#00bf63' : '#b0b0b0'} />
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => router.push({ pathname: '/(app)/add-recording', params: { spaceId, spaceName: name, defaultDate: selectedDate.toISOString().split('T')[0], editId: item.id } } as any)} style={styles.actionBtn}>
+                          <Ionicons name="pencil-outline" size={14} color="#8a8a8a" />
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => handleDelete(item.id, item.name)} style={styles.actionBtn}>
+                          <Ionicons name="trash-outline" size={14} color="#e74c3c" />
+                        </TouchableOpacity>
+                      </View>
                     </View>
                   </View>
+                );
+              }}
+              ListEmptyComponent={
+                <View style={styles.empty}>
+                  <Ionicons name="receipt-outline" size={40} color="#e8e8e8" />
+                  <Text style={styles.emptyText}>no recordings</Text>
                 </View>
-              );
-            }}
-            ListEmptyComponent={
-              <View style={styles.empty}>
-                <Ionicons name="receipt-outline" size={40} color="#e8e8e8" />
-                <Text style={styles.emptyText}>no recordings</Text>
-              </View>
-            }
-          />
-        )}
+              }
+            />
+          )}
+        </Animated.View>
 
         <TouchableOpacity
           style={styles.fab}
@@ -313,21 +332,11 @@ const dateRangeLabel = getDateRangeLabel(viewMode, selectedDate);
           </View>
         </View>
       </Modal>
-
-      <Modal visible={showDatePicker} transparent animationType="fade" onRequestClose={() => setShowDatePicker(false)}>
-        <TouchableOpacity style={styles.pickerOverlay} activeOpacity={1} onPress={() => setShowDatePicker(false)}>
-          <View style={styles.pickerBox}>
-            <Text style={styles.pickerTitle}>jump to date</Text>
-            <TextInput style={styles.pickerInput} placeholder="YYYY-MM-DD" placeholderTextColor="#b0b0b0" value={dateInputVal} onChangeText={setDateInputVal} autoFocus returnKeyType="go" onSubmitEditing={handleDateInputSubmit} />
-            <TouchableOpacity style={styles.pickerBtn} onPress={handleDateInputSubmit}>
-              <Text style={styles.pickerBtnText}>go</Text>
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-      </Modal>
     </Animated.View>
   );
 }
+
+const DOODLE_W = 90;
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#ffffff', position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
@@ -341,9 +350,10 @@ const styles = StyleSheet.create({
   tabItem: { paddingVertical: 8 },
   tabText: { fontFamily: 'DMSans_400Regular', fontSize: 19, color: '#425252' },
   tabTextActive: { fontFamily: 'DMSans_600SemiBold', color: '#425252' },
-  circleDoodle: { position: 'absolute', width: 110, height: 62, top: -8, alignSelf: 'center' },
+  circleDoodle: { position: 'absolute', width: DOODLE_W, height: 54, top: -6, pointerEvents: 'none' },
+  contentArea: { flex: 1 },
   dateRangeLabel: { fontFamily: 'Avenelle', fontSize: 19, color: '#545454', paddingHorizontal: 48, marginBottom: 18, marginTop: 8, textAlign: 'center' },
-  dateChipsRow: { flexDirection: 'row', paddingHorizontal: 48, marginBottom: 20, gap: 8, justifyContent: 'center' },
+  dateChipsRow: { flexDirection: 'row', paddingHorizontal: 48, marginBottom: 14, gap: 8, justifyContent: 'center' },
   dateChip: { flex: 1, alignItems: 'center', paddingVertical: 15, paddingHorizontal: 4, borderRadius: 18, backgroundColor: '#ffffff', minHeight: 75, borderWidth: 1.5, borderColor: '#929090' },
   dateChipSelected: { backgroundColor: '#0ccfcf', borderColor: '#0ccfcf' },
   dateChipDay: { fontFamily: 'DMSans_700Bold', fontSize: 11, color: '#b0b0b0' },
@@ -372,7 +382,6 @@ const styles = StyleSheet.create({
   pickerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'center', alignItems: 'center' },
   pickerBox: { backgroundColor: '#ffffff', borderRadius: 20, padding: 24, width: '80%', gap: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.1, shadowRadius: 20, elevation: 10 },
   pickerTitle: { fontFamily: 'DMSans_700Bold', fontSize: 16, color: '#1c1d1d', marginBottom: 4 },
-  pickerInput: { backgroundColor: '#f5f5f5', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, fontFamily: 'DMSans_400Regular', fontSize: 15, color: '#1c1d1d', borderWidth: 1, borderColor: '#e8e8e8' },
   pickerBtn: { backgroundColor: '#00bf63', borderRadius: 999, paddingVertical: 12, alignItems: 'center' },
   pickerBtnText: { fontFamily: 'DMSans_600SemiBold', fontSize: 14, color: '#fff' },
 });
