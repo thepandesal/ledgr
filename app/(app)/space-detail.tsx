@@ -123,10 +123,7 @@ export default function SpaceDetailScreen() {
     return true;
   });
 
-  const totalIncome = filteredRecordings.filter(r => ['income', 'receivable', 'savings'].includes(r.type)).reduce((s, r) => s + Number(r.amount), 0);
-  const totalExpense = filteredRecordings.filter(r => r.type === 'expense').reduce((s, r) => s + Number(r.amount), 0);
-
-  const dateRangeLabel = getDateRangeLabel(viewMode, selectedDate);
+const dateRangeLabel = getDateRangeLabel(viewMode, selectedDate);
 
   return (
     <Animated.View style={[styles.container, { transform: [{ translateX: slideAnim }] }]}>
@@ -143,25 +140,6 @@ export default function SpaceDetailScreen() {
           <Text style={styles.spaceName}>{(name ?? '').toLowerCase()}</Text>
         </View>
 
-        {/* Summary */}
-        <View style={styles.summary}>
-          <View style={styles.summaryItem}>
-            <Text style={styles.summaryLabel}>in</Text>
-            <Text style={[styles.summaryAmount, { color: '#00bf63' }]}>+{totalIncome.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
-          </View>
-          <View style={styles.summaryDivider} />
-          <View style={styles.summaryItem}>
-            <Text style={styles.summaryLabel}>out</Text>
-            <Text style={[styles.summaryAmount, { color: '#e74c3c' }]}>-{totalExpense.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
-          </View>
-          <View style={styles.summaryDivider} />
-          <View style={styles.summaryItem}>
-            <Text style={styles.summaryLabel}>net</Text>
-            <Text style={[styles.summaryAmount, { color: totalIncome - totalExpense >= 0 ? '#00bf63' : '#e74c3c' }]}>
-              {totalIncome - totalExpense >= 0 ? '+' : ''}{(totalIncome - totalExpense).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-            </Text>
-          </View>
-        </View>
 
         {/* View mode tabs */}
         <View style={styles.tabsWrapper}>
@@ -351,19 +329,14 @@ const styles = StyleSheet.create({
   inner: { flex: 1 },
   backBtn: { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 4 },
   titleBlock: { paddingHorizontal: 24, marginTop: 8, marginBottom: 20 },
-  spacesLabel: { fontFamily: 'Avenelle', fontSize: 13, color: '#929090' },
-  spaceName: { fontFamily: 'Avenelle', fontSize: 40, color: '#0ccfcf', lineHeight: 46 },
-  summary: { flexDirection: 'row', marginHorizontal: 24, backgroundColor: '#ffffff', borderRadius: 16, padding: 16, marginBottom: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 },
-  summaryItem: { flex: 1, alignItems: 'center', gap: 4 },
-  summaryLabel: { fontFamily: 'DMSans_400Regular', fontSize: 11, color: '#b0b0b0', textTransform: 'uppercase', letterSpacing: 0.5 },
-  summaryAmount: { fontFamily: 'DMSans_700Bold', fontSize: 16 },
-  summaryDivider: { width: 1, backgroundColor: '#e8e8e8' },
+  spacesLabel: { fontFamily: 'Avenelle', fontSize: 18, color: '#929090' },
+  spaceName: { fontFamily: 'Avenelle', fontSize: 32, color: '#0ccfcf', lineHeight: 38, textShadowColor: 'rgba(0,0,0,0.15)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 6 },
   tabsWrapper: { paddingHorizontal: 24, marginBottom: 4 },
   tabs: { flexDirection: 'row', gap: 24 },
   tabItem: { paddingVertical: 6 },
   tabText: { fontFamily: 'DMSans_400Regular', fontSize: 15, color: '#425252' },
   tabTextActive: { fontFamily: 'DMSans_600SemiBold', color: '#425252' },
-  circleDoodle: { position: 'absolute', width: 70, height: 40, top: -2, pointerEvents: 'none' },
+  circleDoodle: { position: 'absolute', width: 90, height: 50, top: -8, left: -8, pointerEvents: 'none' },
   dateRangeLabel: { fontFamily: 'Avenelle', fontSize: 18, color: '#1c1d1d', paddingHorizontal: 24, marginBottom: 14, marginTop: 6 },
   dateChipsRow: { flexDirection: 'row', paddingHorizontal: 24, marginBottom: 16, gap: 6 },
   dateChip: { flex: 1, alignItems: 'center', paddingVertical: 12, paddingHorizontal: 4, borderRadius: 14, backgroundColor: '#ffffff', minHeight: 60 },
