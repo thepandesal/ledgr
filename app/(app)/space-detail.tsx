@@ -183,9 +183,10 @@ export default function SpaceDetailScreen() {
                     <View style={{ flex: 1 }}>
                       <Text style={styles.recordingName}>{item.name}</Text>
                       <Text style={styles.recordingMeta}>
-                        {cfg.label} · {new Date(item.transaction_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                        {item.status === 'settled' ? ' · settled' : ''}
+                        {cfg.label} · {new Date(item.transaction_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                       </Text>
+                      {item.notes ? <Text style={styles.recordingNotes} numberOfLines={1}>{item.notes}</Text> : null}
+                      {item.status === 'settled' ? <Text style={styles.settledBadge}>settled</Text> : null}
                     </View>
                   </View>
                   <View style={styles.recordingRight}>
@@ -198,6 +199,12 @@ export default function SpaceDetailScreen() {
                         style={styles.actionBtn}
                       >
                         <Ionicons name="people-outline" size={14} color={splitIds.has(item.id) ? '#00bf63' : '#b0b0b0'} />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => router.push({ pathname: '/(app)/add-recording', params: { spaceId, spaceName: name, defaultDate: selectedDate.toISOString().split('T')[0], editId: item.id } } as any)}
+                        style={styles.actionBtn}
+                      >
+                        <Ionicons name="pencil-outline" size={14} color="#8a8a8a" />
                       </TouchableOpacity>
                       <TouchableOpacity onPress={() => handleDelete(item.id, item.name)} style={styles.actionBtn}>
                         <Ionicons name="trash-outline" size={14} color="#e74c3c" />
@@ -292,6 +299,8 @@ const styles = StyleSheet.create({
   catDot: { width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
   recordingName: { fontFamily: 'DMSans_600SemiBold', fontSize: 14, color: '#1c1d1d' },
   recordingMeta: { fontFamily: 'DMSans_400Regular', fontSize: 11, color: '#b0b0b0', marginTop: 2 },
+  recordingNotes: { fontFamily: 'DMSans_400Regular', fontSize: 11, color: '#8a8a8a', marginTop: 2, fontStyle: 'italic' },
+  settledBadge: { fontFamily: 'DMSans_600SemiBold', fontSize: 10, color: '#00bf63', marginTop: 3 },
   recordingAmount: { fontFamily: 'DMSans_700Bold', fontSize: 15 },
   recordingActions: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   actionBtn: { padding: 2 },

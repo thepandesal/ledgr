@@ -21,7 +21,7 @@ const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const FREQUENCIES = ['daily', 'weekly', 'monthly', 'yearly'];
 
 export default function AddRecordingScreen() {
-  const { spaceId, spaceName, defaultDate } = useLocalSearchParams<{ spaceId: string; spaceName: string; defaultDate: string }>();
+  const { spaceId, spaceName, defaultDate, editId } = useLocalSearchParams<{ spaceId: string; spaceName: string; defaultDate: string; editId: string }>();
   const router = useRouter();
   const slideAnim = useRef(new Animated.Value(width)).current;
 
@@ -63,6 +63,19 @@ export default function AddRecordingScreen() {
     ]);
     if (cats.data) setCategories(cats.data);
     if (accs.data) setAccounts(accs.data);
+    // Pre-fill if editing
+    if (editId) {
+      const { data: rec } = await supabase.from('recordings').select('*, categories(id,name,color,icon), accounts(id,account_name,bank,color)').eq('id', editId).single();
+      if (rec) {
+        setRecName(rec.name);
+        setType(rec.type);
+        setAmount(String(rec.amount));
+        setDate(rec.transaction_date);
+        setNotes(rec.notes ?? '');
+        if (rec.categories) { setSelectedCategory(rec.categories); }
+        if (rec.accounts) { setSelectedAccount(rec.accounts); }
+      }
+    }
   };
 
   const handleBack = () => {
@@ -84,16 +97,25 @@ export default function AddRecordingScreen() {
     setLoading(true); setError('');
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      const { error: err } = await supabase.from('recordings').insert({
-        space_id: spaceId, user_id: user!.id, name: recName.trim(), type,
-        amount: parseFloat(amount), transaction_date: date,
-        notes: notes.trim() || null, category_id: selectedCategory?.id || null, account_id: selectedAccount?.id || null,
-        is_recurring: isLoanType ? isRecurring : false,
-        recurring_frequency: isLoanType && isRecurring ? frequency : null,
-        recurring_days: isLoanType && isRecurring && frequency === 'weekly' ? recurringDays : null,
-        recurring_date: isLoanType && isRecurring && ['monthly', 'yearly'].includes(frequency) ? parseInt(recurringDate) : null,
-      });
-      if (err) throw err;
+      if (editId) {
+        const { error: err } = await supabase.from('recordings').update({
+          name: recName.trim(), type, amount: parseFloat(amount),
+          transaction_date: date, notes: notes.trim() || null,
+          category_id: selectedCategory?.id || null, account_id: selectedAccount?.id || null,
+        }).eq('id', editId);
+        if (err) throw err;
+      } else {
+        const { error: err } = await supabase.from('recordings').insert({
+          space_id: spaceId, user_id: user!.id, name: recName.trim(), type,
+          amount: parseFloat(amount), transaction_date: date,
+          notes: notes.trim() || null, category_id: selectedCategory?.id || null, account_id: selectedAccount?.id || null,
+          is_recurring: isLoanType ? isRecurring : false,
+          recurring_frequency: isLoanType && isRecurring ? frequency : null,
+          recurring_days: isLoanType && isRecurring && frequency === 'weekly' ? recurringDays : null,
+          recurring_date: isLoanType && isRecurring && ['monthly', 'yearly'].includes(frequency) ? parseInt(recurringDate) : null,
+        });
+        if (err) throw err;
+      }
       handleBack();
     } catch (e: any) { setError(e.message); setLoading(false); }
   };
@@ -108,7 +130,7 @@ export default function AddRecordingScreen() {
           <TouchableOpacity onPress={handleBack} style={styles.backBtn}>
             <Ionicons name="close" size={24} color="#8a8a8a" />
           </TouchableOpacity>
-          <Text style={styles.title}>new recording</Text>
+          <Text style={styles.title}>{editId ? 'edit recording' : 'new recording'}</Text>
           <View style={{ width: 32 }} />
         </View>
 
