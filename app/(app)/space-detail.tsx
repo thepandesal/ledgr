@@ -47,11 +47,8 @@ export default function SpaceDetailScreen() {
   const [viewMode, setViewMode] = useState<ViewMode>('daily');
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [recordings, setRecordings] = useState<any[]>([]);
-  const [splitIds, setSplitIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [confirmModal, setConfirmModal] = useState(false);
-  const [pendingDeleteId, setPendingDeleteId] = useState('');
-  const [pendingDeleteName, setPendingDeleteName] = useState('');
   const [tabLayouts, setTabLayouts] = useState<{ x: number; width: number }[]>([]);
 
   useEffect(() => {
@@ -87,11 +84,7 @@ export default function SpaceDetailScreen() {
       .select('*, categories:category_id(name, color, icon), account:account_id(account_name, bank, color)')
       .eq('space_id', spaceId)
       .order('transaction_date', { ascending: false });
-    if (data) {
-      setRecordings(data);
-      const { data: splits } = await supabase.from('bill_splits').select('recording_id').in('recording_id', data.map(r => r.id));
-      if (splits) setSplitIds(new Set(splits.map((s: any) => s.recording_id)));
-    }
+    if (data) setRecordings(data);
     setLoading(false);
   };
 
@@ -282,59 +275,51 @@ export default function SpaceDetailScreen() {
                       const showPartial = (item.type === 'receivable' || item.type === 'payable') && item.status === 'partial' && item.paid_amount;
 
                       return (
-                        <View key={item.id} style={styles.recordingCard}>
-                          {/* Left: category icon */}
-                          <View style={[styles.catDot, { backgroundColor: item.categories?.color ?? '#e8e8e8' }]}>
-                            <Ionicons name={item.categories?.icon ?? 'ellipse-outline'} size={14} color="#1c1d1d" />
+                        <View key={item.id} style={[styles.recordingCard, { backgroundColor: amountColor }]}>
+                          {/* Left: category icon, no background */}
+                          <View style={styles.catIcon}>
+                            <Ionicons name={item.categories?.icon ?? 'ellipse-outline'} size={22} color="#fff" />
                           </View>
 
                           {/* Middle: 3 rows */}
                           <View style={styles.recordingMiddle}>
-                            <Text style={styles.recordingName} numberOfLines={1}>{item.name}</Text>
+                            <Text style={styles.recordingName} numberOfLines={1} ellipsizeMode="tail">{item.name}</Text>
                             <View style={styles.recordingRow2}>
-                              <Text style={styles.recordingLabel}>
+                              <Text style={styles.recordingLabel} numberOfLines={1}>
                                 {item.type.charAt(0).toUpperCase() + item.type.slice(1)}:
                               </Text>
                               {statusLabel ? (
-                                <Text style={[styles.recordingValue, { color: amountColor }]}>{statusLabel}</Text>
+                                <Text style={styles.recordingValue} numberOfLines={1}>{statusLabel}</Text>
                               ) : (
-                                <Text style={styles.recordingValue}>{item.categories?.name ?? '—'}</Text>
+                                <Text style={styles.recordingValue} numberOfLines={1}>{item.categories?.name ?? '—'}</Text>
                               )}
                             </View>
                             {(accountName || item.person_name) && (
                               <View style={styles.recordingRow3}>
-                                <Text style={styles.recordingLabel}>{verb}:</Text>
-                                <Text style={styles.recordingValue}>{item.person_name ?? accountName}</Text>
+                                <Text style={styles.recordingLabel} numberOfLines={1}>{verb}:</Text>
+                                <Text style={styles.recordingValue} numberOfLines={1}>{item.person_name ?? accountName}</Text>
                               </View>
                             )}
                           </View>
 
-                          {/* Right: amount + actions */}
+                          {/* Right: amount + edit */}
                           <View style={styles.recordingRight}>
                             <View style={{ alignItems: 'flex-end' }}>
-                              <Text style={[styles.recordingAmount, { color: amountColor }]}>
+                              <Text style={styles.recordingAmount}>
                                 {showPartial
                                   ? Number(item.paid_amount).toLocaleString('en-US', { minimumFractionDigits: 2 })
                                   : Number(item.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })
                                 }
                               </Text>
                               {showPartial && (
-                                <Text style={{ fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#b0b0b0' }}>
+                                <Text style={{ fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: 'rgba(255,255,255,0.7)' }}>
                                   / {Number(item.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                                 </Text>
                               )}
                             </View>
-                            <View style={styles.recordingActions}>
-                              <TouchableOpacity onPress={() => router.push({ pathname: '/(app)/split-bill', params: { recordingId: item.id, recordingName: item.name, amount: item.amount } } as any)} style={styles.actionBtn}>
-                                <Ionicons name="people-outline" size={14} color={splitIds.has(item.id) ? '#00bf63' : '#b0b0b0'} />
-                              </TouchableOpacity>
-                              <TouchableOpacity onPress={() => router.push({ pathname: '/(app)/add-recording', params: { spaceId, spaceName: name, defaultDate: selectedDate.toISOString().split('T')[0], editId: item.id } } as any)} style={styles.actionBtn}>
-                                <Ionicons name="pencil-outline" size={14} color="#8a8a8a" />
-                              </TouchableOpacity>
-                              <TouchableOpacity onPress={() => { setPendingDeleteId(item.id); setPendingDeleteName(item.name); setConfirmModal(true); }} style={styles.actionBtn}>
-                                <Ionicons name="trash-outline" size={14} color="#e74c3c" />
-                              </TouchableOpacity>
-                            </View>
+                            <TouchableOpacity onPress={() => router.push({ pathname: '/(app)/add-recording', params: { spaceId, spaceName: name, defaultDate: selectedDate.toISOString().split('T')[0], editId: item.id } } as any)} style={styles.actionBtn}>
+                              <Ionicons name="pencil-outline" size={13} color="rgba(255,255,255,0.8)" />
+                            </TouchableOpacity>
                           </View>
                         </View>
                       );
@@ -403,18 +388,18 @@ const styles = StyleSheet.create({
   todayDot: { width: 3, height: 3, borderRadius: 2, backgroundColor: '#0ccfcf', marginTop: 3 },
   todayDotSelected: { backgroundColor: '#fff' },
   list: { paddingHorizontal: 48, paddingBottom: 100, gap: 20 },
-  dateGroupLabel: { fontFamily: 'Avenelle', fontSize: 19, color: '#545454', marginBottom: 10 },
+  dateGroupLabel: { fontFamily: 'Avenelle', fontSize: 19, color: '#545454', marginBottom: 10, textTransform: 'lowercase' },
   dateGroupItems: { gap: 10 },
-  recordingCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f9f9f9', borderRadius: 999, paddingVertical: 14, paddingHorizontal: 16, gap: 12 },
-  catDot: { width: 38, height: 38, borderRadius: 19, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
-  recordingMiddle: { flex: 1, gap: 2 },
-  recordingName: { fontFamily: 'RobotoMono_700Bold', fontSize: 19.8, color: '#1c1d1d' },
+  recordingCard: { flexDirection: 'row', alignItems: 'center', borderRadius: 999, paddingVertical: 12, paddingHorizontal: 16, gap: 10 },
+  catIcon: { flexShrink: 0 },
+  recordingMiddle: { flex: 1, gap: 1, overflow: 'hidden' },
+  recordingName: { fontFamily: 'RobotoMono_700Bold', fontSize: 14, color: '#fff', numberOfLines: 1 },
   recordingRow2: { flexDirection: 'row', gap: 4 },
   recordingRow3: { flexDirection: 'row', gap: 4 },
-  recordingLabel: { fontFamily: 'RobotoMono_400Regular', fontSize: 15.3, color: '#8a8a8a' },
-  recordingValue: { fontFamily: 'RobotoMono_700Bold', fontSize: 15.3, color: '#1c1d1d' },
-  recordingRight: { alignItems: 'flex-end', gap: 6, flexShrink: 0 },
-  recordingAmount: { fontFamily: 'RobotoMono_700Bold', fontSize: 24 },
+  recordingLabel: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: 'rgba(255,255,255,0.75)' },
+  recordingValue: { fontFamily: 'RobotoMono_700Bold', fontSize: 11, color: '#fff', flexShrink: 1 },
+  recordingRight: { alignItems: 'flex-end', gap: 4, flexShrink: 0 },
+  recordingAmount: { fontFamily: 'RobotoMono_700Bold', fontSize: 18, color: '#fff' },
   recordingActions: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   actionBtn: { padding: 2 },
   empty: { alignItems: 'center', paddingTop: 60, gap: 10 },
