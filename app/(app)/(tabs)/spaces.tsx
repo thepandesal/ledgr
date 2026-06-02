@@ -109,25 +109,28 @@ export default function SpacesScreen() {
           </View>
           <Text style={styles.greeting}>Hey, <Text style={styles.greetingName}>{userName}!</Text></Text>
         </View>
+        <TouchableOpacity style={styles.cameraBtn} activeOpacity={0.7}>
+          <Ionicons name="camera-outline" size={22} color="#1c1d1d" />
+        </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <Text style={styles.sectionTitle}>Spaces</Text>
+        <Text style={styles.sectionTitle}>spaces</Text>
         <View style={styles.grid}>
           {spaces.map(space => (
-            <View key={space.id} style={[styles.spaceCard, { backgroundColor: space.color }]}>
+            <View key={space.id} style={styles.spaceCard}>
               <TouchableOpacity style={styles.spaceCardMain} activeOpacity={0.8}
                 onPress={() => router.push({ pathname: '/(app)/space-detail', params: { spaceId: space.id, name: space.name, color: space.color } })}>
-                <Ionicons name={space.icon as any} size={16} color="#1c1d1d" />
-                <Text style={styles.spaceCardText} numberOfLines={1}>{space.name}</Text>
+                <Ionicons name={space.icon as any} size={16} color="#fff" />
+                <Text style={styles.spaceCardText} numberOfLines={1}>{space.name.toLowerCase()}</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={() => openMenu(space)} style={styles.spaceMenuBtn}>
-                <Ionicons name="ellipsis-vertical" size={14} color="#1c1d1d" />
+                <Ionicons name="ellipsis-vertical" size={14} color="#fff" />
               </TouchableOpacity>
             </View>
           ))}
           <TouchableOpacity style={styles.addCard} activeOpacity={0.8} onPress={openCreate}>
-            <Ionicons name="add" size={24} color="#b0b0b0" />
+            <Ionicons name="add" size={24} color="#fff" />
             <Text style={styles.addCardText}>add a space</Text>
           </TouchableOpacity>
         </View>
@@ -248,20 +251,21 @@ export default function SpacesScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f5f5f5' },
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 28, paddingVertical: 16 },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   avatarFallback: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#e8e8e8', justifyContent: 'center', alignItems: 'center' },
+  cameraBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#e8e8e8', justifyContent: 'center', alignItems: 'center' },
   greeting: { fontFamily: 'DMSans_400Regular', fontSize: 16, color: '#8a8a8a' },
   greetingName: { fontFamily: 'DMSans_700Bold', color: '#1c1d1d' },
-  scroll: { paddingHorizontal: 20, paddingBottom: 40 },
-  sectionTitle: { fontFamily: 'DMSans_700Bold', fontSize: 22, color: '#1c1d1d', marginBottom: 16 },
+  scroll: { paddingHorizontal: 28, paddingBottom: 40, paddingTop: 12 },
+  sectionTitle: { fontFamily: 'Avenelle', fontSize: 36, color: '#1c1d1d', marginBottom: 20 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  spaceCard: { width: '47%', borderRadius: 999, paddingVertical: 10, paddingLeft: 16, paddingRight: 8, flexDirection: 'row', alignItems: 'center' },
+  spaceCard: { width: '47%', borderRadius: 999, paddingVertical: 10, paddingLeft: 16, paddingRight: 8, flexDirection: 'row', alignItems: 'center', backgroundColor: '#0ccfcf' },
   spaceCardMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  spaceCardText: { fontFamily: 'DMSans_600SemiBold', fontSize: 13, color: '#1c1d1d', flex: 1 },
+  spaceCardText: { fontFamily: 'Avenelle', fontSize: 15, color: '#fff', flex: 1 },
   spaceMenuBtn: { padding: 6 },
-  addCard: { width: '47%', borderRadius: 999, paddingVertical: 14, paddingHorizontal: 16, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e8e8e8', gap: 6 },
-  addCardText: { fontFamily: 'DMSans_400Regular', fontSize: 13, color: '#b0b0b0' },
+  addCard: { width: '47%', borderRadius: 999, paddingVertical: 14, paddingHorizontal: 16, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', backgroundColor: '#545454', gap: 6 },
+  addCardText: { fontFamily: 'DMSans_400Regular', fontSize: 13, color: '#fff' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'flex-end' },
   modalScroll: { justifyContent: 'flex-end', flexGrow: 1 },
   modalContent: { backgroundColor: '#ffffff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 },
