@@ -1,4 +1,5 @@
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../src/lib/supabase';
 import { useState } from 'react';
 
@@ -36,9 +37,9 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f5f5f5' },
-  inner: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
+  inner: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24, marginTop: -40 },
   tagline: { fontFamily: 'RobotoMono_400Regular', fontSize: 14, color: '#1c1d1d', textAlign: 'center', marginBottom: 4 },
-  brand: { fontFamily: 'Avenelle', fontSize: 288, color: '#0ccfcf', textAlign: 'center', marginBottom: 16, lineHeight: 300 },
+  brand: { fontFamily: 'Avenelle', fontSize: 120, color: '#0ccfcf', textAlign: 'center', marginBottom: 16, lineHeight: 130 },
   buttons: { width: '70%', gap: 12 },
   button: {
     backgroundColor: '#425252',
