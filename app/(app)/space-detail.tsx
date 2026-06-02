@@ -49,6 +49,8 @@ export default function SpaceDetailScreen() {
   const [recordings, setRecordings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [confirmModal, setConfirmModal] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState('');
+  const [pendingDeleteName, setPendingDeleteName] = useState('');
   const [tabLayouts, setTabLayouts] = useState<{ x: number; width: number }[]>([]);
 
   useEffect(() => {
