@@ -56,8 +56,16 @@ export default function SpaceDetailScreen() {
   const [showPicker, setShowPicker] = useState(false);
   const [pickerMonth, setPickerMonth] = useState(new Date().getMonth());
   const [pickerYear, setPickerYear] = useState(new Date().getFullYear());
+  const [pickerDay, setPickerDay] = useState<number | null>(null);
 
   const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+  const openPicker = () => {
+    setPickerMonth(selectedDate.getMonth());
+    setPickerYear(selectedDate.getFullYear());
+    setPickerDay(viewMode === 'daily' ? selectedDate.getDate() : null);
+    setShowPicker(true);
+  };
 
   useEffect(() => {
     Animated.timing(slideAnim, { toValue: 0, duration: 280, useNativeDriver: true }).start();
@@ -181,7 +189,7 @@ export default function SpaceDetailScreen() {
 
           {/* Daily: plain month label centered */}
           {viewMode === 'daily' && (
-            <TouchableOpacity onPress={() => { setPickerMonth(selectedDate.getMonth()); setPickerYear(selectedDate.getFullYear()); setShowPicker(true); }}>
+            <TouchableOpacity onPress={openPicker}>
               <Text style={styles.dateRangeLabel}>{getDailyMonthLabel(selectedDate).toLowerCase()}</Text>
             </TouchableOpacity>
           )}
@@ -195,7 +203,7 @@ export default function SpaceDetailScreen() {
               }}>
                 <Ionicons name="chevron-back" size={22} color="#8a8a8a" />
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => { setPickerMonth(selectedDate.getMonth()); setPickerYear(selectedDate.getFullYear()); setShowPicker(true); }}>
+              <TouchableOpacity onPress={openPicker}>
                 <Text style={styles.dateRangeLabel}>{getNavLabel(viewMode, selectedDate).toLowerCase()}</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={() => {
@@ -346,40 +354,86 @@ export default function SpaceDetailScreen() {
             <TouchableOpacity activeOpacity={1} onPress={e => e.stopPropagation()}>
               <View style={styles.datePickerBox}>
                 <Text style={styles.datePickerTitle}>jump to</Text>
-                {/* Year nav */}
+
+                {/* Month + Year nav row */}
                 <View style={styles.datePickerYearRow}>
-                  <TouchableOpacity onPress={() => setPickerYear(y => y - 1)}>
+                  <TouchableOpacity onPress={() => {
+                    if (pickerMonth === 0) { setPickerMonth(11); setPickerYear(y => y - 1); }
+                    else setPickerMonth(m => m - 1);
+                  }}>
                     <Ionicons name="chevron-back" size={20} color="#425252" />
                   </TouchableOpacity>
-                  <Text style={styles.datePickerYear}>{pickerYear}</Text>
-                  <TouchableOpacity onPress={() => setPickerYear(y => y + 1)}>
+                  <Text style={styles.datePickerYear}>
+                    {MONTHS[pickerMonth].toLowerCase()} {pickerYear}
+                  </Text>
+                  <TouchableOpacity onPress={() => {
+                    if (pickerMonth === 11) { setPickerMonth(0); setPickerYear(y => y + 1); }
+                    else setPickerMonth(m => m + 1);
+                  }}>
                     <Ionicons name="chevron-forward" size={20} color="#425252" />
                   </TouchableOpacity>
                 </View>
-                {/* Month grid */}
-                <View style={styles.datePickerMonthGrid}>
-                  {MONTHS.map((m, i) => {
-                    const isActive = i === pickerMonth;
-                    return (
-                      <TouchableOpacity
-                        key={m}
-                        style={[styles.datePickerMonthBtn, isActive && styles.datePickerMonthBtnActive]}
-                        onPress={() => setPickerMonth(i)}
-                      >
-                        <Text style={[styles.datePickerMonthText, isActive && styles.datePickerMonthTextActive]}>
-                          {m.slice(0, 3).toLowerCase()}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
+
+                {/* Daily / Weekly: show date grid */}
+                {viewMode !== 'monthly' && (() => {
+                  const firstDay = new Date(pickerYear, pickerMonth, 1).getDay();
+                  const daysInMonth = new Date(pickerYear, pickerMonth + 1, 0).getDate();
+                  const cells = Array(firstDay).fill(null).concat(
+                    Array.from({ length: daysInMonth }, (_, i) => i + 1)
+                  );
+                  return (
+                    <View>
+                      {/* Weekday headers */}
+                      <View style={styles.calWeekRow}>
+                        {['su','mo','tu','we','th','fr','sa'].map(d => (
+                          <Text key={d} style={styles.calWeekDay}>{d}</Text>
+                        ))}
+                      </View>
+                      {/* Day cells */}
+                      <View style={styles.calGrid}>
+                        {cells.map((day, i) => {
+                          if (!day) return <View key={`e${i}`} style={styles.calCell} />;
+                          const isSelected = viewMode === 'daily' && day === pickerDay;
+                          const isToday = isSameDay(new Date(pickerYear, pickerMonth, day), new Date());
+                          return (
+                            <TouchableOpacity
+                              key={day}
+                              style={[styles.calCell, isSelected && styles.calCellSelected, !isSelected && isToday && styles.calCellToday]}
+                              onPress={() => setPickerDay(day)}
+                            >
+                              <Text style={[styles.calCellText, (isSelected || isToday) && styles.calCellTextActive]}>{day}</Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    </View>
+                  );
+                })()}
+
+                {/* Monthly: show month grid */}
+                {viewMode === 'monthly' && (
+                  <View style={styles.datePickerMonthGrid}>
+                    {MONTHS.map((m, i) => {
+                      const isActive = i === pickerMonth;
+                      return (
+                        <TouchableOpacity
+                          key={m}
+                          style={[styles.datePickerMonthBtn, isActive && styles.datePickerMonthBtnActive]}
+                          onPress={() => setPickerMonth(i)}
+                        >
+                          <Text style={[styles.datePickerMonthText, isActive && styles.datePickerMonthTextActive]}>
+                            {m.slice(0, 3).toLowerCase()}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
+
                 <TouchableOpacity
                   style={styles.datePickerConfirm}
                   onPress={() => {
-                    const d = new Date(selectedDate);
-                    d.setFullYear(pickerYear);
-                    d.setMonth(pickerMonth);
-                    d.setDate(1);
+                    const d = new Date(pickerYear, pickerMonth, viewMode === 'daily' && pickerDay ? pickerDay : 1);
                     setSelectedDate(d);
                     setShowPicker(false);
                   }}
@@ -462,8 +516,8 @@ const styles = StyleSheet.create({
   pickerBtnText: { fontFamily: 'DMSans_600SemiBold', fontSize: 14, color: '#fff' },
   datePickerBox: { backgroundColor: '#ffffff', borderRadius: 24, padding: 24, width: 300, gap: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 24, elevation: 12 },
   datePickerTitle: { fontFamily: 'Avenelle', fontSize: 22, color: '#0ccfcf', textAlign: 'center' },
-  datePickerYearRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 8 },
-  datePickerYear: { fontFamily: 'DMSans_700Bold', fontSize: 18, color: '#425252' },
+  datePickerYearRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 4 },
+  datePickerYear: { fontFamily: 'Avenelle', fontSize: 17, color: '#425252' },
   datePickerMonthGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   datePickerMonthBtn: { width: '30%', paddingVertical: 10, borderRadius: 999, alignItems: 'center', borderWidth: 1, borderColor: '#e8e8e8' },
   datePickerMonthBtnActive: { backgroundColor: '#0ccfcf', borderColor: '#0ccfcf' },
@@ -471,4 +525,12 @@ const styles = StyleSheet.create({
   datePickerMonthTextActive: { color: '#fff' },
   datePickerConfirm: { backgroundColor: '#425252', borderRadius: 999, paddingVertical: 13, alignItems: 'center', marginTop: 4 },
   datePickerConfirmText: { fontFamily: 'DMSans_600SemiBold', fontSize: 15, color: '#fff' },
+  calWeekRow: { flexDirection: 'row', marginBottom: 4 },
+  calWeekDay: { flex: 1, textAlign: 'center', fontFamily: 'DMSans_600SemiBold', fontSize: 11, color: '#b0b0b0' },
+  calGrid: { flexDirection: 'row', flexWrap: 'wrap' },
+  calCell: { width: '14.28%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 999 },
+  calCellSelected: { backgroundColor: '#0ccfcf' },
+  calCellToday: { backgroundColor: '#f0f0f0' },
+  calCellText: { fontFamily: 'DMSans_400Regular', fontSize: 13, color: '#425252' },
+  calCellTextActive: { fontFamily: 'DMSans_600SemiBold', color: '#fff' },
 });
