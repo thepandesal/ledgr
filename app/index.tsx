@@ -37,9 +37,9 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f5f5f5' },
   inner: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
-  tagline: { fontFamily: 'RobotoMono_400Regular', fontSize: 14, color: '#1c1d1d', textAlign: 'center', marginBottom: 12 },
-  brand: { fontFamily: 'Avenelle', fontSize: 96, color: '#0ccfcf', textAlign: 'center', marginBottom: 48, lineHeight: 100 },
-  buttons: { width: '100%', gap: 12 },
+  tagline: { fontFamily: 'RobotoMono_400Regular', fontSize: 14, color: '#1c1d1d', textAlign: 'center', marginBottom: 4 },
+  brand: { fontFamily: 'Avenelle', fontSize: 288, color: '#0ccfcf', textAlign: 'center', marginBottom: 16, lineHeight: 300 },
+  buttons: { width: '70%', gap: 12 },
   button: {
     backgroundColor: '#425252',
     borderRadius: 999,
