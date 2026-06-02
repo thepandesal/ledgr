@@ -65,15 +65,25 @@ export default function AddRecordingScreen() {
     if (accs.data) setAccounts(accs.data);
     // Pre-fill if editing
     if (editId) {
-      const { data: rec } = await supabase.from('recordings').select('*, categories(id,name,color,icon), accounts(id,account_name,bank,color)').eq('id', editId).single();
+      const { data: rec } = await supabase
+        .from('recordings')
+        .select('*, categories:category_id(id,name,color,icon), account:account_id(id,account_name,bank,color)')
+        .eq('id', editId)
+        .single();
       if (rec) {
         setRecName(rec.name);
         setType(rec.type);
         setAmount(String(rec.amount));
         setDate(rec.transaction_date);
         setNotes(rec.notes ?? '');
-        if (rec.categories) { setSelectedCategory(rec.categories); }
-        if (rec.accounts) { setSelectedAccount(rec.accounts); }
+        if (rec.categories) setSelectedCategory(rec.categories);
+        if (rec.account) setSelectedAccount(rec.account);
+        if (rec.is_recurring) {
+          setIsRecurring(true);
+          setFrequency(rec.recurring_frequency ?? 'monthly');
+          setRecurringDays(rec.recurring_days ?? []);
+          setRecurringDate(String(rec.recurring_date ?? 1));
+        }
       }
     }
   };

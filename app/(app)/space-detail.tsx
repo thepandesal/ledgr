@@ -18,6 +18,14 @@ const TYPE_CONFIG: Record<string, { color: string; sign: string; label: string }
   payable:    { color: '#8a8a8a', sign: '⋯', label: 'Payable' },
 };
 
+const ACCOUNT_VERB: Record<string, string> = {
+  expense:    'Paid from',
+  income:     'Received to',
+  savings:    'Saved to',
+  receivable: 'Lent from',
+  payable:    'Paying from',
+};
+
 function addDays(date: Date, days: number) { const d = new Date(date); d.setDate(d.getDate() + days); return d; }
 function isSameDay(a: Date, b: Date) { return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate(); }
 
@@ -44,7 +52,10 @@ export default function SpaceDetailScreen() {
 
   const loadRecordings = async () => {
     setLoading(true);
-    const { data } = await supabase.from('recordings').select('*, categories(name, color, icon)').eq('space_id', spaceId).order('transaction_date', { ascending: false });
+    const { data } = await supabase.from('recordings')
+      .select('*, categories:category_id(name, color, icon), account:account_id(account_name, bank, color)')
+      .eq('space_id', spaceId)
+      .order('transaction_date', { ascending: false });
     if (data) {
       setRecordings(data);
       const { data: splits } = await supabase.from('bill_splits').select('recording_id').in('recording_id', data.map(r => r.id));
@@ -185,8 +196,13 @@ export default function SpaceDetailScreen() {
                       <Text style={styles.recordingMeta}>
                         {cfg.label} · {new Date(item.transaction_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                       </Text>
+                      {item.account ? (
+                        <Text style={styles.recordingAccount}>
+                          {ACCOUNT_VERB[item.type] ?? 'Via'}: {item.account.account_name} · {item.account.bank}
+                        </Text>
+                      ) : null}
                       {item.notes ? <Text style={styles.recordingNotes} numberOfLines={1}>{item.notes}</Text> : null}
-                      {item.status === 'settled' ? <Text style={styles.settledBadge}>settled</Text> : null}
+                      {item.status === 'settled' ? <Text style={styles.settledBadge}>✓ settled</Text> : null}
                     </View>
                   </View>
                   <View style={styles.recordingRight}>
@@ -300,6 +316,7 @@ const styles = StyleSheet.create({
   recordingName: { fontFamily: 'DMSans_600SemiBold', fontSize: 14, color: '#1c1d1d' },
   recordingMeta: { fontFamily: 'DMSans_400Regular', fontSize: 11, color: '#b0b0b0', marginTop: 2 },
   recordingNotes: { fontFamily: 'DMSans_400Regular', fontSize: 11, color: '#8a8a8a', marginTop: 2, fontStyle: 'italic' },
+  recordingAccount: { fontFamily: 'DMSans_400Regular', fontSize: 11, color: '#8a8a8a', marginTop: 2 },
   settledBadge: { fontFamily: 'DMSans_600SemiBold', fontSize: 10, color: '#00bf63', marginTop: 3 },
   recordingAmount: { fontFamily: 'DMSans_700Bold', fontSize: 15 },
   recordingActions: { flexDirection: 'row', gap: 8, alignItems: 'center' },
