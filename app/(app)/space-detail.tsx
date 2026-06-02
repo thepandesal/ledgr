@@ -77,7 +77,7 @@ export default function SpaceDetailScreen() {
       const idx = MODES.indexOf(viewMode);
       const layout = tabLayouts[idx];
       if (!layout) return;
-      const target = layout.x + layout.width / 2 - 55;
+      const target = -(layout.width / 2) - 2;
       Animated.spring(circleAnim, { toValue: target, useNativeDriver: true, tension: 60, friction: 10 }).start();
     }
   }, [viewMode, tabLayouts]);
@@ -146,28 +146,30 @@ const dateRangeLabel = getDateRangeLabel(viewMode, selectedDate);
         <View style={styles.tabsWrapper}>
           <View style={styles.tabs}>
             {MODES.map((mode, idx) => (
-              <TouchableOpacity
-                key={mode}
-                style={styles.tabItem}
-                onPress={() => setViewMode(mode)}
-                onLayout={e => {
-                  const { x, width: w } = e.nativeEvent.layout;
-                  setTabLayouts(prev => { const next = [...prev]; next[idx] = { x, width: w }; return next; });
-                }}
-              >
-                <Text style={[styles.tabText, viewMode === mode && styles.tabTextActive]}>
-                  {mode.charAt(0).toUpperCase() + mode.slice(1)}
-                </Text>
-              </TouchableOpacity>
+              <View key={mode} style={{ alignItems: 'center' }}>
+                {tabLayouts.filter(Boolean).length === 3 && viewMode === mode && (
+                  <Animated.Image
+                    source={require('../../assets/circle-doodle.png')}
+                    style={[styles.circleDoodle, { transform: [{ translateX: circleAnim }] }]}
+                    resizeMode="contain"
+                    pointerEvents="none"
+                  />
+                )}
+                <TouchableOpacity
+                  style={styles.tabItem}
+                  onPress={() => setViewMode(mode)}
+                  onLayout={e => {
+                    const { x, width: w } = e.nativeEvent.layout;
+                    setTabLayouts(prev => { const next = [...prev]; next[idx] = { x, width: w }; return next; });
+                  }}
+                >
+                  <Text style={[styles.tabText, viewMode === mode && styles.tabTextActive]}>
+                    {mode.charAt(0).toUpperCase() + mode.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             ))}
           </View>
-          {tabLayouts.filter(Boolean).length === 3 && (
-            <Animated.Image
-              source={require('../../assets/circle-doodle.png')}
-              style={[styles.circleDoodle, { transform: [{ translateX: circleAnim }] }]}
-              resizeMode="contain"
-            />
-          )}
         </View>
 
         {/* Date range label */}
@@ -339,10 +341,10 @@ const styles = StyleSheet.create({
   tabItem: { paddingVertical: 8 },
   tabText: { fontFamily: 'DMSans_400Regular', fontSize: 19, color: '#425252' },
   tabTextActive: { fontFamily: 'DMSans_600SemiBold', color: '#425252' },
-  circleDoodle: { position: 'absolute', width: 110, height: 62, top: -10, left: 0, pointerEvents: 'none' },
-  dateRangeLabel: { fontFamily: 'Avenelle', fontSize: 23, color: '#929090', paddingHorizontal: 48, marginBottom: 18, marginTop: 8, textAlign: 'center' },
+  circleDoodle: { position: 'absolute', width: 110, height: 62, top: -8, alignSelf: 'center' },
+  dateRangeLabel: { fontFamily: 'Avenelle', fontSize: 19, color: '#545454', paddingHorizontal: 48, marginBottom: 18, marginTop: 8, textAlign: 'center' },
   dateChipsRow: { flexDirection: 'row', paddingHorizontal: 48, marginBottom: 20, gap: 8, justifyContent: 'center' },
-  dateChip: { flex: 1, alignItems: 'center', paddingVertical: 15, paddingHorizontal: 4, borderRadius: 18, backgroundColor: '#ffffff', minHeight: 75, borderWidth: 0.5, borderColor: '#929090' },
+  dateChip: { flex: 1, alignItems: 'center', paddingVertical: 15, paddingHorizontal: 4, borderRadius: 18, backgroundColor: '#ffffff', minHeight: 75, borderWidth: 1.5, borderColor: '#929090' },
   dateChipSelected: { backgroundColor: '#0ccfcf', borderColor: '#0ccfcf' },
   dateChipDay: { fontFamily: 'DMSans_700Bold', fontSize: 11, color: '#b0b0b0' },
   dateChipNum: { fontFamily: 'DMSans_700Bold', fontSize: 20, color: '#1c1d1d', marginTop: 5 },
