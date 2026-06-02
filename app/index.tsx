@@ -18,7 +18,7 @@ export default function LoginScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['bottom']}>
       <View style={styles.inner}>
         <Text style={styles.tagline}>track your money the right way with</Text>
         <Text style={styles.brand}>ledgr</Text>
@@ -37,8 +37,8 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f5f5f5' },
-  inner: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24, marginTop: -40 },
-  tagline: { fontFamily: 'RobotoMono_400Regular', fontSize: 14, color: '#1c1d1d', textAlign: 'center', marginBottom: 4 },
+  inner: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
+  tagline: { fontFamily: 'RobotoMono_400Regular', fontSize: 14, color: '#1c1d1d', textAlign: 'center', marginBottom: 16 },
   brand: { fontFamily: 'Avenelle', fontSize: 120, color: '#0ccfcf', textAlign: 'center', marginBottom: 16, lineHeight: 130 },
   buttons: { width: '70%', gap: 12 },
   button: {
