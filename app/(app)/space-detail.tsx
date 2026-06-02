@@ -64,7 +64,6 @@ export default function SpaceDetailScreen() {
   const [pendingDeleteId, setPendingDeleteId] = useState('');
   const [pendingDeleteName, setPendingDeleteName] = useState('');
 
-  // Tab widths for circle positioning
   const [tabLayouts, setTabLayouts] = useState<{ x: number; width: number }[]>([]);
 
   useEffect(() => {
@@ -74,9 +73,11 @@ export default function SpaceDetailScreen() {
   useEffect(() => { if (spaceId) loadRecordings(); }, [spaceId]);
 
   useEffect(() => {
-    if (tabLayouts.length === 3) {
+    if (tabLayouts.filter(Boolean).length === 3) {
       const idx = MODES.indexOf(viewMode);
-      const target = tabLayouts[idx]?.x ?? 0;
+      const layout = tabLayouts[idx];
+      if (!layout) return;
+      const target = layout.x + layout.width / 2 - 55;
       Animated.spring(circleAnim, { toValue: target, useNativeDriver: true, tension: 60, friction: 10 }).start();
     }
   }, [viewMode, tabLayouts]);
@@ -154,11 +155,13 @@ const dateRangeLabel = getDateRangeLabel(viewMode, selectedDate);
                   setTabLayouts(prev => { const next = [...prev]; next[idx] = { x, width: w }; return next; });
                 }}
               >
-                <Text style={[styles.tabText, viewMode === mode && styles.tabTextActive]}>{mode}</Text>
+                <Text style={[styles.tabText, viewMode === mode && styles.tabTextActive]}>
+                  {mode.charAt(0).toUpperCase() + mode.slice(1)}
+                </Text>
               </TouchableOpacity>
             ))}
           </View>
-          {tabLayouts.length === 3 && (
+          {tabLayouts.filter(Boolean).length === 3 && (
             <Animated.Image
               source={require('../../assets/circle-doodle.png')}
               style={[styles.circleDoodle, { transform: [{ translateX: circleAnim }] }]}
@@ -327,27 +330,27 @@ const dateRangeLabel = getDateRangeLabel(viewMode, selectedDate);
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#ffffff', position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   inner: { flex: 1 },
-  backBtn: { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 4 },
-  titleBlock: { paddingHorizontal: 24, marginTop: 8, marginBottom: 20, alignItems: 'center' },
-  spacesLabel: { fontFamily: 'Avenelle', fontSize: 18, color: '#929090' },
-  spaceName: { fontFamily: 'Avenelle', fontSize: 32, color: '#0ccfcf', lineHeight: 38, textShadowColor: 'rgba(0,0,0,0.15)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 6 },
-  tabsWrapper: { paddingHorizontal: 24, marginBottom: 4, alignItems: 'center' },
-  tabs: { flexDirection: 'row', gap: 24 },
-  tabItem: { paddingVertical: 6 },
-  tabText: { fontFamily: 'DMSans_400Regular', fontSize: 15, color: '#425252' },
+  backBtn: { paddingHorizontal: 40, paddingTop: 14, paddingBottom: 4 },
+  titleBlock: { paddingHorizontal: 48, marginTop: 8, marginBottom: 25, alignItems: 'center' },
+  spacesLabel: { fontFamily: 'Avenelle', fontSize: 23, color: '#929090' },
+  spaceName: { fontFamily: 'Avenelle', fontSize: 40, color: '#0ccfcf', lineHeight: 48, textShadowColor: 'rgba(0,0,0,0.15)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 6 },
+  tabsWrapper: { paddingHorizontal: 48, marginBottom: 5, alignItems: 'center' },
+  tabs: { flexDirection: 'row', gap: 30 },
+  tabItem: { paddingVertical: 8 },
+  tabText: { fontFamily: 'DMSans_400Regular', fontSize: 19, color: '#425252' },
   tabTextActive: { fontFamily: 'DMSans_600SemiBold', color: '#425252' },
-  circleDoodle: { position: 'absolute', width: 90, height: 50, top: -8, left: -8, pointerEvents: 'none' },
-  dateRangeLabel: { fontFamily: 'Avenelle', fontSize: 18, color: '#1c1d1d', paddingHorizontal: 24, marginBottom: 14, marginTop: 6, textAlign: 'center' },
-  dateChipsRow: { flexDirection: 'row', paddingHorizontal: 24, marginBottom: 16, gap: 6, justifyContent: 'center' },
-  dateChip: { flex: 1, alignItems: 'center', paddingVertical: 12, paddingHorizontal: 4, borderRadius: 14, backgroundColor: '#ffffff', minHeight: 60, borderWidth: 0.5, borderColor: '#929090' },
+  circleDoodle: { position: 'absolute', width: 110, height: 62, top: -10, left: 0, pointerEvents: 'none' },
+  dateRangeLabel: { fontFamily: 'Avenelle', fontSize: 23, color: '#929090', paddingHorizontal: 48, marginBottom: 18, marginTop: 8, textAlign: 'center' },
+  dateChipsRow: { flexDirection: 'row', paddingHorizontal: 48, marginBottom: 20, gap: 8, justifyContent: 'center' },
+  dateChip: { flex: 1, alignItems: 'center', paddingVertical: 15, paddingHorizontal: 4, borderRadius: 18, backgroundColor: '#ffffff', minHeight: 75, borderWidth: 0.5, borderColor: '#929090' },
   dateChipSelected: { backgroundColor: '#0ccfcf', borderColor: '#0ccfcf' },
-  dateChipDay: { fontFamily: 'DMSans_700Bold', fontSize: 9, color: '#b0b0b0' },
-  dateChipNum: { fontFamily: 'DMSans_700Bold', fontSize: 16, color: '#1c1d1d', marginTop: 4 },
+  dateChipDay: { fontFamily: 'DMSans_700Bold', fontSize: 11, color: '#b0b0b0' },
+  dateChipNum: { fontFamily: 'DMSans_700Bold', fontSize: 20, color: '#1c1d1d', marginTop: 5 },
   dateChipTextSelected: { color: '#fff' },
   todayDot: { width: 3, height: 3, borderRadius: 2, backgroundColor: '#0ccfcf', marginTop: 3 },
   todayDotSelected: { backgroundColor: '#fff' },
-  navRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24, marginBottom: 12 },
-  list: { paddingHorizontal: 24, paddingBottom: 100, gap: 8 },
+  navRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 48, marginBottom: 15 },
+  list: { paddingHorizontal: 48, paddingBottom: 100, gap: 10 },
   recordingCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#ffffff', borderRadius: 14, padding: 14, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 1 },
   recordingLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
   recordingRight: { alignItems: 'flex-end', gap: 4 },
