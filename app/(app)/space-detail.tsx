@@ -280,7 +280,7 @@ export default function SpaceDetailScreen() {
                         <TouchableOpacity key={item.id} style={[styles.recordingCard, { backgroundColor: amountColor }]} activeOpacity={0.85}
                           onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: item.id } } as any)}>
                           <View style={styles.catIcon}>
-                            <Ionicons name={item.categories?.icon ?? 'ellipse-outline'} size={28} color="#fff" />
+                            <Ionicons name={item.categories?.icon ?? 'ellipse-outline'} size={36} color="#fff" />
                           </View>
                           <View style={styles.recordingMiddle}>
                             <Text style={styles.recordingName} numberOfLines={1} ellipsizeMode="tail">{item.name}</Text>
@@ -375,7 +375,7 @@ const styles = StyleSheet.create({
   dateChipTextSelected: { color: '#fff' },
   todayDot: { width: 3, height: 3, borderRadius: 2, backgroundColor: '#0ccfcf', marginTop: 3 },
   todayDotSelected: { backgroundColor: '#fff' },
-  list: { paddingHorizontal: 48, paddingBottom: 100, gap: 24 },
+  list: { paddingHorizontal: 48, paddingBottom: 100, gap: 48 },
   dateGroupLabel: { fontFamily: 'Avenelle', fontSize: 19, color: '#545454', marginBottom: 12, textTransform: 'lowercase' },
   dateGroupItems: { gap: 10 },
   recordingCard: { flexDirection: 'row', alignItems: 'center', borderRadius: 999, paddingVertical: 14, paddingHorizontal: 18, gap: 12 },
@@ -387,7 +387,7 @@ const styles = StyleSheet.create({
   recordingLabel: { fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: 'rgba(255,255,255,0.75)' },
   recordingValue: { fontFamily: 'RobotoMono_700Bold', fontSize: 12, color: '#fff', flexShrink: 1 },
   recordingRight: { alignItems: 'flex-end', gap: 4, flexShrink: 0 },
-  recordingAmount: { fontFamily: 'RobotoMono_700Bold', fontSize: 18, color: '#fff' },
+  recordingAmount: { fontFamily: 'RobotoMono_400Regular', fontSize: 18, color: '#fff' },
   empty: { alignItems: 'center', paddingTop: 60, gap: 10 },
   emptyText: { fontFamily: 'DMSans_400Regular', fontSize: 14, color: '#b0b0b0' },
   fab: { position: 'absolute', bottom: 24, right: 24, backgroundColor: '#00bf63', borderRadius: 999, paddingVertical: 14, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', gap: 8, shadowColor: '#00bf63', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 8 },
