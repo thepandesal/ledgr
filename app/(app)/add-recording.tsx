@@ -46,6 +46,7 @@ export default function AddRecordingScreen() {
   const [accountInput, setAccountInput] = useState('');
   const [selectedAccount, setSelectedAccount] = useState<any>(null);
   const [accountSuggestions, setAccountSuggestions] = useState<any[]>([]);
+  const [personName, setPersonName] = useState('');
 
   const isLoanType = type === 'receivable' || type === 'payable';
 
@@ -76,6 +77,7 @@ export default function AddRecordingScreen() {
         setAmount(String(rec.amount));
         setDate(rec.transaction_date);
         setNotes(rec.notes ?? '');
+        setPersonName(rec.person_name ?? '');
         if (rec.categories) setSelectedCategory(rec.categories);
         if (rec.account) setSelectedAccount(rec.account);
         if (rec.is_recurring) {
@@ -115,10 +117,17 @@ export default function AddRecordingScreen() {
         }).eq('id', editId);
         if (err) throw err;
       } else {
+        const statusMap: Record<string, string> = {
+          expense: 'paid', income: 'received', savings: 'saved',
+          payable: 'unpaid', receivable: 'pending',
+        };
         const { error: err } = await supabase.from('recordings').insert({
           space_id: spaceId, user_id: user!.id, name: recName.trim(), type,
           amount: parseFloat(amount), transaction_date: date,
-          notes: notes.trim() || null, category_id: selectedCategory?.id || null, account_id: selectedAccount?.id || null,
+          notes: notes.trim() || null, category_id: selectedCategory?.id || null,
+          account_id: selectedAccount?.id || null,
+          status: statusMap[type] ?? 'paid',
+          person_name: isLoanType ? personName.trim() || null : null,
           is_recurring: isLoanType ? isRecurring : false,
           recurring_frequency: isLoanType && isRecurring ? frequency : null,
           recurring_days: isLoanType && isRecurring && frequency === 'weekly' ? recurringDays : null,
@@ -235,6 +244,13 @@ export default function AddRecordingScreen() {
 
           <Text style={styles.label}>notes <Text style={styles.optional}>(optional)</Text></Text>
           <TextInput style={[styles.input, styles.textArea]} placeholder="add a note..." placeholderTextColor="#b0b0b0" value={notes} onChangeText={setNotes} multiline numberOfLines={3} />
+
+          {isLoanType && (
+            <>
+              <Text style={styles.label}>{type === 'payable' ? 'who are you paying?' : 'who owes you?'} <Text style={styles.optional}>(optional)</Text></Text>
+              <TextInput style={styles.input} placeholder="e.g. John" placeholderTextColor="#b0b0b0" value={personName} onChangeText={setPersonName} />
+            </>
+          )}
 
           {isLoanType && (
             <>

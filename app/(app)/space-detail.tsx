@@ -12,18 +12,7 @@ type ViewMode = 'daily' | 'weekly' | 'monthly';
 const MODES: ViewMode[] = ['daily', 'weekly', 'monthly'];
 const DOODLE_W = 90;
 
-const TYPE_CONFIG: Record<string, { color: string; sign: string; label: string }> = {
-  expense:    { color: '#e74c3c', sign: '-', label: 'Expense' },
-  income:     { color: '#00bf63', sign: '+', label: 'Income' },
-  savings:    { color: '#3498db', sign: '+', label: 'Savings' },
-  receivable: { color: '#00bf63', sign: '+', label: 'Receivable' },
-  payable:    { color: '#8a8a8a', sign: '⋯', label: 'Payable' },
-};
 
-const ACCOUNT_VERB: Record<string, string> = {
-  expense: 'Paid from', income: 'Received to', savings: 'Saved to',
-  receivable: 'Lent from', payable: 'Paying from',
-};
 
 function addDays(date: Date, days: number) { const d = new Date(date); d.setDate(d.getDate() + days); return d; }
 function isSameDay(a: Date, b: Date) { return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate(); }
@@ -265,31 +254,76 @@ export default function SpaceDetailScreen() {
                   <Text style={styles.dateGroupLabel}>{group.dateLabel}</Text>
                   <View style={styles.dateGroupItems}>
                     {group.items.map(item => {
-                      const cfg = TYPE_CONFIG[item.type] ?? { color: '#1c1d1d', sign: '', label: item.type };
+                      let amountColor = '#2ab671';
+                      let statusLabel = '';
+                      if (item.type === 'payable') {
+                        amountColor = '#425252';
+                        statusLabel = item.status === 'paid' ? 'Paid' : item.status === 'partial' ? 'Partial' : 'Unpaid';
+                      } else if (item.type === 'receivable') {
+                        if (item.status === 'received') { amountColor = '#2ab671'; statusLabel = 'Received'; }
+                        else if (item.status === 'partial') { amountColor = '#f0ff97'; statusLabel = 'Partial'; }
+                        else { amountColor = '#425252'; statusLabel = 'Pending'; }
+                      } else if (item.type === 'expense') {
+                        amountColor = '#ed6a6a';
+                      }
+
+                      // Row 3: verb + account
+                      const verbMap: Record<string, string> = {
+                        expense: 'Paid from',
+                        income: 'Received on',
+                        savings: 'Saved to',
+                        receivable: item.status === 'received' ? 'Received on' : 'Expecting to',
+                        payable: item.status === 'paid' ? 'Paid from' : 'Paying from',
+                      };
+                      const verb = verbMap[item.type] ?? 'Via';
+                      const accountName = item.account?.account_name ?? null;
+
+                      // show paid_amount / amount for partial
+                      const showPartial = (item.type === 'receivable' || item.type === 'payable') && item.status === 'partial' && item.paid_amount;
+
                       return (
                         <View key={item.id} style={styles.recordingCard}>
-                          <View style={styles.recordingLeft}>
-                            {item.categories ? (
-                              <View style={[styles.catDot, { backgroundColor: item.categories.color }]}>
-                                <Ionicons name={item.categories.icon} size={12} color="#1c1d1d" />
-                              </View>
-                            ) : (
-                              <View style={[styles.catDot, { backgroundColor: '#e8e8e8' }]}>
-                                <Ionicons name="ellipse-outline" size={12} color="#8a8a8a" />
+                          {/* Left: category icon */}
+                          <View style={[styles.catDot, { backgroundColor: item.categories?.color ?? '#e8e8e8' }]}>
+                            <Ionicons name={item.categories?.icon ?? 'ellipse-outline'} size={14} color="#1c1d1d" />
+                          </View>
+
+                          {/* Middle: 3 rows */}
+                          <View style={styles.recordingMiddle}>
+                            <Text style={styles.recordingName} numberOfLines={1}>{item.name}</Text>
+                            <View style={styles.recordingRow2}>
+                              <Text style={styles.recordingLabel}>
+                                {item.type.charAt(0).toUpperCase() + item.type.slice(1)}:
+                              </Text>
+                              {statusLabel ? (
+                                <Text style={[styles.recordingValue, { color: amountColor }]}>{statusLabel}</Text>
+                              ) : (
+                                <Text style={styles.recordingValue}>{item.categories?.name ?? '—'}</Text>
+                              )}
+                            </View>
+                            {(accountName || item.person_name) && (
+                              <View style={styles.recordingRow3}>
+                                <Text style={styles.recordingLabel}>{verb}:</Text>
+                                <Text style={styles.recordingValue}>{item.person_name ?? accountName}</Text>
                               </View>
                             )}
-                            <View style={{ flex: 1 }}>
-                              <Text style={styles.recordingName}>{item.name}</Text>
-                              <Text style={styles.recordingMeta}>{cfg.label}</Text>
-                              {item.account ? <Text style={styles.recordingAccount}>{ACCOUNT_VERB[item.type] ?? 'Via'}: {item.account.account_name} · {item.account.bank}</Text> : null}
-                              {item.notes ? <Text style={styles.recordingNotes} numberOfLines={1}>{item.notes}</Text> : null}
-                              {item.status === 'settled' ? <Text style={styles.settledBadge}>✓ settled</Text> : null}
-                            </View>
                           </View>
+
+                          {/* Right: amount + actions */}
                           <View style={styles.recordingRight}>
-                            <Text style={[styles.recordingAmount, { color: cfg.color }]}>
-                              {cfg.sign}{Number(item.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                            </Text>
+                            <View style={{ alignItems: 'flex-end' }}>
+                              <Text style={[styles.recordingAmount, { color: amountColor }]}>
+                                {showPartial
+                                  ? Number(item.paid_amount).toLocaleString('en-US', { minimumFractionDigits: 2 })
+                                  : Number(item.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })
+                                }
+                              </Text>
+                              {showPartial && (
+                                <Text style={{ fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#b0b0b0' }}>
+                                  / {Number(item.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                </Text>
+                              )}
+                            </View>
                             <View style={styles.recordingActions}>
                               <TouchableOpacity onPress={() => router.push({ pathname: '/(app)/split-bill', params: { recordingId: item.id, recordingName: item.name, amount: item.amount } } as any)} style={styles.actionBtn}>
                                 <Ionicons name="people-outline" size={14} color={splitIds.has(item.id) ? '#00bf63' : '#b0b0b0'} />
@@ -369,18 +403,18 @@ const styles = StyleSheet.create({
   todayDot: { width: 3, height: 3, borderRadius: 2, backgroundColor: '#0ccfcf', marginTop: 3 },
   todayDotSelected: { backgroundColor: '#fff' },
   list: { paddingHorizontal: 48, paddingBottom: 100, gap: 20 },
-  dateGroupLabel: { fontFamily: 'DMSans_600SemiBold', fontSize: 13, color: '#929090', marginBottom: 8 },
-  dateGroupItems: { gap: 8 },
-  recordingCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#f9f9f9', borderRadius: 14, padding: 14 },
-  recordingLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
-  recordingRight: { alignItems: 'flex-end', gap: 4 },
-  catDot: { width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
-  recordingName: { fontFamily: 'DMSans_600SemiBold', fontSize: 14, color: '#1c1d1d' },
-  recordingMeta: { fontFamily: 'DMSans_400Regular', fontSize: 11, color: '#b0b0b0', marginTop: 2 },
-  recordingNotes: { fontFamily: 'DMSans_400Regular', fontSize: 11, color: '#8a8a8a', marginTop: 2, fontStyle: 'italic' },
-  recordingAccount: { fontFamily: 'DMSans_400Regular', fontSize: 11, color: '#8a8a8a', marginTop: 2 },
-  settledBadge: { fontFamily: 'DMSans_600SemiBold', fontSize: 10, color: '#00bf63', marginTop: 3 },
-  recordingAmount: { fontFamily: 'DMSans_700Bold', fontSize: 15 },
+  dateGroupLabel: { fontFamily: 'Avenelle', fontSize: 19, color: '#545454', marginBottom: 10 },
+  dateGroupItems: { gap: 10 },
+  recordingCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f9f9f9', borderRadius: 999, paddingVertical: 14, paddingHorizontal: 16, gap: 12 },
+  catDot: { width: 38, height: 38, borderRadius: 19, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
+  recordingMiddle: { flex: 1, gap: 2 },
+  recordingName: { fontFamily: 'RobotoMono_700Bold', fontSize: 19.8, color: '#1c1d1d' },
+  recordingRow2: { flexDirection: 'row', gap: 4 },
+  recordingRow3: { flexDirection: 'row', gap: 4 },
+  recordingLabel: { fontFamily: 'RobotoMono_400Regular', fontSize: 15.3, color: '#8a8a8a' },
+  recordingValue: { fontFamily: 'RobotoMono_700Bold', fontSize: 15.3, color: '#1c1d1d' },
+  recordingRight: { alignItems: 'flex-end', gap: 6, flexShrink: 0 },
+  recordingAmount: { fontFamily: 'RobotoMono_700Bold', fontSize: 24 },
   recordingActions: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   actionBtn: { padding: 2 },
   empty: { alignItems: 'center', paddingTop: 60, gap: 10 },

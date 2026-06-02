@@ -1,6 +1,6 @@
 import { Stack, useRouter } from 'expo-router';
 import { useFonts, DMSans_400Regular, DMSans_500Medium, DMSans_600SemiBold, DMSans_700Bold } from '@expo-google-fonts/dm-sans';
-import { RobotoMono_400Regular } from '@expo-google-fonts/roboto-mono';
+import { RobotoMono_400Regular, RobotoMono_700Bold } from '@expo-google-fonts/roboto-mono';
 import { View, ActivityIndicator } from 'react-native';
 import { useEffect, useState } from 'react';
 import { supabase } from '../src/lib/supabase';
@@ -12,6 +12,7 @@ export default function RootLayout() {
     DMSans_600SemiBold,
     DMSans_700Bold,
     RobotoMono_400Regular,
+    RobotoMono_700Bold,
     Avenelle: require('../assets/avenelle.ttf'),
   });
 
