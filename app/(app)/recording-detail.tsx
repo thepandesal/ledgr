@@ -1,14 +1,9 @@
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Animated, Dimensions, ScrollView, TextInput, Modal, Share, Linking } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Animated, Dimensions, ScrollView, TextInput, Modal, Share, Linking, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../../src/lib/supabase';
 import { BlurView } from 'expo-blur';
-import * as Print from 'expo-print';
-import * as MediaLibrary from 'expo-media-library';
-import * as Sharing from 'expo-sharing';
-import * as FileSystem from 'expo-file-system';
-import { WebView } from 'react-native-webview';
 
 const { width } = Dimensions.get('window');
 const MAX_NAME_CHARS = 18;
@@ -215,11 +210,13 @@ export default function RecordingDetailScreen() {
   };
 
   const saveAsImage = async () => {
-    if (!recording) return;
+    if (!recording || Platform.OS === 'web') {
+      // Web fallback: generate link instead
+      await generateShare();
+      return;
+    }
     setShareLoading(true);
-    // Build HTML with html2canvas injected, trigger capture via WebView
     const html = buildHtml(buildShareData());
-    // Inject html2canvas CDN + capture script
     const captureHtmlWithScript = html.replace(
       '</body>',
       `<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -236,10 +233,14 @@ export default function RecordingDetailScreen() {
   };
 
   const handleWebViewMessage = async (event: any) => {
+    if (Platform.OS === 'web') return;
     const dataUrl = event.nativeEvent.data;
     if (!dataUrl.startsWith('data:image/png')) return;
     setCaptureHtml(null);
     try {
+      const FileSystem = require('expo-file-system');
+      const MediaLibrary = require('expo-media-library');
+      const Sharing = require('expo-sharing');
       const base64 = dataUrl.replace('data:image/png;base64,', '');
       const fileUri = `${FileSystem.cacheDirectory}split_${Date.now()}.png`;
       await FileSystem.writeAsStringAsync(fileUri, base64, { encoding: FileSystem.EncodingType.Base64 });
@@ -252,11 +253,8 @@ export default function RecordingDetailScreen() {
         await Sharing.shareAsync(fileUri, { mimeType: 'image/png', dialogTitle: 'Save split image' });
         setSaveImageModal(false);
       }
-    } catch (e) {
-      console.log(e);
-    } finally {
-      setShareLoading(false);
-    }
+    } catch (e) { console.log(e); }
+    finally { setShareLoading(false); }
   };
 
   const handleBack = () => {
@@ -972,17 +970,20 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
           </TouchableOpacity>
         </BlurView>
       </Modal>
-      {/* Hidden WebView for image capture */}
-      {captureHtml && (
-        <WebView
-          ref={webviewRef}
-          source={{ html: captureHtml }}
-          style={{ position: 'absolute', width: 390, height: 1, opacity: 0, top: -9999 }}
-          onMessage={handleWebViewMessage}
-          javaScriptEnabled
-          originWhitelist={['*']}
-        />
-      )}
+      {/* Hidden WebView for image capture - native only */}
+      {captureHtml && Platform.OS !== 'web' && (() => {
+        const { WebView } = require('react-native-webview');
+        return (
+          <WebView
+            ref={webviewRef}
+            source={{ html: captureHtml }}
+            style={{ position: 'absolute', width: 390, height: 1, opacity: 0, top: -9999 }}
+            onMessage={handleWebViewMessage}
+            javaScriptEnabled
+            originWhitelist={['*']}
+          />
+        );
+      })()}
     </Animated.View>
   );
 }
