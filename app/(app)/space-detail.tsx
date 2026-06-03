@@ -607,7 +607,7 @@ const styles = StyleSheet.create({
   list: { paddingHorizontal: 32, paddingBottom: 100, gap: 48, paddingTop: 16 },
   dateGroupLabel: { fontFamily: 'ChillaxMedium', fontSize: 13, color: '#0ccfcf', marginBottom: 8, marginTop: 16 },
   dateGroupItems: { gap: 10 },
-  recordingCard: { flexDirection: 'row', alignItems: 'center', borderRadius: 14, paddingVertical: 10, paddingHorizontal: 14, gap: 10, backgroundColor: '#ffffff', borderWidth: 1, borderStyle: 'dashed' },
+  recordingCard: { flexDirection: 'row', alignItems: 'center', borderRadius: 999, paddingVertical: 10, paddingHorizontal: 14, gap: 10, backgroundColor: '#ffffff', borderWidth: 1, borderStyle: 'dashed', borderColor: '#929090' },
   catIcon: { flexShrink: 0 },
   recordingMiddle: { flex: 1, gap: 2, overflow: 'hidden' },
   recordingName: { fontFamily: 'RobotoMono_700Bold', fontSize: 12, color: '#425252' },
