@@ -6,6 +6,7 @@ import { useRouter } from 'expo-router';
 import { supabase } from '../../../src/lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
+import { BlurView } from 'expo-blur';
 
 const PASTEL_COLORS = [
   '#FFB3B3', '#FFD9B3', '#FFFAB3', '#B3FFB3', '#B3FFE0',
@@ -100,39 +101,50 @@ export default function SpacesScreen() {
     });
   };
 
+  const firstName = userName.split(' ')[0];
+
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <View style={styles.avatarFallback}>
-            <Ionicons name="person" size={16} color="#b0b0b0" />
-          </View>
-          <Text style={styles.greeting}>Hey, <Text style={styles.greetingName}>{userName}!</Text></Text>
-        </View>
-      </View>
-
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <Text style={styles.sectionTitle}>spaces</Text>
-        <View style={styles.grid}>
-          {spaces.map(space => (
-            <View key={space.id} style={styles.spaceCard}>
-              <TouchableOpacity style={styles.spaceCardMain} activeOpacity={0.8}
-                onPress={() => router.push({ pathname: '/(app)/space-detail', params: { spaceId: space.id, name: space.name, color: space.color } })}>
-                <Ionicons name={space.icon as any} size={16} color="#fff" />
-                <Text style={styles.spaceCardText} numberOfLines={1}>{space.name.toLowerCase()}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => openMenu(space)} style={styles.spaceMenuBtn}>
-                <Ionicons name="ellipsis-vertical" size={14} color="#fff" />
-              </TouchableOpacity>
-            </View>
-          ))}
-          <TouchableOpacity style={styles.addCard} activeOpacity={0.8} onPress={openCreate}>
-            <Ionicons name="add" size={24} color="#fff" />
-            <Text style={styles.addCardText}>add a space</Text>
-          </TouchableOpacity>
+
+        {/* Header */}
+        <View style={styles.titleBlock}>
+          <Text style={styles.greetingLabel}>hey, {firstName.toLowerCase()}!</Text>
+          <Text style={styles.pageTitle}>your spaces</Text>
         </View>
+
+        {/* Spaces section header */}
+        <Text style={styles.sectionHeader}>spaces</Text>
+
+        {/* Space cards */}
+        <View style={styles.spaceList}>
+          {spaces.map(space => (
+            <TouchableOpacity
+              key={space.id}
+              style={styles.spaceCard}
+              activeOpacity={0.85}
+              onPress={() => router.push({ pathname: '/(app)/space-detail', params: { spaceId: space.id, name: space.name, color: space.color } })}
+            >
+              <View style={[styles.spaceIconWrap, { backgroundColor: space.color + '33' }]}>
+                <Ionicons name={space.icon as any} size={20} color={space.color} />
+              </View>
+              <Text style={styles.spaceCardName} numberOfLines={1}>{space.name.toLowerCase()}</Text>
+              <TouchableOpacity onPress={() => openMenu(space)} style={styles.spaceMenuBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Ionicons name="ellipsis-horizontal" size={16} color="#929090" />
+              </TouchableOpacity>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Add space button */}
+        <TouchableOpacity style={styles.addSpaceBtn} onPress={openCreate} activeOpacity={0.8}>
+          <Ionicons name="add" size={14} color="#425252" />
+          <Text style={styles.addSpaceBtnText}>add a space</Text>
+        </TouchableOpacity>
+
       </ScrollView>
 
+      {/* Create space modal */}
       <Modal visible={createModal} transparent animationType="slide" onRequestClose={() => setCreateModal(false)}>
         <View style={styles.modalOverlay}>
           <ScrollView contentContainerStyle={styles.modalScroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
@@ -149,7 +161,7 @@ export default function SpacesScreen() {
                 placeholderTextColor="#b0b0b0" value={spaceName}
                 onChangeText={v => { setSpaceName(v.slice(0, 15)); setError(''); }} maxLength={15} autoFocus />
               <Text style={styles.charCount}>{spaceName.length}/15</Text>
-              {error ? <Text style={styles.error}>{error}</Text> : null}
+              {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
               <Text style={styles.label}>color</Text>
               <View style={styles.colorRow}>
@@ -168,9 +180,9 @@ export default function SpacesScreen() {
               </View>
 
               <Text style={styles.label}>preview</Text>
-              <View style={[styles.preview, { backgroundColor: selectedColor }]}>
-                <Ionicons name={selectedIcon as any} size={16} color="#1c1d1d" />
-                <Text style={styles.previewText}>{spaceName || 'my space'}</Text>
+              <View style={[styles.preview, { backgroundColor: selectedColor + '33' }]}>
+                <Ionicons name={selectedIcon as any} size={18} color={selectedColor} />
+                <Text style={[styles.previewText, { color: selectedColor }]}>{spaceName.toLowerCase() || 'my space'}</Text>
               </View>
 
               <Text style={styles.label}>default category</Text>
@@ -227,79 +239,80 @@ export default function SpacesScreen() {
         </View>
       </Modal>
 
+      {/* Space menu modal */}
       <Modal visible={menuModal} transparent animationType="none" onRequestClose={() => closeMenu()}>
-        <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => closeMenu()}>
-          <Animated.View style={[styles.menuContent, { opacity: menuFade }]}>
-            <TouchableOpacity style={styles.menuItem} onPress={() => closeMenu()}>
-              <Ionicons name="pencil-outline" size={18} color="#1c1d1d" />
-              <Text style={styles.menuItemText}>edit</Text>
-            </TouchableOpacity>
-            <View style={styles.menuDivider} />
-            <TouchableOpacity style={styles.menuItem} onPress={handleDeleteSpace}>
-              <Ionicons name="trash-outline" size={18} color="#e74c3c" />
-              <Text style={[styles.menuItemText, { color: '#e74c3c' }]}>delete</Text>
-            </TouchableOpacity>
-          </Animated.View>
-        </TouchableOpacity>
+        <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}>
+          <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => closeMenu()}>
+            <Animated.View style={[styles.menuContent, { opacity: menuFade }]}>
+              <TouchableOpacity style={styles.menuItem} onPress={() => closeMenu()}>
+                <Ionicons name="pencil-outline" size={16} color="#425252" />
+                <Text style={styles.menuItemText}>edit</Text>
+              </TouchableOpacity>
+              <View style={styles.menuDivider} />
+              <TouchableOpacity style={styles.menuItem} onPress={handleDeleteSpace}>
+                <Ionicons name="trash-outline" size={16} color="#ed6a6a" />
+                <Text style={[styles.menuItemText, { color: '#ed6a6a' }]}>delete</Text>
+              </TouchableOpacity>
+            </Animated.View>
+          </TouchableOpacity>
+        </BlurView>
       </Modal>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f5f5' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24, paddingTop: 52, paddingBottom: 16 },
-  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  avatarFallback: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#e8e8e8', justifyContent: 'center', alignItems: 'center' },
-  greeting: { fontFamily: 'DMSans_400Regular', fontSize: 16, color: '#8a8a8a' },
-  greetingName: { fontFamily: 'DMSans_700Bold', color: '#1c1d1d' },
-  scroll: { paddingHorizontal: 24, paddingBottom: 40, paddingTop: 12 },
-  sectionTitle: { fontFamily: 'Avenelle', fontSize: 36, color: '#1c1d1d', marginBottom: 20 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  spaceCard: { width: '47%', borderRadius: 999, paddingVertical: 10, paddingLeft: 16, paddingRight: 8, flexDirection: 'row', alignItems: 'center', backgroundColor: '#0ccfcf' },
-  spaceCardMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  spaceCardText: { fontFamily: 'Avenelle', fontSize: 15, color: '#fff', flex: 1 },
-  spaceMenuBtn: { padding: 6 },
-  addCard: { width: '47%', borderRadius: 999, paddingVertical: 14, paddingHorizontal: 16, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', backgroundColor: '#545454', gap: 6 },
-  addCardText: { fontFamily: 'DMSans_400Regular', fontSize: 13, color: '#fff' },
+  container: { flex: 1, backgroundColor: '#ffffff' },
+  scroll: { paddingHorizontal: 32, paddingBottom: 60, paddingTop: 52 },
+  titleBlock: { marginBottom: 20 },
+  greetingLabel: { fontFamily: 'ChillaxMedium', fontSize: 11, color: '#929090', marginBottom: 2 },
+  pageTitle: { fontFamily: 'Avenelle', fontSize: 32, color: '#425252', lineHeight: 36, letterSpacing: -1, textShadowColor: 'rgba(0,0,0,0.12)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4 },
+  sectionHeader: { fontFamily: 'ChillaxMedium', fontSize: 15, color: '#0ccfcf', letterSpacing: -0.5, marginBottom: 12 },
+  spaceList: { gap: 10, marginBottom: 16 },
+  spaceCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#fafafa', borderRadius: 14, paddingVertical: 14, paddingHorizontal: 16, borderWidth: 1, borderColor: '#f0f0f0' },
+  spaceIconWrap: { width: 38, height: 38, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+  spaceCardName: { flex: 1, fontFamily: 'Avenelle', fontSize: 18, color: '#425252', letterSpacing: -0.5 },
+  spaceMenuBtn: { padding: 4 },
+  addSpaceBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-end', backgroundColor: '#ffffff', borderRadius: 999, paddingVertical: 6, paddingHorizontal: 14, borderWidth: 1, borderColor: '#929090', shadowColor: '#000', shadowOffset: { width: 3, height: 3 }, shadowOpacity: 1, shadowRadius: 0, elevation: 3 },
+  addSpaceBtnText: { fontFamily: 'DMSans_400Regular', fontSize: 11, color: '#425252' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'flex-end' },
   modalScroll: { justifyContent: 'flex-end', flexGrow: 1 },
   modalContent: { backgroundColor: '#ffffff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  modalTitle: { fontFamily: 'DMSans_700Bold', fontSize: 18, color: '#1c1d1d' },
-  label: { fontFamily: 'DMSans_600SemiBold', fontSize: 11, color: '#8a8a8a', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 16 },
-  input: { backgroundColor: '#f5f5f5', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 13, fontFamily: 'DMSans_400Regular', fontSize: 15, color: '#1c1d1d', borderWidth: 1, borderColor: '#e8e8e8' },
-  inputError: { borderColor: '#e74c3c' },
-  charCount: { fontFamily: 'DMSans_400Regular', fontSize: 11, color: '#b0b0b0', textAlign: 'right', marginTop: 4 },
-  error: { fontFamily: 'DMSans_400Regular', fontSize: 13, color: '#e74c3c', marginTop: 4 },
+  modalTitle: { fontFamily: 'ChillaxMedium', fontSize: 18, color: '#425252' },
+  label: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#929090', marginBottom: 8, marginTop: 16, textTransform: 'uppercase', letterSpacing: 0.5 },
+  input: { backgroundColor: '#f5f5f5', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 13, fontFamily: 'DMSans_400Regular', fontSize: 16, color: '#1c1d1d', borderWidth: 1, borderColor: '#e8e8e8' },
+  inputError: { borderColor: '#ed6a6a' },
+  charCount: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#b0b0b0', textAlign: 'right', marginTop: 4 },
+  errorText: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#ed6a6a', marginTop: 4 },
   colorRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   colorDot: { width: 30, height: 30, borderRadius: 15 },
   colorDotSelected: { borderWidth: 3, borderColor: '#1c1d1d' },
   iconRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   iconBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#f5f5f5', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#e8e8e8' },
-  iconBtnSelected: { backgroundColor: '#1c1d1d', borderColor: '#1c1d1d' },
-  preview: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 999, paddingVertical: 14, paddingHorizontal: 16, marginTop: 4 },
-  previewText: { fontFamily: 'DMSans_700Bold', fontSize: 14, color: '#1c1d1d' },
-  createBtn: { backgroundColor: '#00bf63', borderRadius: 999, paddingVertical: 15, alignItems: 'center', marginTop: 20 },
+  iconBtnSelected: { backgroundColor: '#425252', borderColor: '#425252' },
+  preview: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 14, paddingVertical: 14, paddingHorizontal: 16, marginTop: 4 },
+  previewText: { fontFamily: 'Avenelle', fontSize: 18, letterSpacing: -0.5 },
+  createBtn: { backgroundColor: '#425252', borderRadius: 999, paddingVertical: 15, alignItems: 'center', marginTop: 20 },
   createBtnDisabled: { opacity: 0.4 },
-  createBtnText: { fontFamily: 'DMSans_600SemiBold', fontSize: 15, color: '#ffffff' },
+  createBtnText: { fontFamily: 'RobotoMono_700Bold', fontSize: 14, color: '#ffffff' },
   toggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },
-  toggleLabel: { fontFamily: 'DMSans_400Regular', fontSize: 14, color: '#8a8a8a' },
+  toggleLabel: { fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#8a8a8a' },
   toggleBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999, borderWidth: 1, borderColor: '#e8e8e8', backgroundColor: '#f5f5f5' },
-  toggleBtnActive: { backgroundColor: '#00bf63', borderColor: '#00bf63' },
-  toggleBtnText: { fontFamily: 'DMSans_600SemiBold', fontSize: 13, color: '#b0b0b0' },
+  toggleBtnActive: { backgroundColor: '#0ccfcf', borderColor: '#0ccfcf' },
+  toggleBtnText: { fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#b0b0b0' },
   toggleBtnTextActive: { color: '#ffffff' },
   badgeRow: { flexDirection: 'row', marginTop: 8 },
   badge: { flexDirection: 'row', alignItems: 'center', borderRadius: 999, paddingVertical: 8, paddingHorizontal: 14, gap: 6 },
-  badgeText: { fontFamily: 'DMSans_600SemiBold', fontSize: 14, color: '#1c1d1d' },
+  badgeText: { fontFamily: 'RobotoMono_700Bold', fontSize: 13, color: '#1c1d1d' },
   suggestions: { backgroundColor: '#f5f5f5', borderRadius: 12, marginTop: 4, overflow: 'hidden', borderWidth: 1, borderColor: '#e8e8e8' },
   suggestion: { paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#e8e8e8', flexDirection: 'row', alignItems: 'center', gap: 10 },
-  suggestionText: { fontFamily: 'DMSans_400Regular', fontSize: 14, color: '#1c1d1d' },
+  suggestionText: { fontFamily: 'RobotoMono_400Regular', fontSize: 13, color: '#1c1d1d' },
   catDot: { width: 24, height: 24, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-  noResults: { fontFamily: 'DMSans_400Regular', fontSize: 13, color: '#b0b0b0', marginTop: 8, textAlign: 'center' },
-  menuOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'center', alignItems: 'center' },
+  noResults: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#b0b0b0', marginTop: 8, textAlign: 'center' },
+  menuOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   menuContent: { backgroundColor: '#ffffff', borderRadius: 16, overflow: 'hidden', minWidth: 160, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 8 },
   menuItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingVertical: 16 },
-  menuItemText: { fontFamily: 'DMSans_400Regular', fontSize: 15, color: '#1c1d1d' },
-  menuDivider: { height: 1, backgroundColor: '#e8e8e8' },
+  menuItemText: { fontFamily: 'RobotoMono_400Regular', fontSize: 14, color: '#425252' },
+  menuDivider: { height: 1, backgroundColor: '#f0f0f0' },
 });
