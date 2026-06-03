@@ -14,6 +14,7 @@ export default function RootLayout() {
     RobotoMono_400Regular,
     RobotoMono_700Bold,
     Avenelle: require('../assets/avenelle.ttf'),
+    ChillaxMedium: require('../assets/Chillax-Medium.otf'),
   });
 
   const router = useRouter();
