@@ -4,6 +4,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../../src/lib/supabase';
 import { BlurView } from 'expo-blur';
+import * as Print from 'expo-print';
+import * as MediaLibrary from 'expo-media-library';
+import * as Sharing from 'expo-sharing';
 
 const { width } = Dimensions.get('window');
 const MAX_NAME_CHARS = 18;
@@ -120,47 +123,112 @@ export default function RecordingDetailScreen() {
     setSaveImageModal(true);
   };
 
+  const buildShareData = () => {
+    const perPersonMap: Record<string, number> = {};
+    items.forEach(item => {
+      item.subitems.forEach(sub => {
+        const pp = sub.people.length > 0 ? sub.cost / sub.people.length : 0;
+        sub.people.forEach(p => { perPersonMap[p] = (perPersonMap[p] || 0) + pp; });
+      });
+    });
+    return {
+      recordingName: recording?.name ?? '',
+      recordingAmount: Number(recording?.amount ?? 0),
+      recordingType: recording?.type ?? '',
+      date: recording?.transaction_date ? new Date(recording.transaction_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '',
+      perPerson: Object.entries(perPersonMap).map(([name, total]) => ({ name, total })),
+      items: items.map(item => ({ name: item.name, cost: item.cost, subitems: item.subitems.map(s => ({ name: s.name, cost: s.cost, people: s.people })) })),
+      payment: shareSelectedAccount ? { accountName: shareSelectedAccount.account_name, bank: shareSelectedAccount.bank, accountNumber: shareSelectedAccount.account_number, qrCode: shareSelectedAccount.qr_code ?? null } : null,
+    };
+  };
+
+  const buildHtml = (data: ReturnType<typeof buildShareData>) => {
+    const amtColor = data.recordingType === 'expense' ? '#ed6a6a' : data.recordingType === 'income' ? '#2ab671' : '#425252';
+    const perPersonRows = data.perPerson.map(p =>
+      `<tr><td style="font-family:monospace;font-size:13px;color:#425252;padding:8px 0;border-bottom:1px dotted #ccc">${p.name}</td><td style="font-family:monospace;font-size:13px;font-weight:bold;color:#425252;text-align:right;padding:8px 0;border-bottom:1px dotted #ccc">${p.total.toLocaleString('en-US',{minimumFractionDigits:2})}</td></tr>`
+    ).join('');
+    const itemsHtml = data.items.map(item => `
+      <div style="background:#fafafa;border-radius:12px;padding:14px;margin-bottom:10px;border:1px solid #f0f0f0">
+        <div style="display:flex;justify-content:space-between;margin-bottom:10px">
+          <span style="font-family:monospace;font-weight:bold;font-size:13px;color:#425252">${item.name}</span>
+          <span style="font-family:monospace;font-size:12px;color:#929090">${item.cost.toLocaleString('en-US',{minimumFractionDigits:2})}</span>
+        </div>
+        ${item.subitems.map(sub => {
+          const pp = sub.people.length > 0 ? sub.cost / sub.people.length : sub.cost;
+          return `<div style="display:flex;gap:8px;margin-bottom:8px">
+            <span style="color:#c0c0c0">↳</span>
+            <div style="flex:1">
+              <div style="display:flex;justify-content:space-between">
+                <span style="font-family:monospace;font-weight:bold;font-size:11px;color:#425252">${sub.name}</span>
+                <span style="font-family:monospace;font-size:11px;color:#929090">${sub.cost.toLocaleString('en-US',{minimumFractionDigits:2})}</span>
+              </div>
+              <div style="font-family:monospace;font-size:10px;color:#929090">${sub.people.length} ${sub.people.length===1?'person':'people'} · ${pp.toLocaleString('en-US',{minimumFractionDigits:2})} each</div>
+              <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">${sub.people.map(p=>`<span style="background:#f0f0f0;border-radius:99px;padding:2px 8px;font-family:monospace;font-size:10px;color:#425252">${p}</span>`).join('')}</div>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    `).join('');
+    const paymentHtml = data.payment ? `
+      <h3 style="font-size:14px;color:#0ccfcf;margin:24px 0 10px">payment information</h3>
+      <div style="background:#fafafa;border-radius:12px;padding:14px;border:1px solid #f0f0f0;display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-size:15px;font-weight:600;color:#425252">${data.payment.accountName}</div>
+          <div style="font-family:monospace;font-size:11px;color:#929090">${data.payment.bank}</div>
+          <div style="font-family:monospace;font-weight:bold;font-size:13px;color:#425252">${data.payment.accountNumber}</div>
+        </div>
+        ${data.payment.qrCode ? `<img src="${data.payment.qrCode}" width="80" height="80" style="border-radius:8px"/>` : ''}
+      </div>
+    ` : '';
+    return `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;padding:24px;background:#fff;font-family:sans-serif}*{box-sizing:border-box}</style></head><body>
+      <div style="font-size:18px;color:#0ccfcf;margin-bottom:8px">ledgr</div>
+      <div style="font-size:24px;color:#425252;font-weight:600;margin-bottom:4px">${data.recordingName}</div>
+      <div style="font-family:monospace;font-size:20px;color:${amtColor};margin-bottom:2px">${data.recordingAmount.toLocaleString('en-US',{minimumFractionDigits:2})}</div>
+      <div style="font-family:monospace;font-size:11px;color:#929090;margin-bottom:24px">${data.date}</div>
+      <h3 style="font-size:14px;color:#0ccfcf;margin:0 0 10px">per person pay</h3>
+      <div style="background:#fafafa;border-radius:12px;padding:8px 16px;border:1px solid #f0f0f0;margin-bottom:24px">
+        <table style="width:100%;border-collapse:collapse">${perPersonRows}</table>
+      </div>
+      <h3 style="font-size:14px;color:#0ccfcf;margin:0 0 10px">item information</h3>
+      ${itemsHtml}
+      ${paymentHtml}
+      <div style="font-family:monospace;font-size:10px;color:#c0c0c0;text-align:center;margin-top:24px">generated by ledgr</div>
+    </body></html>`;
+  };
+
   const generateShare = async () => {
     if (!recording) return;
     setShareLoading(true);
     try {
-      const perPersonMap: Record<string, number> = {};
-      items.forEach(item => {
-        item.subitems.forEach(sub => {
-          const pp = sub.people.length > 0 ? sub.cost / sub.people.length : 0;
-          sub.people.forEach(p => { perPersonMap[p] = (perPersonMap[p] || 0) + pp; });
-        });
-      });
-      const perPerson = Object.entries(perPersonMap).map(([name, total]) => ({ name, total }));
-      const shareData = {
-        recordingName: recording.name,
-        recordingAmount: Number(recording.amount),
-        recordingType: recording.type,
-        date: new Date(recording.transaction_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-        perPerson,
-        items: items.map(item => ({
-          name: item.name,
-          cost: item.cost,
-          subitems: item.subitems.map(s => ({ name: s.name, cost: s.cost, people: s.people })),
-        })),
-        payment: shareSelectedAccount ? {
-          accountName: shareSelectedAccount.account_name,
-          bank: shareSelectedAccount.bank,
-          accountNumber: shareSelectedAccount.account_number,
-          qrCode: shareSelectedAccount.qr_code ?? null,
-        } : null,
-      };
+      const shareData = buildShareData();
       const { data: row, error } = await supabase.from('split_shares').insert({ recording_id: recordingId, data: shareData }).select().single();
       if (error || !row) throw error;
       const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://ledgr-six.vercel.app';
       const shareUrl = `${baseUrl}/split/${row.id}`;
       setSaveImageModal(false);
       await Share.share({ message: `Here's the split breakdown: ${shareUrl}`, url: shareUrl });
-    } catch (e: any) {
-      console.log(e);
-    } finally {
-      setShareLoading(false);
-    }
+    } catch (e: any) { console.log(e); } finally { setShareLoading(false); }
+  };
+
+  const saveAsImage = async () => {
+    if (!recording) return;
+    setShareLoading(true);
+    try {
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      const html = buildHtml(buildShareData());
+      const { uri } = await Print.printToFileAsync({ html, width: 390 });
+      if (status === 'granted') {
+        await MediaLibrary.saveToLibraryAsync(uri);
+        setSaveImageModal(false);
+        alert('Saved to your camera roll!');
+      } else {
+        // fallback — share the file
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: 'Save split breakdown' });
+        }
+        setSaveImageModal(false);
+      }
+    } catch (e: any) { console.log(e); } finally { setShareLoading(false); }
   };
 
   const handleBack = () => {
@@ -848,14 +916,11 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.shareOptionBtn}
-                    onPress={async () => {
-                      // generate and open in browser
-                      await generateShare();
-                    }}
+                    onPress={saveAsImage}
                     disabled={shareLoading}
                   >
                     <Ionicons name="image-outline" size={18} color="#425252" />
-                    <Text style={[styles.shareOptionText, { color: '#425252' }]}>save image</Text>
+                    <Text style={[styles.shareOptionText, { color: '#425252' }]}>{shareLoading ? 'saving...' : 'save as pdf'}</Text>
                   </TouchableOpacity>
                 </View>
 
