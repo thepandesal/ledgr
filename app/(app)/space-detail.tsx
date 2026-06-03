@@ -179,6 +179,14 @@ export default function SpaceDetailScreen() {
           <Text style={styles.spaceName}>{(name ?? '').toLowerCase()}</Text>
         </View>
 
+        {/* Recordings header */}
+        <View style={styles.recordingsHeader}>
+          <Text style={styles.recordingsTitle}>recordings</Text>
+          <TouchableOpacity style={styles.filterBtn} onPress={() => setShowFilter(true)}>
+            <Ionicons name="options-outline" size={18} color={activeFilter ? '#0ccfcf' : '#929090'} />
+          </TouchableOpacity>
+        </View>
+
         {/* Stats row */}
         <View style={styles.statsRow}>
           <View style={styles.statItem}>
@@ -243,14 +251,6 @@ export default function SpaceDetailScreen() {
               />
             )}
           </View>
-        </View>
-
-        {/* Recordings header */}
-        <View style={styles.recordingsHeader}>
-          <Text style={styles.recordingsTitle}>recordings</Text>
-          <TouchableOpacity style={styles.filterBtn} onPress={() => setShowFilter(true)}>
-            <Ionicons name="options-outline" size={18} color={activeFilter ? '#0ccfcf' : '#929090'} />
-          </TouchableOpacity>
         </View>
 
         {/* Animated content area */}
@@ -559,7 +559,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#ffffff', position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   inner: { flex: 1 },
   backBtn: { paddingHorizontal: 40, paddingTop: 14, paddingBottom: 4 },
-  titleBlock: { paddingHorizontal: 48, marginTop: 8, marginBottom: 25 },
+  titleBlock: { paddingHorizontal: 48, marginTop: 8, marginBottom: 10 },
   spacesLabel: { fontFamily: 'ChillaxMedium', fontSize: 13, color: '#929090' },
   spaceName: { fontFamily: 'Avenelle', fontSize: 40, color: '#425252', lineHeight: 48, textShadowColor: 'rgba(0,0,0,0.12)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4 },
   recordingsHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 48, marginBottom: 12 },
