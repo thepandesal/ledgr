@@ -179,10 +179,11 @@ function AccountForm({ userId, initial, onClose, onSaved }: {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') { Alert.alert('Permission needed', 'Please allow photo access.'); return; }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [1, 1],
       quality: 1,
+      allowsMultipleSelection: false,
     });
     if (!result.canceled && result.assets[0]) {
       const compressed = await ImageManipulator.manipulateAsync(
