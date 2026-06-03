@@ -53,7 +53,7 @@ export default function SplitSharePage() {
         {/* Per Person Pay */}
         <Text style={s.sectionHeader}>per person pay</Text>
         <View style={s.card}>
-          {data.perPerson.map((p, i) => (
+          {(data.perPerson ?? []).map((p, i) => (
             <View key={i}>
               <View style={s.infoRow}>
                 <Text style={s.infoLabel}>{p.name}</Text>
@@ -67,7 +67,7 @@ export default function SplitSharePage() {
 
         {/* Item Information */}
         <Text style={s.sectionHeader}>item information</Text>
-        {data.items.map((item, ii) => (
+        {(data.items ?? []).map((item, ii) => (
           <View key={ii} style={s.itemBlock}>
             <View style={s.itemHeader}>
               <Text style={s.itemName}>{item.name.toLowerCase()}</Text>
@@ -84,7 +84,7 @@ export default function SplitSharePage() {
               </View>
             ) : (
               item.subitems.map((sub, si) => {
-                const pp = sub.people.length > 0 ? sub.cost / sub.people.length : sub.cost;
+                const pp = (sub.people?.length ?? 0) > 0 ? sub.cost / sub.people.length : sub.cost;
                 return (
                   <View key={si} style={s.subRow}>
                     <Text style={s.arrow}>↳</Text>
@@ -93,9 +93,9 @@ export default function SplitSharePage() {
                         <Text style={s.subName}>{sub.name.toLowerCase()}</Text>
                         <Text style={s.subCost}>{sub.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
                       </View>
-                      <Text style={s.subSplit}>{sub.people.length} {sub.people.length === 1 ? 'person' : 'people'} · {pp.toLocaleString('en-US', { minimumFractionDigits: 2 })} each</Text>
+                      <Text style={s.subSplit}>{sub.people?.length ?? 0} {(sub.people?.length ?? 0) === 1 ? 'person' : 'people'} · {pp.toLocaleString('en-US', { minimumFractionDigits: 2 })} each</Text>
                       <View style={s.chips}>
-                        {sub.people.map((p, pi) => (
+                        {(sub.people ?? []).map((p, pi) => (
                           <View key={pi} style={s.chip}><Text style={s.chipText}>{p}</Text></View>
                         ))}
                       </View>
