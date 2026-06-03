@@ -1,25 +1,23 @@
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView,
-  Modal, TextInput, ActivityIndicator, Alert, Animated,
+  Modal, TextInput, ActivityIndicator, Alert, Animated, Image,
 } from 'react-native';
 import { supabase } from '../../../src/lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
+import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
+import { BlurView } from 'expo-blur';
 
-const PASTEL_COLORS = [
-  '#FFB3B3', '#FFD9B3', '#FFFAB3', '#B3FFB3', '#B3FFE0',
-  '#B3F0FF', '#B3C6FF', '#D9B3FF', '#FFB3F0', '#FFB3C6',
-];
-const ACCOUNT_TYPES = ['ATM', 'Credit Card', 'Savings', 'Cash'];
 const DEFAULT_BANKS = ['BDO', 'BPI', 'Metrobank', 'UnionBank', 'Security Bank', 'PNB', 'Landbank', 'RCBC', 'Chinabank', 'EastWest', 'GCash', 'Maya', 'Seabank', 'GoTyme', 'Tonik'];
 
-interface Account { id: string; bank: string; account_type: string; account_name: string; account_details: string; color: string; }
+interface Account { id: string; bank: string; account_name: string; account_number: string; qr_code: string | null; }
 
 export default function AccountsScreen() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [userId, setUserId] = useState('');
   const [addModal, setAddModal] = useState(false);
-  const [editModal, setEditModal] = useState(false);
+  const [editAccount, setEditAccount] = useState<Account | null>(null);
   const [menuModal, setMenuModal] = useState(false);
   const [selected, setSelected] = useState<Account | null>(null);
   const menuFade = useRef(new Animated.Value(0)).current;
@@ -46,207 +44,330 @@ export default function AccountsScreen() {
 
   const handleDelete = () => {
     closeMenu(() => {
-      Alert.alert('Delete Account', 'If this account has been used in recordings, those recordings will reflect a null account. Are you sure?', [
+      Alert.alert('Delete Account', 'This cannot be undone.', [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: async () => { await supabase.from('accounts').delete().eq('id', selected!.id); await loadAccounts(userId); } },
+        { text: 'Delete', style: 'destructive', onPress: async () => {
+          await supabase.from('accounts').delete().eq('id', selected!.id);
+          loadAccounts(userId);
+        }},
       ]);
     });
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}><Text style={styles.title}>Accounts</Text></View>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <View style={styles.grid}>
-          {accounts.map(account => (
-            <View key={account.id} style={[styles.accountBtn, { backgroundColor: account.color }]}>
-              <View style={styles.accountBtnLeft}>
-                <Text style={styles.accountName}>{account.account_name}</Text>
-                <Text style={styles.accountMeta}>{account.bank} · {account.account_type}</Text>
-              </View>
-              <TouchableOpacity onPress={() => openMenu(account)} style={styles.menuBtn}>
-                <Ionicons name="ellipsis-vertical" size={16} color="#1c1d1d" />
-              </TouchableOpacity>
-            </View>
-          ))}
-          <TouchableOpacity style={styles.addBtn} onPress={() => setAddModal(true)} activeOpacity={0.8}>
-            <Ionicons name="add" size={16} color="#b0b0b0" />
-            <Text style={styles.addBtnText}>add an account</Text>
-          </TouchableOpacity>
+
+        <View style={styles.titleBlock}>
+          <Text style={styles.pageLabel}>your</Text>
+          <Text style={styles.pageTitle}>accounts</Text>
         </View>
+
+        <Text style={styles.sectionHeader}>saved accounts</Text>
+
+        <View style={styles.list}>
+          {accounts.map(account => (
+            <TouchableOpacity
+              key={account.id}
+              style={styles.accountCard}
+              activeOpacity={0.85}
+              onLongPress={() => openMenu(account)}
+            >
+              <View style={styles.accountLeft}>
+                <View style={styles.accountIconWrap}>
+                  <Ionicons name="card-outline" size={18} color="#0ccfcf" />
+                </View>
+                <View style={styles.accountInfo}>
+                  <Text style={styles.accountName} numberOfLines={1}>{account.account_name}</Text>
+                  <Text style={styles.accountBank}>{account.bank}</Text>
+                  {account.account_number ? (
+                    <Text style={styles.accountNumber}>•••• {account.account_number.slice(-4)}</Text>
+                  ) : null}
+                </View>
+              </View>
+              <View style={styles.accountRight}>
+                {account.qr_code ? (
+                  <Image source={{ uri: account.qr_code }} style={styles.qrThumb} resizeMode="cover" />
+                ) : (
+                  <View style={styles.qrEmpty}>
+                    <Ionicons name="qr-code-outline" size={16} color="#c0c0c0" />
+                  </View>
+                )}
+                <TouchableOpacity onPress={() => openMenu(account)} style={styles.menuBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Ionicons name="ellipsis-horizontal" size={16} color="#929090" />
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <TouchableOpacity style={styles.addBtn} onPress={() => setAddModal(true)} activeOpacity={0.8}>
+          <Ionicons name="add" size={14} color="#425252" />
+          <Text style={styles.addBtnText}>add an account</Text>
+        </TouchableOpacity>
+
       </ScrollView>
 
-      <AccountForm visible={addModal} title="new account" userId={userId} onClose={() => setAddModal(false)} onSaved={() => { setAddModal(false); loadAccounts(userId); }} banks={DEFAULT_BANKS} />
-      <AccountForm visible={editModal} title="edit account" userId={userId} initial={selected ?? undefined} onClose={() => setEditModal(false)} onSaved={() => { setEditModal(false); loadAccounts(userId); }} banks={DEFAULT_BANKS} />
+      {/* Add modal */}
+      {addModal && (
+        <AccountForm
+          userId={userId}
+          onClose={() => setAddModal(false)}
+          onSaved={() => { setAddModal(false); loadAccounts(userId); }}
+        />
+      )}
 
+      {/* Edit modal */}
+      {editAccount && (
+        <AccountForm
+          userId={userId}
+          initial={editAccount}
+          onClose={() => setEditAccount(null)}
+          onSaved={() => { setEditAccount(null); loadAccounts(userId); }}
+        />
+      )}
+
+      {/* Menu modal */}
       <Modal visible={menuModal} transparent animationType="none" onRequestClose={() => closeMenu()}>
-        <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => closeMenu()}>
-          <Animated.View style={[styles.menuContent, { opacity: menuFade }]}>
-            <TouchableOpacity style={styles.menuItem} onPress={() => closeMenu(() => setEditModal(true))}>
-              <Ionicons name="pencil-outline" size={18} color="#1c1d1d" />
-              <Text style={styles.menuItemText}>edit</Text>
-            </TouchableOpacity>
-            <View style={styles.menuDivider} />
-            <TouchableOpacity style={styles.menuItem} onPress={handleDelete}>
-              <Ionicons name="trash-outline" size={18} color="#e74c3c" />
-              <Text style={[styles.menuItemText, { color: '#e74c3c' }]}>delete</Text>
-            </TouchableOpacity>
-          </Animated.View>
-        </TouchableOpacity>
+        <BlurView intensity={40} tint="light" style={{ flex: 1 }}>
+          <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => closeMenu()}>
+            <Animated.View style={[styles.menuContent, { opacity: menuFade }]}>
+              <TouchableOpacity style={styles.menuItem} onPress={() => closeMenu(() => setEditAccount(selected))}>
+                <Ionicons name="pencil-outline" size={16} color="#425252" />
+                <Text style={styles.menuItemText}>edit</Text>
+              </TouchableOpacity>
+              <View style={styles.menuDivider} />
+              <TouchableOpacity style={styles.menuItem} onPress={handleDelete}>
+                <Ionicons name="trash-outline" size={16} color="#ed6a6a" />
+                <Text style={[styles.menuItemText, { color: '#ed6a6a' }]}>delete</Text>
+              </TouchableOpacity>
+            </Animated.View>
+          </TouchableOpacity>
+        </BlurView>
       </Modal>
     </SafeAreaView>
   );
 }
 
-function AccountForm({ visible, title, userId, initial, onClose, onSaved, banks }: { visible: boolean; title: string; userId: string; initial?: Account; onClose: () => void; onSaved: () => void; banks: string[]; }) {
-  const [bankInput, setBankInput] = useState('');
-  const [selectedBank, setSelectedBank] = useState('');
+function AccountForm({ userId, initial, onClose, onSaved }: {
+  userId: string; initial?: Account | null; onClose: () => void; onSaved: () => void;
+}) {
+  const slideAnim = useRef(new Animated.Value(500)).current;
+  const [bankInput, setBankInput] = useState(initial?.bank ?? '');
   const [suggestions, setSuggestions] = useState<string[]>([]);
-  const [showAddBank, setShowAddBank] = useState(false);
-  const [accountType, setAccountType] = useState(ACCOUNT_TYPES[0]);
-  const [accountName, setAccountName] = useState('');
-  const [accountDetails, setAccountDetails] = useState('');
-  const [color, setColor] = useState(PASTEL_COLORS[0]);
+  const [accountName, setAccountName] = useState(initial?.account_name ?? '');
+  const [accountNumber, setAccountNumber] = useState(initial?.account_number ?? '');
+  const [qrCode, setQrCode] = useState<string | null>(initial?.qr_code ?? null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [allBanks, setAllBanks] = useState(banks);
+  const [allBanks, setAllBanks] = useState(DEFAULT_BANKS);
 
   useEffect(() => {
-    if (visible) {
-      if (initial) { setSelectedBank(initial.bank); setBankInput(''); setAccountType(initial.account_type); setAccountName(initial.account_name); setAccountDetails(initial.account_details ?? ''); setColor(initial.color); }
-      else { setSelectedBank(''); setBankInput(''); setAccountType(ACCOUNT_TYPES[0]); setAccountName(''); setAccountDetails(''); setColor(PASTEL_COLORS[0]); }
-      setError(''); setSuggestions([]); setShowAddBank(false);
-    }
-  }, [visible]);
+    Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, tension: 65, friction: 11 }).start();
+  }, []);
+
+  const close = () => {
+    Animated.timing(slideAnim, { toValue: 500, duration: 220, useNativeDriver: true }).start(onClose);
+  };
 
   const handleBankInput = (val: string) => {
-    setBankInput(val); setSelectedBank('');
-    if (val.trim()) { const f = allBanks.filter(b => b.toLowerCase().includes(val.toLowerCase())); setSuggestions(f); setShowAddBank(f.length === 0 || !f.some(b => b.toLowerCase() === val.toLowerCase())); }
-    else { setSuggestions([]); setShowAddBank(false); }
+    setBankInput(val);
+    setSuggestions(val.trim() ? allBanks.filter(b => b.toLowerCase().includes(val.toLowerCase())) : []);
   };
 
-  const selectBank = (bank: string) => { setSelectedBank(bank); setBankInput(''); setSuggestions([]); setShowAddBank(false); };
-  const addNewBank = () => { const b = bankInput.trim(); if (!b) return; setAllBanks(prev => [...prev, b]); selectBank(b); };
+  const pickQR = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') { Alert.alert('Permission needed', 'Please allow photo access.'); return; }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 1,
+    });
+    if (!result.canceled && result.assets[0]) {
+      const compressed = await ImageManipulator.manipulateAsync(
+        result.assets[0].uri,
+        [{ resize: { width: 300, height: 300 } }],
+        { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+      );
+      setQrCode(`data:image/jpeg;base64,${compressed.base64}`);
+    }
+  };
 
   const handleSubmit = async () => {
-    const bank = selectedBank || bankInput.trim();
-    if (!bank || !accountName.trim()) { setError('Bank and account name are required.'); return; }
+    if (!bankInput.trim() || !accountName.trim() || !accountNumber.trim()) {
+      setError('bank, account name and account number are required.');
+      return;
+    }
     setLoading(true); setError('');
     try {
-      if (initial) { const { error: err } = await supabase.from('accounts').update({ bank, account_type: accountType, account_name: accountName.trim(), account_details: accountDetails.trim(), color }).eq('id', initial.id); if (err) throw err; }
-      else { const { error: err } = await supabase.from('accounts').insert({ user_id: userId, bank, account_type: accountType, account_name: accountName.trim(), account_details: accountDetails.trim(), color }); if (err) throw err; }
+      const payload = {
+        bank: bankInput.trim(),
+        account_name: accountName.trim(),
+        account_number: accountNumber.trim(),
+        qr_code: qrCode,
+        account_type: 'Savings',
+        account_details: '',
+        color: '#f0f0f0',
+      };
+      if (initial) {
+        const { error: err } = await supabase.from('accounts').update(payload).eq('id', initial.id);
+        if (err) throw err;
+      } else {
+        const { error: err } = await supabase.from('accounts').insert({ ...payload, user_id: userId });
+        if (err) throw err;
+      }
       onSaved();
-    } catch (e: any) { setError(e.message); } finally { setLoading(false); }
+    } catch (e: any) { setError(e.message); setLoading(false); }
   };
 
-  const bank = selectedBank || bankInput.trim();
-
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>{title}</Text>
-            <TouchableOpacity onPress={onClose}><Ionicons name="close" size={22} color="#b0b0b0" /></TouchableOpacity>
+    <Modal visible transparent animationType="none" onRequestClose={close}>
+      <BlurView intensity={40} tint="light" style={{ flex: 1 }}>
+        <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={close} />
+        <Animated.View style={[styles.formSheet, { transform: [{ translateY: slideAnim }] }]}>
+          <View style={styles.formHeader}>
+            <View>
+              <Text style={styles.formLabel}>{initial ? 'editing' : 'new'}</Text>
+              <Text style={styles.formTitle}>account</Text>
+            </View>
+            <TouchableOpacity onPress={close}>
+              <Ionicons name="close" size={22} color="#929090" />
+            </TouchableOpacity>
           </View>
+
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-            {error ? <Text style={styles.error}>{error}</Text> : null}
-            <Text style={styles.label}>bank</Text>
-            {selectedBank ? (
-              <View style={styles.bankBadgeRow}>
-                <View style={styles.bankBadge}>
-                  <Text style={styles.bankBadgeText}>{selectedBank}</Text>
-                  <TouchableOpacity onPress={() => setSelectedBank('')} style={styles.bankBadgeX}><Ionicons name="close" size={14} color="#1c1d1d" /></TouchableOpacity>
-                </View>
+            {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+            <View style={styles.infoBlock}>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>account name</Text>
+                <TextInput
+                  style={styles.infoInput}
+                  placeholder="e.g. my gcash"
+                  placeholderTextColor="#c0c0c0"
+                  value={accountName}
+                  onChangeText={setAccountName}
+                  autoFocus
+                />
               </View>
-            ) : (
-              <>
-                <TextInput style={styles.input} placeholder="type to search or add a bank" placeholderTextColor="#b0b0b0" value={bankInput} onChangeText={handleBankInput} autoCorrect={false} />
-                {suggestions.length > 0 && (
-                  <View style={styles.suggestions}>
-                    {suggestions.map(b => <TouchableOpacity key={b} style={styles.suggestion} onPress={() => selectBank(b)}><Text style={styles.suggestionText}>{b}</Text></TouchableOpacity>)}
-                  </View>
-                )}
-                {showAddBank && bankInput.trim() !== '' && (
-                  <TouchableOpacity style={styles.addBankRow} onPress={addNewBank}>
-                    <Ionicons name="add-circle-outline" size={16} color="#00bf63" />
-                    <Text style={styles.addBankText}>add "{bankInput.trim()}" as a new bank</Text>
+              <View style={styles.infoDivider} />
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>bank</Text>
+                <TextInput
+                  style={styles.infoInput}
+                  placeholder="e.g. gcash"
+                  placeholderTextColor="#c0c0c0"
+                  value={bankInput}
+                  onChangeText={handleBankInput}
+                />
+              </View>
+              <View style={styles.infoDivider} />
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>acct no.</Text>
+                <TextInput
+                  style={styles.infoInput}
+                  placeholder="required"
+                  placeholderTextColor="#c0c0c0"
+                  value={accountNumber}
+                  onChangeText={setAccountNumber}
+                  keyboardType="numeric"
+                />
+              </View>
+            </View>
+
+            {suggestions.length > 0 && (
+              <View style={styles.suggestionBox}>
+                {suggestions.map(b => (
+                  <TouchableOpacity key={b} style={styles.suggestionItem} onPress={() => { setBankInput(b); setSuggestions([]); }}>
+                    <Text style={styles.suggestionText}>{b}</Text>
                   </TouchableOpacity>
-                )}
-              </>
+                ))}
+              </View>
             )}
-            <Text style={styles.label}>account type</Text>
-            <View style={styles.chipRow}>
-              {ACCOUNT_TYPES.map(t => (
-                <TouchableOpacity key={t} style={[styles.chip, accountType === t && styles.chipActive]} onPress={() => setAccountType(t)}>
-                  <Text style={[styles.chipText, accountType === t && styles.chipTextActive]}>{t}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            <Text style={styles.label}>account name</Text>
-            <TextInput style={styles.input} placeholder="e.g. My BDO Savings" placeholderTextColor="#b0b0b0" value={accountName} onChangeText={setAccountName} />
-            <Text style={styles.label}>account details</Text>
-            <TextInput style={[styles.input, styles.textArea]} placeholder="e.g. account number, notes..." placeholderTextColor="#b0b0b0" value={accountDetails} onChangeText={setAccountDetails} multiline numberOfLines={3} />
-            <Text style={styles.detailsWarning}>⚠️ Do not include CVV, passwords, or any confidential information.</Text>
-            <Text style={styles.label}>color</Text>
-            <View style={styles.colorRow}>
-              {PASTEL_COLORS.map(c => <TouchableOpacity key={c} style={[styles.colorDot, { backgroundColor: c }, color === c && styles.colorDotSelected]} onPress={() => setColor(c)} />)}
-            </View>
-            <TouchableOpacity style={[styles.saveBtn, !bank || !accountName.trim() ? styles.saveBtnDisabled : null]} onPress={handleSubmit} disabled={loading || !bank || !accountName.trim()} activeOpacity={0.8}>
+
+            {/* QR Code */}
+            <Text style={styles.fieldLabel}>qr code <Text style={styles.fieldOptional}>(optional)</Text></Text>
+            <TouchableOpacity style={styles.qrUploadBtn} onPress={pickQR} activeOpacity={0.8}>
+              {qrCode ? (
+                <View style={styles.qrPreviewWrap}>
+                  <Image source={{ uri: qrCode }} style={styles.qrPreview} resizeMode="cover" />
+                  <TouchableOpacity style={styles.qrRemove} onPress={() => setQrCode(null)}>
+                    <Ionicons name="close-circle" size={20} color="#ed6a6a" />
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <View style={styles.qrEmpty2}>
+                  <Ionicons name="qr-code-outline" size={28} color="#c0c0c0" />
+                  <Text style={styles.qrUploadText}>tap to upload & crop</Text>
+                  <Text style={styles.qrUploadSub}>max 300×300 · jpeg compressed</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.saveBtn, (!bankInput.trim() || !accountName.trim() || !accountNumber.trim()) && { opacity: 0.4 }]}
+              onPress={handleSubmit}
+              disabled={loading || !bankInput.trim() || !accountName.trim() || !accountNumber.trim()}
+              activeOpacity={0.8}
+            >
               {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>{initial ? 'save changes' : 'add account'}</Text>}
             </TouchableOpacity>
           </ScrollView>
-        </View>
-      </View>
+        </Animated.View>
+      </BlurView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f5f5' },
-  header: { paddingHorizontal: 20, paddingVertical: 16 },
-  title: { fontFamily: 'DMSans_700Bold', fontSize: 22, color: '#1c1d1d' },
-  scroll: { paddingHorizontal: 20, paddingBottom: 40 },
-  grid: { gap: 10 },
-  accountBtn: { borderRadius: 999, paddingVertical: 14, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  accountBtnLeft: { flex: 1 },
-  accountName: { fontFamily: 'DMSans_600SemiBold', fontSize: 14, color: '#1c1d1d' },
-  accountMeta: { fontFamily: 'DMSans_400Regular', fontSize: 11, color: 'rgba(0,0,0,0.5)', marginTop: 2 },
+  container: { flex: 1, backgroundColor: '#ffffff' },
+  scroll: { paddingHorizontal: 32, paddingBottom: 60, paddingTop: 52 },
+  titleBlock: { marginBottom: 20 },
+  pageLabel: { fontFamily: 'ChillaxMedium', fontSize: 11, color: '#929090', marginBottom: 2 },
+  pageTitle: { fontFamily: 'Avenelle', fontSize: 32, color: '#425252', lineHeight: 36, letterSpacing: -1, textShadowColor: 'rgba(0,0,0,0.12)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4 },
+  sectionHeader: { fontFamily: 'ChillaxMedium', fontSize: 15, color: '#0ccfcf', letterSpacing: -0.5, marginBottom: 12 },
+  list: { gap: 10, marginBottom: 16 },
+  accountCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#fafafa', borderRadius: 14, paddingVertical: 12, paddingHorizontal: 14, borderWidth: 1, borderColor: '#f0f0f0' },
+  accountLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  accountIconWrap: { width: 36, height: 36, borderRadius: 10, backgroundColor: '#f0fffe', justifyContent: 'center', alignItems: 'center' },
+  accountInfo: { flex: 1, gap: 2 },
+  accountName: { fontFamily: 'Avenelle', fontSize: 16, color: '#425252', letterSpacing: -0.5 },
+  accountBank: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#929090' },
+  accountNumber: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#c0c0c0' },
+  accountRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  qrThumb: { width: 32, height: 32, borderRadius: 6 },
+  qrEmpty: { width: 32, height: 32, borderRadius: 6, backgroundColor: '#f5f5f5', justifyContent: 'center', alignItems: 'center' },
   menuBtn: { padding: 4 },
-  addBtn: { borderRadius: 999, paddingVertical: 14, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e8e8e8', gap: 6 },
-  addBtnText: { fontFamily: 'DMSans_400Regular', fontSize: 13, color: '#b0b0b0' },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: '#ffffff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40, maxHeight: '92%' },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  modalTitle: { fontFamily: 'DMSans_700Bold', fontSize: 18, color: '#1c1d1d' },
-  label: { fontFamily: 'DMSans_600SemiBold', fontSize: 11, color: '#8a8a8a', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 16 },
-  input: { backgroundColor: '#f5f5f5', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 13, fontFamily: 'DMSans_400Regular', fontSize: 15, color: '#1c1d1d', borderWidth: 1, borderColor: '#e8e8e8' },
-  textArea: { minHeight: 80, textAlignVertical: 'top' },
-  detailsWarning: { fontFamily: 'DMSans_400Regular', fontSize: 11, color: '#e67e22', marginTop: 6 },
-  bankBadgeRow: { flexDirection: 'row' },
-  bankBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#00bf63', borderRadius: 999, paddingVertical: 8, paddingHorizontal: 14, gap: 6 },
-  bankBadgeText: { fontFamily: 'DMSans_600SemiBold', fontSize: 14, color: '#1c1d1d' },
-  bankBadgeX: { padding: 2 },
-  suggestions: { backgroundColor: '#f5f5f5', borderRadius: 12, marginTop: 4, overflow: 'hidden', borderWidth: 1, borderColor: '#e8e8e8' },
-  suggestion: { paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#e8e8e8' },
-  suggestionText: { fontFamily: 'DMSans_400Regular', fontSize: 14, color: '#1c1d1d' },
-  addBankRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, paddingHorizontal: 4 },
-  addBankText: { fontFamily: 'DMSans_400Regular', fontSize: 13, color: '#00bf63' },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, borderWidth: 1, borderColor: '#e8e8e8', backgroundColor: '#f5f5f5' },
-  chipActive: { backgroundColor: '#00bf63', borderColor: '#00bf63' },
-  chipText: { fontFamily: 'DMSans_400Regular', fontSize: 13, color: '#8a8a8a' },
-  chipTextActive: { color: '#ffffff', fontFamily: 'DMSans_600SemiBold' },
-  colorRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  colorDot: { width: 30, height: 30, borderRadius: 15 },
-  colorDotSelected: { borderWidth: 3, borderColor: '#1c1d1d' },
-  saveBtn: { backgroundColor: '#00bf63', borderRadius: 999, paddingVertical: 15, alignItems: 'center', marginTop: 20, marginBottom: 10 },
-  saveBtnDisabled: { opacity: 0.4 },
-  saveBtnText: { fontFamily: 'DMSans_600SemiBold', fontSize: 15, color: '#ffffff' },
-  error: { fontFamily: 'DMSans_400Regular', fontSize: 13, color: '#e74c3c', marginBottom: 4 },
-  menuOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'center', alignItems: 'center' },
-  menuContent: { backgroundColor: '#ffffff', borderRadius: 16, overflow: 'hidden', minWidth: 160, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 8 },
-  menuItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingVertical: 16 },
-  menuItemText: { fontFamily: 'DMSans_400Regular', fontSize: 15, color: '#1c1d1d' },
-  menuDivider: { height: 1, backgroundColor: '#e8e8e8' },
+  addBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-end', backgroundColor: '#fafafa', borderRadius: 999, paddingVertical: 8, paddingHorizontal: 14, borderWidth: 1, borderColor: '#e8e8e8' },
+  addBtnText: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#425252' },
+  menuOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  menuContent: { backgroundColor: '#ffffff', borderRadius: 14, overflow: 'hidden', minWidth: 160, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 8 },
+  menuItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingVertical: 14 },
+  menuItemText: { fontFamily: 'RobotoMono_400Regular', fontSize: 13, color: '#425252' },
+  menuDivider: { height: 1, backgroundColor: '#f0f0f0' },
+  formSheet: { backgroundColor: '#ffffff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 48, maxHeight: '88%' },
+  formHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 },
+  formLabel: { fontFamily: 'ChillaxMedium', fontSize: 11, color: '#929090' },
+  formTitle: { fontFamily: 'Avenelle', fontSize: 28, color: '#425252', letterSpacing: -0.5, lineHeight: 32 },
+  errorText: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#ed6a6a', marginBottom: 10 },
+  infoBlock: { backgroundColor: '#fafafa', borderRadius: 14, paddingHorizontal: 14, paddingVertical: 4, borderWidth: 1, borderColor: '#f0f0f0', marginBottom: 8 },
+  infoRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 11, gap: 10 },
+  infoLabel: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#929090', width: 70, flexShrink: 0 },
+  infoInput: { flex: 1, fontFamily: 'RobotoMono_400Regular', fontSize: 16, color: '#425252', padding: 0 },
+  infoDivider: { height: 1, backgroundColor: '#f0f0f0' },
+  suggestionBox: { backgroundColor: '#ffffff', borderRadius: 10, borderWidth: 1, borderColor: '#f0f0f0', marginBottom: 8, overflow: 'hidden' },
+  suggestionItem: { paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
+  suggestionText: { fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#425252' },
+  fieldLabel: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#929090', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 16 },
+  fieldOptional: { color: '#c0c0c0', textTransform: 'none' },
+  qrUploadBtn: { borderRadius: 14, borderWidth: 1, borderColor: '#f0f0f0', backgroundColor: '#fafafa', overflow: 'hidden', marginBottom: 24 },
+  qrEmpty2: { alignItems: 'center', justifyContent: 'center', paddingVertical: 24, gap: 6 },
+  qrUploadText: { fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#929090' },
+  qrUploadSub: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#c0c0c0' },
+  qrPreviewWrap: { alignItems: 'center', padding: 16 },
+  qrPreview: { width: 160, height: 160, borderRadius: 10 },
+  qrRemove: { position: 'absolute', top: 8, right: 8 },
+  saveBtn: { backgroundColor: '#425252', borderRadius: 999, paddingVertical: 14, alignItems: 'center' },
+  saveBtnText: { fontFamily: 'RobotoMono_700Bold', fontSize: 13, color: '#fff' },
 });
