@@ -288,11 +288,10 @@ export default function RecordingDetailScreen() {
           <View style={styles.splitBtnGrid}>
             {[
               { icon: 'add-circle-outline', label: 'add item', onPress: () => {
-                const totalItemsCost = items.reduce((s, i) => s + i.subitems.reduce((ss, sub) => ss + sub.cost, 0), 0);
-                const recordingAmount = recording ? Number(recording.amount) : 0;
-                const isFullyAllocated = Math.abs(totalItemsCost - recordingAmount) < 0.01 && recordingAmount > 0;
-                if (filledPeople.length > 0 && !isFullyAllocated) setAddItemModal(true);
-              }, disabled: filledPeople.length === 0 || Math.abs(items.reduce((s, i) => s + i.subitems.reduce((ss, sub) => ss + sub.cost, 0), 0) - (recording ? Number(recording.amount) : 0)) < 0.01 },
+                const total = items.reduce((s, i) => s + i.cost, 0);
+                const recAmt = recording ? Number(recording.amount) : 0;
+                if (filledPeople.length > 0 && !(Math.abs(total - recAmt) < 0.01 && recAmt > 0)) setAddItemModal(true);
+              }, disabled: filledPeople.length === 0 || (Math.abs(items.reduce((s, i) => s + i.cost, 0) - (recording ? Number(recording.amount) : 0)) < 0.01 && items.length > 0) },
               { icon: 'people-outline', label: 'add people', onPress: () => openPeopleModal(), disabled: false },
               { icon: 'image-outline', label: 'save image', onPress: () => setCookingModal(true), disabled: false },
               { icon: 'person-add-outline', label: 'save person', onPress: () => setCookingModal(true), disabled: false },
@@ -336,7 +335,7 @@ export default function RecordingDetailScreen() {
           {/* Items */}
           <Text style={styles.sectionHeader}>items</Text>
           {(() => {
-            const totalItemsCost = items.reduce((s, i) => s + i.subitems.reduce((ss, sub) => ss + sub.cost, 0), 0);
+            const totalItemsCost = items.reduce((s, i) => s + i.cost, 0);
             const recordingAmount = recording ? Number(recording.amount) : 0;
             const isFullyAllocated = Math.abs(totalItemsCost - recordingAmount) < 0.01 && recordingAmount > 0;
             return (
@@ -349,7 +348,7 @@ export default function RecordingDetailScreen() {
                   <View style={styles.itemsList}>
                     {items.map((item, idx) => {
                       const subitemTotal = item.subitems.reduce((s, sub) => s + sub.cost, 0);
-                      const itemFull = Math.abs(subitemTotal - item.cost) < 0.01;
+                      const itemFull = item.subitems.length > 0 && Math.abs(subitemTotal - item.cost) < 0.01;
                       return (
                         <View key={item.id}>
                           <View style={styles.itemCard}>
@@ -363,10 +362,7 @@ export default function RecordingDetailScreen() {
                               onPress={() => {
                                 if (itemFull) return;
                                 setActiveItemId(item.id);
-                                const used = item.subitems.reduce((s, sub) => s + sub.cost, 0);
-                                const remaining = item.cost - used;
-                                setSubitemCost(remaining > 0 ? remaining.toFixed(2) : '');
-                                setSubitemName(''); setSubitemPeople([]);
+                                setSubitemName(''); setSubitemCost(''); setSubitemPeople([]);
                                 setAddSubitemModal(true);
                               }}
                               activeOpacity={itemFull ? 1 : 0.8}
@@ -413,7 +409,6 @@ export default function RecordingDetailScreen() {
                         </View>
                       );
                     })}
-                    {/* Total row */}
                     <View style={styles.itemsTotalRow}>
                       <Text style={styles.itemsTotalLabel}>total allocated</Text>
                       <View style={styles.itemsTotalDots} />
@@ -423,7 +418,6 @@ export default function RecordingDetailScreen() {
                     </View>
                   </View>
                 )}
-                {/* Disable add item if fully allocated */}
                 {isFullyAllocated && (
                   <Text style={styles.allocatedNote}>all amount allocated</Text>
                 )}
