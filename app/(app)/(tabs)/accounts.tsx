@@ -175,17 +175,36 @@ function CropView({ uri, onCrop, onCancel }: { uri: string; onCrop: (base64: str
   })).current;
 
   const doCrop = async () => {
-    const relX = (bx.current - imgDisplay.x) / imgDisplay.w;
-    const relY = (by.current - imgDisplay.y) / imgDisplay.h;
-    const relS = bs.current / imgDisplay.w;
-    const originX = Math.max(0, relX * imgNatural.w);
-    const originY = Math.max(0, relY * imgNatural.h);
-    const cropW = Math.min(imgNatural.w - originX, relS * imgNatural.w);
-    const cropH = Math.min(imgNatural.h - originY, relS * imgNatural.h);
+    // Get actual displayed image bounds accounting for resizeMode contain
+    const imgRatio = imgNatural.w / imgNatural.h;
+    const screenRatio = SW / SH;
+    let renderedW, renderedH, offsetX, offsetY;
+    if (imgRatio > screenRatio) {
+      renderedW = SW;
+      renderedH = SW / imgRatio;
+      offsetX = 0;
+      offsetY = (SH - renderedH) / 2;
+    } else {
+      renderedH = SH;
+      renderedW = SH * imgRatio;
+      offsetX = (SW - renderedW) / 2;
+      offsetY = 0;
+    }
+    // Crop box in screen coords
+    const cx = bx.current;
+    const cy = by.current;
+    const cs = bs.current;
+    // Convert to image pixel coords
+    const scaleX = imgNatural.w / renderedW;
+    const scaleY = imgNatural.h / renderedH;
+    const originX = Math.max(0, (cx - offsetX) * scaleX);
+    const originY = Math.max(0, (cy - offsetY) * scaleY);
+    const cropW = Math.min(imgNatural.w - originX, cs * scaleX);
+    const cropH = Math.min(imgNatural.h - originY, cs * scaleY);
     const result = await ImageManipulator.manipulateAsync(
       uri,
-      [{ crop: { originX, originY, width: cropW, height: cropH } }, { resize: { width: 300, height: 300 } }],
-      { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+      [{ crop: { originX, originY, width: cropW, height: cropH } }, { resize: { width: 600, height: 600 } }],
+      { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG, base64: true }
     );
     onCrop(`data:image/jpeg;base64,${result.base64}`);
   };
