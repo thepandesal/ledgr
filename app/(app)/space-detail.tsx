@@ -509,14 +509,13 @@ export default function SpaceDetailScreen() {
                   <View style={styles.datePickerMonthGrid}>
                     {MONTHS.map((m, i) => {
                       const isActive = i === pickerMonth;
-                      const isCurrentMonth = i === selectedDate.getMonth() && pickerYear === selectedDate.getFullYear();
                       return (
                         <TouchableOpacity
                           key={m}
-                          style={[styles.datePickerMonthBtn, (isActive || isCurrentMonth) && styles.datePickerMonthBtnActive]}
+                          style={[styles.datePickerMonthBtn, isActive && styles.datePickerMonthBtnActive]}
                           onPress={() => setPickerMonth(i)}
                         >
-                          <Text style={[styles.datePickerMonthText, (isActive || isCurrentMonth) && styles.datePickerMonthTextActive]}>
+                          <Text style={[styles.datePickerMonthText, isActive && styles.datePickerMonthTextActive]}>
                             {m.slice(0, 3).toLowerCase()}
                           </Text>
                         </TouchableOpacity>
@@ -600,7 +599,7 @@ const styles = StyleSheet.create({
   todayDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: '#0ccfcf', marginTop: 3 },
   todayDotSelected: { backgroundColor: '#fff' },
   entryDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: '#0ccfcf', marginTop: 3 },
-  list: { paddingHorizontal: 32, paddingBottom: 100, gap: 48 },
+  list: { paddingHorizontal: 32, paddingBottom: 100, gap: 48, paddingTop: 16 },
   dateGroupLabel: { fontFamily: 'ChillaxMedium', fontSize: 13, color: '#425252', marginBottom: 8, textShadowColor: 'rgba(0,0,0,0.08)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   dateGroupItems: { gap: 10 },
   recordingCard: { flexDirection: 'row', alignItems: 'center', borderRadius: 999, paddingVertical: 10, paddingHorizontal: 14, gap: 8 },
@@ -613,7 +612,7 @@ const styles = StyleSheet.create({
   recordingValue: { fontFamily: 'RobotoMono_700Bold', fontSize: 10, color: '#fff', flexShrink: 1 },
   recordingRight: { alignItems: 'flex-end', gap: 3, flexShrink: 0 },
   recordingAmount: { fontFamily: 'RobotoMono_400Regular', fontSize: 14, color: '#fff' },
-  addRecordingRow: { paddingHorizontal: 32, alignItems: 'flex-end', marginBottom: 10 },
+  addRecordingRow: { paddingHorizontal: 32, alignItems: 'flex-end', marginBottom: 10, marginTop: 20 },
   addRecordingBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#ffffff', borderRadius: 999, paddingVertical: 6, paddingHorizontal: 14, borderWidth: 1, borderColor: '#929090', shadowColor: '#000', shadowOffset: { width: 3, height: 3 }, shadowOpacity: 1, shadowRadius: 0, elevation: 3 },
   addRecordingText: { fontFamily: 'DMSans_400Regular', fontSize: 11, color: '#425252' },
   empty: { alignItems: 'center', paddingTop: 60, gap: 10 },
