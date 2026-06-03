@@ -41,7 +41,8 @@ export default function SplitSharePage() {
   const amtColor = data.recordingType === 'expense' ? '#ed6a6a' : data.recordingType === 'income' ? '#2ab671' : '#425252';
 
   return (
-    <ScrollView style={s.container} contentContainerStyle={s.scroll}>
+    <>
+      <ScrollView style={s.container} contentContainerStyle={s.scroll}>
 
       {/* Header */}
       <Text style={s.appLabel}>ledgr</Text>
@@ -128,6 +129,7 @@ export default function SplitSharePage() {
         </TouchableOpacity>
       </BlurView>
     </Modal>
+    </>
   );
 }
 
