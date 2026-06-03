@@ -7,6 +7,8 @@ import { BlurView } from 'expo-blur';
 import * as Print from 'expo-print';
 import * as MediaLibrary from 'expo-media-library';
 import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system';
+import { WebView } from 'react-native-webview';
 
 const { width } = Dimensions.get('window');
 const MAX_NAME_CHARS = 18;
@@ -31,6 +33,8 @@ export default function RecordingDetailScreen() {
   const [shareAccounts, setShareAccounts] = useState<any[]>([]);
   const [shareSelectedAccount, setShareSelectedAccount] = useState<any>(null);
   const [shareLoading, setShareLoading] = useState(false);
+  const [captureHtml, setCaptureHtml] = useState<string | null>(null);
+  const webviewRef = useRef<any>(null);
   const [tooltip, setTooltip] = useState<{ name: string } | null>(null);
   const [contacts, setContacts] = useState<string[]>([]);
   const [suggestions, setSuggestions] = useState<string[]>([]);
@@ -213,22 +217,46 @@ export default function RecordingDetailScreen() {
   const saveAsImage = async () => {
     if (!recording) return;
     setShareLoading(true);
+    // Build HTML with html2canvas injected, trigger capture via WebView
+    const html = buildHtml(buildShareData());
+    // Inject html2canvas CDN + capture script
+    const captureHtmlWithScript = html.replace(
+      '</body>',
+      `<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+      <script>
+        window.onload = function() {
+          html2canvas(document.body, { scale: 2, useCORS: true, backgroundColor: '#ffffff' }).then(function(canvas) {
+            var dataUrl = canvas.toDataURL('image/png');
+            window.ReactNativeWebView.postMessage(dataUrl);
+          });
+        };
+      </script></body>`
+    );
+    setCaptureHtml(captureHtmlWithScript);
+  };
+
+  const handleWebViewMessage = async (event: any) => {
+    const dataUrl = event.nativeEvent.data;
+    if (!dataUrl.startsWith('data:image/png')) return;
+    setCaptureHtml(null);
     try {
+      const base64 = dataUrl.replace('data:image/png;base64,', '');
+      const fileUri = `${FileSystem.cacheDirectory}split_${Date.now()}.png`;
+      await FileSystem.writeAsStringAsync(fileUri, base64, { encoding: FileSystem.EncodingType.Base64 });
       const { status } = await MediaLibrary.requestPermissionsAsync();
-      const html = buildHtml(buildShareData());
-      const { uri } = await Print.printToFileAsync({ html, width: 390 });
       if (status === 'granted') {
-        await MediaLibrary.saveToLibraryAsync(uri);
+        await MediaLibrary.saveToLibraryAsync(fileUri);
         setSaveImageModal(false);
-        alert('Saved to your camera roll!');
-      } else {
-        // fallback — share the file
-        if (await Sharing.isAvailableAsync()) {
-          await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: 'Save split breakdown' });
-        }
+        alert('Image saved to your camera roll!');
+      } else if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(fileUri, { mimeType: 'image/png', dialogTitle: 'Save split image' });
         setSaveImageModal(false);
       }
-    } catch (e: any) { console.log(e); } finally { setShareLoading(false); }
+    } catch (e) {
+      console.log(e);
+    } finally {
+      setShareLoading(false);
+    }
   };
 
   const handleBack = () => {
@@ -944,6 +972,17 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
           </TouchableOpacity>
         </BlurView>
       </Modal>
+      {/* Hidden WebView for image capture */}
+      {captureHtml && (
+        <WebView
+          ref={webviewRef}
+          source={{ html: captureHtml }}
+          style={{ position: 'absolute', width: 390, height: 1, opacity: 0, top: -9999 }}
+          onMessage={handleWebViewMessage}
+          javaScriptEnabled
+          originWhitelist={['*']}
+        />
+      )}
     </Animated.View>
   );
 }
