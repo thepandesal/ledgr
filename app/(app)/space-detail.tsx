@@ -355,18 +355,18 @@ export default function SpaceDetailScreen() {
                       const showPartial = (item.type === 'receivable' || item.type === 'payable') && item.status === 'partial' && item.paid_amount;
 
                       return (
-                        <TouchableOpacity key={item.id} style={[styles.recordingCard, { backgroundColor: amountColor }]} activeOpacity={0.85}
+                        <TouchableOpacity key={item.id} style={[styles.recordingCard, { borderColor: amountColor }]} activeOpacity={0.85}
                           onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: item.id } } as any)}>
                           <View style={styles.catIcon}>
-                            <Ionicons name={item.categories?.icon ?? 'ellipse-outline'} size={24} color="#fff" />
+                            <Ionicons name={item.categories?.icon ?? 'ellipse-outline'} size={22} color={amountColor} />
                           </View>
                           <View style={styles.recordingMiddle}>
                             <Text style={styles.recordingName} numberOfLines={1} ellipsizeMode="tail">{item.name}</Text>
                             <View style={styles.recordingRow2}>
-                              <Text style={styles.recordingLabel} numberOfLines={1}>{item.type.charAt(0).toUpperCase() + item.type.slice(1)}:</Text>
+                              <Text style={[styles.recordingLabel, { color: amountColor }]} numberOfLines={1}>{item.type.charAt(0).toUpperCase() + item.type.slice(1)}:</Text>
                               {statusLabel
-                                ? <Text style={styles.recordingValue} numberOfLines={1}>{statusLabel}</Text>
-                                : <Text style={styles.recordingValue} numberOfLines={1}>{item.categories?.name ?? '—'}</Text>}
+                                ? <Text style={[styles.recordingValue, { color: amountColor }]} numberOfLines={1}>{statusLabel}</Text>
+                                : <Text style={[styles.recordingValue, { color: amountColor }]} numberOfLines={1}>{item.categories?.name ?? '—'}</Text>}
                             </View>
                             {(accountName || item.person_name) && (
                               <View style={styles.recordingRow3}>
@@ -376,13 +376,13 @@ export default function SpaceDetailScreen() {
                             )}
                           </View>
                           <View style={styles.recordingRight}>
-                            <Text style={styles.recordingAmount}>
+                            <Text style={[styles.recordingAmount, { color: amountColor }]}>
                               {showPartial
                                 ? Number(item.paid_amount).toLocaleString('en-US', { minimumFractionDigits: 2 })
                                 : Number(item.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                             </Text>
                             {showPartial && (
-                              <Text style={{ fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: 'rgba(255,255,255,0.7)' }}>
+                              <Text style={{ fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#b0b0b0' }}>
                                 / {Number(item.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                               </Text>
                             )}
@@ -607,16 +607,16 @@ const styles = StyleSheet.create({
   list: { paddingHorizontal: 32, paddingBottom: 100, gap: 48, paddingTop: 16 },
   dateGroupLabel: { fontFamily: 'ChillaxMedium', fontSize: 13, color: '#0ccfcf', marginBottom: 8, marginTop: 16 },
   dateGroupItems: { gap: 10 },
-  recordingCard: { flexDirection: 'row', alignItems: 'center', borderRadius: 999, paddingVertical: 10, paddingHorizontal: 14, gap: 8 },
+  recordingCard: { flexDirection: 'row', alignItems: 'center', borderRadius: 14, paddingVertical: 10, paddingHorizontal: 14, gap: 10, backgroundColor: '#ffffff', borderWidth: 1, borderStyle: 'dashed' },
   catIcon: { flexShrink: 0 },
   recordingMiddle: { flex: 1, gap: 2, overflow: 'hidden' },
-  recordingName: { fontFamily: 'RobotoMono_700Bold', fontSize: 12, color: '#fff' },
+  recordingName: { fontFamily: 'RobotoMono_700Bold', fontSize: 12, color: '#425252' },
   recordingRow2: { flexDirection: 'row', gap: 3 },
   recordingRow3: { flexDirection: 'row', gap: 3 },
-  recordingLabel: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: 'rgba(255,255,255,0.75)' },
-  recordingValue: { fontFamily: 'RobotoMono_700Bold', fontSize: 10, color: '#fff', flexShrink: 1 },
+  recordingLabel: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#929090' },
+  recordingValue: { fontFamily: 'RobotoMono_700Bold', fontSize: 10, color: '#929090', flexShrink: 1 },
   recordingRight: { alignItems: 'flex-end', gap: 3, flexShrink: 0 },
-  recordingAmount: { fontFamily: 'RobotoMono_400Regular', fontSize: 14, color: '#fff' },
+  recordingAmount: { fontFamily: 'RobotoMono_400Regular', fontSize: 14 },
   addRecordingRow: { paddingHorizontal: 32, alignItems: 'flex-end', marginBottom: 10, marginTop: 20 },
   addRecordingBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#fafafa', borderRadius: 999, paddingVertical: 10, paddingHorizontal: 14, borderWidth: 1, borderColor: '#e8e8e8' },
   addRecordingText: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#425252' },
