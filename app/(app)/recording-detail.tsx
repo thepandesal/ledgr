@@ -268,29 +268,32 @@ export default function RecordingDetailScreen() {
                 const perPerson = item.people.length > 0 ? item.cost / item.people.length : 0;
                 return (
                   <View key={item.id} style={styles.itemCard}>
-                    {/* Number */}
                     <Text style={styles.itemNumber}>{idx + 1}</Text>
-                    {/* Middle */}
                     <View style={styles.itemMiddle}>
                       <Text style={styles.itemName} numberOfLines={1}>{truncate(item.name, MAX_ITEM_NAME)}</Text>
                       <Text style={styles.itemCost}>{item.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
-                      {/* Person circles */}
+                    </View>
+                    <View style={styles.itemRight}>
                       <View style={styles.itemPeopleRow}>
-                        {item.people.map((p, pi) => (
+                        {item.people.slice(0, 3).map((p, pi) => (
                           <TouchableOpacity
                             key={pi}
                             style={styles.personCircle}
-                            onPress={() => setTooltip(tooltip?.name === p ? null : { name: p, x: 0, y: 0 })}
+                            onPress={() => setTooltip(tooltip?.name === p ? null : { name: p })}
                           >
                             <Text style={styles.personCircleLetter}>{p[0]?.toUpperCase()}</Text>
                           </TouchableOpacity>
                         ))}
+                        {item.people.length > 3 && (
+                          <View style={styles.personCircleExtra}>
+                            <Text style={styles.personCircleLetter}>+{item.people.length - 3}</Text>
+                          </View>
+                        )}
                       </View>
                       <Text style={styles.itemSplit}>
                         {item.people.length} {item.people.length === 1 ? 'person' : 'people'}, {perPerson.toLocaleString('en-US', { minimumFractionDigits: 2 })} each
                       </Text>
                     </View>
-                    {/* Delete */}
                     <TouchableOpacity onPress={() => deleteItem(item.id)} style={styles.itemDelete}>
                       <Ionicons name="close" size={14} color="#c0c0c0" />
                     </TouchableOpacity>
@@ -520,16 +523,18 @@ const styles = StyleSheet.create({
   personChipText: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#425252' },
   personChipDelete: { padding: 2 },
   itemsList: { gap: 10, marginBottom: 24 },
-  itemCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: '#fafafa', borderRadius: 14, padding: 12, borderWidth: 1, borderColor: '#f0f0f0' },
-  itemNumber: { fontFamily: 'RobotoMono_700Bold', fontSize: 13, color: '#0ccfcf', width: 20, paddingTop: 2 },
-  itemMiddle: { flex: 1, gap: 4 },
+  itemCard: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#fafafa', borderRadius: 14, padding: 12, borderWidth: 1, borderColor: '#f0f0f0' },
+  itemNumber: { fontFamily: 'RobotoMono_700Bold', fontSize: 13, color: '#0ccfcf', width: 20, flexShrink: 0 },
+  itemMiddle: { flex: 1, gap: 2 },
   itemName: { fontFamily: 'RobotoMono_700Bold', fontSize: 11, color: '#425252' },
   itemCost: { fontFamily: 'RobotoMono_400Regular', fontSize: 13, color: '#425252' },
-  itemPeopleRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 2 },
-  personCircle: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#0ccfcf', justifyContent: 'center', alignItems: 'center' },
-  personCircleLetter: { fontFamily: 'RobotoMono_700Bold', fontSize: 10, color: '#fff' },
-  itemSplit: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#929090', marginTop: 2 },
-  itemDelete: { padding: 4 },
+  itemRight: { alignItems: 'flex-end', gap: 4, flexShrink: 0 },
+  itemPeopleRow: { flexDirection: 'row', gap: 3 },
+  personCircle: { width: 22, height: 22, borderRadius: 11, backgroundColor: '#0ccfcf', justifyContent: 'center', alignItems: 'center' },
+  personCircleExtra: { width: 22, height: 22, borderRadius: 11, backgroundColor: '#c0c0c0', justifyContent: 'center', alignItems: 'center' },
+  personCircleLetter: { fontFamily: 'RobotoMono_700Bold', fontSize: 9, color: '#fff' },
+  itemSplit: { fontFamily: 'RobotoMono_400Regular', fontSize: 9, color: '#929090' },
+  itemDelete: { padding: 4, flexShrink: 0 },
   cookingBox: { borderRadius: 14, borderWidth: 1, borderColor: '#e8e8e8', backgroundColor: '#fafafa', padding: 20, alignItems: 'center', marginBottom: 24 },
   cookingText: { fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#929090', textAlign: 'center' },
   tooltip: { position: 'absolute', top: '50%', alignSelf: 'center', backgroundColor: '#425252', borderRadius: 8, paddingVertical: 6, paddingHorizontal: 12 },
