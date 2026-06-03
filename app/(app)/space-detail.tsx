@@ -466,29 +466,36 @@ export default function SpaceDetailScreen() {
                   const cells = Array(firstDay).fill(null).concat(
                     Array.from({ length: daysInMonth }, (_, i) => i + 1)
                   );
+                  // for weekly: which days are in the selected week
+                  const selWeekStart = addDays(selectedDate, -selectedDate.getDay());
+                  const selWeekEnd = addDays(selWeekStart, 6);
                   return (
                     <View>
-                      {/* Weekday headers */}
                       <View style={styles.calWeekRow}>
                         {['su','mo','tu','we','th','fr','sa'].map(d => (
                           <Text key={d} style={styles.calWeekDay}>{d}</Text>
                         ))}
                       </View>
-                      {/* Day cells */}
                       <View style={styles.calGrid}>
                         {cells.map((day, i) => {
                           if (!day) return <View key={`e${i}`} style={styles.calCell} />;
-                          const isSelected = viewMode === 'daily' && day === pickerDay;
-                          const isToday = isSameDay(new Date(pickerYear, pickerMonth, day), new Date());
-                          const hasEntry = recordingDates.has(dateKey(new Date(pickerYear, pickerMonth, day)));
+                          const cellDate = new Date(pickerYear, pickerMonth, day);
+                          const isSelectedDay = viewMode === 'daily' && day === pickerDay;
+                          const isInSelectedWeek = viewMode === 'weekly' && cellDate >= selWeekStart && cellDate <= selWeekEnd;
+                          const isHighlighted = isSelectedDay || isInSelectedWeek;
+                          const isToday = isSameDay(cellDate, new Date());
+                          const hasEntry = recordingDates.has(dateKey(cellDate));
                           return (
                             <TouchableOpacity
                               key={day}
-                              style={[styles.calCell, isSelected && styles.calCellSelected, !isSelected && isToday && styles.calCellToday]}
-                              onPress={() => setPickerDay(day)}
+                              style={[styles.calCell, isHighlighted && styles.calCellSelected, !isHighlighted && isToday && styles.calCellToday]}
+                              onPress={() => {
+                                if (viewMode === 'daily') setPickerDay(day);
+                                else setSelectedDate(cellDate);
+                              }}
                             >
-                              <Text style={[styles.calCellText, (isSelected || isToday) && styles.calCellTextActive]}>{day}</Text>
-                              {hasEntry && <View style={[styles.calEntryDot, isSelected && styles.calEntryDotSelected]} />}
+                              <Text style={[styles.calCellText, (isHighlighted || isToday) && styles.calCellTextActive]}>{day}</Text>
+                              {hasEntry && <View style={[styles.calEntryDot, isHighlighted && styles.calEntryDotSelected]} />}
                             </TouchableOpacity>
                           );
                         })}
@@ -502,13 +509,14 @@ export default function SpaceDetailScreen() {
                   <View style={styles.datePickerMonthGrid}>
                     {MONTHS.map((m, i) => {
                       const isActive = i === pickerMonth;
+                      const isCurrentMonth = i === selectedDate.getMonth() && pickerYear === selectedDate.getFullYear();
                       return (
                         <TouchableOpacity
                           key={m}
-                          style={[styles.datePickerMonthBtn, isActive && styles.datePickerMonthBtnActive]}
+                          style={[styles.datePickerMonthBtn, (isActive || isCurrentMonth) && styles.datePickerMonthBtnActive]}
                           onPress={() => setPickerMonth(i)}
                         >
-                          <Text style={[styles.datePickerMonthText, isActive && styles.datePickerMonthTextActive]}>
+                          <Text style={[styles.datePickerMonthText, (isActive || isCurrentMonth) && styles.datePickerMonthTextActive]}>
                             {m.slice(0, 3).toLowerCase()}
                           </Text>
                         </TouchableOpacity>
@@ -558,11 +566,11 @@ export default function SpaceDetailScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#ffffff', position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   inner: { flex: 1 },
-  backBtn: { paddingHorizontal: 40, paddingTop: 14, paddingBottom: 4 },
-  titleBlock: { paddingHorizontal: 48, marginTop: 8, marginBottom: 10 },
+  backBtn: { paddingHorizontal: 28, paddingTop: 14, paddingBottom: 4 },
+  titleBlock: { paddingHorizontal: 32, marginTop: 8, marginBottom: 10 },
   spacesLabel: { fontFamily: 'ChillaxMedium', fontSize: 11, color: '#929090' },
   spaceName: { fontFamily: 'Avenelle', fontSize: 32, color: '#425252', lineHeight: 36, letterSpacing: -1, textShadowColor: 'rgba(0,0,0,0.12)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4 },
-  recordingsHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 48, marginBottom: 8 },
+  recordingsHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 32, marginBottom: 8 },
   recordingsTitle: { fontFamily: 'ChillaxMedium', fontSize: 15, color: '#425252', letterSpacing: -0.5 },
   filterBtn: { padding: 6 },
   filterBox: { backgroundColor: '#ffffff', borderRadius: 20, padding: 20, width: 260, gap: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 24, elevation: 12 },
@@ -570,20 +578,20 @@ const styles = StyleSheet.create({
   filterOption: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 999, borderWidth: 1, borderColor: '#e8e8e8' },
   filterDot: { width: 8, height: 8, borderRadius: 4 },
   filterOptionText: { fontFamily: 'RobotoMono_400Regular', fontSize: 13, color: '#929090' },
-  statsRow: { flexDirection: 'row', paddingHorizontal: 48, marginBottom: 24, gap: 16, justifyContent: 'flex-start' },
+  statsRow: { flexDirection: 'row', paddingHorizontal: 32, marginBottom: 24, gap: 16, justifyContent: 'flex-start' },
   statItem: { alignItems: 'flex-start', gap: 4 },
   statLabel: { fontFamily: 'RobotoMono_400Regular', fontSize: 9, color: '#929090' },
   statValue: { fontFamily: 'RobotoMono_700Bold', fontSize: 18 },
-  topNavRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 48, marginBottom: 8 },
+  topNavRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 32, marginBottom: 8 },
   dateNavLeft: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   dateNavLabel: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#929090' },
   tabsInline: { flexDirection: 'row', gap: 10 },
   tabItemInline: { paddingVertical: 2 },
   tabTextInline: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#929090' },
   tabTextInlineActive: { fontFamily: 'RobotoMono_700Bold', color: '#425252' },
-  circleDoodle: { position: 'absolute', width: 70, height: 32, top: -8, pointerEvents: 'none' },
+  circleDoodle: { position: 'absolute', width: 70, height: 32, top: -8, left: 4, pointerEvents: 'none' },
   contentArea: { flex: 1 },
-  dateChipsRow: { flexDirection: 'row', paddingHorizontal: 48, marginBottom: 8, marginTop: 6, gap: 6, justifyContent: 'center' },
+  dateChipsRow: { flexDirection: 'row', paddingHorizontal: 32, marginBottom: 8, marginTop: 6, gap: 6, justifyContent: 'center' },
   dateChip: { flex: 1, alignItems: 'center', paddingVertical: 6, paddingHorizontal: 2, borderRadius: 10, backgroundColor: '#ffffff', minHeight: 42, borderWidth: 1.5, borderColor: '#929090' },
   dateChipSelected: { backgroundColor: '#0ccfcf', borderColor: '#0ccfcf' },
   dateChipDay: { fontFamily: 'DMSans_700Bold', fontSize: 8, color: '#b0b0b0' },
@@ -592,7 +600,7 @@ const styles = StyleSheet.create({
   todayDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: '#0ccfcf', marginTop: 3 },
   todayDotSelected: { backgroundColor: '#fff' },
   entryDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: '#0ccfcf', marginTop: 3 },
-  list: { paddingHorizontal: 48, paddingBottom: 100, gap: 48 },
+  list: { paddingHorizontal: 32, paddingBottom: 100, gap: 48 },
   dateGroupLabel: { fontFamily: 'ChillaxMedium', fontSize: 13, color: '#425252', marginBottom: 8, textShadowColor: 'rgba(0,0,0,0.08)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   dateGroupItems: { gap: 10 },
   recordingCard: { flexDirection: 'row', alignItems: 'center', borderRadius: 999, paddingVertical: 10, paddingHorizontal: 14, gap: 8 },
@@ -605,8 +613,8 @@ const styles = StyleSheet.create({
   recordingValue: { fontFamily: 'RobotoMono_700Bold', fontSize: 10, color: '#fff', flexShrink: 1 },
   recordingRight: { alignItems: 'flex-end', gap: 3, flexShrink: 0 },
   recordingAmount: { fontFamily: 'RobotoMono_400Regular', fontSize: 14, color: '#fff' },
-  addRecordingRow: { paddingHorizontal: 48, alignItems: 'flex-end', marginBottom: 10 },
-  addRecordingBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#ffffff', borderRadius: 999, paddingVertical: 6, paddingHorizontal: 14, borderWidth: 1, borderColor: '#929090', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 0, elevation: 3 },
+  addRecordingRow: { paddingHorizontal: 32, alignItems: 'flex-end', marginBottom: 10 },
+  addRecordingBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#ffffff', borderRadius: 999, paddingVertical: 6, paddingHorizontal: 14, borderWidth: 1, borderColor: '#929090', shadowColor: '#000', shadowOffset: { width: 3, height: 3 }, shadowOpacity: 1, shadowRadius: 0, elevation: 3 },
   addRecordingText: { fontFamily: 'DMSans_400Regular', fontSize: 11, color: '#425252' },
   empty: { alignItems: 'center', paddingTop: 60, gap: 10 },
   emptyText: { fontFamily: 'DMSans_400Regular', fontSize: 14, color: '#b0b0b0' },

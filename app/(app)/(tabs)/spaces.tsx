@@ -248,12 +248,12 @@ export default function SpacesScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f5f5f5' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 36, paddingTop: 52, paddingBottom: 16 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24, paddingTop: 52, paddingBottom: 16 },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   avatarFallback: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#e8e8e8', justifyContent: 'center', alignItems: 'center' },
   greeting: { fontFamily: 'DMSans_400Regular', fontSize: 16, color: '#8a8a8a' },
   greetingName: { fontFamily: 'DMSans_700Bold', color: '#1c1d1d' },
-  scroll: { paddingHorizontal: 36, paddingBottom: 40, paddingTop: 12 },
+  scroll: { paddingHorizontal: 24, paddingBottom: 40, paddingTop: 12 },
   sectionTitle: { fontFamily: 'Avenelle', fontSize: 36, color: '#1c1d1d', marginBottom: 20 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   spaceCard: { width: '47%', borderRadius: 999, paddingVertical: 10, paddingLeft: 16, paddingRight: 8, flexDirection: 'row', alignItems: 'center', backgroundColor: '#0ccfcf' },
