@@ -26,6 +26,9 @@ export default function RootLayout() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (redirected) return;
       redirected = true;
+      // Don't redirect if on split share page
+      const path = typeof window !== 'undefined' ? window.location.pathname : '';
+      if (path.startsWith('/split/')) { setReady(true); return; }
       if (!session) {
         router.replace('/');
       } else if (!session.user.user_metadata?.full_name) {
@@ -58,7 +61,7 @@ export default function RootLayout() {
       <Stack.Screen name="index" options={{ animation: 'none' }} />
       <Stack.Screen name="onboarding" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="(app)" options={{ animation: 'none' }} />
-      <Stack.Screen name="split/[id]" options={{ animation: 'fade', headerShown: false }} />
+      <Stack.Screen name="split" options={{ animation: 'fade', headerShown: false }} />
     </Stack>
   );
 }
