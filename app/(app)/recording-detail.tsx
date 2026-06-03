@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Animated, Dimensions, ScrollView, TextInput, Modal } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Animated, Dimensions, ScrollView, TextInput, Modal, Share, Linking } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
@@ -24,6 +24,10 @@ export default function RecordingDetailScreen() {
   const [addItemModal, setAddItemModal] = useState(false);
   const [editSubitemsItemId, setEditSubitemsItemId] = useState<string | null>(null);
   const [cookingModal, setCookingModal] = useState(false);
+  const [saveImageModal, setSaveImageModal] = useState(false);
+  const [shareAccounts, setShareAccounts] = useState<any[]>([]);
+  const [shareSelectedAccount, setShareSelectedAccount] = useState<any>(null);
+  const [shareLoading, setShareLoading] = useState(false);
   const [tooltip, setTooltip] = useState<{ name: string } | null>(null);
   const [contacts, setContacts] = useState<string[]>([]);
   const [suggestions, setSuggestions] = useState<string[]>([]);
@@ -103,6 +107,60 @@ export default function RecordingDetailScreen() {
     if (!user) return;
     await supabase.from('contacts').insert({ user_id: user.id, name: name.trim() });
     setContacts(prev => [...prev, name.trim()].sort());
+  };
+
+  const openSaveImage = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data: accs } = await supabase.from('accounts').select().eq('user_id', user.id).order('account_name');
+    if (accs) setShareAccounts(accs);
+    // default to recording's account
+    const recAccount = accs?.find((a: any) => a.id === recording?.account_id) ?? accs?.[0] ?? null;
+    setShareSelectedAccount(recAccount);
+    setSaveImageModal(true);
+  };
+
+  const generateShare = async () => {
+    if (!recording) return;
+    setShareLoading(true);
+    try {
+      // compute per person totals
+      const perPersonMap: Record<string, number> = {};
+      items.forEach(item => {
+        item.subitems.forEach(sub => {
+          const pp = sub.people.length > 0 ? sub.cost / sub.people.length : 0;
+          sub.people.forEach(p => { perPersonMap[p] = (perPersonMap[p] || 0) + pp; });
+        });
+      });
+      const perPerson = Object.entries(perPersonMap).map(([name, total]) => ({ name, total }));
+      const shareData = {
+        recordingName: recording.name,
+        recordingAmount: Number(recording.amount),
+        recordingType: recording.type,
+        date: new Date(recording.transaction_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+        perPerson,
+        items: items.map(item => ({
+          name: item.name,
+          cost: item.cost,
+          subitems: item.subitems.map(s => ({ name: s.name, cost: s.cost, people: s.people })),
+        })),
+        payment: shareSelectedAccount ? {
+          accountName: shareSelectedAccount.account_name,
+          bank: shareSelectedAccount.bank,
+          accountNumber: shareSelectedAccount.account_number,
+          qrCode: shareSelectedAccount.qr_code ?? null,
+        } : null,
+      };
+      const { data: row, error } = await supabase.from('split_shares').insert({ recording_id: recordingId, data: shareData }).select().single();
+      if (error || !row) throw error;
+      const shareUrl = `https://ledgr.vercel.app/split/${row.id}`;
+      setSaveImageModal(false);
+      await Share.share({ message: `Here's the split breakdown:\n${shareUrl}`, url: shareUrl });
+    } catch (e: any) {
+      console.log(e);
+    } finally {
+      setShareLoading(false);
+    }
   };
 
   const handleBack = () => {
@@ -328,7 +386,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                 if (filledPeople.length > 0 && !(Math.abs(total - recAmt) < 0.01 && recAmt > 0)) setAddItemModal(true);
               }, disabled: filledPeople.length === 0 || (Math.abs(items.reduce((s, i) => s + i.cost, 0) - (recording ? Number(recording.amount) : 0)) < 0.01 && items.length > 0) },
               { icon: 'people-outline', label: 'add people', onPress: () => openPeopleModal(), disabled: false },
-              { icon: 'image-outline', label: 'save image', onPress: () => setCookingModal(true), disabled: false },
+              { icon: 'image-outline', label: 'save image', onPress: () => openSaveImage(), disabled: filledPeople.length === 0 || items.length === 0 },
               { icon: 'person-add-outline', label: 'save person', onPress: () => setCookingModal(true), disabled: false },
             ].map(b => (
               <TouchableOpacity
@@ -752,6 +810,52 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
         </BlurView>
       </Modal>
 
+      {/* Save image modal */}
+      <Modal visible={saveImageModal} transparent animationType="fade" onRequestClose={() => setSaveImageModal(false)}>
+        <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}>
+          <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setSaveImageModal(false)}>
+            <TouchableOpacity activeOpacity={1} onPress={e => e.stopPropagation()}>
+              <View style={styles.modalBox}>
+                <Text style={styles.modalTitle}>share split</Text>
+                <Text style={styles.subitemRemaining}>choose payment account</Text>
+                <ScrollView style={{ width: '100%', maxHeight: 180 }} showsVerticalScrollIndicator={false}>
+                  {shareAccounts.map((acc: any) => (
+                    <TouchableOpacity
+                      key={acc.id}
+                      style={[styles.accountOption, shareSelectedAccount?.id === acc.id && styles.accountOptionActive]}
+                      onPress={() => setShareSelectedAccount(acc)}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.accountOptionName, shareSelectedAccount?.id === acc.id && { color: '#fff' }]}>{acc.account_name}</Text>
+                        <Text style={[styles.accountOptionBank, shareSelectedAccount?.id === acc.id && { color: 'rgba(255,255,255,0.7)' }]}>{acc.bank} · {acc.account_number}</Text>
+                      </View>
+                      {shareSelectedAccount?.id === acc.id && <Ionicons name="checkmark" size={14} color="#fff" />}
+                    </TouchableOpacity>
+                  ))}
+                  {shareAccounts.length === 0 && (
+                    <Text style={[styles.subitemRemaining, { textAlign: 'center', marginVertical: 8 }]}>no accounts saved</Text>
+                  )}
+                </ScrollView>
+                <View style={styles.modalBtns}>
+                  <TouchableOpacity style={[styles.modalBtn, { backgroundColor: '#f5f5f5' }]} onPress={() => setSaveImageModal(false)}>
+                    <Text style={[styles.modalBtnText, { color: '#8a8a8a' }]}>cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.modalBtn, shareLoading && { opacity: 0.6 }]}
+                    onPress={generateShare}
+                    disabled={shareLoading}
+                  >
+                    {shareLoading
+                      ? <Text style={styles.modalBtnText}>generating...</Text>
+                      : <Text style={styles.modalBtnText}>generate link</Text>}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </BlurView>
+      </Modal>
+
       {/* Cooking modal */}
       <Modal visible={cookingModal} transparent animationType="fade" onRequestClose={() => setCookingModal(false)}>
         <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}>
@@ -871,6 +975,10 @@ const styles = StyleSheet.create({
   personSelectText: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#929090' },
   personSelectTextActive: { color: '#fff', fontFamily: 'RobotoMono_700Bold' },
   subitemRemaining: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#929090', alignSelf: 'flex-start' },
+  accountOption: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: '#f0f0f0', marginBottom: 6, backgroundColor: '#fafafa' },
+  accountOptionActive: { backgroundColor: '#425252', borderColor: '#425252' },
+  accountOptionName: { fontFamily: 'ChillaxMedium', fontSize: 13, color: '#425252' },
+  accountOptionBank: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#929090' },
   subitemError: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#ed6a6a', alignSelf: 'flex-start' },
   splitPreview: { fontFamily: 'RobotoMono_700Bold', fontSize: 12, color: '#0ccfcf', alignSelf: 'flex-start' },
 });

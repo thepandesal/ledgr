@@ -58,6 +58,7 @@ export default function RootLayout() {
       <Stack.Screen name="index" options={{ animation: 'none' }} />
       <Stack.Screen name="onboarding" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="(app)" options={{ animation: 'none' }} />
+      <Stack.Screen name="split/[id]" options={{ animation: 'fade', headerShown: false }} />
     </Stack>
   );
 }
