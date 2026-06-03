@@ -36,6 +36,7 @@ export default function RecordingDetailScreen() {
     Animated.timing(slideAnim, { toValue: 0, duration: 280, useNativeDriver: true }).start();
     loadRecording();
     loadContacts();
+    loadPeople();
   }, []);
 
   const loadRecording = async () => {
@@ -44,6 +45,13 @@ export default function RecordingDetailScreen() {
       .select('*, categories:category_id(name, color, icon), account:account_id(account_name, bank)')
       .eq('id', recordingId).single();
     if (data) setRecording(data);
+  };
+
+  const loadPeople = async () => {
+    if (!recordingId) return;
+    const { data } = await supabase.from('bill_splits')
+      .select('person_name').eq('recording_id', recordingId).order('created_at');
+    if (data && data.length > 0) setPeople(data.map((r: any) => r.person_name));
   };
 
   const loadContacts = async () => {
@@ -78,7 +86,18 @@ export default function RecordingDetailScreen() {
     setActiveSuggestionIdx(null);
   };
   const savePeopleAndClose = async () => {
-    for (const p of people.filter(p => p.trim())) await saveContact(p);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user || !recordingId) return;
+    const filled = people.filter(p => p.trim());
+    // delete existing and reinsert
+    await supabase.from('bill_splits').delete().eq('recording_id', recordingId);
+    if (filled.length > 0) {
+      await supabase.from('bill_splits').insert(
+        filled.map(name => ({ recording_id: recordingId, user_id: user.id, person_name: name.trim() }))
+      );
+    }
+    // save new contacts
+    for (const p of filled) await saveContact(p);
     setAddPersonModal(false);
     setSuggestions([]);
     setActiveSuggestionIdx(null);
