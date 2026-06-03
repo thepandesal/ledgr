@@ -180,22 +180,26 @@ export default function SpaceDetailScreen() {
         </View>
 
         {/* Stats row */}
-        <View style={styles.statsRow}>
-          <View style={styles.statItem}>
-            <Text style={styles.statLabel}>expenses</Text>
-            <Text style={[styles.statValue, { color: '#ed6a6a' }]}>{shortAmount(totalExpenses)}</Text>
+        <View style={styles.statsBlock}>
+          <View style={styles.statsInfoRow}>
+            <Text style={styles.statsLabel}>expenses</Text>
+            <View style={styles.statsDots} />
+            <Text style={[styles.statsValue, { color: '#ed6a6a' }]}>{shortAmount(totalExpenses)}</Text>
           </View>
-          <View style={styles.statItem}>
-            <Text style={styles.statLabel}>income/savings</Text>
-            <Text style={[styles.statValue, { color: '#00bf63' }]}>{shortAmount(totalIncomeSavings)}</Text>
+          <View style={styles.statsInfoRow}>
+            <Text style={styles.statsLabel}>income / savings</Text>
+            <View style={styles.statsDots} />
+            <Text style={[styles.statsValue, { color: '#00bf63' }]}>{shortAmount(totalIncomeSavings)}</Text>
           </View>
-          <View style={styles.statItem}>
-            <Text style={styles.statLabel}>payables</Text>
-            <Text style={[styles.statValue, { color: '#929090' }]}>{countPayables}</Text>
+          <View style={styles.statsInfoRow}>
+            <Text style={styles.statsLabel}>payables</Text>
+            <View style={styles.statsDots} />
+            <Text style={[styles.statsValue, { color: '#929090' }]}>{countPayables}</Text>
           </View>
-          <View style={styles.statItem}>
-            <Text style={styles.statLabel}>receivables</Text>
-            <Text style={[styles.statValue, { color: '#929090' }]}>{countReceivables}</Text>
+          <View style={styles.statsInfoRow}>
+            <Text style={styles.statsLabel}>receivables</Text>
+            <View style={styles.statsDots} />
+            <Text style={[styles.statsValue, { color: '#929090' }]}>{countReceivables}</Text>
           </View>
         </View>
 
@@ -577,10 +581,11 @@ const styles = StyleSheet.create({
   filterOption: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 999, borderWidth: 1, borderColor: '#e8e8e8' },
   filterDot: { width: 8, height: 8, borderRadius: 4 },
   filterOptionText: { fontFamily: 'RobotoMono_400Regular', fontSize: 13, color: '#929090' },
-  statsRow: { flexDirection: 'row', paddingHorizontal: 16, marginHorizontal: 32, marginBottom: 16, gap: 16, justifyContent: 'flex-start', backgroundColor: '#fafafa', borderRadius: 14, paddingVertical: 12, borderWidth: 1, borderColor: '#f0f0f0' },
-  statItem: { alignItems: 'flex-start', gap: 4 },
-  statLabel: { fontFamily: 'RobotoMono_400Regular', fontSize: 9, color: '#929090' },
-  statValue: { fontFamily: 'RobotoMono_700Bold', fontSize: 18 },
+  statsBlock: { marginHorizontal: 32, backgroundColor: '#fafafa', borderRadius: 14, paddingHorizontal: 14, paddingVertical: 6, marginBottom: 16, borderWidth: 1, borderColor: '#f0f0f0' },
+  statsInfoRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6 },
+  statsLabel: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#929090', flexShrink: 0 },
+  statsDots: { flex: 1, borderBottomWidth: 1, borderStyle: 'dotted', borderColor: '#c0c0c0', marginHorizontal: 8 },
+  statsValue: { fontFamily: 'RobotoMono_700Bold', fontSize: 11, flexShrink: 0 },
   topNavRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 32, marginBottom: 8 },
   dateNavLeft: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   dateNavLabel: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#929090' },
