@@ -256,43 +256,65 @@ export default function SpaceDetailScreen() {
         {/* Animated content area */}
         <Animated.View style={[styles.contentArea, { transform: [{ translateX: contentSlide }] }]}>
 
+          {/* Add recording button row */}
+          <View style={styles.addRecordingRow}>
+            <TouchableOpacity
+              style={styles.addRecordingBtn}
+              onPress={() => router.push({ pathname: '/(app)/add-recording', params: { spaceId, spaceName: name, defaultDate: selectedDate.toISOString().split('T')[0] } } as any)}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="add" size={14} color="#425252" />
+              <Text style={styles.addRecordingText}>add recording</Text>
+            </TouchableOpacity>
+          </View>
+
           {/* Daily date chips */}
           {viewMode === 'daily' && (
-            <View style={styles.dateChipsRow}>
-              {Array.from({ length: 7 }, (_, i) => addDays(selectedDate, i - 3)).map((date, i) => {
-                const isSelected = isSameDay(date, selectedDate);
-                const isToday = isSameDay(date, new Date());
-                return (
-                  <TouchableOpacity key={i} style={[styles.dateChip, isSelected && styles.dateChipSelected]} onPress={() => setSelectedDate(date)}>
-                    <Text style={[styles.dateChipDay, isSelected && styles.dateChipTextSelected]}>
-                      {date.toLocaleDateString('en-US', { weekday: 'short' })}
-                    </Text>
-                    <Text style={[styles.dateChipNum, isSelected && styles.dateChipTextSelected]}>{date.getDate()}</Text>
-                    {isToday && <View style={[styles.todayDot, isSelected && styles.todayDotSelected]} />}
-                    {!isToday && recordingDates.has(dateKey(date)) && <View style={styles.entryDot} />}
-                  </TouchableOpacity>
-                );
-              })}
+            <View style={styles.dateChipsRowWrapper}>
+              <View style={styles.dateChipsRow}>
+                {Array.from({ length: 7 }, (_, i) => addDays(selectedDate, i - 3)).map((date, i) => {
+                  const isSelected = isSameDay(date, selectedDate);
+                  const isToday = isSameDay(date, new Date());
+                  return (
+                    <TouchableOpacity key={i} style={[styles.dateChip, isSelected && styles.dateChipSelected]} onPress={() => setSelectedDate(date)}>
+                      <Text style={[styles.dateChipDay, isSelected && styles.dateChipTextSelected]}>
+                        {date.toLocaleDateString('en-US', { weekday: 'short' })}
+                      </Text>
+                      <Text style={[styles.dateChipNum, isSelected && styles.dateChipTextSelected]}>{date.getDate()}</Text>
+                      {isToday && <View style={[styles.todayDot, isSelected && styles.todayDotSelected]} />}
+                      {!isToday && recordingDates.has(dateKey(date)) && <View style={styles.entryDot} />}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              <TouchableOpacity style={styles.addDateBtn} onPress={() => router.push({ pathname: '/(app)/add-recording', params: { spaceId, spaceName: name, defaultDate: selectedDate.toISOString().split('T')[0] } } as any)}>
+                <Ionicons name="add" size={18} color="#929090" />
+              </TouchableOpacity>
             </View>
           )}
 
           {/* Weekly date chips */}
           {viewMode === 'weekly' && (
-            <View style={styles.dateChipsRow}>
-              {Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)).map((date, i) => {
-                const isToday = isSameDay(date, new Date());
-                return (
-                  <View key={i} style={[styles.dateChip, isToday && styles.dateChipSelected]}>
-                    <Text style={[styles.dateChipDay, isToday && styles.dateChipTextSelected]}>
-                      {date.toLocaleDateString('en-US', { weekday: 'short' })}
-                    </Text>
-                    <Text style={[styles.dateChipNum, isToday && styles.dateChipTextSelected]}>{date.getDate()}</Text>
-                    {isToday
-                      ? <View style={[styles.todayDot, styles.todayDotSelected]} />
-                      : recordingDates.has(dateKey(date)) && <View style={styles.entryDot} />}
-                  </View>
-                );
-              })}
+            <View style={styles.dateChipsRowWrapper}>
+              <View style={styles.dateChipsRow}>
+                {Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)).map((date, i) => {
+                  const isToday = isSameDay(date, new Date());
+                  return (
+                    <View key={i} style={[styles.dateChip, isToday && styles.dateChipSelected]}>
+                      <Text style={[styles.dateChipDay, isToday && styles.dateChipTextSelected]}>
+                        {date.toLocaleDateString('en-US', { weekday: 'short' })}
+                      </Text>
+                      <Text style={[styles.dateChipNum, isToday && styles.dateChipTextSelected]}>{date.getDate()}</Text>
+                      {isToday
+                        ? <View style={[styles.todayDot, styles.todayDotSelected]} />
+                        : recordingDates.has(dateKey(date)) && <View style={styles.entryDot} />}
+                    </View>
+                  );
+                })}
+              </View>
+              <TouchableOpacity style={styles.addDateBtn} onPress={() => router.push({ pathname: '/(app)/add-recording', params: { spaceId, spaceName: name, defaultDate: selectedDate.toISOString().split('T')[0] } } as any)}>
+                <Ionicons name="add" size={18} color="#929090" />
+              </TouchableOpacity>
             </View>
           )}
 
@@ -342,7 +364,7 @@ export default function SpaceDetailScreen() {
                         <TouchableOpacity key={item.id} style={[styles.recordingCard, { backgroundColor: amountColor }]} activeOpacity={0.85}
                           onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: item.id } } as any)}>
                           <View style={styles.catIcon}>
-                            <Ionicons name={item.categories?.icon ?? 'ellipse-outline'} size={36} color="#fff" />
+                            <Ionicons name={item.categories?.icon ?? 'ellipse-outline'} size={24} color="#fff" />
                           </View>
                           <View style={styles.recordingMiddle}>
                             <Text style={styles.recordingName} numberOfLines={1} ellipsizeMode="tail">{item.name}</Text>
@@ -381,14 +403,7 @@ export default function SpaceDetailScreen() {
           )}
         </Animated.View>
 
-        <TouchableOpacity
-          style={styles.fab}
-          onPress={() => router.push({ pathname: '/(app)/add-recording', params: { spaceId, spaceName: name, defaultDate: selectedDate.toISOString().split('T')[0] } } as any)}
-          activeOpacity={0.85}
-        >
-          <Ionicons name="add" size={22} color="#fff" />
-          <Text style={styles.fabText}>add recording</Text>
-        </TouchableOpacity>
+
       </SafeAreaView>
 
       {/* Filter Modal */}
@@ -554,9 +569,9 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#ffffff', position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   inner: { flex: 1 },
   backBtn: { paddingHorizontal: 40, paddingTop: 14, paddingBottom: 4 },
-  titleBlock: { paddingHorizontal: 48, marginTop: 8, marginBottom: 25, alignItems: 'center' },
+  titleBlock: { paddingHorizontal: 48, marginTop: 8, marginBottom: 25 },
   spacesLabel: { fontFamily: 'ChillaxMedium', fontSize: 13, color: '#929090' },
-  spaceName: { fontFamily: 'Avenelle', fontSize: 40, color: '#425252', lineHeight: 48 },
+  spaceName: { fontFamily: 'Avenelle', fontSize: 40, color: '#425252', lineHeight: 48, textShadowColor: 'rgba(0,0,0,0.12)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4 },
   recordingsHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 48, marginBottom: 12 },
   recordingsTitle: { fontFamily: 'ChillaxMedium', fontSize: 20, color: '#425252' },
   filterBtn: { padding: 6 },
@@ -565,10 +580,10 @@ const styles = StyleSheet.create({
   filterOption: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 999, borderWidth: 1, borderColor: '#e8e8e8' },
   filterDot: { width: 8, height: 8, borderRadius: 4 },
   filterOptionText: { fontFamily: 'RobotoMono_400Regular', fontSize: 13, color: '#929090' },
-  statsRow: { flexDirection: 'row', paddingHorizontal: 48, marginBottom: 24, gap: 4 },
-  statItem: { flex: 1, alignItems: 'center', gap: 4 },
-  statLabel: { fontFamily: 'RobotoMono_400Regular', fontSize: 9, color: '#929090', textAlign: 'center' },
-  statValue: { fontFamily: 'RobotoMono_400Regular', fontSize: 18 },
+  statsRow: { flexDirection: 'row', paddingHorizontal: 48, marginBottom: 24, gap: 16, justifyContent: 'flex-start' },
+  statItem: { alignItems: 'flex-start', gap: 4 },
+  statLabel: { fontFamily: 'RobotoMono_400Regular', fontSize: 9, color: '#929090' },
+  statValue: { fontFamily: 'RobotoMono_700Bold', fontSize: 18 },
   topNavRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 48, marginBottom: 14 },
   dateNavLeft: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   dateNavLabel: { fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#929090' },
@@ -579,31 +594,32 @@ const styles = StyleSheet.create({
   circleDoodle: { position: 'absolute', width: DOODLE_W, height: 40, top: -8, pointerEvents: 'none' },
   contentArea: { flex: 1 },
   dateChipsRow: { flexDirection: 'row', paddingHorizontal: 48, marginBottom: 14, marginTop: 8, gap: 8, justifyContent: 'center' },
-  dateChip: { flex: 1, alignItems: 'center', paddingVertical: 15, paddingHorizontal: 4, borderRadius: 18, backgroundColor: '#ffffff', minHeight: 75, borderWidth: 1.5, borderColor: '#929090' },
+  dateChip: { flex: 1, alignItems: 'center', paddingVertical: 8, paddingHorizontal: 4, borderRadius: 12, backgroundColor: '#ffffff', minHeight: 52, borderWidth: 1.5, borderColor: '#929090' },
   dateChipSelected: { backgroundColor: '#0ccfcf', borderColor: '#0ccfcf' },
-  dateChipDay: { fontFamily: 'DMSans_700Bold', fontSize: 11, color: '#b0b0b0' },
-  dateChipNum: { fontFamily: 'DMSans_700Bold', fontSize: 20, color: '#1c1d1d', marginTop: 5 },
+  dateChipDay: { fontFamily: 'DMSans_700Bold', fontSize: 9, color: '#b0b0b0' },
+  dateChipNum: { fontFamily: 'DMSans_700Bold', fontSize: 15, color: '#1c1d1d', marginTop: 3 },
   dateChipTextSelected: { color: '#fff' },
   todayDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: '#0ccfcf', marginTop: 3 },
   todayDotSelected: { backgroundColor: '#fff' },
   entryDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: '#0ccfcf', marginTop: 3 },
   list: { paddingHorizontal: 48, paddingBottom: 100, gap: 48 },
-  dateGroupLabel: { fontFamily: 'Avenelle', fontSize: 19, color: '#545454', marginBottom: 12, textTransform: 'lowercase' },
+  dateGroupLabel: { fontFamily: 'ChillaxMedium', fontSize: 13, color: '#425252', marginBottom: 8, textShadowColor: 'rgba(0,0,0,0.08)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   dateGroupItems: { gap: 10 },
-  recordingCard: { flexDirection: 'row', alignItems: 'center', borderRadius: 999, paddingVertical: 14, paddingHorizontal: 18, gap: 12 },
+  recordingCard: { flexDirection: 'row', alignItems: 'center', borderRadius: 999, paddingVertical: 10, paddingHorizontal: 14, gap: 8 },
   catIcon: { flexShrink: 0 },
-  recordingMiddle: { flex: 1, gap: 3, overflow: 'hidden' },
-  recordingName: { fontFamily: 'RobotoMono_700Bold', fontSize: 15, color: '#fff' },
-  recordingRow2: { flexDirection: 'row', gap: 4 },
-  recordingRow3: { flexDirection: 'row', gap: 4 },
-  recordingLabel: { fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: 'rgba(255,255,255,0.75)' },
-  recordingValue: { fontFamily: 'RobotoMono_700Bold', fontSize: 12, color: '#fff', flexShrink: 1 },
-  recordingRight: { alignItems: 'flex-end', gap: 4, flexShrink: 0 },
-  recordingAmount: { fontFamily: 'RobotoMono_400Regular', fontSize: 18, color: '#fff' },
-  empty: { alignItems: 'center', paddingTop: 60, gap: 10 },
+  recordingMiddle: { flex: 1, gap: 2, overflow: 'hidden' },
+  recordingName: { fontFamily: 'RobotoMono_700Bold', fontSize: 12, color: '#fff' },
+  recordingRow2: { flexDirection: 'row', gap: 3 },
+  recordingRow3: { flexDirection: 'row', gap: 3 },
+  recordingLabel: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: 'rgba(255,255,255,0.75)' },
+  recordingValue: { fontFamily: 'RobotoMono_700Bold', fontSize: 10, color: '#fff', flexShrink: 1 },
+  recordingRight: { alignItems: 'flex-end', gap: 3, flexShrink: 0 },
+  recordingAmount: { fontFamily: 'RobotoMono_400Regular', fontSize: 14, color: '#fff' },
+  addRecordingRow: { paddingHorizontal: 48, alignItems: 'flex-end', marginBottom: 10 },
+  addRecordingBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#ffffff', borderRadius: 999, paddingVertical: 8, paddingHorizontal: 16, borderWidth: 1, borderColor: '#929090', shadowColor: '#929090', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 1, shadowRadius: 6, elevation: 4 },
+  addRecordingText: { fontFamily: 'DMSans_400Regular', fontSize: 12, color: '#425252' }, { alignItems: 'center', paddingTop: 60, gap: 10 },
   emptyText: { fontFamily: 'DMSans_400Regular', fontSize: 14, color: '#b0b0b0' },
-  fab: { position: 'absolute', bottom: 24, right: 24, backgroundColor: '#00bf63', borderRadius: 999, paddingVertical: 14, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', gap: 8, shadowColor: '#00bf63', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 8 },
-  fabText: { fontFamily: 'DMSans_600SemiBold', fontSize: 14, color: '#fff' },
+
   pickerOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   pickerBox: { backgroundColor: '#ffffff', borderRadius: 20, padding: 24, width: '80%', gap: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.1, shadowRadius: 20, elevation: 10 },
   pickerTitle: { fontFamily: 'DMSans_700Bold', fontSize: 16, color: '#1c1d1d', marginBottom: 4 },
