@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { BlurView } from 'expo-blur';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 
 const DEFAULT_BANKS = ['BDO', 'BPI', 'Metrobank', 'UnionBank', 'Security Bank', 'PNB', 'Landbank', 'RCBC', 'Chinabank', 'EastWest', 'GCash', 'Maya', 'Seabank', 'GoTyme', 'Tonik'];
 
@@ -152,7 +153,8 @@ export default function AccountsScreen() {
 function AccountForm({ userId, initial, onClose, onSaved }: {
   userId: string; initial?: Account | null; onClose: () => void; onSaved: () => void;
 }) {
-  const slideAnim = useRef(new Animated.Value(500)).current;
+  const router = useRouter();
+  const slideAnim = useRef(new Animated.Value(0)).current;
   const [bankInput, setBankInput] = useState(initial?.bank ?? '');
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [accountName, setAccountName] = useState(initial?.account_name ?? '');
@@ -160,15 +162,15 @@ function AccountForm({ userId, initial, onClose, onSaved }: {
   const [qrCode, setQrCode] = useState<string | null>(initial?.qr_code ?? null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [allBanks, setAllBanks] = useState(DEFAULT_BANKS);
+  const [allBanks] = useState(DEFAULT_BANKS);
 
   useEffect(() => {
-    Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, tension: 65, friction: 11 }).start();
+    const { cropEvents } = require('../../../src/lib/cropEvents');
+    cropEvents.on((data: string) => setQrCode(data));
+    return () => cropEvents.off();
   }, []);
 
-  const close = () => {
-    Animated.timing(slideAnim, { toValue: 500, duration: 220, useNativeDriver: true }).start(onClose);
-  };
+  const close = onClose;
 
   const handleBankInput = (val: string) => {
     setBankInput(val);
@@ -180,18 +182,12 @@ function AccountForm({ userId, initial, onClose, onSaved }: {
     if (status !== 'granted') { Alert.alert('Permission needed', 'Please allow photo access.'); return; }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [1, 1],
+      allowsEditing: false,
       quality: 1,
       allowsMultipleSelection: false,
     });
     if (!result.canceled && result.assets[0]) {
-      const compressed = await ImageManipulator.manipulateAsync(
-        result.assets[0].uri,
-        [{ resize: { width: 300, height: 300 } }],
-        { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG, base64: true }
-      );
-      setQrCode(`data:image/jpeg;base64,${compressed.base64}`);
+      router.push({ pathname: '/(app)/crop-qr', params: { uri: result.assets[0].uri } } as any);
     }
   };
 
@@ -223,15 +219,10 @@ function AccountForm({ userId, initial, onClose, onSaved }: {
   };
 
   return (
-    <Modal visible transparent animationType="none" onRequestClose={close}>
-      <View style={{ flex: 1 }}>
-        <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill} />
-        <KeyboardAvoidingView
-          style={{ flex: 1 }}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        >
-          <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={close} />
-          <Animated.View style={[styles.formSheet, { transform: [{ translateY: slideAnim }] }]}>
+    <Modal visible transparent animationType="slide" onRequestClose={close}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={close} />
+        <View style={styles.formSheet}>
           <View style={styles.formHeader}>
             <View>
               <Text style={styles.formLabel}>{initial ? 'editing' : 'new'}</Text>
@@ -320,9 +311,8 @@ function AccountForm({ userId, initial, onClose, onSaved }: {
               {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>{initial ? 'save changes' : 'add account'}</Text>}
             </TouchableOpacity>
           </ScrollView>
-        </Animated.View>
+        </View>
         </KeyboardAvoidingView>
-      </View>
     </Modal>
   );
 }
