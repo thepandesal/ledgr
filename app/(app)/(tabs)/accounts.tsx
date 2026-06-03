@@ -1,6 +1,6 @@
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView,
-  Modal, TextInput, ActivityIndicator, Alert, Animated, Image,
+  Modal, TextInput, ActivityIndicator, Alert, Animated, Image, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { supabase } from '../../../src/lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
@@ -223,9 +223,14 @@ function AccountForm({ userId, initial, onClose, onSaved }: {
 
   return (
     <Modal visible transparent animationType="none" onRequestClose={close}>
-      <BlurView intensity={40} tint="light" style={{ flex: 1 }}>
-        <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={close} />
-        <Animated.View style={[styles.formSheet, { transform: [{ translateY: slideAnim }] }]}>
+      <View style={{ flex: 1 }}>
+        <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill} />
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={close} />
+          <Animated.View style={[styles.formSheet, { transform: [{ translateY: slideAnim }] }]}>
           <View style={styles.formHeader}>
             <View>
               <Text style={styles.formLabel}>{initial ? 'editing' : 'new'}</Text>
@@ -315,7 +320,8 @@ function AccountForm({ userId, initial, onClose, onSaved }: {
             </TouchableOpacity>
           </ScrollView>
         </Animated.View>
-      </BlurView>
+        </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 }
@@ -332,7 +338,7 @@ const styles = StyleSheet.create({
   accountLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
   accountIconWrap: { width: 36, height: 36, borderRadius: 10, backgroundColor: '#f0fffe', justifyContent: 'center', alignItems: 'center' },
   accountInfo: { flex: 1, gap: 2 },
-  accountName: { fontFamily: 'Avenelle', fontSize: 16, color: '#425252', letterSpacing: -0.5 },
+  accountName: { fontFamily: 'ChillaxMedium', fontSize: 16, color: '#425252', letterSpacing: -0.5 },
   accountBank: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#929090' },
   accountNumber: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#c0c0c0' },
   accountRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
