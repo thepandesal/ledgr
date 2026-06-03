@@ -179,14 +179,6 @@ export default function SpaceDetailScreen() {
           <Text style={styles.spaceName}>{(name ?? '').toLowerCase()}</Text>
         </View>
 
-        {/* Recordings header */}
-        <View style={styles.recordingsHeader}>
-          <Text style={styles.recordingsTitle}>recordings</Text>
-          <TouchableOpacity style={styles.filterBtn} onPress={() => setShowFilter(true)}>
-            <Ionicons name="options-outline" size={18} color={activeFilter ? '#0ccfcf' : '#929090'} />
-          </TouchableOpacity>
-        </View>
-
         {/* Stats row */}
         <View style={styles.statsRow}>
           <View style={styles.statItem}>
@@ -205,6 +197,14 @@ export default function SpaceDetailScreen() {
             <Text style={styles.statLabel}>receivables</Text>
             <Text style={[styles.statValue, { color: '#929090' }]}>{countReceivables}</Text>
           </View>
+        </View>
+
+        {/* Recordings header */}
+        <View style={styles.recordingsHeader}>
+          <Text style={styles.recordingsTitle}>recordings</Text>
+          <TouchableOpacity style={styles.filterBtn} onPress={() => setShowFilter(true)}>
+            <Ionicons name="options-outline" size={18} color={activeFilter ? '#0ccfcf' : '#929090'} />
+          </TouchableOpacity>
         </View>
 
         {/* Nav row: date range left, tabs right */}
