@@ -60,7 +60,7 @@ export default function SplitSharePage() {
                 <View style={s.dots} />
                 <Text style={s.infoValue}>{p.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
               </View>
-              {i < data.perPerson.length - 1 && <View style={s.divider} />}
+              {i < (data.perPerson?.length ?? 0) - 1 && <View style={s.divider} />}
             </View>
           ))}
         </View>
@@ -73,7 +73,7 @@ export default function SplitSharePage() {
               <Text style={s.itemName}>{item.name.toLowerCase()}</Text>
               <Text style={s.itemCost}>{item.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
             </View>
-            {item.subitems.length === 0 && item.people && item.people.length > 0 ? (
+            {(item.subitems?.length ?? 0) === 0 && item.people && item.people.length > 0 ? (
               <View style={s.itemPeopleRow}>
                 {item.people.map((p, pi) => (
                   <View key={pi} style={s.chip}><Text style={s.chipText}>{p}</Text></View>
@@ -83,7 +83,7 @@ export default function SplitSharePage() {
                 </Text>
               </View>
             ) : (
-              item.subitems.map((sub, si) => {
+              (item.subitems ?? []).map((sub, si) => {
                 const pp = (sub.people?.length ?? 0) > 0 ? sub.cost / sub.people.length : sub.cost;
                 return (
                   <View key={si} style={s.subRow}>
