@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Animated, Dimensions, ScrollView, TextInput, Modal, Share, Linking, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Animated, Dimensions, ScrollView, TextInput, Modal, Share, Linking, Platform, Clipboard } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
@@ -10,7 +10,7 @@ const MAX_NAME_CHARS = 18;
 const MAX_ITEM_NAME = 20;
 
 interface Subitem { id: string; name: string; cost: number; people: string[]; }
-interface Item { id: string; name: string; cost: number; subitems: Subitem[]; }
+interface Item { id: string; name: string; cost: number; people: string[]; subitems: Subitem[]; }
 
 export default function RecordingDetailScreen() {
   const { recordingId } = useLocalSearchParams<{ recordingId: string }>();
@@ -30,6 +30,7 @@ export default function RecordingDetailScreen() {
   const [shareLoading, setShareLoading] = useState(false);
   const [captureHtml, setCaptureHtml] = useState<string | null>(null);
   const webviewRef = useRef<any>(null);
+  const [copiedToast, setCopiedToast] = useState(false);
   const [tooltip, setTooltip] = useState<{ name: string } | null>(null);
   const [contacts, setContacts] = useState<string[]>([]);
   const [suggestions, setSuggestions] = useState<string[]>([]);
@@ -37,10 +38,12 @@ export default function RecordingDetailScreen() {
   const [deletePersonConfirm, setDeletePersonConfirm] = useState<{ idx: number; name: string; affectedItems: number } | null>(null);
 
   // Add item form state
-  const [itemForms, setItemForms] = useState<{ name: string; cost: string; subitemForms: { name: string; people: string[] }[] }[]>([{ name: '', cost: '', subitemForms: [] }]);
-  const addItemForm = () => setItemForms(prev => [...prev, { name: '', cost: '', subitemForms: [] }]);
+  const [itemForms, setItemForms] = useState<{ name: string; cost: string; people: string[]; subitemForms: { name: string; people: string[] }[] }[]>([{ name: '', cost: '', people: [], subitemForms: [] }]);
+  const addItemForm = () => setItemForms(prev => [...prev, { name: '', cost: '', people: [], subitemForms: [] }]);
   const updateItemForm = (i: number, field: 'name' | 'cost', val: string) =>
     setItemForms(prev => { const n = [...prev]; n[i] = { ...n[i], [field]: val }; return n; });
+  const toggleItemFormPerson = (i: number, person: string) =>
+    setItemForms(prev => { const n = [...prev]; const p = n[i].people.includes(person) ? n[i].people.filter(x => x !== person) : [...n[i].people, person]; n[i] = { ...n[i], people: p }; return n; });
   const removeItemForm = (i: number) => setItemForms(prev => prev.filter((_, idx) => idx !== i));
   const addSubitemForm = (itemIdx: number) =>
     setItemForms(prev => { const n = [...prev]; n[itemIdx] = { ...n[itemIdx], subitemForms: [...n[itemIdx].subitemForms, { name: '', people: [] }] }; return n; });
@@ -125,10 +128,16 @@ export default function RecordingDetailScreen() {
   const buildShareData = () => {
     const perPersonMap: Record<string, number> = {};
     items.forEach(item => {
-      item.subitems.forEach(sub => {
-        const pp = sub.people.length > 0 ? sub.cost / sub.people.length : 0;
-        sub.people.forEach(p => { perPersonMap[p] = (perPersonMap[p] || 0) + pp; });
-      });
+      if (item.subitems.length === 0) {
+        // no subitems — split equally among item.people
+        const pp = item.people.length > 0 ? item.cost / item.people.length : 0;
+        item.people.forEach(p => { perPersonMap[p] = (perPersonMap[p] || 0) + pp; });
+      } else {
+        item.subitems.forEach(sub => {
+          const pp = sub.people.length > 0 ? sub.cost / sub.people.length : 0;
+          sub.people.forEach(p => { perPersonMap[p] = (perPersonMap[p] || 0) + pp; });
+        });
+      }
     });
     return {
       recordingName: recording?.name ?? '',
@@ -205,7 +214,14 @@ export default function RecordingDetailScreen() {
       const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://ledgr-six.vercel.app';
       const shareUrl = `${baseUrl}/split/${row.id}`;
       setSaveImageModal(false);
-      await Share.share({ message: `Here's the split breakdown: ${shareUrl}`, url: shareUrl });
+      // Copy to clipboard
+      if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        await navigator.clipboard.writeText(shareUrl);
+      } else {
+        Clipboard.setString(shareUrl);
+      }
+      setCopiedToast(true);
+      setTimeout(() => setCopiedToast(false), 2500);
     } catch (e: any) { console.log(e); } finally { setShareLoading(false); }
   };
 
@@ -340,11 +356,11 @@ export default function RecordingDetailScreen() {
           ).select();
           if (subData) subitems = subData.map((s: any) => ({ id: s.id, name: s.name, cost: Number(s.cost), people: s.people }));
         }
-        newItems.push({ id: savedItem.id, name: savedItem.name, cost: Number(savedItem.cost), subitems });
+        newItems.push({ id: savedItem.id, name: savedItem.name, cost: Number(savedItem.cost), people: savedItem.people ?? [], subitems });
       }
       setItems(prev => [...prev, ...newItems]);
     }
-    setItemForms([{ name: '', cost: '', subitemForms: [] }]);
+    setItemForms([{ name: '', cost: '', people: [], subitemForms: [] }]);
     setAddItemModal(false);
   };
 
@@ -542,6 +558,25 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                               <Text style={styles.itemName} numberOfLines={1}>{truncate(item.name, MAX_ITEM_NAME)}</Text>
                               <Text style={styles.itemCost}>{item.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
                             </View>
+                            {item.subitems.length === 0 && item.people.length > 0 && (
+                              <View style={styles.itemRight}>
+                                <View style={styles.itemPeopleRow}>
+                                  {item.people.slice(0, 3).map((p, pi) => (
+                                    <TouchableOpacity key={pi} style={styles.personCircle} onPress={() => setTooltip(tooltip?.name === p ? null : { name: p })}>
+                                      <Text style={styles.personCircleLetter}>{p[0]?.toUpperCase()}</Text>
+                                    </TouchableOpacity>
+                                  ))}
+                                  {item.people.length > 3 && (
+                                    <View style={styles.personCircleExtra}>
+                                      <Text style={styles.personCircleLetter}>+{item.people.length - 3}</Text>
+                                    </View>
+                                  )}
+                                </View>
+                                <Text style={styles.itemSplit}>
+                                  {item.people.length} {item.people.length === 1 ? 'person' : 'people'}, {(item.cost / item.people.length).toLocaleString('en-US', { minimumFractionDigits: 2 })} each
+                                </Text>
+                              </View>
+                            )}
                             <TouchableOpacity style={styles.addSubitemBtn} onPress={() => openEditSubitems(item)}>
                               <Ionicons name="add" size={13} color="#0ccfcf" />
                               <Text style={styles.addSubitemBtnText}>subitem</Text>
@@ -710,6 +745,24 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                           )}
                         </View>
 
+                        {/* People chips at item level (only when no subitems) */}
+                        {form.subitemForms.length === 0 && (
+                          <View style={styles.itemPeopleSelect}>
+                            {filledPeople.map((p, pi) => {
+                              const sel = form.people.includes(p);
+                              return (
+                                <TouchableOpacity
+                                  key={pi}
+                                  style={[styles.personSelectChip, sel && styles.personSelectChipActive]}
+                                  onPress={() => toggleItemFormPerson(itemIdx, p)}
+                                >
+                                  <Text style={[styles.personSelectText, sel && styles.personSelectTextActive]}>{p}</Text>
+                                </TouchableOpacity>
+                              );
+                            })}
+                          </View>
+                        )}
+
                         {/* Subitem rows */}
                         {form.subitemForms.map((sub, subIdx) => (
                           <View key={subIdx} style={styles.subitemFormRow}>
@@ -776,7 +829,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                 </TouchableOpacity>
 
                 <View style={styles.modalBtns}>
-                  <TouchableOpacity style={[styles.modalBtn, { backgroundColor: '#f5f5f5' }]} onPress={() => { setAddItemModal(false); setItemForms([{ name: '', cost: '', subitemForms: [] }]); }}>
+                  <TouchableOpacity style={[styles.modalBtn, { backgroundColor: '#f5f5f5' }]} onPress={() => { setAddItemModal(false); setItemForms([{ name: '', cost: '', people: [], subitemForms: [] }]); }}>
                     <Text style={[styles.modalBtnText, { color: '#8a8a8a' }]}>cancel</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -970,6 +1023,14 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
           </TouchableOpacity>
         </BlurView>
       </Modal>
+      {/* Copied toast */}
+      {copiedToast && (
+        <View style={styles.toast} pointerEvents="none">
+          <Ionicons name="checkmark-circle" size={16} color="#fff" />
+          <Text style={styles.toastText}>link copied to clipboard</Text>
+        </View>
+      )}
+
       {/* Hidden WebView for image capture - native only */}
       {captureHtml && Platform.OS !== 'web' && (() => {
         const { WebView } = require('react-native-webview');
@@ -1092,6 +1153,8 @@ const styles = StyleSheet.create({
   personSelectText: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#929090' },
   personSelectTextActive: { color: '#fff', fontFamily: 'RobotoMono_700Bold' },
   subitemRemaining: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#929090', alignSelf: 'flex-start' },
+  toast: { position: 'absolute', bottom: 48, alignSelf: 'center', backgroundColor: '#425252', borderRadius: 999, paddingVertical: 10, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  toastText: { fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#fff' },
   shareOptionsRow: { flexDirection: 'row', gap: 10, width: '100%', marginBottom: 4 },
   shareOptionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: '#f0f0f0', backgroundColor: '#fafafa' },
   shareOptionText: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#0ccfcf' },
