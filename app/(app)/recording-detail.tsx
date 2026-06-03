@@ -22,6 +22,7 @@ export default function RecordingDetailScreen() {
   const [items, setItems] = useState<Item[]>([]);
   const [addPersonModal, setAddPersonModal] = useState(false);
   const [addItemModal, setAddItemModal] = useState(false);
+  const [editSubitemsItemId, setEditSubitemsItemId] = useState<string | null>(null);
   const [cookingModal, setCookingModal] = useState(false);
   const [tooltip, setTooltip] = useState<{ name: string } | null>(null);
   const [contacts, setContacts] = useState<string[]>([]);
@@ -195,6 +196,40 @@ export default function RecordingDetailScreen() {
     setAddItemModal(false);
   };
 
+  // subitem forms for editing existing item
+  const [editSubitemForms, setEditSubitemForms] = useState<{ name: string; people: string[] }[]>([{ name: '', people: [] }]);
+  const addEditSubitemForm = () => setEditSubitemForms(prev => [...prev, { name: '', people: [] }]);
+  const updateEditSubitemForm = (i: number, val: string) => setEditSubitemForms(prev => { const n = [...prev]; n[i] = { ...n[i], name: val }; return n; });
+  const toggleEditSubitemPerson = (i: number, person: string) => setEditSubitemForms(prev => { const n = [...prev]; const p = n[i].people.includes(person) ? n[i].people.filter(x => x !== person) : [...n[i].people, person]; n[i] = { ...n[i], people: p }; return n; });
+  const removeEditSubitemForm = (i: number) => setEditSubitemForms(prev => prev.filter((_, idx) => idx !== i));
+
+  const openEditSubitems = (item: Item) => {
+    setEditSubitemsItemId(item.id);
+    setEditSubitemForms([{ name: '', people: [] }]);
+  };
+
+  const saveEditSubitems = async () => {
+    if (!editSubitemsItemId) return;
+    const item = items.find(i => i.id === editSubitemsItemId);
+    if (!item) return;
+    const filled = editSubitemForms.filter(s => s.name.trim());
+    if (filled.length === 0) { setEditSubitemsItemId(null); return; }
+    const allSubs = [...item.subitems, ...filled.map(s => ({ id: '', name: s.name, cost: 0, people: s.people }))];
+    const equalCost = item.cost / allSubs.length;
+    // update existing subitem costs
+    await Promise.all(item.subitems.map(s => supabase.from('split_subitems').update({ cost: equalCost }).eq('id', s.id)));
+    // insert new subitems
+    const { data } = await supabase.from('split_subitems').insert(
+      filled.map(s => ({ item_id: editSubitemsItemId, name: s.name.trim(), cost: equalCost, people: s.people }))
+    ).select();
+    const newSubs: Subitem[] = data ? data.map((s: any) => ({ id: s.id, name: s.name, cost: equalCost, people: s.people })) : [];
+    setItems(prev => prev.map(i => i.id === editSubitemsItemId
+      ? { ...i, subitems: [...i.subitems.map(s => ({ ...s, cost: equalCost })), ...newSubs] }
+      : i
+    ));
+    setEditSubitemsItemId(null);
+  };
+
   const deleteItem = async (id: string) => {
     await supabase.from('split_items').delete().eq('id', id);
     setItems(prev => prev.filter(item => item.id !== id));
@@ -202,10 +237,19 @@ export default function RecordingDetailScreen() {
 
   const deleteSubitem = async (itemId: string, subitemId: string) => {
     await supabase.from('split_subitems').delete().eq('id', subitemId);
-    setItems(prev => prev.map(i => i.id === itemId
-      ? { ...i, subitems: i.subitems.filter(s => s.id !== subitemId) }
-      : i
-    ));
+    const item = items.find(i => i.id === itemId);
+    if (!item) return;
+    const remaining = item.subitems.filter(s => s.id !== subitemId);
+    if (remaining.length > 0) {
+      const equalCost = item.cost / remaining.length;
+      await Promise.all(remaining.map(s => supabase.from('split_subitems').update({ cost: equalCost }).eq('id', s.id)));
+      setItems(prev => prev.map(i => i.id === itemId
+        ? { ...i, subitems: remaining.map(s => ({ ...s, cost: equalCost })) }
+        : i
+      ));
+    } else {
+      setItems(prev => prev.map(i => i.id === itemId ? { ...i, subitems: [] } : i));
+    }
   };
 
 const truncate = (str: string, max: number) => str && str.length > max ? str.slice(0, max) + '...' : str;
@@ -346,6 +390,10 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                               <Text style={styles.itemName} numberOfLines={1}>{truncate(item.name, MAX_ITEM_NAME)}</Text>
                               <Text style={styles.itemCost}>{item.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
                             </View>
+                            <TouchableOpacity style={styles.addSubitemBtn} onPress={() => openEditSubitems(item)}>
+                              <Ionicons name="add" size={13} color="#0ccfcf" />
+                              <Text style={styles.addSubitemBtnText}>subitem</Text>
+                            </TouchableOpacity>
                             <TouchableOpacity onPress={() => deleteItem(item.id)} style={styles.itemDelete}>
                               <Ionicons name="close" size={14} color="#c0c0c0" />
                             </TouchableOpacity>
@@ -587,6 +635,92 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                     <Text style={styles.modalBtnText}>save</Text>
                   </TouchableOpacity>
                 </View>
+              </View>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </BlurView>
+      </Modal>
+
+      {/* Edit subitems modal */}
+      <Modal visible={!!editSubitemsItemId} transparent animationType="fade" onRequestClose={() => setEditSubitemsItemId(null)}>
+        <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}>
+          <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setEditSubitemsItemId(null)}>
+            <TouchableOpacity activeOpacity={1} onPress={e => e.stopPropagation()}>
+              <View style={styles.modalBox}>
+                {(() => {
+                  const item = items.find(i => i.id === editSubitemsItemId);
+                  if (!item) return null;
+                  const totalSubs = item.subitems.length + editSubitemForms.filter(s => s.name.trim()).length;
+                  const equalCost = totalSubs > 0 ? item.cost / totalSubs : item.cost;
+                  return (
+                    <>
+                      <Text style={styles.modalTitle}>add subitems</Text>
+                      <Text style={styles.subitemRemaining}>
+                        {item.name} · {item.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      </Text>
+                      {item.subitems.length > 0 && (
+                        <Text style={styles.subitemRemaining}>
+                          {item.subitems.length} existing · will become {equalCost.toLocaleString('en-US', { minimumFractionDigits: 2 })} each
+                        </Text>
+                      )}
+                      <ScrollView style={{ width: '100%', maxHeight: 280 }} showsVerticalScrollIndicator={false}>
+                        {editSubitemForms.map((sub, i) => (
+                          <View key={i} style={styles.subitemFormRow}>
+                            <Text style={styles.subitemArrow}>↳</Text>
+                            <View style={{ flex: 1, gap: 6 }}>
+                              <View style={styles.subitemFormInputRow}>
+                                <TextInput
+                                  style={styles.subitemFormInput}
+                                  placeholder="subitem name"
+                                  placeholderTextColor="#c0c0c0"
+                                  value={sub.name}
+                                  onChangeText={v => updateEditSubitemForm(i, v)}
+                                  autoFocus={i === 0}
+                                />
+                                {sub.name.trim() && (
+                                  <Text style={styles.subitemAutoHint}>
+                                    {equalCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                  </Text>
+                                )}
+                                {editSubitemForms.length > 1 && (
+                                  <TouchableOpacity onPress={() => removeEditSubitemForm(i)} style={styles.removeBtn}>
+                                    <Ionicons name="close" size={12} color="#c0c0c0" />
+                                  </TouchableOpacity>
+                                )}
+                              </View>
+                              <View style={styles.itemPeopleSelect}>
+                                {filledPeople.map((p, pi) => {
+                                  const sel = sub.people.includes(p);
+                                  return (
+                                    <TouchableOpacity key={pi} style={[styles.personSelectChip, sel && styles.personSelectChipActive]} onPress={() => toggleEditSubitemPerson(i, p)}>
+                                      <Text style={[styles.personSelectText, sel && styles.personSelectTextActive]}>{p}</Text>
+                                    </TouchableOpacity>
+                                  );
+                                })}
+                              </View>
+                            </View>
+                          </View>
+                        ))}
+                      </ScrollView>
+                      <TouchableOpacity style={styles.addMoreBtn} onPress={addEditSubitemForm}>
+                        <Ionicons name="add" size={11} color="#0ccfcf" />
+                        <Text style={styles.addMoreText}>add more</Text>
+                      </TouchableOpacity>
+                      <View style={styles.modalBtns}>
+                        <TouchableOpacity style={[styles.modalBtn, { backgroundColor: '#f5f5f5' }]} onPress={() => setEditSubitemsItemId(null)}>
+                          <Text style={[styles.modalBtnText, { color: '#8a8a8a' }]}>cancel</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.modalBtn, editSubitemForms.every(s => !s.name.trim()) && { opacity: 0.4 }]}
+                          onPress={saveEditSubitems}
+                          disabled={editSubitemForms.every(s => !s.name.trim())}
+                        >
+                          <Text style={styles.modalBtnText}>save</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </>
+                  );
+                })()}
               </View>
             </TouchableOpacity>
           </TouchableOpacity>
