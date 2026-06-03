@@ -17,7 +17,7 @@ export default function RecordingDetailScreen() {
   const slideAnim = useRef(new Animated.Value(width)).current;
 
   const [recording, setRecording] = useState<any>(null);
-  const [people, setPeople] = useState<string[]>(['', '', '']);
+  const [people, setPeople] = useState<string[]>([]);
   const [items, setItems] = useState<Item[]>([]);
   const [addPersonModal, setAddPersonModal] = useState(false);
   const [addItemModal, setAddItemModal] = useState(false);
@@ -26,6 +26,7 @@ export default function RecordingDetailScreen() {
   const [contacts, setContacts] = useState<string[]>([]);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [activeSuggestionIdx, setActiveSuggestionIdx] = useState<number | null>(null);
+  const [deletePersonConfirm, setDeletePersonConfirm] = useState<{ idx: number; name: string; affectedItems: number } | null>(null);
 
   // Add item form state
   const [itemName, setItemName] = useState('');
@@ -73,6 +74,10 @@ export default function RecordingDetailScreen() {
     Animated.timing(slideAnim, { toValue: width, duration: 250, useNativeDriver: true }).start(() => router.back());
   };
 
+  const openPeopleModal = () => {
+    if (people.length === 0) setPeople(['', '', '']);
+    setAddPersonModal(true);
+  };
   const addPerson = () => setPeople(prev => [...prev, '']);
   const updatePerson = (i: number, val: string) => {
     setPeople(prev => { const n = [...prev]; n[i] = val; return n; });
@@ -80,6 +85,23 @@ export default function RecordingDetailScreen() {
     setSuggestions(val.trim() ? contacts.filter(c => c.toLowerCase().startsWith(val.toLowerCase()) && !people.includes(c)) : []);
   };
   const removePerson = (i: number) => setPeople(prev => prev.filter((_, idx) => idx !== i));
+
+  const requestDeletePerson = (i: number) => {
+    const name = people[i]?.trim();
+    if (!name) { removePerson(i); return; }
+    const affectedItems = items.filter(item => item.people.includes(name)).length;
+    if (affectedItems === 0) { removePerson(i); return; }
+    setDeletePersonConfirm({ idx: i, name, affectedItems });
+  };
+
+  const confirmDeletePerson = () => {
+    if (!deletePersonConfirm) return;
+    const name = deletePersonConfirm.name;
+    // remove from items too
+    setItems(prev => prev.map(item => ({ ...item, people: item.people.filter(p => p !== name) })));
+    removePerson(deletePersonConfirm.idx);
+    setDeletePersonConfirm(null);
+  };
   const pickSuggestion = (i: number, name: string) => {
     setPeople(prev => { const n = [...prev]; n[i] = name; return n; });
     setSuggestions([]);
@@ -194,7 +216,7 @@ export default function RecordingDetailScreen() {
           <View style={styles.splitBtnGrid}>
             {[
               { icon: 'add-circle-outline', label: 'add item', onPress: () => filledPeople.length > 0 ? setAddItemModal(true) : null, disabled: filledPeople.length === 0 },
-              { icon: 'people-outline', label: 'add people', onPress: () => setAddPersonModal(true), disabled: false },
+              { icon: 'people-outline', label: 'add people', onPress: () => openPeopleModal(), disabled: false },
               { icon: 'image-outline', label: 'save image', onPress: () => setCookingModal(true), disabled: false },
               { icon: 'person-add-outline', label: 'save person', onPress: () => setCookingModal(true), disabled: false },
             ].map(b => (
@@ -217,10 +239,10 @@ export default function RecordingDetailScreen() {
               <Text style={styles.peoplePlaceholder}>no people added yet</Text>
             ) : (
               <View style={styles.peopleChips}>
-                {visiblePeople.map((p, i) => (
+                {visiblePeople.map((person, i) => (
                   <View key={i} style={styles.personChip}>
-                    <Text style={styles.personChipText}>{p}</Text>
-                    <TouchableOpacity onPress={() => removePerson(people.indexOf(p))} style={styles.personChipDelete}>
+                    <Text style={styles.personChipText}>{person}</Text>
+                    <TouchableOpacity onPress={() => requestDeletePerson(people.findIndex(p => p === person))} style={styles.personChipDelete}>
                       <Ionicons name="close" size={10} color="#929090" />
                     </TouchableOpacity>
                   </View>
@@ -310,7 +332,7 @@ export default function RecordingDetailScreen() {
                           returnKeyType="next"
                         />
                         {people.length > 1 && (
-                          <TouchableOpacity onPress={() => removePerson(i)} style={styles.removeBtn}>
+                          <TouchableOpacity onPress={() => requestDeletePerson(i)} style={styles.removeBtn}>
                             <Ionicons name="close" size={14} color="#929090" />
                           </TouchableOpacity>
                         )}
@@ -413,6 +435,31 @@ export default function RecordingDetailScreen() {
         </BlurView>
       </Modal>
 
+      {/* Delete person confirm */}
+      <Modal visible={!!deletePersonConfirm} transparent animationType="fade" onRequestClose={() => setDeletePersonConfirm(null)}>
+        <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}>
+          <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setDeletePersonConfirm(null)}>
+            <TouchableOpacity activeOpacity={1} onPress={e => e.stopPropagation()}>
+              <View style={styles.modalBox}>
+                <Text style={styles.modalTitle}>remove person</Text>
+                <Text style={styles.deleteWarning}>
+                  <Text style={{ fontFamily: 'RobotoMono_700Bold' }}>{deletePersonConfirm?.name}</Text>
+                  {` is included in ${deletePersonConfirm?.affectedItems} item${deletePersonConfirm?.affectedItems === 1 ? '' : 's'}. removing them will update those splits.`}
+                </Text>
+                <View style={styles.modalBtns}>
+                  <TouchableOpacity style={[styles.modalBtn, { backgroundColor: '#f5f5f5' }]} onPress={() => setDeletePersonConfirm(null)}>
+                    <Text style={[styles.modalBtnText, { color: '#8a8a8a' }]}>cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[styles.modalBtn, { backgroundColor: '#ed6a6a' }]} onPress={confirmDeletePerson}>
+                    <Text style={styles.modalBtnText}>remove</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </BlurView>
+      </Modal>
+
       {/* Cooking modal */}
       <Modal visible={cookingModal} transparent animationType="fade" onRequestClose={() => setCookingModal(false)}>
         <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}>
@@ -498,6 +545,7 @@ const styles = StyleSheet.create({
   removeBtn: { padding: 4 },
   addMoreBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start' },
   addMoreText: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#0ccfcf' },
+  deleteWarning: { fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#929090', textAlign: 'center', lineHeight: 18 },
   suggestionBox: { backgroundColor: '#ffffff', borderRadius: 8, borderWidth: 1, borderColor: '#f0f0f0', marginTop: -4, marginBottom: 6, overflow: 'hidden' },
   suggestionItem: { paddingHorizontal: 12, paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
   suggestionText: { fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#425252' },
