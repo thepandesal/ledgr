@@ -14,7 +14,7 @@ export default function AppLayout() {
       <Stack.Screen name="add-recording" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="split-bill" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="recording-detail" options={{ animation: 'none' }} />
-      <Stack.Screen name="crop-qr" options={{ animation: 'slide_from_bottom', presentation: 'fullScreenModal' }} />
+      <Stack.Screen name="crop-qr" options={{ animation: 'fade', presentation: 'fullScreenModal', headerShown: false }} />
     </Stack>
   );
 }
