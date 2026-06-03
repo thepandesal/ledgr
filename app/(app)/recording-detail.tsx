@@ -16,9 +16,8 @@ export default function RecordingDetailScreen() {
   const slideAnim = useRef(new Animated.Value(width)).current;
 
   const [recording, setRecording] = useState<any>(null);
-  const [people, setPeople] = useState<string[]>([]);
+  const [people, setPeople] = useState<string[]>(['', '', '']);
   const [addPersonModal, setAddPersonModal] = useState(false);
-  const [personInput, setPersonInput] = useState('');
   const [cookingModal, setCookingModal] = useState(false);
 
   useEffect(() => {
@@ -39,13 +38,9 @@ export default function RecordingDetailScreen() {
     Animated.timing(slideAnim, { toValue: width, duration: 250, useNativeDriver: true }).start(() => router.back());
   };
 
-  const addPerson = () => {
-    if (personInput.trim()) {
-      setPeople(prev => [...prev, personInput.trim()]);
-      setPersonInput('');
-      setAddPersonModal(false);
-    }
-  };
+  const addPerson = () => setPeople(prev => [...prev, '']);
+  const updatePerson = (i: number, val: string) => setPeople(prev => { const n = [...prev]; n[i] = val; return n; });
+  const removePerson = (i: number) => setPeople(prev => prev.filter((_, idx) => idx !== i));
 
   const truncate = (str: string, max: number) =>
     str && str.length > max ? str.slice(0, max) + '...' : str;
@@ -72,9 +67,10 @@ export default function RecordingDetailScreen() {
     return map[type] ?? type;
   };
 
+  const filledPeople = people.filter(p => p.trim());
   const PREVIEW_LIMIT = 4;
-  const visiblePeople = people.slice(0, PREVIEW_LIMIT);
-  const extraCount = people.length - PREVIEW_LIMIT;
+  const visiblePeople = filledPeople.slice(0, PREVIEW_LIMIT);
+  const extraCount = filledPeople.length - PREVIEW_LIMIT;
 
   return (
     <Animated.View style={[styles.container, { transform: [{ translateX: slideAnim }] }]}>
@@ -170,23 +166,37 @@ export default function RecordingDetailScreen() {
           <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setAddPersonModal(false)}>
             <TouchableOpacity activeOpacity={1} onPress={e => e.stopPropagation()}>
               <View style={styles.modalBox}>
-                <Text style={styles.modalTitle}>add person</Text>
-                <TextInput
-                  style={styles.modalInput}
-                  placeholder="name"
-                  placeholderTextColor="#b0b0b0"
-                  value={personInput}
-                  onChangeText={setPersonInput}
-                  autoFocus
-                  returnKeyType="done"
-                  onSubmitEditing={addPerson}
-                />
+                <Text style={styles.modalTitle}>people</Text>
+                <ScrollView style={{ width: '100%', maxHeight: 220 }} showsVerticalScrollIndicator={false}>
+                  {people.map((p, i) => (
+                    <View key={i} style={styles.personRow}>
+                      <TextInput
+                        style={styles.personInput}
+                        placeholder={`person ${i + 1}`}
+                        placeholderTextColor="#c0c0c0"
+                        value={p}
+                        onChangeText={v => updatePerson(i, v)}
+                        returnKeyType="next"
+                        autoFocus={i === people.length - 1 && people.length > 3}
+                      />
+                      {people.length > 1 && (
+                        <TouchableOpacity onPress={() => removePerson(i)} style={styles.removeBtn}>
+                          <Ionicons name="close" size={14} color="#929090" />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  ))}
+                </ScrollView>
+                <TouchableOpacity style={styles.addMoreBtn} onPress={addPerson}>
+                  <Ionicons name="add" size={13} color="#0ccfcf" />
+                  <Text style={styles.addMoreText}>add more</Text>
+                </TouchableOpacity>
                 <View style={styles.modalBtns}>
                   <TouchableOpacity style={[styles.modalBtn, { backgroundColor: '#f5f5f5' }]} onPress={() => setAddPersonModal(false)}>
                     <Text style={[styles.modalBtnText, { color: '#8a8a8a' }]}>cancel</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.modalBtn} onPress={addPerson}>
-                    <Text style={styles.modalBtnText}>add</Text>
+                  <TouchableOpacity style={styles.modalBtn} onPress={() => setAddPersonModal(false)}>
+                    <Text style={styles.modalBtnText}>done</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -254,6 +264,11 @@ const styles = StyleSheet.create({
   personChipText: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#425252' },
   cookingBox: { borderRadius: 14, borderWidth: 1, borderColor: '#e8e8e8', backgroundColor: '#fafafa', padding: 20, alignItems: 'center', marginBottom: 24 },
   cookingText: { fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#929090', textAlign: 'center' },
+  personRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
+  personInput: { flex: 1, backgroundColor: '#f5f5f5', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#425252', borderWidth: 1, borderColor: '#e8e8e8' },
+  removeBtn: { padding: 4 },
+  addMoreBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', marginBottom: 10 },
+  addMoreText: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#0ccfcf' },
   modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   modalBox: { backgroundColor: '#ffffff', borderRadius: 20, padding: 24, width: 280, gap: 14, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 20, elevation: 10 },
   modalTitle: { fontFamily: 'ChillaxMedium', fontSize: 16, color: '#425252', alignSelf: 'flex-start' },
