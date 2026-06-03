@@ -30,18 +30,19 @@ export default function RecordingDetailScreen() {
   const [deletePersonConfirm, setDeletePersonConfirm] = useState<{ idx: number; name: string; affectedItems: number } | null>(null);
 
   // Add item form state
-  const [itemForms, setItemForms] = useState<{ name: string; cost: string }[]>([{ name: '', cost: '' }]);
-  const addItemForm = () => setItemForms(prev => [...prev, { name: '', cost: '' }]);
+  const [itemForms, setItemForms] = useState<{ name: string; cost: string; subitemForms: { name: string; people: string[] }[] }[]>([{ name: '', cost: '', subitemForms: [] }]);
+  const addItemForm = () => setItemForms(prev => [...prev, { name: '', cost: '', subitemForms: [] }]);
   const updateItemForm = (i: number, field: 'name' | 'cost', val: string) =>
     setItemForms(prev => { const n = [...prev]; n[i] = { ...n[i], [field]: val }; return n; });
   const removeItemForm = (i: number) => setItemForms(prev => prev.filter((_, idx) => idx !== i));
-
-  // Add subitem form state
-  const [addSubitemModal, setAddSubitemModal] = useState(false);
-  const [activeItemId, setActiveItemId] = useState<string | null>(null);
-  const [subitemName, setSubitemName] = useState('');
-  const [subitemCost, setSubitemCost] = useState('');
-  const [subitemPeople, setSubitemPeople] = useState<string[]>([]);
+  const addSubitemForm = (itemIdx: number) =>
+    setItemForms(prev => { const n = [...prev]; n[itemIdx] = { ...n[itemIdx], subitemForms: [...n[itemIdx].subitemForms, { name: '', people: [] }] }; return n; });
+  const updateSubitemForm = (itemIdx: number, subIdx: number, field: 'name', val: string) =>
+    setItemForms(prev => { const n = [...prev]; const subs = [...n[itemIdx].subitemForms]; subs[subIdx] = { ...subs[subIdx], [field]: val }; n[itemIdx] = { ...n[itemIdx], subitemForms: subs }; return n; });
+  const toggleSubitemFormPerson = (itemIdx: number, subIdx: number, person: string) =>
+    setItemForms(prev => { const n = [...prev]; const subs = [...n[itemIdx].subitemForms]; const people = subs[subIdx].people.includes(person) ? subs[subIdx].people.filter(p => p !== person) : [...subs[subIdx].people, person]; subs[subIdx] = { ...subs[subIdx], people }; n[itemIdx] = { ...n[itemIdx], subitemForms: subs }; return n; });
+  const removeSubitemForm = (itemIdx: number, subIdx: number) =>
+    setItemForms(prev => { const n = [...prev]; n[itemIdx] = { ...n[itemIdx], subitemForms: n[itemIdx].subitemForms.filter((_, idx) => idx !== subIdx) }; return n; });
 
   useEffect(() => {
     Animated.timing(slideAnim, { toValue: 0, duration: 280, useNativeDriver: true }).start();
@@ -172,37 +173,31 @@ export default function RecordingDetailScreen() {
       valid.map(f => ({ recording_id: recordingId, user_id: user.id, name: f.name.trim(), cost: parseFloat(f.cost), people: [] }))
     ).select();
     if (!error && data) {
-      setItems(prev => [...prev, ...data.map((r: any) => ({ id: r.id, name: r.name, cost: Number(r.cost), subitems: [] }))]);
+      // for each saved item, save its subitems with auto-equal cost
+      const newItems: Item[] = [];
+      for (let i = 0; i < data.length; i++) {
+        const savedItem = data[i];
+        const form = valid[i];
+        const filledSubs = form.subitemForms.filter(s => s.name.trim());
+        let subitems: Subitem[] = [];
+        if (filledSubs.length > 0) {
+          const equalCost = parseFloat(form.cost) / filledSubs.length;
+          const { data: subData } = await supabase.from('split_subitems').insert(
+            filledSubs.map(s => ({ item_id: savedItem.id, name: s.name.trim(), cost: equalCost, people: s.people }))
+          ).select();
+          if (subData) subitems = subData.map((s: any) => ({ id: s.id, name: s.name, cost: Number(s.cost), people: s.people }));
+        }
+        newItems.push({ id: savedItem.id, name: savedItem.name, cost: Number(savedItem.cost), subitems });
+      }
+      setItems(prev => [...prev, ...newItems]);
     }
-    setItemForms([{ name: '', cost: '' }]);
+    setItemForms([{ name: '', cost: '', subitemForms: [] }]);
     setAddItemModal(false);
   };
 
   const deleteItem = async (id: string) => {
     await supabase.from('split_items').delete().eq('id', id);
     setItems(prev => prev.filter(item => item.id !== id));
-  };
-
-  const saveSubitem = async () => {
-    if (!subitemName.trim() || !subitemCost || subitemPeople.length === 0 || !activeItemId) return;
-    const item = items.find(i => i.id === activeItemId);
-    if (!item) return;
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    const { data, error } = await supabase.from('split_subitems').insert({
-      item_id: activeItemId,
-      name: subitemName.trim(),
-      cost: parseFloat(subitemCost),
-      people: subitemPeople,
-    }).select().single();
-    if (!error && data) {
-      setItems(prev => prev.map(i => i.id === activeItemId
-        ? { ...i, subitems: [...i.subitems, { id: data.id, name: data.name, cost: Number(data.cost), people: data.people }] }
-        : i
-      ));
-    }
-    setSubitemName(''); setSubitemCost(''); setSubitemPeople([]);
-    setAddSubitemModal(false);
   };
 
   const deleteSubitem = async (itemId: string, subitemId: string) => {
@@ -213,11 +208,7 @@ export default function RecordingDetailScreen() {
     ));
   };
 
-  const toggleSubitemPerson = (name: string) => {
-    setSubitemPeople(prev => prev.includes(name) ? prev.filter(p => p !== name) : [...prev, name]);
-  };
-
-  const truncate = (str: string, max: number) => str && str.length > max ? str.slice(0, max) + '...' : str;
+const truncate = (str: string, max: number) => str && str.length > max ? str.slice(0, max) + '...' : str;
 
   const amountColor = () => {
     if (!recording) return '#929090';
@@ -347,8 +338,6 @@ export default function RecordingDetailScreen() {
                 ) : (
                   <View style={styles.itemsList}>
                     {items.map((item, idx) => {
-                      const subitemTotal = item.subitems.reduce((s, sub) => s + sub.cost, 0);
-                      const itemFull = item.subitems.length > 0 && Math.abs(subitemTotal - item.cost) < 0.01;
                       return (
                         <View key={item.id}>
                           <View style={styles.itemCard}>
@@ -357,19 +346,6 @@ export default function RecordingDetailScreen() {
                               <Text style={styles.itemName} numberOfLines={1}>{truncate(item.name, MAX_ITEM_NAME)}</Text>
                               <Text style={styles.itemCost}>{item.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
                             </View>
-                            <TouchableOpacity
-                              style={[styles.addSubitemBtn, itemFull && { borderColor: '#c0c0c0', opacity: 0.4 }]}
-                              onPress={() => {
-                                if (itemFull) return;
-                                setActiveItemId(item.id);
-                                setSubitemName(''); setSubitemCost(''); setSubitemPeople([]);
-                                setAddSubitemModal(true);
-                              }}
-                              activeOpacity={itemFull ? 1 : 0.8}
-                            >
-                              <Ionicons name="add" size={13} color={itemFull ? '#c0c0c0' : '#0ccfcf'} />
-                              <Text style={[styles.addSubitemBtnText, itemFull && { color: '#c0c0c0' }]}>subitem</Text>
-                            </TouchableOpacity>
                             <TouchableOpacity onPress={() => deleteItem(item.id)} style={styles.itemDelete}>
                               <Ionicons name="close" size={14} color="#c0c0c0" />
                             </TouchableOpacity>
@@ -499,42 +475,108 @@ export default function RecordingDetailScreen() {
             <TouchableOpacity activeOpacity={1} onPress={e => e.stopPropagation()}>
               <View style={styles.modalBox}>
                 <Text style={styles.modalTitle}>add items</Text>
-                <ScrollView style={{ width: '100%', maxHeight: 300 }} showsVerticalScrollIndicator={false}>
-                  {itemForms.map((form, i) => (
-                    <View key={i} style={styles.itemFormRow}>
-                      <View style={styles.itemFormBlock}>
-                        <TextInput
-                          style={styles.itemFormInput}
-                          placeholder="item name"
-                          placeholderTextColor="#c0c0c0"
-                          value={form.name}
-                          onChangeText={v => updateItemForm(i, 'name', v.slice(0, MAX_ITEM_NAME))}
-                          autoFocus={i === 0}
-                        />
-                        <View style={styles.itemFormDivider} />
-                        <TextInput
-                          style={styles.itemFormInput}
-                          placeholder="cost"
-                          placeholderTextColor="#c0c0c0"
-                          value={form.cost}
-                          onChangeText={v => updateItemForm(i, 'cost', v)}
-                          keyboardType="decimal-pad"
-                        />
-                      </View>
-                      {itemForms.length > 1 && (
-                        <TouchableOpacity onPress={() => removeItemForm(i)} style={styles.removeBtn}>
-                          <Ionicons name="close" size={14} color="#929090" />
+                <ScrollView style={{ width: '100%', maxHeight: 420 }} showsVerticalScrollIndicator={false}>
+                  {itemForms.map((form, itemIdx) => {
+                    const filledSubs = form.subitemForms.filter(s => s.name.trim());
+                    const costNum = parseFloat(form.cost) || 0;
+                    const equalCost = filledSubs.length > 0 ? costNum / filledSubs.length : 0;
+                    return (
+                      <View key={itemIdx} style={styles.itemFormSection}>
+                        {/* Item header row */}
+                        <View style={styles.itemFormRow}>
+                          <View style={[styles.itemFormBlock, { flex: 1 }]}>
+                            <TextInput
+                              style={styles.itemFormInput}
+                              placeholder="item name"
+                              placeholderTextColor="#c0c0c0"
+                              value={form.name}
+                              onChangeText={v => updateItemForm(itemIdx, 'name', v.slice(0, MAX_ITEM_NAME))}
+                              autoFocus={itemIdx === 0}
+                            />
+                            <View style={styles.itemFormDivider} />
+                            <TextInput
+                              style={styles.itemFormInput}
+                              placeholder="total cost"
+                              placeholderTextColor="#c0c0c0"
+                              value={form.cost}
+                              onChangeText={v => updateItemForm(itemIdx, 'cost', v)}
+                              keyboardType="decimal-pad"
+                            />
+                          </View>
+                          {itemForms.length > 1 && (
+                            <TouchableOpacity onPress={() => removeItemForm(itemIdx)} style={styles.removeBtn}>
+                              <Ionicons name="close" size={14} color="#929090" />
+                            </TouchableOpacity>
+                          )}
+                        </View>
+
+                        {/* Subitem rows */}
+                        {form.subitemForms.map((sub, subIdx) => (
+                          <View key={subIdx} style={styles.subitemFormRow}>
+                            <Text style={styles.subitemArrow}>↳</Text>
+                            <View style={{ flex: 1, gap: 6 }}>
+                              <View style={styles.subitemFormInputRow}>
+                                <TextInput
+                                  style={styles.subitemFormInput}
+                                  placeholder="subitem name"
+                                  placeholderTextColor="#c0c0c0"
+                                  value={sub.name}
+                                  onChangeText={v => updateSubitemForm(itemIdx, subIdx, 'name', v.slice(0, MAX_ITEM_NAME))}
+                                />
+                                {form.cost && sub.name.trim() && (
+                                  <Text style={styles.subitemAutoHint}>
+                                    {equalCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                  </Text>
+                                )}
+                                <TouchableOpacity onPress={() => removeSubitemForm(itemIdx, subIdx)} style={styles.removeBtn}>
+                                  <Ionicons name="close" size={12} color="#c0c0c0" />
+                                </TouchableOpacity>
+                              </View>
+                              {/* People chips */}
+                              <View style={styles.itemPeopleSelect}>
+                                {filledPeople.map((p, pi) => {
+                                  const sel = sub.people.includes(p);
+                                  return (
+                                    <TouchableOpacity
+                                      key={pi}
+                                      style={[styles.personSelectChip, sel && styles.personSelectChipActive]}
+                                      onPress={() => toggleSubitemFormPerson(itemIdx, subIdx, p)}
+                                    >
+                                      <Text style={[styles.personSelectText, sel && styles.personSelectTextActive]}>{p}</Text>
+                                    </TouchableOpacity>
+                                  );
+                                })}
+                              </View>
+                            </View>
+                          </View>
+                        ))}
+
+                        {/* Add subitem row */}
+                        <TouchableOpacity style={[styles.addMoreBtn, { marginLeft: 20 }]} onPress={() => addSubitemForm(itemIdx)}>
+                          <Ionicons name="add" size={11} color="#0ccfcf" />
+                          <Text style={styles.addMoreText}>add subitem</Text>
                         </TouchableOpacity>
-                      )}
-                    </View>
-                  ))}
+
+                        {/* Equal cost preview */}
+                        {filledSubs.length > 0 && form.cost && (
+                          <Text style={styles.subitemRemaining}>
+                            {filledSubs.length} subitems · {equalCost.toLocaleString('en-US', { minimumFractionDigits: 2 })} each
+                          </Text>
+                        )}
+
+                        {itemForms.length > 1 && itemIdx < itemForms.length - 1 && <View style={styles.itemFormSectionDivider} />}
+                      </View>
+                    );
+                  })}
                 </ScrollView>
+
                 <TouchableOpacity style={styles.addMoreBtn} onPress={addItemForm}>
                   <Ionicons name="add" size={13} color="#0ccfcf" />
-                  <Text style={styles.addMoreText}>add more</Text>
+                  <Text style={styles.addMoreText}>add item</Text>
                 </TouchableOpacity>
+
                 <View style={styles.modalBtns}>
-                  <TouchableOpacity style={[styles.modalBtn, { backgroundColor: '#f5f5f5' }]} onPress={() => { setAddItemModal(false); setItemForms([{ name: '', cost: '' }]); }}>
+                  <TouchableOpacity style={[styles.modalBtn, { backgroundColor: '#f5f5f5' }]} onPress={() => { setAddItemModal(false); setItemForms([{ name: '', cost: '', subitemForms: [] }]); }}>
                     <Text style={[styles.modalBtnText, { color: '#8a8a8a' }]}>cancel</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -545,90 +587,6 @@ export default function RecordingDetailScreen() {
                     <Text style={styles.modalBtnText}>save</Text>
                   </TouchableOpacity>
                 </View>
-              </View>
-            </TouchableOpacity>
-          </TouchableOpacity>
-        </BlurView>
-      </Modal>
-
-      {/* Add subitem modal */}
-      <Modal visible={addSubitemModal} transparent animationType="fade" onRequestClose={() => setAddSubitemModal(false)}>
-        <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}>
-          <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setAddSubitemModal(false)}>
-            <TouchableOpacity activeOpacity={1} onPress={e => e.stopPropagation()}>
-              <View style={styles.modalBox}>
-                <Text style={styles.modalTitle}>add subitem</Text>
-
-                {(() => {
-                  const item = items.find(i => i.id === activeItemId);
-                  if (!item) return null;
-                  const usedCost = item.subitems.reduce((s, sub) => s + sub.cost, 0);
-                  const remaining = item.cost - usedCost;
-                  const isExact = Math.abs(usedCost + (parseFloat(subitemCost) || 0) - item.cost) < 0.01;
-                  const isOver = usedCost + (parseFloat(subitemCost) || 0) > item.cost + 0.01;
-                  return (
-                    <>
-                      <Text style={styles.subitemRemaining}>
-                        remaining: {remaining.toLocaleString('en-US', { minimumFractionDigits: 2 })} of {item.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                      </Text>
-                      <View style={styles.itemFormBlock}>
-                        <TextInput
-                          style={styles.itemFormInput}
-                          placeholder="subitem name"
-                          placeholderTextColor="#c0c0c0"
-                          value={subitemName}
-                          onChangeText={v => setSubitemName(v.slice(0, MAX_ITEM_NAME))}
-                          autoFocus
-                        />
-                        <View style={styles.itemFormDivider} />
-                        <TextInput
-                          style={[styles.itemFormInput, isOver && { color: '#ed6a6a' }]}
-                          placeholder={remaining.toFixed(2)}
-                          placeholderTextColor="#0ccfcf"
-                          value={subitemCost}
-                          onChangeText={setSubitemCost}
-                          keyboardType="decimal-pad"
-                        />
-                      </View>
-                      {isOver && <Text style={styles.subitemError}>exceeds item total</Text>}
-
-                      <Text style={styles.itemFormLabel}>who's included?</Text>
-                      <View style={styles.itemPeopleSelect}>
-                        {filledPeople.map((p, i) => {
-                          const selected = subitemPeople.includes(p);
-                          return (
-                            <TouchableOpacity
-                              key={i}
-                              style={[styles.personSelectChip, selected && styles.personSelectChipActive]}
-                              onPress={() => toggleSubitemPerson(p)}
-                            >
-                              <Text style={[styles.personSelectText, selected && styles.personSelectTextActive]}>{p}</Text>
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </View>
-
-                      {subitemPeople.length > 0 && subitemCost && !isOver && (
-                        <Text style={styles.splitPreview}>
-                          {(parseFloat(subitemCost) / subitemPeople.length).toLocaleString('en-US', { minimumFractionDigits: 2 })} each
-                        </Text>
-                      )}
-
-                      <View style={styles.modalBtns}>
-                        <TouchableOpacity style={[styles.modalBtn, { backgroundColor: '#f5f5f5' }]} onPress={() => setAddSubitemModal(false)}>
-                          <Text style={[styles.modalBtnText, { color: '#8a8a8a' }]}>cancel</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[styles.modalBtn, (!subitemName.trim() || !subitemCost || subitemPeople.length === 0 || isOver) && { opacity: 0.4 }]}
-                          onPress={saveSubitem}
-                          disabled={!subitemName.trim() || !subitemCost || subitemPeople.length === 0 || isOver}
-                        >
-                          <Text style={styles.modalBtnText}>save</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </>
-                  );
-                })()}
               </View>
             </TouchableOpacity>
           </TouchableOpacity>
@@ -762,6 +720,12 @@ const styles = StyleSheet.create({
   suggestionBox: { backgroundColor: '#ffffff', borderRadius: 8, borderWidth: 1, borderColor: '#f0f0f0', marginTop: -4, marginBottom: 6, overflow: 'hidden' },
   suggestionItem: { paddingHorizontal: 12, paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
   suggestionText: { fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#425252' },
+  itemFormSection: { marginBottom: 12 },
+  itemFormSectionDivider: { height: 1, backgroundColor: '#f0f0f0', marginVertical: 10 },
+  subitemFormRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 8, marginLeft: 4 },
+  subitemFormInputRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  subitemFormInput: { flex: 1, backgroundColor: '#f5f5f5', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, fontFamily: 'RobotoMono_400Regular', fontSize: 14, color: '#425252', borderWidth: 1, borderColor: '#f0f0f0' },
+  subitemAutoHint: { fontFamily: 'RobotoMono_700Bold', fontSize: 10, color: '#0ccfcf', flexShrink: 0 },
   itemFormRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
   itemFormBlock: { width: '100%', backgroundColor: '#fafafa', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 4, borderWidth: 1, borderColor: '#f0f0f0' },
   itemFormInput: { paddingVertical: 10, fontFamily: 'RobotoMono_400Regular', fontSize: 16, color: '#425252' },
