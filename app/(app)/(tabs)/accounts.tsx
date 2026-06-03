@@ -122,85 +122,78 @@ export default function AccountsScreen() {
 }
 
 function CropView({ uri, onCrop, onCancel }: { uri: string; onCrop: (base64: string) => void; onCancel: () => void }) {
-  const [imgDisplay, setImgDisplay] = useState({ x: 0, y: 0, w: SW, h: SH });
   const [imgNatural, setImgNatural] = useState({ w: 1, h: 1 });
 
-  const bx = useRef((SW - INIT_CROP) / 2);
-  const by = useRef((SH - INIT_CROP) / 2);
-  const bs = useRef(INIT_CROP);
-  const animX = useRef(new Animated.Value(bx.current)).current;
-  const animY = useRef(new Animated.Value(by.current)).current;
-  const animS = useRef(new Animated.Value(bs.current)).current;
+  // Use state for crop box so doCrop always reads current values
+  const [box, setBox] = useState({ x: (SW - INIT_CROP) / 2, y: (SH - INIT_CROP) / 2, s: INIT_CROP });
+  const boxRef = useRef(box);
+  const animX = useRef(new Animated.Value(box.x)).current;
+  const animY = useRef(new Animated.Value(box.y)).current;
+  const animS = useRef(new Animated.Value(box.s)).current;
+
+  useEffect(() => { boxRef.current = box; }, [box]);
 
   useEffect(() => {
-    Image.getSize(uri, (w, h) => {
-      setImgNatural({ w, h });
-      const r = Math.min(SW / w, SH / h);
-      const dw = w * r, dh = h * r;
-      setImgDisplay({ x: (SW - dw) / 2, y: (SH - dh) / 2, w: dw, h: dh });
-    });
+    Image.getSize(uri, (w, h) => setImgNatural({ w, h }));
   }, [uri]);
 
   const mode = useRef<'move' | 'resize' | null>(null);
+  const startBox = useRef(box);
 
   const pan = useRef(PanResponder.create({
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: () => true,
     onPanResponderGrant: (e) => {
+      startBox.current = boxRef.current;
       const { locationX, locationY } = e.nativeEvent;
-      // if touch is near bottom-right corner → resize
-      const nearCorner = locationX > bs.current - HANDLE_HIT && locationY > bs.current - HANDLE_HIT;
-      mode.current = nearCorner ? 'resize' : 'move';
+      mode.current = (locationX > startBox.current.s - HANDLE_HIT && locationY > startBox.current.s - HANDLE_HIT) ? 'resize' : 'move';
     },
     onPanResponderMove: (_, gs) => {
+      const b = startBox.current;
       if (mode.current === 'move') {
-        const nx = Math.max(0, Math.min(SW - bs.current, bx.current + gs.dx));
-        const ny = Math.max(0, Math.min(SH - bs.current, by.current + gs.dy));
+        const nx = Math.max(0, Math.min(SW - b.s, b.x + gs.dx));
+        const ny = Math.max(0, Math.min(SH - b.s, b.y + gs.dy));
         animX.setValue(nx);
         animY.setValue(ny);
       } else {
-        const ns = Math.max(MIN_CROP, Math.min(Math.min(SW - bx.current, SH - by.current), bs.current + gs.dx));
+        const ns = Math.max(MIN_CROP, Math.min(Math.min(SW - b.x, SH - b.y), b.s + gs.dx));
         animS.setValue(ns);
       }
     },
     onPanResponderRelease: (_, gs) => {
+      const b = startBox.current;
+      let newBox;
       if (mode.current === 'move') {
-        bx.current = Math.max(0, Math.min(SW - bs.current, bx.current + gs.dx));
-        by.current = Math.max(0, Math.min(SH - bs.current, by.current + gs.dy));
+        newBox = { x: Math.max(0, Math.min(SW - b.s, b.x + gs.dx)), y: Math.max(0, Math.min(SH - b.s, b.y + gs.dy)), s: b.s };
       } else {
-        bs.current = Math.max(MIN_CROP, Math.min(Math.min(SW - bx.current, SH - by.current), bs.current + gs.dx));
+        const ns = Math.max(MIN_CROP, Math.min(Math.min(SW - b.x, SH - b.y), b.s + gs.dx));
+        newBox = { ...b, s: ns };
       }
+      boxRef.current = newBox;
+      setBox(newBox);
       mode.current = null;
     },
   })).current;
 
   const doCrop = async () => {
-    // Get actual displayed image bounds accounting for resizeMode contain
-    const imgRatio = imgNatural.w / imgNatural.h;
+    const { x: cx, y: cy, s: cs } = boxRef.current;
+    const { w: iw, h: ih } = imgNatural;
+    const imgRatio = iw / ih;
     const screenRatio = SW / SH;
     let renderedW, renderedH, offsetX, offsetY;
     if (imgRatio > screenRatio) {
-      renderedW = SW;
-      renderedH = SW / imgRatio;
-      offsetX = 0;
-      offsetY = (SH - renderedH) / 2;
+      renderedW = SW; renderedH = SW / imgRatio;
+      offsetX = 0; offsetY = (SH - renderedH) / 2;
     } else {
-      renderedH = SH;
-      renderedW = SH * imgRatio;
-      offsetX = (SW - renderedW) / 2;
-      offsetY = 0;
+      renderedH = SH; renderedW = SH * imgRatio;
+      offsetX = (SW - renderedW) / 2; offsetY = 0;
     }
-    // Crop box in screen coords
-    const cx = bx.current;
-    const cy = by.current;
-    const cs = bs.current;
-    // Convert to image pixel coords
-    const scaleX = imgNatural.w / renderedW;
-    const scaleY = imgNatural.h / renderedH;
+    const scaleX = iw / renderedW;
+    const scaleY = ih / renderedH;
     const originX = Math.max(0, (cx - offsetX) * scaleX);
     const originY = Math.max(0, (cy - offsetY) * scaleY);
-    const cropW = Math.min(imgNatural.w - originX, cs * scaleX);
-    const cropH = Math.min(imgNatural.h - originY, cs * scaleY);
+    const cropW = Math.min(iw - originX, cs * scaleX);
+    const cropH = Math.min(ih - originY, cs * scaleY);
     const result = await ImageManipulator.manipulateAsync(
       uri,
       [{ crop: { originX, originY, width: cropW, height: cropH } }, { resize: { width: 600, height: 600 } }],
