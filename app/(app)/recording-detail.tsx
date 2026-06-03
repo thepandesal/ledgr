@@ -124,7 +124,6 @@ export default function RecordingDetailScreen() {
     if (!recording) return;
     setShareLoading(true);
     try {
-      // compute per person totals
       const perPersonMap: Record<string, number> = {};
       items.forEach(item => {
         item.subitems.forEach(sub => {
@@ -153,9 +152,10 @@ export default function RecordingDetailScreen() {
       };
       const { data: row, error } = await supabase.from('split_shares').insert({ recording_id: recordingId, data: shareData }).select().single();
       if (error || !row) throw error;
-      const shareUrl = `https://ledgr.vercel.app/split/${row.id}`;
+      const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://ledgr-six.vercel.app';
+      const shareUrl = `${baseUrl}/split/${row.id}`;
       setSaveImageModal(false);
-      await Share.share({ message: `Here's the split breakdown:\n${shareUrl}`, url: shareUrl });
+      await Share.share({ message: `Here's the split breakdown: ${shareUrl}`, url: shareUrl });
     } catch (e: any) {
       console.log(e);
     } finally {
@@ -386,7 +386,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                 if (filledPeople.length > 0 && !(Math.abs(total - recAmt) < 0.01 && recAmt > 0)) setAddItemModal(true);
               }, disabled: filledPeople.length === 0 || (Math.abs(items.reduce((s, i) => s + i.cost, 0) - (recording ? Number(recording.amount) : 0)) < 0.01 && items.length > 0) },
               { icon: 'people-outline', label: 'add people', onPress: () => openPeopleModal(), disabled: false },
-              { icon: 'image-outline', label: 'save image', onPress: () => openSaveImage(), disabled: filledPeople.length === 0 || items.length === 0 },
+              { icon: 'share-outline', label: 'share', onPress: () => openSaveImage(), disabled: filledPeople.length === 0 || items.length === 0 || items.every(i => i.subitems.length === 0) },
               { icon: 'person-add-outline', label: 'save person', onPress: () => setCookingModal(true), disabled: false },
             ].map(b => (
               <TouchableOpacity
@@ -836,20 +836,32 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                     <Text style={[styles.subitemRemaining, { textAlign: 'center', marginVertical: 8 }]}>no accounts saved</Text>
                   )}
                 </ScrollView>
-                <View style={styles.modalBtns}>
-                  <TouchableOpacity style={[styles.modalBtn, { backgroundColor: '#f5f5f5' }]} onPress={() => setSaveImageModal(false)}>
-                    <Text style={[styles.modalBtnText, { color: '#8a8a8a' }]}>cancel</Text>
-                  </TouchableOpacity>
+
+                <View style={styles.shareOptionsRow}>
                   <TouchableOpacity
-                    style={[styles.modalBtn, shareLoading && { opacity: 0.6 }]}
+                    style={styles.shareOptionBtn}
                     onPress={generateShare}
                     disabled={shareLoading}
                   >
-                    {shareLoading
-                      ? <Text style={styles.modalBtnText}>generating...</Text>
-                      : <Text style={styles.modalBtnText}>generate link</Text>}
+                    <Ionicons name="link-outline" size={18} color="#0ccfcf" />
+                    <Text style={styles.shareOptionText}>share link</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.shareOptionBtn}
+                    onPress={async () => {
+                      // generate and open in browser
+                      await generateShare();
+                    }}
+                    disabled={shareLoading}
+                  >
+                    <Ionicons name="image-outline" size={18} color="#425252" />
+                    <Text style={[styles.shareOptionText, { color: '#425252' }]}>save image</Text>
                   </TouchableOpacity>
                 </View>
+
+                <TouchableOpacity style={[styles.modalBtn, { width: '100%', backgroundColor: '#f5f5f5' }]} onPress={() => setSaveImageModal(false)}>
+                  <Text style={[styles.modalBtnText, { color: '#8a8a8a' }]}>cancel</Text>
+                </TouchableOpacity>
               </View>
             </TouchableOpacity>
           </TouchableOpacity>
@@ -975,6 +987,9 @@ const styles = StyleSheet.create({
   personSelectText: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#929090' },
   personSelectTextActive: { color: '#fff', fontFamily: 'RobotoMono_700Bold' },
   subitemRemaining: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#929090', alignSelf: 'flex-start' },
+  shareOptionsRow: { flexDirection: 'row', gap: 10, width: '100%', marginBottom: 4 },
+  shareOptionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: '#f0f0f0', backgroundColor: '#fafafa' },
+  shareOptionText: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#0ccfcf' },
   accountOption: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: '#f0f0f0', marginBottom: 6, backgroundColor: '#fafafa' },
   accountOptionActive: { backgroundColor: '#425252', borderColor: '#425252' },
   accountOptionName: { fontFamily: 'ChillaxMedium', fontSize: 13, color: '#425252' },
