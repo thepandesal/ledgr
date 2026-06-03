@@ -256,7 +256,47 @@ export default function SpaceDetailScreen() {
         {/* Animated content area */}
         <Animated.View style={[styles.contentArea, { transform: [{ translateX: contentSlide }] }]}>
 
-          {/* Add recording button row */}
+          {/* Daily date chips */}
+          {viewMode === 'daily' && (
+            <View style={styles.dateChipsRow}>
+              {Array.from({ length: 7 }, (_, i) => addDays(selectedDate, i - 3)).map((date, i) => {
+                const isSelected = isSameDay(date, selectedDate);
+                const isToday = isSameDay(date, new Date());
+                return (
+                  <TouchableOpacity key={i} style={[styles.dateChip, isSelected && styles.dateChipSelected]} onPress={() => setSelectedDate(date)}>
+                    <Text style={[styles.dateChipDay, isSelected && styles.dateChipTextSelected]}>
+                      {date.toLocaleDateString('en-US', { weekday: 'short' })}
+                    </Text>
+                    <Text style={[styles.dateChipNum, isSelected && styles.dateChipTextSelected]}>{date.getDate()}</Text>
+                    {isToday && <View style={[styles.todayDot, isSelected && styles.todayDotSelected]} />}
+                    {!isToday && recordingDates.has(dateKey(date)) && <View style={styles.entryDot} />}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
+
+          {/* Weekly date chips */}
+          {viewMode === 'weekly' && (
+            <View style={styles.dateChipsRow}>
+              {Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)).map((date, i) => {
+                const isToday = isSameDay(date, new Date());
+                return (
+                  <View key={i} style={[styles.dateChip, isToday && styles.dateChipSelected]}>
+                    <Text style={[styles.dateChipDay, isToday && styles.dateChipTextSelected]}>
+                      {date.toLocaleDateString('en-US', { weekday: 'short' })}
+                    </Text>
+                    <Text style={[styles.dateChipNum, isToday && styles.dateChipTextSelected]}>{date.getDate()}</Text>
+                    {isToday
+                      ? <View style={[styles.todayDot, styles.todayDotSelected]} />
+                      : recordingDates.has(dateKey(date)) && <View style={styles.entryDot} />}
+                  </View>
+                );
+              })}
+            </View>
+          )}
+
+          {/* Add recording button */}
           <View style={styles.addRecordingRow}>
             <TouchableOpacity
               style={styles.addRecordingBtn}
@@ -267,56 +307,6 @@ export default function SpaceDetailScreen() {
               <Text style={styles.addRecordingText}>add recording</Text>
             </TouchableOpacity>
           </View>
-
-          {/* Daily date chips */}
-          {viewMode === 'daily' && (
-            <View style={styles.dateChipsRowWrapper}>
-              <View style={styles.dateChipsRow}>
-                {Array.from({ length: 7 }, (_, i) => addDays(selectedDate, i - 3)).map((date, i) => {
-                  const isSelected = isSameDay(date, selectedDate);
-                  const isToday = isSameDay(date, new Date());
-                  return (
-                    <TouchableOpacity key={i} style={[styles.dateChip, isSelected && styles.dateChipSelected]} onPress={() => setSelectedDate(date)}>
-                      <Text style={[styles.dateChipDay, isSelected && styles.dateChipTextSelected]}>
-                        {date.toLocaleDateString('en-US', { weekday: 'short' })}
-                      </Text>
-                      <Text style={[styles.dateChipNum, isSelected && styles.dateChipTextSelected]}>{date.getDate()}</Text>
-                      {isToday && <View style={[styles.todayDot, isSelected && styles.todayDotSelected]} />}
-                      {!isToday && recordingDates.has(dateKey(date)) && <View style={styles.entryDot} />}
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-              <TouchableOpacity style={styles.addDateBtn} onPress={() => router.push({ pathname: '/(app)/add-recording', params: { spaceId, spaceName: name, defaultDate: selectedDate.toISOString().split('T')[0] } } as any)}>
-                <Ionicons name="add" size={18} color="#929090" />
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {/* Weekly date chips */}
-          {viewMode === 'weekly' && (
-            <View style={styles.dateChipsRowWrapper}>
-              <View style={styles.dateChipsRow}>
-                {Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)).map((date, i) => {
-                  const isToday = isSameDay(date, new Date());
-                  return (
-                    <View key={i} style={[styles.dateChip, isToday && styles.dateChipSelected]}>
-                      <Text style={[styles.dateChipDay, isToday && styles.dateChipTextSelected]}>
-                        {date.toLocaleDateString('en-US', { weekday: 'short' })}
-                      </Text>
-                      <Text style={[styles.dateChipNum, isToday && styles.dateChipTextSelected]}>{date.getDate()}</Text>
-                      {isToday
-                        ? <View style={[styles.todayDot, styles.todayDotSelected]} />
-                        : recordingDates.has(dateKey(date)) && <View style={styles.entryDot} />}
-                    </View>
-                  );
-                })}
-              </View>
-              <TouchableOpacity style={styles.addDateBtn} onPress={() => router.push({ pathname: '/(app)/add-recording', params: { spaceId, spaceName: name, defaultDate: selectedDate.toISOString().split('T')[0] } } as any)}>
-                <Ionicons name="add" size={18} color="#929090" />
-              </TouchableOpacity>
-            </View>
-          )}
 
           {/* Grouped recordings list */}
           {loading ? (
