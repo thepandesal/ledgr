@@ -9,7 +9,8 @@ const { width } = Dimensions.get('window');
 const MAX_NAME_CHARS = 18;
 const MAX_ITEM_NAME = 20;
 
-interface Item { id: string; name: string; cost: number; people: string[]; }
+interface Subitem { id: string; name: string; cost: number; people: string[]; }
+interface Item { id: string; name: string; cost: number; subitems: Subitem[]; }
 
 export default function RecordingDetailScreen() {
   const { recordingId } = useLocalSearchParams<{ recordingId: string }>();
@@ -31,7 +32,13 @@ export default function RecordingDetailScreen() {
   // Add item form state
   const [itemName, setItemName] = useState('');
   const [itemCost, setItemCost] = useState('');
-  const [itemPeople, setItemPeople] = useState<string[]>([]);
+
+  // Add subitem form state
+  const [addSubitemModal, setAddSubitemModal] = useState(false);
+  const [activeItemId, setActiveItemId] = useState<string | null>(null);
+  const [subitemName, setSubitemName] = useState('');
+  const [subitemCost, setSubitemCost] = useState('');
+  const [subitemPeople, setSubitemPeople] = useState<string[]>([]);
 
   useEffect(() => {
     Animated.timing(slideAnim, { toValue: 0, duration: 280, useNativeDriver: true }).start();
@@ -60,7 +67,22 @@ export default function RecordingDetailScreen() {
     if (!recordingId) return;
     const { data } = await supabase.from('split_items')
       .select('*').eq('recording_id', recordingId).order('created_at');
-    if (data) setItems(data.map((r: any) => ({ id: r.id, name: r.name, cost: Number(r.cost), people: r.people })));
+    if (!data) return;
+    const itemIds = data.map((r: any) => r.id);
+    let subitems: any[] = [];
+    if (itemIds.length > 0) {
+      const { data: sd } = await supabase.from('split_subitems')
+        .select('*').in('item_id', itemIds).order('created_at');
+      if (sd) subitems = sd;
+    }
+    setItems(data.map((r: any) => ({
+      id: r.id,
+      name: r.name,
+      cost: Number(r.cost),
+      subitems: subitems
+        .filter((s: any) => s.item_id === r.id)
+        .map((s: any) => ({ id: s.id, name: s.name, cost: Number(s.cost), people: s.people })),
+    })));
   };
 
   const loadContacts = async () => {
@@ -97,7 +119,8 @@ export default function RecordingDetailScreen() {
   const requestDeletePerson = (i: number) => {
     const name = people[i]?.trim();
     if (!name) { removePerson(i); return; }
-    const affectedItems = items.filter(item => item.people.includes(name)).length;
+    const affectedItems = items.reduce((count, item) =>
+      count + item.subitems.filter(s => s.people.includes(name)).length, 0);
     if (affectedItems === 0) { removePerson(i); return; }
     setDeletePersonConfirm({ idx: i, name, affectedItems });
   };
@@ -105,8 +128,10 @@ export default function RecordingDetailScreen() {
   const confirmDeletePerson = () => {
     if (!deletePersonConfirm) return;
     const name = deletePersonConfirm.name;
-    // remove from items too
-    setItems(prev => prev.map(item => ({ ...item, people: item.people.filter(p => p !== name) })));
+    setItems(prev => prev.map(item => ({
+      ...item,
+      subitems: item.subitems.map(s => ({ ...s, people: s.people.filter(p => p !== name) }))
+    })));
     removePerson(deletePersonConfirm.idx);
     setDeletePersonConfirm(null);
   };
@@ -136,7 +161,7 @@ export default function RecordingDetailScreen() {
   const filledPeople = people.filter(p => p.trim());
 
   const saveItem = async () => {
-    if (!itemName.trim() || !itemCost || itemPeople.length === 0) return;
+    if (!itemName.trim() || !itemCost) return;
     const { data: { user } } = await supabase.auth.getUser();
     if (!user || !recordingId) return;
     const { data, error } = await supabase.from('split_items').insert({
@@ -144,12 +169,12 @@ export default function RecordingDetailScreen() {
       user_id: user.id,
       name: itemName.trim(),
       cost: parseFloat(itemCost),
-      people: itemPeople,
+      people: [],
     }).select().single();
     if (!error && data) {
-      setItems(prev => [...prev, { id: data.id, name: data.name, cost: Number(data.cost), people: data.people }]);
+      setItems(prev => [...prev, { id: data.id, name: data.name, cost: Number(data.cost), subitems: [] }]);
     }
-    setItemName(''); setItemCost(''); setItemPeople([]);
+    setItemName(''); setItemCost('');
     setAddItemModal(false);
   };
 
@@ -158,8 +183,38 @@ export default function RecordingDetailScreen() {
     setItems(prev => prev.filter(item => item.id !== id));
   };
 
-  const toggleItemPerson = (name: string) => {
-    setItemPeople(prev => prev.includes(name) ? prev.filter(p => p !== name) : [...prev, name]);
+  const saveSubitem = async () => {
+    if (!subitemName.trim() || !subitemCost || subitemPeople.length === 0 || !activeItemId) return;
+    const item = items.find(i => i.id === activeItemId);
+    if (!item) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data, error } = await supabase.from('split_subitems').insert({
+      item_id: activeItemId,
+      name: subitemName.trim(),
+      cost: parseFloat(subitemCost),
+      people: subitemPeople,
+    }).select().single();
+    if (!error && data) {
+      setItems(prev => prev.map(i => i.id === activeItemId
+        ? { ...i, subitems: [...i.subitems, { id: data.id, name: data.name, cost: Number(data.cost), people: data.people }] }
+        : i
+      ));
+    }
+    setSubitemName(''); setSubitemCost(''); setSubitemPeople([]);
+    setAddSubitemModal(false);
+  };
+
+  const deleteSubitem = async (itemId: string, subitemId: string) => {
+    await supabase.from('split_subitems').delete().eq('id', subitemId);
+    setItems(prev => prev.map(i => i.id === itemId
+      ? { ...i, subitems: i.subitems.filter(s => s.id !== subitemId) }
+      : i
+    ));
+  };
+
+  const toggleSubitemPerson = (name: string) => {
+    setSubitemPeople(prev => prev.includes(name) ? prev.filter(p => p !== name) : [...prev, name]);
   };
 
   const truncate = (str: string, max: number) => str && str.length > max ? str.slice(0, max) + '...' : str;
@@ -281,42 +336,73 @@ export default function RecordingDetailScreen() {
             </View>
           ) : (
             <View style={styles.itemsList}>
-              {items.map((item, idx) => {
-                const perPerson = item.people.length > 0 ? item.cost / item.people.length : 0;
-                return (
-                  <View key={item.id} style={styles.itemCard}>
+              {items.map((item, idx) => (
+                <View key={item.id}>
+                  {/* Item card */}
+                  <View style={styles.itemCard}>
                     <Text style={styles.itemNumber}>{idx + 1}</Text>
                     <View style={styles.itemMiddle}>
                       <Text style={styles.itemName} numberOfLines={1}>{truncate(item.name, MAX_ITEM_NAME)}</Text>
                       <Text style={styles.itemCost}>{item.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
                     </View>
-                    <View style={styles.itemRight}>
-                      <View style={styles.itemPeopleRow}>
-                        {item.people.slice(0, 3).map((p, pi) => (
-                          <TouchableOpacity
-                            key={pi}
-                            style={styles.personCircle}
-                            onPress={() => setTooltip(tooltip?.name === p ? null : { name: p })}
-                          >
-                            <Text style={styles.personCircleLetter}>{p[0]?.toUpperCase()}</Text>
-                          </TouchableOpacity>
-                        ))}
-                        {item.people.length > 3 && (
-                          <View style={styles.personCircleExtra}>
-                            <Text style={styles.personCircleLetter}>+{item.people.length - 3}</Text>
-                          </View>
-                        )}
-                      </View>
-                      <Text style={styles.itemSplit}>
-                        {item.people.length} {item.people.length === 1 ? 'person' : 'people'}, {perPerson.toLocaleString('en-US', { minimumFractionDigits: 2 })} each
-                      </Text>
-                    </View>
+                    <TouchableOpacity
+                      style={styles.addSubitemBtn}
+                      onPress={() => {
+                        setActiveItemId(item.id);
+                        const used = item.subitems.reduce((s, sub) => s + sub.cost, 0);
+                        const remaining = item.cost - used;
+                        setSubitemCost(remaining > 0 ? remaining.toFixed(2) : '');
+                        setSubitemName(''); setSubitemPeople([]);
+                        setAddSubitemModal(true);
+                      }}
+                    >
+                      <Ionicons name="add" size={13} color="#0ccfcf" />
+                      <Text style={styles.addSubitemBtnText}>subitem</Text>
+                    </TouchableOpacity>
                     <TouchableOpacity onPress={() => deleteItem(item.id)} style={styles.itemDelete}>
                       <Ionicons name="close" size={14} color="#c0c0c0" />
                     </TouchableOpacity>
                   </View>
-                );
-              })}
+
+                  {/* Subitem cards */}
+                  {item.subitems.map(sub => {
+                    const perPerson = sub.people.length > 0 ? sub.cost / sub.people.length : 0;
+                    return (
+                      <View key={sub.id} style={styles.subitemCard}>
+                        <Text style={styles.subitemArrow}>↳</Text>
+                        <View style={styles.itemMiddle}>
+                          <Text style={styles.subitemName} numberOfLines={1}>{truncate(sub.name, MAX_ITEM_NAME)}</Text>
+                          <Text style={styles.subitemCostText}>{sub.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+                        </View>
+                        <View style={styles.itemRight}>
+                          <View style={styles.itemPeopleRow}>
+                            {sub.people.slice(0, 3).map((p, pi) => (
+                              <TouchableOpacity
+                                key={pi}
+                                style={styles.personCircle}
+                                onPress={() => setTooltip(tooltip?.name === p ? null : { name: p })}
+                              >
+                                <Text style={styles.personCircleLetter}>{p[0]?.toUpperCase()}</Text>
+                              </TouchableOpacity>
+                            ))}
+                            {sub.people.length > 3 && (
+                              <View style={styles.personCircleExtra}>
+                                <Text style={styles.personCircleLetter}>+{sub.people.length - 3}</Text>
+                              </View>
+                            )}
+                          </View>
+                          <Text style={styles.itemSplit}>
+                            {sub.people.length} {sub.people.length === 1 ? 'person' : 'people'}, {perPerson.toLocaleString('en-US', { minimumFractionDigits: 2 })} each
+                          </Text>
+                        </View>
+                        <TouchableOpacity onPress={() => deleteSubitem(item.id, sub.id)} style={styles.itemDelete}>
+                          <Ionicons name="close" size={12} color="#c0c0c0" />
+                        </TouchableOpacity>
+                      </View>
+                    );
+                  })}
+                </View>
+              ))}
             </View>
           )}
 
@@ -394,7 +480,6 @@ export default function RecordingDetailScreen() {
             <TouchableOpacity activeOpacity={1} onPress={e => e.stopPropagation()}>
               <View style={styles.modalBox}>
                 <Text style={styles.modalTitle}>add item</Text>
-
                 <View style={styles.itemFormBlock}>
                   <TextInput
                     style={styles.itemFormInput}
@@ -414,41 +499,102 @@ export default function RecordingDetailScreen() {
                     keyboardType="decimal-pad"
                   />
                 </View>
-
-                <Text style={styles.itemFormLabel}>who's included?</Text>
-                <View style={styles.itemPeopleSelect}>
-                  {filledPeople.map((p, i) => {
-                    const selected = itemPeople.includes(p);
-                    return (
-                      <TouchableOpacity
-                        key={i}
-                        style={[styles.personSelectChip, selected && styles.personSelectChipActive]}
-                        onPress={() => toggleItemPerson(p)}
-                      >
-                        <Text style={[styles.personSelectText, selected && styles.personSelectTextActive]}>{p}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-
-                {itemPeople.length > 0 && itemCost && (
-                  <Text style={styles.splitPreview}>
-                    {(parseFloat(itemCost) / itemPeople.length).toLocaleString('en-US', { minimumFractionDigits: 2 })} each
-                  </Text>
-                )}
-
                 <View style={styles.modalBtns}>
                   <TouchableOpacity style={[styles.modalBtn, { backgroundColor: '#f5f5f5' }]} onPress={() => setAddItemModal(false)}>
                     <Text style={[styles.modalBtnText, { color: '#8a8a8a' }]}>cancel</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[styles.modalBtn, (!itemName.trim() || !itemCost || itemPeople.length === 0) && { opacity: 0.4 }]}
+                    style={[styles.modalBtn, (!itemName.trim() || !itemCost) && { opacity: 0.4 }]}
                     onPress={saveItem}
-                    disabled={!itemName.trim() || !itemCost || itemPeople.length === 0}
+                    disabled={!itemName.trim() || !itemCost}
                   >
                     <Text style={styles.modalBtnText}>save</Text>
                   </TouchableOpacity>
                 </View>
+              </View>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </BlurView>
+      </Modal>
+
+      {/* Add subitem modal */}
+      <Modal visible={addSubitemModal} transparent animationType="fade" onRequestClose={() => setAddSubitemModal(false)}>
+        <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}>
+          <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setAddSubitemModal(false)}>
+            <TouchableOpacity activeOpacity={1} onPress={e => e.stopPropagation()}>
+              <View style={styles.modalBox}>
+                <Text style={styles.modalTitle}>add subitem</Text>
+
+                {(() => {
+                  const item = items.find(i => i.id === activeItemId);
+                  if (!item) return null;
+                  const usedCost = item.subitems.reduce((s, sub) => s + sub.cost, 0);
+                  const remaining = item.cost - usedCost;
+                  const isExact = Math.abs(usedCost + (parseFloat(subitemCost) || 0) - item.cost) < 0.01;
+                  const isOver = usedCost + (parseFloat(subitemCost) || 0) > item.cost + 0.01;
+                  return (
+                    <>
+                      <Text style={styles.subitemRemaining}>
+                        remaining: {remaining.toLocaleString('en-US', { minimumFractionDigits: 2 })} of {item.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      </Text>
+                      <View style={styles.itemFormBlock}>
+                        <TextInput
+                          style={styles.itemFormInput}
+                          placeholder="subitem name"
+                          placeholderTextColor="#c0c0c0"
+                          value={subitemName}
+                          onChangeText={v => setSubitemName(v.slice(0, MAX_ITEM_NAME))}
+                          autoFocus
+                        />
+                        <View style={styles.itemFormDivider} />
+                        <TextInput
+                          style={[styles.itemFormInput, isOver && { color: '#ed6a6a' }]}
+                          placeholder={remaining.toFixed(2)}
+                          placeholderTextColor="#0ccfcf"
+                          value={subitemCost}
+                          onChangeText={setSubitemCost}
+                          keyboardType="decimal-pad"
+                        />
+                      </View>
+                      {isOver && <Text style={styles.subitemError}>exceeds item total</Text>}
+
+                      <Text style={styles.itemFormLabel}>who's included?</Text>
+                      <View style={styles.itemPeopleSelect}>
+                        {filledPeople.map((p, i) => {
+                          const selected = subitemPeople.includes(p);
+                          return (
+                            <TouchableOpacity
+                              key={i}
+                              style={[styles.personSelectChip, selected && styles.personSelectChipActive]}
+                              onPress={() => toggleSubitemPerson(p)}
+                            >
+                              <Text style={[styles.personSelectText, selected && styles.personSelectTextActive]}>{p}</Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+
+                      {subitemPeople.length > 0 && subitemCost && !isOver && (
+                        <Text style={styles.splitPreview}>
+                          {(parseFloat(subitemCost) / subitemPeople.length).toLocaleString('en-US', { minimumFractionDigits: 2 })} each
+                        </Text>
+                      )}
+
+                      <View style={styles.modalBtns}>
+                        <TouchableOpacity style={[styles.modalBtn, { backgroundColor: '#f5f5f5' }]} onPress={() => setAddSubitemModal(false)}>
+                          <Text style={[styles.modalBtnText, { color: '#8a8a8a' }]}>cancel</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.modalBtn, (!subitemName.trim() || !subitemCost || subitemPeople.length === 0 || isOver) && { opacity: 0.4 }]}
+                          onPress={saveSubitem}
+                          disabled={!subitemName.trim() || !subitemCost || subitemPeople.length === 0 || isOver}
+                        >
+                          <Text style={styles.modalBtnText}>save</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </>
+                  );
+                })()}
               </View>
             </TouchableOpacity>
           </TouchableOpacity>
@@ -552,6 +698,12 @@ const styles = StyleSheet.create({
   personCircleLetter: { fontFamily: 'RobotoMono_700Bold', fontSize: 9, color: '#fff' },
   itemSplit: { fontFamily: 'RobotoMono_400Regular', fontSize: 9, color: '#929090' },
   itemDelete: { padding: 4, flexShrink: 0 },
+  addSubitemBtn: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999, borderWidth: 1, borderColor: '#0ccfcf', flexShrink: 0 },
+  addSubitemBtnText: { fontFamily: 'RobotoMono_400Regular', fontSize: 9, color: '#0ccfcf' },
+  subitemCard: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#ffffff', borderRadius: 10, padding: 10, borderWidth: 1, borderColor: '#f0f0f0', marginTop: 4, marginLeft: 28 },
+  subitemArrow: { fontSize: 12, color: '#c0c0c0', flexShrink: 0 },
+  subitemName: { fontFamily: 'RobotoMono_700Bold', fontSize: 10, color: '#425252' },
+  subitemCostText: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#425252' },
   cookingBox: { borderRadius: 14, borderWidth: 1, borderColor: '#e8e8e8', backgroundColor: '#fafafa', padding: 20, alignItems: 'center', marginBottom: 24 },
   cookingText: { fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#929090', textAlign: 'center' },
   tooltip: { position: 'absolute', top: '50%', alignSelf: 'center', backgroundColor: '#425252', borderRadius: 8, paddingVertical: 6, paddingHorizontal: 12 },
@@ -580,5 +732,7 @@ const styles = StyleSheet.create({
   personSelectChipActive: { backgroundColor: '#0ccfcf', borderColor: '#0ccfcf' },
   personSelectText: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#929090' },
   personSelectTextActive: { color: '#fff', fontFamily: 'RobotoMono_700Bold' },
+  subitemRemaining: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#929090', alignSelf: 'flex-start' },
+  subitemError: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#ed6a6a', alignSelf: 'flex-start' },
   splitPreview: { fontFamily: 'RobotoMono_700Bold', fontSize: 12, color: '#0ccfcf', alignSelf: 'flex-start' },
 });
