@@ -617,7 +617,8 @@ const styles = StyleSheet.create({
   recordingAmount: { fontFamily: 'RobotoMono_400Regular', fontSize: 14, color: '#fff' },
   addRecordingRow: { paddingHorizontal: 48, alignItems: 'flex-end', marginBottom: 10 },
   addRecordingBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#ffffff', borderRadius: 999, paddingVertical: 8, paddingHorizontal: 16, borderWidth: 1, borderColor: '#929090', shadowColor: '#929090', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 1, shadowRadius: 6, elevation: 4 },
-  addRecordingText: { fontFamily: 'DMSans_400Regular', fontSize: 12, color: '#425252' }, { alignItems: 'center', paddingTop: 60, gap: 10 },
+  addRecordingText: { fontFamily: 'DMSans_400Regular', fontSize: 12, color: '#425252' },
+  empty: { alignItems: 'center', paddingTop: 60, gap: 10 },
   emptyText: { fontFamily: 'DMSans_400Regular', fontSize: 14, color: '#b0b0b0' },
 
   pickerOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center' },
