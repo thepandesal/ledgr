@@ -613,7 +613,7 @@ const styles = StyleSheet.create({
   recordingRight: { alignItems: 'flex-end', gap: 3, flexShrink: 0 },
   recordingAmount: { fontFamily: 'RobotoMono_400Regular', fontSize: 14, color: '#fff' },
   addRecordingRow: { paddingHorizontal: 32, alignItems: 'flex-end', marginBottom: 10, marginTop: 20 },
-  addRecordingBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#fafafa', borderRadius: 999, paddingVertical: 6, paddingHorizontal: 14, borderWidth: 1, borderColor: '#e8e8e8', shadowColor: '#000', shadowOffset: { width: 3, height: 3 }, shadowOpacity: 1, shadowRadius: 0, elevation: 3 },
+  addRecordingBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#fafafa', borderRadius: 999, paddingVertical: 10, paddingHorizontal: 14, borderWidth: 1, borderColor: '#e8e8e8' },
   addRecordingText: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#425252' },
   empty: { alignItems: 'center', paddingTop: 60, gap: 10 },
   emptyText: { fontFamily: 'DMSans_400Regular', fontSize: 14, color: '#b0b0b0' },
