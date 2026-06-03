@@ -10,7 +10,7 @@ interface ShareData {
   recordingType: string;
   date: string;
   perPerson: { name: string; total: number }[];
-  items: { name: string; cost: number; subitems: { name: string; cost: number; people: string[] }[] }[];
+  items: { name: string; cost: number; people?: string[]; subitems: { name: string; cost: number; people: string[] }[] }[];
   payment: { accountName: string; bank: string; accountNumber: string; qrCode: string | null; } | null;
 }
 
@@ -19,6 +19,7 @@ export default function SplitSharePage() {
   const [data, setData] = useState<ShareData | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [qrModal, setQrModal] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -44,91 +45,101 @@ export default function SplitSharePage() {
     <>
       <ScrollView style={s.container} contentContainerStyle={s.scroll}>
 
-      {/* Header */}
-      <Text style={s.appLabel}>ledgr</Text>
-      <Text style={s.recName}>{data.recordingName.toLowerCase()}</Text>
-      <Text style={[s.recAmount, { color: amtColor }]}>{Number(data.recordingAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
-      <Text style={s.recDate}>{data.date}</Text>
+        <Text style={s.appLabel}>ledgr</Text>
+        <Text style={s.recName}>{data.recordingName.toLowerCase()}</Text>
+        <Text style={[s.recAmount, { color: amtColor }]}>{Number(data.recordingAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+        <Text style={s.recDate}>{data.date}</Text>
 
-      {/* Per Person Pay */}
-      <Text style={s.sectionHeader}>per person pay</Text>
-      <View style={s.card}>
-        {data.perPerson.map((p, i) => (
-          <View key={i}>
-            <View style={s.infoRow}>
-              <Text style={s.infoLabel}>{p.name}</Text>
-              <View style={s.dots} />
-              <Text style={s.infoValue}>{p.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+        {/* Per Person Pay */}
+        <Text style={s.sectionHeader}>per person pay</Text>
+        <View style={s.card}>
+          {data.perPerson.map((p, i) => (
+            <View key={i}>
+              <View style={s.infoRow}>
+                <Text style={s.infoLabel}>{p.name}</Text>
+                <View style={s.dots} />
+                <Text style={s.infoValue}>{p.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+              </View>
+              {i < data.perPerson.length - 1 && <View style={s.divider} />}
             </View>
-            {i < data.perPerson.length - 1 && <View style={s.divider} />}
+          ))}
+        </View>
+
+        {/* Item Information */}
+        <Text style={s.sectionHeader}>item information</Text>
+        {data.items.map((item, ii) => (
+          <View key={ii} style={s.itemBlock}>
+            <View style={s.itemHeader}>
+              <Text style={s.itemName}>{item.name.toLowerCase()}</Text>
+              <Text style={s.itemCost}>{item.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+            </View>
+            {item.subitems.length === 0 && item.people && item.people.length > 0 ? (
+              <View style={s.itemPeopleRow}>
+                {item.people.map((p, pi) => (
+                  <View key={pi} style={s.chip}><Text style={s.chipText}>{p}</Text></View>
+                ))}
+                <Text style={s.subSplit}>
+                  {item.people.length} {item.people.length === 1 ? 'person' : 'people'} · {(item.cost / item.people.length).toLocaleString('en-US', { minimumFractionDigits: 2 })} each
+                </Text>
+              </View>
+            ) : (
+              item.subitems.map((sub, si) => {
+                const pp = sub.people.length > 0 ? sub.cost / sub.people.length : sub.cost;
+                return (
+                  <View key={si} style={s.subRow}>
+                    <Text style={s.arrow}>↳</Text>
+                    <View style={{ flex: 1, gap: 3 }}>
+                      <View style={s.subTop}>
+                        <Text style={s.subName}>{sub.name.toLowerCase()}</Text>
+                        <Text style={s.subCost}>{sub.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+                      </View>
+                      <Text style={s.subSplit}>{sub.people.length} {sub.people.length === 1 ? 'person' : 'people'} · {pp.toLocaleString('en-US', { minimumFractionDigits: 2 })} each</Text>
+                      <View style={s.chips}>
+                        {sub.people.map((p, pi) => (
+                          <View key={pi} style={s.chip}><Text style={s.chipText}>{p}</Text></View>
+                        ))}
+                      </View>
+                    </View>
+                  </View>
+                );
+              })
+            )}
           </View>
         ))}
-      </View>
 
-      {/* Item Information */}
-      <Text style={s.sectionHeader}>item information</Text>
-      {data.items.map((item, ii) => (
-        <View key={ii} style={s.itemBlock}>
-          <View style={s.itemHeader}>
-            <Text style={s.itemName}>{item.name.toLowerCase()}</Text>
-            <Text style={s.itemCost}>{item.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
-          </View>
-          {item.subitems.map((sub, si) => {
-            const pp = sub.people.length > 0 ? sub.cost / sub.people.length : sub.cost;
-            return (
-              <View key={si} style={s.subRow}>
-                <Text style={s.arrow}>↳</Text>
-                <View style={{ flex: 1, gap: 3 }}>
-                  <View style={s.subTop}>
-                    <Text style={s.subName}>{sub.name.toLowerCase()}</Text>
-                    <Text style={s.subCost}>{sub.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
-                  </View>
-                  <Text style={s.subSplit}>{sub.people.length} {sub.people.length === 1 ? 'person' : 'people'} · {pp.toLocaleString('en-US', { minimumFractionDigits: 2 })} each</Text>
-                  <View style={s.chips}>
-                    {sub.people.map((p, pi) => (
-                      <View key={pi} style={s.chip}><Text style={s.chipText}>{p}</Text></View>
-                    ))}
-                  </View>
+        {/* Payment Information */}
+        {data.payment && (
+          <>
+            <Text style={s.sectionHeader}>payment information</Text>
+            <View style={s.card}>
+              <View style={s.payRow}>
+                <View style={{ gap: 3, flex: 1 }}>
+                  <Text style={s.payName}>{data.payment.accountName}</Text>
+                  <Text style={s.payBank}>{data.payment.bank}</Text>
+                  <Text style={s.payNumber}>{data.payment.accountNumber}</Text>
                 </View>
+                {data.payment.qrCode
+                  ? <TouchableOpacity onPress={() => setQrModal(true)}>
+                      <Image source={{ uri: data.payment!.qrCode! }} style={s.qr} resizeMode="contain" />
+                    </TouchableOpacity>
+                  : null}
               </View>
-            );
-          })}
-        </View>
-      ))}
-
-      {/* Payment Information */}
-      {data.payment && (
-        <>
-          <Text style={s.sectionHeader}>payment information</Text>
-          <View style={s.card}>
-            <View style={s.payRow}>
-              <View style={{ gap: 3, flex: 1 }}>
-                <Text style={s.payName}>{data.payment.accountName}</Text>
-                <Text style={s.payBank}>{data.payment.bank}</Text>
-                <Text style={s.payNumber}>{data.payment.accountNumber}</Text>
-              </View>
-              {data.payment.qrCode
-                ? <TouchableOpacity onPress={() => setQrModal(true)}>
-                    <Image source={{ uri: data.payment.qrCode }} style={s.qr} resizeMode="contain" />
-                  </TouchableOpacity>
-                : null}
             </View>
-          </View>
-        </>
-      )}
+          </>
+        )}
 
-      <Text style={s.footer}>generated by ledgr</Text>
-    </ScrollView>
+        <Text style={s.footer}>generated by ledgr</Text>
+      </ScrollView>
 
-    {/* QR Modal */}
-    <Modal visible={qrModal} transparent animationType="fade" onRequestClose={() => setQrModal(false)}>
-      <BlurView intensity={60} tint="dark" style={s.qrOverlay}>
-        <TouchableOpacity style={s.qrOverlay} activeOpacity={1} onPress={() => setQrModal(false)}>
-          <Image source={{ uri: data?.payment?.qrCode ?? '' }} style={s.qrLarge} resizeMode="contain" />
-          <Text style={s.qrTap}>tap anywhere to close</Text>
-        </TouchableOpacity>
-      </BlurView>
-    </Modal>
+      {/* QR Modal */}
+      <Modal visible={qrModal} transparent animationType="fade" onRequestClose={() => setQrModal(false)}>
+        <BlurView intensity={60} tint="dark" style={s.qrOverlay}>
+          <TouchableOpacity style={s.qrOverlay} activeOpacity={1} onPress={() => setQrModal(false)}>
+            <Image source={{ uri: data.payment?.qrCode ?? '' }} style={s.qrLarge} resizeMode="contain" />
+            <Text style={s.qrTap}>tap anywhere to close</Text>
+          </TouchableOpacity>
+        </BlurView>
+      </Modal>
     </>
   );
 }
@@ -153,6 +164,7 @@ const s = StyleSheet.create({
   itemHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
   itemName: { fontFamily: 'RobotoMono_700Bold', fontSize: 13, color: '#425252' },
   itemCost: { fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#929090' },
+  itemPeopleRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, alignItems: 'center' },
   subRow: { flexDirection: 'row', gap: 8, marginBottom: 8 },
   arrow: { fontSize: 11, color: '#c0c0c0', marginTop: 2 },
   subTop: { flexDirection: 'row', justifyContent: 'space-between' },
