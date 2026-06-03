@@ -605,7 +605,7 @@ const styles = StyleSheet.create({
   todayDotSelected: { backgroundColor: '#fff' },
   entryDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: '#0ccfcf', marginTop: 3 },
   list: { paddingHorizontal: 32, paddingBottom: 100, gap: 48, paddingTop: 16 },
-  dateGroupLabel: { fontFamily: 'ChillaxMedium', fontSize: 13, color: '#0ccfcf', marginBottom: 8, marginTop: 16 },
+  dateGroupLabel: { fontFamily: 'ChillaxMedium', fontSize: 13, color: '#0ccfcf', marginBottom: 8, marginTop: 32 },
   dateGroupItems: { gap: 10 },
   recordingCard: { flexDirection: 'row', alignItems: 'center', borderRadius: 999, paddingVertical: 10, paddingHorizontal: 14, gap: 10, backgroundColor: '#ffffff', borderWidth: 1, borderStyle: 'dashed', borderColor: '#929090' },
   catIcon: { flexShrink: 0 },

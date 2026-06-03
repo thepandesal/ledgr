@@ -7,8 +7,9 @@ import { BlurView } from 'expo-blur';
 
 const { width } = Dimensions.get('window');
 const MAX_NAME_CHARS = 18;
+const MAX_ITEM_NAME = 20;
 
-function cookingAlert() { return { title: "we're cooking something", message: "" }; }
+interface Item { id: string; name: string; cost: number; people: string[]; }
 
 export default function RecordingDetailScreen() {
   const { recordingId } = useLocalSearchParams<{ recordingId: string }>();
@@ -17,8 +18,16 @@ export default function RecordingDetailScreen() {
 
   const [recording, setRecording] = useState<any>(null);
   const [people, setPeople] = useState<string[]>(['', '', '']);
+  const [items, setItems] = useState<Item[]>([]);
   const [addPersonModal, setAddPersonModal] = useState(false);
+  const [addItemModal, setAddItemModal] = useState(false);
   const [cookingModal, setCookingModal] = useState(false);
+  const [tooltip, setTooltip] = useState<{ name: string; x: number; y: number } | null>(null);
+
+  // Add item form state
+  const [itemName, setItemName] = useState('');
+  const [itemCost, setItemCost] = useState('');
+  const [itemPeople, setItemPeople] = useState<string[]>([]);
 
   useEffect(() => {
     Animated.timing(slideAnim, { toValue: 0, duration: 280, useNativeDriver: true }).start();
@@ -29,8 +38,7 @@ export default function RecordingDetailScreen() {
     if (!recordingId) return;
     const { data } = await supabase.from('recordings')
       .select('*, categories:category_id(name, color, icon), account:account_id(account_name, bank)')
-      .eq('id', recordingId)
-      .single();
+      .eq('id', recordingId).single();
     if (data) setRecording(data);
   };
 
@@ -42,8 +50,27 @@ export default function RecordingDetailScreen() {
   const updatePerson = (i: number, val: string) => setPeople(prev => { const n = [...prev]; n[i] = val; return n; });
   const removePerson = (i: number) => setPeople(prev => prev.filter((_, idx) => idx !== i));
 
-  const truncate = (str: string, max: number) =>
-    str && str.length > max ? str.slice(0, max) + '...' : str;
+  const filledPeople = people.filter(p => p.trim());
+
+  const saveItem = () => {
+    if (!itemName.trim() || !itemCost || itemPeople.length === 0) return;
+    setItems(prev => [...prev, {
+      id: Date.now().toString(),
+      name: itemName.trim(),
+      cost: parseFloat(itemCost),
+      people: itemPeople,
+    }]);
+    setItemName(''); setItemCost(''); setItemPeople([]);
+    setAddItemModal(false);
+  };
+
+  const deleteItem = (id: string) => setItems(prev => prev.filter(item => item.id !== id));
+
+  const toggleItemPerson = (name: string) => {
+    setItemPeople(prev => prev.includes(name) ? prev.filter(p => p !== name) : [...prev, name]);
+  };
+
+  const truncate = (str: string, max: number) => str && str.length > max ? str.slice(0, max) + '...' : str;
 
   const amountColor = () => {
     if (!recording) return '#929090';
@@ -54,20 +81,15 @@ export default function RecordingDetailScreen() {
 
   const formatDate = (d: string) => {
     if (!d) return '—';
-    const date = new Date(d);
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
   const typeLabel = (type: string, status: string) => {
-    const map: Record<string, string> = {
-      expense: 'Expense', income: 'Income', savings: 'Savings',
-    };
     if (type === 'payable') return `Payable · ${status === 'paid' ? 'Paid' : status === 'partial' ? 'Partial' : 'Unpaid'}`;
     if (type === 'receivable') return `Receivable · ${status === 'received' ? 'Received' : status === 'partial' ? 'Partial' : 'Pending'}`;
-    return map[type] ?? type;
+    return { expense: 'Expense', income: 'Income', savings: 'Savings' }[type] ?? type;
   };
 
-  const filledPeople = people.filter(p => p.trim());
   const PREVIEW_LIMIT = 4;
   const visiblePeople = filledPeople.slice(0, PREVIEW_LIMIT);
   const extraCount = filledPeople.length - PREVIEW_LIMIT;
@@ -118,14 +140,19 @@ export default function RecordingDetailScreen() {
           <Text style={styles.sectionHeader}>split bill</Text>
           <View style={styles.splitBtnGrid}>
             {[
-              { icon: 'add-circle-outline', label: 'add item', onPress: () => setCookingModal(true) },
-              { icon: 'people-outline', label: 'add people', onPress: () => setAddPersonModal(true) },
-              { icon: 'image-outline', label: 'save image', onPress: () => setCookingModal(true) },
-              { icon: 'person-add-outline', label: 'save person', onPress: () => setCookingModal(true) },
+              { icon: 'add-circle-outline', label: 'add item', onPress: () => filledPeople.length > 0 ? setAddItemModal(true) : null, disabled: filledPeople.length === 0 },
+              { icon: 'people-outline', label: 'add people', onPress: () => setAddPersonModal(true), disabled: false },
+              { icon: 'image-outline', label: 'save image', onPress: () => setCookingModal(true), disabled: false },
+              { icon: 'person-add-outline', label: 'save person', onPress: () => setCookingModal(true), disabled: false },
             ].map(b => (
-              <TouchableOpacity key={b.label} style={styles.splitBtn} onPress={b.onPress} activeOpacity={0.8}>
-                <Ionicons name={b.icon as any} size={18} color="#425252" />
-                <Text style={styles.splitBtnText}>{b.label}</Text>
+              <TouchableOpacity
+                key={b.label}
+                style={[styles.splitBtn, b.disabled && styles.splitBtnDisabled]}
+                onPress={b.onPress}
+                activeOpacity={b.disabled ? 1 : 0.8}
+              >
+                <Ionicons name={b.icon as any} size={16} color={b.disabled ? '#c0c0c0' : '#425252'} />
+                <Text style={[styles.splitBtnText, b.disabled && { color: '#c0c0c0' }]}>{b.label}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -133,13 +160,16 @@ export default function RecordingDetailScreen() {
           {/* People */}
           <Text style={styles.peopleHeader}>people</Text>
           <View style={styles.peopleContainer}>
-            {people.length === 0 ? (
+            {filledPeople.length === 0 ? (
               <Text style={styles.peoplePlaceholder}>no people added yet</Text>
             ) : (
               <View style={styles.peopleChips}>
                 {visiblePeople.map((p, i) => (
                   <View key={i} style={styles.personChip}>
                     <Text style={styles.personChipText}>{p}</Text>
+                    <TouchableOpacity onPress={() => removePerson(people.indexOf(p))} style={styles.personChipDelete}>
+                      <Ionicons name="close" size={10} color="#929090" />
+                    </TouchableOpacity>
                   </View>
                 ))}
                 {extraCount > 0 && (
@@ -153,12 +183,59 @@ export default function RecordingDetailScreen() {
 
           {/* Items */}
           <Text style={styles.sectionHeader}>items</Text>
-          <View style={styles.cookingBox}>
-            <Text style={styles.cookingText}>🍳 we're cooking something</Text>
-          </View>
+          {items.length === 0 ? (
+            <View style={styles.cookingBox}>
+              <Text style={styles.cookingText}>no items yet</Text>
+            </View>
+          ) : (
+            <View style={styles.itemsList}>
+              {items.map((item, idx) => {
+                const perPerson = item.people.length > 0 ? item.cost / item.people.length : 0;
+                return (
+                  <View key={item.id} style={styles.itemCard}>
+                    {/* Number */}
+                    <Text style={styles.itemNumber}>{idx + 1}</Text>
+                    {/* Middle */}
+                    <View style={styles.itemMiddle}>
+                      <Text style={styles.itemName} numberOfLines={1}>{truncate(item.name, MAX_ITEM_NAME)}</Text>
+                      <Text style={styles.itemCost}>{item.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+                      {/* Person circles */}
+                      <View style={styles.itemPeopleRow}>
+                        {item.people.map((p, pi) => (
+                          <TouchableOpacity
+                            key={pi}
+                            style={styles.personCircle}
+                            onPress={() => setTooltip(tooltip?.name === p ? null : { name: p, x: 0, y: 0 })}
+                          >
+                            <Text style={styles.personCircleLetter}>{p[0]?.toUpperCase()}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                      <Text style={styles.itemSplit}>
+                        {item.people.length} {item.people.length === 1 ? 'person' : 'people'}, {perPerson.toLocaleString('en-US', { minimumFractionDigits: 2 })} each
+                      </Text>
+                    </View>
+                    {/* Delete */}
+                    <TouchableOpacity onPress={() => deleteItem(item.id)} style={styles.itemDelete}>
+                      <Ionicons name="close" size={14} color="#c0c0c0" />
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
+            </View>
+          )}
 
         </ScrollView>
       </SafeAreaView>
+
+      {/* Tooltip */}
+      {tooltip && (
+        <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setTooltip(null)} activeOpacity={1}>
+          <View style={styles.tooltip}>
+            <Text style={styles.tooltipText}>{tooltip.name}</Text>
+          </View>
+        </TouchableOpacity>
+      )}
 
       {/* Add people modal */}
       <Modal visible={addPersonModal} transparent animationType="fade" onRequestClose={() => setAddPersonModal(false)}>
@@ -177,7 +254,6 @@ export default function RecordingDetailScreen() {
                         value={p}
                         onChangeText={v => updatePerson(i, v)}
                         returnKeyType="next"
-                        autoFocus={i === people.length - 1 && people.length > 3}
                       />
                       {people.length > 1 && (
                         <TouchableOpacity onPress={() => removePerson(i)} style={styles.removeBtn}>
@@ -197,6 +273,74 @@ export default function RecordingDetailScreen() {
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.modalBtn} onPress={() => setAddPersonModal(false)}>
                     <Text style={styles.modalBtnText}>done</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </BlurView>
+      </Modal>
+
+      {/* Add item modal */}
+      <Modal visible={addItemModal} transparent animationType="fade" onRequestClose={() => setAddItemModal(false)}>
+        <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}>
+          <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setAddItemModal(false)}>
+            <TouchableOpacity activeOpacity={1} onPress={e => e.stopPropagation()}>
+              <View style={styles.modalBox}>
+                <Text style={styles.modalTitle}>add item</Text>
+
+                <View style={styles.itemFormBlock}>
+                  <TextInput
+                    style={styles.itemFormInput}
+                    placeholder="item name"
+                    placeholderTextColor="#c0c0c0"
+                    value={itemName}
+                    onChangeText={v => setItemName(v.slice(0, MAX_ITEM_NAME))}
+                    autoFocus
+                  />
+                  <View style={styles.itemFormDivider} />
+                  <TextInput
+                    style={styles.itemFormInput}
+                    placeholder="item cost"
+                    placeholderTextColor="#c0c0c0"
+                    value={itemCost}
+                    onChangeText={setItemCost}
+                    keyboardType="decimal-pad"
+                  />
+                </View>
+
+                <Text style={styles.itemFormLabel}>who's included?</Text>
+                <View style={styles.itemPeopleSelect}>
+                  {filledPeople.map((p, i) => {
+                    const selected = itemPeople.includes(p);
+                    return (
+                      <TouchableOpacity
+                        key={i}
+                        style={[styles.personSelectChip, selected && styles.personSelectChipActive]}
+                        onPress={() => toggleItemPerson(p)}
+                      >
+                        <Text style={[styles.personSelectText, selected && styles.personSelectTextActive]}>{p}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                {itemPeople.length > 0 && itemCost && (
+                  <Text style={styles.splitPreview}>
+                    {(parseFloat(itemCost) / itemPeople.length).toLocaleString('en-US', { minimumFractionDigits: 2 })} each
+                  </Text>
+                )}
+
+                <View style={styles.modalBtns}>
+                  <TouchableOpacity style={[styles.modalBtn, { backgroundColor: '#f5f5f5' }]} onPress={() => setAddItemModal(false)}>
+                    <Text style={[styles.modalBtnText, { color: '#8a8a8a' }]}>cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.modalBtn, (!itemName.trim() || !itemCost || itemPeople.length === 0) && { opacity: 0.4 }]}
+                    onPress={saveItem}
+                    disabled={!itemName.trim() || !itemCost || itemPeople.length === 0}
+                  >
+                    <Text style={styles.modalBtnText}>save</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -245,7 +389,7 @@ const styles = StyleSheet.create({
   titleBlock: { marginBottom: 16 },
   recordingsLabel: { fontFamily: 'ChillaxMedium', fontSize: 11, color: '#929090', marginBottom: 2 },
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
-  recordingName: { fontFamily: 'Avenelle', fontSize: 26, color: '#0ccfcf', lineHeight: 30, letterSpacing: -1, flex: 1 },
+  recordingName: { fontFamily: 'Avenelle', fontSize: 26, color: '#425252', lineHeight: 30, letterSpacing: -1, flex: 1 },
   amount: { fontFamily: 'RobotoMono_400Regular', fontSize: 20, flexShrink: 0 },
   actionRow: { flexDirection: 'row', gap: 10, marginBottom: 24 },
   actionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 999, borderWidth: 1, borderColor: '#e8e8e8', backgroundColor: '#fafafa' },
@@ -255,25 +399,49 @@ const styles = StyleSheet.create({
   infoBlock: { backgroundColor: '#fafafa', borderRadius: 14, paddingHorizontal: 14, paddingVertical: 6, marginBottom: 24 },
   splitBtnGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 24 },
   splitBtn: { width: '47%', flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1, borderColor: '#e8e8e8', backgroundColor: '#fafafa' },
+  splitBtnDisabled: { opacity: 0.4 },
   splitBtnText: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#425252' },
   peopleHeader: { fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#929090', textAlign: 'center', marginBottom: 10 },
   peopleContainer: { borderWidth: 1, borderColor: '#929090', borderStyle: 'dashed', borderRadius: 14, padding: 14, marginBottom: 24, minHeight: 56, justifyContent: 'center' },
   peoplePlaceholder: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#c0c0c0', textAlign: 'center' },
   peopleChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  personChip: { backgroundColor: '#f0f0f0', borderRadius: 999, paddingVertical: 5, paddingHorizontal: 12 },
+  personChip: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#f0f0f0', borderRadius: 999, paddingVertical: 5, paddingLeft: 12, paddingRight: 8 },
   personChipText: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#425252' },
+  personChipDelete: { padding: 2 },
+  itemsList: { gap: 10, marginBottom: 24 },
+  itemCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: '#fafafa', borderRadius: 14, padding: 12, borderWidth: 1, borderColor: '#f0f0f0' },
+  itemNumber: { fontFamily: 'RobotoMono_700Bold', fontSize: 13, color: '#0ccfcf', width: 20, paddingTop: 2 },
+  itemMiddle: { flex: 1, gap: 4 },
+  itemName: { fontFamily: 'RobotoMono_700Bold', fontSize: 11, color: '#425252' },
+  itemCost: { fontFamily: 'RobotoMono_400Regular', fontSize: 13, color: '#425252' },
+  itemPeopleRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 2 },
+  personCircle: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#0ccfcf', justifyContent: 'center', alignItems: 'center' },
+  personCircleLetter: { fontFamily: 'RobotoMono_700Bold', fontSize: 10, color: '#fff' },
+  itemSplit: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#929090', marginTop: 2 },
+  itemDelete: { padding: 4 },
   cookingBox: { borderRadius: 14, borderWidth: 1, borderColor: '#e8e8e8', backgroundColor: '#fafafa', padding: 20, alignItems: 'center', marginBottom: 24 },
   cookingText: { fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#929090', textAlign: 'center' },
-  personRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
-  personInput: { flex: 1, backgroundColor: '#f5f5f5', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#425252', borderWidth: 1, borderColor: '#e8e8e8' },
-  removeBtn: { padding: 4 },
-  addMoreBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', marginBottom: 10 },
-  addMoreText: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#0ccfcf' },
+  tooltip: { position: 'absolute', top: '50%', alignSelf: 'center', backgroundColor: '#425252', borderRadius: 8, paddingVertical: 6, paddingHorizontal: 12 },
+  tooltipText: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#fff' },
   modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  modalBox: { backgroundColor: '#ffffff', borderRadius: 20, padding: 24, width: 280, gap: 14, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 20, elevation: 10 },
+  modalBox: { backgroundColor: '#ffffff', borderRadius: 20, padding: 20, width: 300, gap: 12, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 20, elevation: 10 },
   modalTitle: { fontFamily: 'ChillaxMedium', fontSize: 16, color: '#425252', alignSelf: 'flex-start' },
-  modalInput: { width: '100%', backgroundColor: '#f5f5f5', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 11, fontFamily: 'RobotoMono_400Regular', fontSize: 16, color: '#1c1d1d', borderWidth: 1, borderColor: '#e8e8e8' },
   modalBtns: { flexDirection: 'row', gap: 10, width: '100%' },
   modalBtn: { flex: 1, backgroundColor: '#425252', borderRadius: 999, paddingVertical: 11, alignItems: 'center' },
   modalBtnText: { fontFamily: 'RobotoMono_700Bold', fontSize: 13, color: '#fff' },
+  personRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
+  personInput: { flex: 1, backgroundColor: '#f5f5f5', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, fontFamily: 'RobotoMono_400Regular', fontSize: 16, color: '#425252', borderWidth: 1, borderColor: '#e8e8e8' },
+  removeBtn: { padding: 4 },
+  addMoreBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start' },
+  addMoreText: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#0ccfcf' },
+  itemFormBlock: { width: '100%', backgroundColor: '#fafafa', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 4, borderWidth: 1, borderColor: '#f0f0f0' },
+  itemFormInput: { paddingVertical: 10, fontFamily: 'RobotoMono_400Regular', fontSize: 16, color: '#425252' },
+  itemFormDivider: { height: 1, backgroundColor: '#f0f0f0' },
+  itemFormLabel: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#929090', textTransform: 'uppercase', letterSpacing: 0.5, alignSelf: 'flex-start' },
+  itemPeopleSelect: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, width: '100%' },
+  personSelectChip: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 999, borderWidth: 1, borderColor: '#e8e8e8', backgroundColor: '#fafafa' },
+  personSelectChipActive: { backgroundColor: '#0ccfcf', borderColor: '#0ccfcf' },
+  personSelectText: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#929090' },
+  personSelectTextActive: { color: '#fff', fontFamily: 'RobotoMono_700Bold' },
+  splitPreview: { fontFamily: 'RobotoMono_700Bold', fontSize: 12, color: '#0ccfcf', alignSelf: 'flex-start' },
 });
