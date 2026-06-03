@@ -38,6 +38,7 @@ export default function RecordingDetailScreen() {
     loadRecording();
     loadContacts();
     loadPeople();
+    loadItems();
   }, []);
 
   const loadRecording = async () => {
@@ -53,6 +54,13 @@ export default function RecordingDetailScreen() {
     const { data } = await supabase.from('bill_splits')
       .select('person_name').eq('recording_id', recordingId).order('created_at');
     if (data && data.length > 0) setPeople(data.map((r: any) => r.person_name));
+  };
+
+  const loadItems = async () => {
+    if (!recordingId) return;
+    const { data } = await supabase.from('split_items')
+      .select('*').eq('recording_id', recordingId).order('created_at');
+    if (data) setItems(data.map((r: any) => ({ id: r.id, name: r.name, cost: Number(r.cost), people: r.people })));
   };
 
   const loadContacts = async () => {
@@ -127,19 +135,28 @@ export default function RecordingDetailScreen() {
 
   const filledPeople = people.filter(p => p.trim());
 
-  const saveItem = () => {
+  const saveItem = async () => {
     if (!itemName.trim() || !itemCost || itemPeople.length === 0) return;
-    setItems(prev => [...prev, {
-      id: Date.now().toString(),
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user || !recordingId) return;
+    const { data, error } = await supabase.from('split_items').insert({
+      recording_id: recordingId,
+      user_id: user.id,
       name: itemName.trim(),
       cost: parseFloat(itemCost),
       people: itemPeople,
-    }]);
+    }).select().single();
+    if (!error && data) {
+      setItems(prev => [...prev, { id: data.id, name: data.name, cost: Number(data.cost), people: data.people }]);
+    }
     setItemName(''); setItemCost(''); setItemPeople([]);
     setAddItemModal(false);
   };
 
-  const deleteItem = (id: string) => setItems(prev => prev.filter(item => item.id !== id));
+  const deleteItem = async (id: string) => {
+    await supabase.from('split_items').delete().eq('id', id);
+    setItems(prev => prev.filter(item => item.id !== id));
+  };
 
   const toggleItemPerson = (name: string) => {
     setItemPeople(prev => prev.includes(name) ? prev.filter(p => p !== name) : [...prev, name]);
