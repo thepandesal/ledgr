@@ -145,7 +145,7 @@ export default function RecordingDetailScreen() {
       recordingType: recording?.type ?? '',
       date: recording?.transaction_date ? new Date(recording.transaction_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '',
       perPerson: Object.entries(perPersonMap).map(([name, total]) => ({ name, total })),
-      items: items.map(item => ({ name: item.name, cost: item.cost, subitems: item.subitems.map(s => ({ name: s.name, cost: s.cost, people: s.people })) })),
+      items: items.map(item => ({ name: item.name, cost: item.cost, people: item.people ?? [], subitems: item.subitems.map(s => ({ name: s.name, cost: s.cost, people: s.people })) })),
       payment: shareSelectedAccount ? { accountName: shareSelectedAccount.account_name, bank: shareSelectedAccount.bank, accountNumber: shareSelectedAccount.account_number, qrCode: shareSelectedAccount.qr_code ?? null } : null,
     };
   };
@@ -336,10 +336,17 @@ export default function RecordingDetailScreen() {
   const saveItem = async () => {
     const valid = itemForms.filter(f => f.name.trim() && f.cost);
     if (valid.length === 0) return;
+    const currentTotal = items.reduce((s, i) => s + i.cost, 0);
+    const newTotal = currentTotal + valid.reduce((s, f) => s + parseFloat(f.cost || '0'), 0);
+    const recAmt = recording ? Number(recording.amount) : 0;
+    if (recAmt > 0 && newTotal > recAmt + 0.01) {
+      alert(`Total items (${newTotal.toFixed(2)}) would exceed recording amount (${recAmt.toFixed(2)})`);
+      return;
+    }
     const { data: { user } } = await supabase.auth.getUser();
     if (!user || !recordingId) return;
     const { data, error } = await supabase.from('split_items').insert(
-      valid.map(f => ({ recording_id: recordingId, user_id: user.id, name: f.name.trim(), cost: parseFloat(f.cost), people: [] }))
+      valid.map(f => ({ recording_id: recordingId, user_id: user.id, name: f.name.trim(), cost: parseFloat(f.cost), people: f.people }))
     ).select();
     if (!error && data) {
       // for each saved item, save its subitems with auto-equal cost
@@ -1165,3 +1172,7 @@ const styles = StyleSheet.create({
   subitemError: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#ed6a6a', alignSelf: 'flex-start' },
   splitPreview: { fontFamily: 'RobotoMono_700Bold', fontSize: 12, color: '#0ccfcf', alignSelf: 'flex-start' },
 });
+
+
+
+
