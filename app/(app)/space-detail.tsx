@@ -20,11 +20,14 @@ function isSameDay(a: Date, b: Date) { return a.getFullYear() === b.getFullYear(
 function dateKey(d: Date) { return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`; }
 
 function getNavLabel(viewMode: ViewMode, selectedDate: Date) {
+  if (viewMode === 'daily') {
+    return selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
   if (viewMode === 'weekly') {
     const start = addDays(selectedDate, -selectedDate.getDay());
     const end = addDays(start, 6);
     const fmt = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    return `${fmt(start)} to ${fmt(end)}`;
+    return `${fmt(start)} - ${fmt(end)}`;
   }
   return selectedDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 }
@@ -54,6 +57,8 @@ export default function SpaceDetailScreen() {
   const [pendingDeleteName, setPendingDeleteName] = useState('');
   const [tabLayouts, setTabLayouts] = useState<{ x: number; width: number }[]>([]);
   const [showPicker, setShowPicker] = useState(false);
+  const [activeFilter, setActiveFilter] = useState<string | null>(null);
+  const [showFilter, setShowFilter] = useState(false);
   const [pickerMonth, setPickerMonth] = useState(new Date().getMonth());
   const [pickerYear, setPickerYear] = useState(new Date().getFullYear());
   const [pickerDay, setPickerDay] = useState<number | null>(null);
@@ -119,6 +124,7 @@ export default function SpaceDetailScreen() {
   const filteredRecordings = recordings.filter(r => {
     const parts = r.transaction_date.split('-');
     const rDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+    if (activeFilter && r.type !== activeFilter) return false;
     if (viewMode === 'daily') return isSameDay(rDate, selectedDate);
     if (viewMode === 'weekly') { const end = addDays(weekStart, 6); return rDate >= weekStart && rDate <= end; }
     return rDate.getMonth() === selectedDate.getMonth() && rDate.getFullYear() === selectedDate.getFullYear();
@@ -142,6 +148,18 @@ export default function SpaceDetailScreen() {
   });
   grouped.sort((a, b) => b.dateObj.getTime() - a.dateObj.getTime());
 
+  // Stats (all recordings in space, not filtered)
+  const totalExpenses = recordings.filter(r => r.type === 'expense').reduce((s, r) => s + Number(r.amount), 0);
+  const totalIncomeSavings = recordings.filter(r => r.type === 'income' || r.type === 'savings').reduce((s, r) => s + Number(r.amount), 0);
+  const countPayables = recordings.filter(r => r.type === 'payable' && r.status !== 'paid').length;
+  const countReceivables = recordings.filter(r => r.type === 'receivable' && r.status !== 'received').length;
+
+  const shortAmount = (n: number) => {
+    if (n >= 1_000_000) return (n / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
+    if (n >= 1_000) return (n / 1_000).toFixed(1).replace(/\.0$/, '') + 'K';
+    return n.toFixed(0);
+  };
+
   // Set of dateKeys that have recordings (for dots)
   const recordingDates = new Set(recordings.map(r => {
     const parts = r.transaction_date.split('-');
@@ -161,20 +179,57 @@ export default function SpaceDetailScreen() {
           <Text style={styles.spaceName}>{(name ?? '').toLowerCase()}</Text>
         </View>
 
-        {/* Tabs */}
-        <View style={styles.tabsWrapper}>
-          <View style={styles.tabs}>
+        {/* Stats row */}
+        <View style={styles.statsRow}>
+          <View style={styles.statItem}>
+            <Text style={styles.statLabel}>expenses</Text>
+            <Text style={[styles.statValue, { color: '#ed6a6a' }]}>{shortAmount(totalExpenses)}</Text>
+          </View>
+          <View style={styles.statItem}>
+            <Text style={styles.statLabel}>income/savings</Text>
+            <Text style={[styles.statValue, { color: '#00bf63' }]}>{shortAmount(totalIncomeSavings)}</Text>
+          </View>
+          <View style={styles.statItem}>
+            <Text style={styles.statLabel}>payables</Text>
+            <Text style={[styles.statValue, { color: '#929090' }]}>{countPayables}</Text>
+          </View>
+          <View style={styles.statItem}>
+            <Text style={styles.statLabel}>receivables</Text>
+            <Text style={[styles.statValue, { color: '#929090' }]}>{countReceivables}</Text>
+          </View>
+        </View>
+
+        {/* Nav row: date range left, tabs right */}
+        <View style={styles.topNavRow}>
+          <TouchableOpacity style={styles.dateNavLeft} onPress={openPicker}>
+            <TouchableOpacity onPress={() => {
+              if (viewMode === 'daily') setSelectedDate(d => addDays(d, -1));
+              else if (viewMode === 'weekly') setSelectedDate(d => addDays(d, -7));
+              else setSelectedDate(d => { const n = new Date(d); n.setMonth(n.getMonth() - 1); return n; });
+            }}>
+              <Ionicons name="chevron-back" size={16} color="#929090" />
+            </TouchableOpacity>
+            <Text style={styles.dateNavLabel}>{getNavLabel(viewMode, selectedDate).toLowerCase()}</Text>
+            <TouchableOpacity onPress={() => {
+              if (viewMode === 'daily') setSelectedDate(d => addDays(d, 1));
+              else if (viewMode === 'weekly') setSelectedDate(d => addDays(d, 7));
+              else setSelectedDate(d => { const n = new Date(d); n.setMonth(n.getMonth() + 1); return n; });
+            }}>
+              <Ionicons name="chevron-forward" size={16} color="#929090" />
+            </TouchableOpacity>
+          </TouchableOpacity>
+          <View style={styles.tabsInline}>
             {MODES.map((mode, idx) => (
               <TouchableOpacity
                 key={mode}
-                style={styles.tabItem}
+                style={styles.tabItemInline}
                 onPress={() => switchMode(mode)}
                 onLayout={e => {
                   const { x, width: w } = e.nativeEvent.layout;
                   setTabLayouts(prev => { const next = [...prev]; next[idx] = { x, width: w }; return next; });
                 }}
               >
-                <Text style={[styles.tabText, viewMode === mode && styles.tabTextActive]}>
+                <Text style={[styles.tabTextInline, viewMode === mode && styles.tabTextInlineActive]}>
                   {mode.charAt(0).toUpperCase() + mode.slice(1)}
                 </Text>
               </TouchableOpacity>
@@ -190,36 +245,16 @@ export default function SpaceDetailScreen() {
           </View>
         </View>
 
+        {/* Recordings header */}
+        <View style={styles.recordingsHeader}>
+          <Text style={styles.recordingsTitle}>recordings</Text>
+          <TouchableOpacity style={styles.filterBtn} onPress={() => setShowFilter(true)}>
+            <Ionicons name="options-outline" size={18} color={activeFilter ? '#0ccfcf' : '#929090'} />
+          </TouchableOpacity>
+        </View>
+
         {/* Animated content area */}
         <Animated.View style={[styles.contentArea, { transform: [{ translateX: contentSlide }] }]}>
-
-          {/* Daily: plain month label centered */}
-          {viewMode === 'daily' && (
-            <TouchableOpacity onPress={openPicker}>
-              <Text style={styles.dateRangeLabel}>{getDailyMonthLabel(selectedDate).toLowerCase()}</Text>
-            </TouchableOpacity>
-          )}
-
-          {/* Weekly / Monthly: arrows flanking the label */}
-          {viewMode !== 'daily' && (
-            <View style={styles.navRow}>
-              <TouchableOpacity onPress={() => {
-                if (viewMode === 'weekly') setSelectedDate(d => addDays(d, -7));
-                else setSelectedDate(d => { const n = new Date(d); n.setMonth(n.getMonth() - 1); return n; });
-              }}>
-                <Ionicons name="chevron-back" size={22} color="#8a8a8a" />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={openPicker}>
-                <Text style={styles.dateRangeLabel}>{getNavLabel(viewMode, selectedDate).toLowerCase()}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => {
-                if (viewMode === 'weekly') setSelectedDate(d => addDays(d, 7));
-                else setSelectedDate(d => { const n = new Date(d); n.setMonth(n.getMonth() + 1); return n; });
-              }}>
-                <Ionicons name="chevron-forward" size={22} color="#8a8a8a" />
-              </TouchableOpacity>
-            </View>
-          )}
 
           {/* Daily date chips */}
           {viewMode === 'daily' && (
@@ -356,6 +391,42 @@ export default function SpaceDetailScreen() {
         </TouchableOpacity>
       </SafeAreaView>
 
+      {/* Filter Modal */}
+      <Modal visible={showFilter} transparent animationType="fade" onRequestClose={() => setShowFilter(false)}>
+        <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}>
+          <TouchableOpacity style={styles.pickerOverlay} activeOpacity={1} onPress={() => setShowFilter(false)}>
+            <TouchableOpacity activeOpacity={1} onPress={e => e.stopPropagation()}>
+              <View style={styles.filterBox}>
+                <Text style={styles.filterTitle}>filter by</Text>
+                {[
+                  { key: null, label: 'all' },
+                  { key: 'expense', label: 'expense', color: '#ed6a6a' },
+                  { key: 'income', label: 'income', color: '#00bf63' },
+                  { key: 'savings', label: 'savings', color: '#00bf63' },
+                  { key: 'payable', label: 'payable', color: '#929090' },
+                  { key: 'receivable', label: 'receivable', color: '#929090' },
+                ].map(f => {
+                  const isActive = activeFilter === f.key;
+                  return (
+                    <TouchableOpacity
+                      key={String(f.key)}
+                      style={[styles.filterOption, isActive && { borderColor: f.color ?? '#0ccfcf', backgroundColor: (f.color ?? '#0ccfcf') + '18' }]}
+                      onPress={() => { setActiveFilter(f.key); setShowFilter(false); }}
+                    >
+                      {f.color && <View style={[styles.filterDot, { backgroundColor: f.color }]} />}
+                      <Text style={[styles.filterOptionText, isActive && { color: f.color ?? '#0ccfcf', fontFamily: 'RobotoMono_700Bold' }]}>
+                        {f.label}
+                      </Text>
+                      {isActive && <Ionicons name="checkmark" size={14} color={f.color ?? '#0ccfcf'} style={{ marginLeft: 'auto' }} />}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </BlurView>
+      </Modal>
+
       {/* Date Picker Modal */}
       <Modal visible={showPicker} transparent animationType="fade" onRequestClose={() => setShowPicker(false)}>
         <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}>
@@ -486,16 +557,28 @@ const styles = StyleSheet.create({
   titleBlock: { paddingHorizontal: 48, marginTop: 8, marginBottom: 25, alignItems: 'center' },
   spacesLabel: { fontFamily: 'ChillaxMedium', fontSize: 13, color: '#929090' },
   spaceName: { fontFamily: 'Avenelle', fontSize: 40, color: '#425252', lineHeight: 48 },
-  tabsWrapper: { paddingHorizontal: 48, marginBottom: 5, alignItems: 'center' },
-  tabs: { flexDirection: 'row', gap: 30 },
-  tabItem: { paddingVertical: 8 },
-  tabText: { fontFamily: 'DMSans_400Regular', fontSize: 19, color: '#425252' },
-  tabTextActive: { fontFamily: 'DMSans_600SemiBold', color: '#425252' },
-  circleDoodle: { position: 'absolute', width: DOODLE_W, height: 54, top: -6, pointerEvents: 'none' },
+  recordingsHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 48, marginBottom: 12 },
+  recordingsTitle: { fontFamily: 'ChillaxMedium', fontSize: 20, color: '#425252' },
+  filterBtn: { padding: 6 },
+  filterBox: { backgroundColor: '#ffffff', borderRadius: 20, padding: 20, width: 260, gap: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 24, elevation: 12 },
+  filterTitle: { fontFamily: 'ChillaxMedium', fontSize: 16, color: '#425252', marginBottom: 4 },
+  filterOption: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 999, borderWidth: 1, borderColor: '#e8e8e8' },
+  filterDot: { width: 8, height: 8, borderRadius: 4 },
+  filterOptionText: { fontFamily: 'RobotoMono_400Regular', fontSize: 13, color: '#929090' },
+  statsRow: { flexDirection: 'row', paddingHorizontal: 48, marginBottom: 24, gap: 4 },
+  statItem: { flex: 1, alignItems: 'center', gap: 4 },
+  statLabel: { fontFamily: 'RobotoMono_400Regular', fontSize: 9, color: '#929090', textAlign: 'center' },
+  statValue: { fontFamily: 'RobotoMono_400Regular', fontSize: 18 },
+  topNavRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 48, marginBottom: 14 },
+  dateNavLeft: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  dateNavLabel: { fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#929090' },
+  tabsInline: { flexDirection: 'row', gap: 14 },
+  tabItemInline: { paddingVertical: 4 },
+  tabTextInline: { fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#929090' },
+  tabTextInlineActive: { fontFamily: 'RobotoMono_700Bold', color: '#425252' },
+  circleDoodle: { position: 'absolute', width: DOODLE_W, height: 40, top: -8, pointerEvents: 'none' },
   contentArea: { flex: 1 },
-  dateRangeLabel: { fontFamily: 'Avenelle', fontSize: 19, color: '#545454', paddingHorizontal: 12, marginBottom: 18, marginTop: 28, textAlign: 'center', flexShrink: 1 },
-  navRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 40, marginBottom: 14 },
-  dateChipsRow: { flexDirection: 'row', paddingHorizontal: 48, marginBottom: 14, gap: 8, justifyContent: 'center' },
+  dateChipsRow: { flexDirection: 'row', paddingHorizontal: 48, marginBottom: 14, marginTop: 8, gap: 8, justifyContent: 'center' },
   dateChip: { flex: 1, alignItems: 'center', paddingVertical: 15, paddingHorizontal: 4, borderRadius: 18, backgroundColor: '#ffffff', minHeight: 75, borderWidth: 1.5, borderColor: '#929090' },
   dateChipSelected: { backgroundColor: '#0ccfcf', borderColor: '#0ccfcf' },
   dateChipDay: { fontFamily: 'DMSans_700Bold', fontSize: 11, color: '#b0b0b0' },
