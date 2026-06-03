@@ -22,7 +22,10 @@ export default function RecordingDetailScreen() {
   const [addPersonModal, setAddPersonModal] = useState(false);
   const [addItemModal, setAddItemModal] = useState(false);
   const [cookingModal, setCookingModal] = useState(false);
-  const [tooltip, setTooltip] = useState<{ name: string; x: number; y: number } | null>(null);
+  const [tooltip, setTooltip] = useState<{ name: string } | null>(null);
+  const [contacts, setContacts] = useState<string[]>([]);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [activeSuggestionIdx, setActiveSuggestionIdx] = useState<number | null>(null);
 
   // Add item form state
   const [itemName, setItemName] = useState('');
@@ -32,6 +35,7 @@ export default function RecordingDetailScreen() {
   useEffect(() => {
     Animated.timing(slideAnim, { toValue: 0, duration: 280, useNativeDriver: true }).start();
     loadRecording();
+    loadContacts();
   }, []);
 
   const loadRecording = async () => {
@@ -42,13 +46,43 @@ export default function RecordingDetailScreen() {
     if (data) setRecording(data);
   };
 
+  const loadContacts = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data } = await supabase.from('contacts').select('name').eq('user_id', user.id).order('name');
+    if (data) setContacts(data.map((c: any) => c.name));
+  };
+
+  const saveContact = async (name: string) => {
+    if (!name.trim() || contacts.includes(name.trim())) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    await supabase.from('contacts').insert({ user_id: user.id, name: name.trim() });
+    setContacts(prev => [...prev, name.trim()].sort());
+  };
+
   const handleBack = () => {
     Animated.timing(slideAnim, { toValue: width, duration: 250, useNativeDriver: true }).start(() => router.back());
   };
 
   const addPerson = () => setPeople(prev => [...prev, '']);
-  const updatePerson = (i: number, val: string) => setPeople(prev => { const n = [...prev]; n[i] = val; return n; });
+  const updatePerson = (i: number, val: string) => {
+    setPeople(prev => { const n = [...prev]; n[i] = val; return n; });
+    setActiveSuggestionIdx(i);
+    setSuggestions(val.trim() ? contacts.filter(c => c.toLowerCase().startsWith(val.toLowerCase()) && !people.includes(c)) : []);
+  };
   const removePerson = (i: number) => setPeople(prev => prev.filter((_, idx) => idx !== i));
+  const pickSuggestion = (i: number, name: string) => {
+    setPeople(prev => { const n = [...prev]; n[i] = name; return n; });
+    setSuggestions([]);
+    setActiveSuggestionIdx(null);
+  };
+  const savePeopleAndClose = async () => {
+    for (const p of people.filter(p => p.trim())) await saveContact(p);
+    setAddPersonModal(false);
+    setSuggestions([]);
+    setActiveSuggestionIdx(null);
+  };
 
   const filledPeople = people.filter(p => p.trim());
 
@@ -244,21 +278,32 @@ export default function RecordingDetailScreen() {
             <TouchableOpacity activeOpacity={1} onPress={e => e.stopPropagation()}>
               <View style={styles.modalBox}>
                 <Text style={styles.modalTitle}>people</Text>
-                <ScrollView style={{ width: '100%', maxHeight: 220 }} showsVerticalScrollIndicator={false}>
+                <ScrollView style={{ width: '100%', maxHeight: 260 }} showsVerticalScrollIndicator={false}>
                   {people.map((p, i) => (
-                    <View key={i} style={styles.personRow}>
-                      <TextInput
-                        style={styles.personInput}
-                        placeholder={`person ${i + 1}`}
-                        placeholderTextColor="#c0c0c0"
-                        value={p}
-                        onChangeText={v => updatePerson(i, v)}
-                        returnKeyType="next"
-                      />
-                      {people.length > 1 && (
-                        <TouchableOpacity onPress={() => removePerson(i)} style={styles.removeBtn}>
-                          <Ionicons name="close" size={14} color="#929090" />
-                        </TouchableOpacity>
+                    <View key={i}>
+                      <View style={styles.personRow}>
+                        <TextInput
+                          style={styles.personInput}
+                          placeholder={`person ${i + 1}`}
+                          placeholderTextColor="#c0c0c0"
+                          value={p}
+                          onChangeText={v => updatePerson(i, v)}
+                          returnKeyType="next"
+                        />
+                        {people.length > 1 && (
+                          <TouchableOpacity onPress={() => removePerson(i)} style={styles.removeBtn}>
+                            <Ionicons name="close" size={14} color="#929090" />
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                      {activeSuggestionIdx === i && suggestions.length > 0 && (
+                        <View style={styles.suggestionBox}>
+                          {suggestions.map((s, si) => (
+                            <TouchableOpacity key={si} style={styles.suggestionItem} onPress={() => pickSuggestion(i, s)}>
+                              <Text style={styles.suggestionText}>{s}</Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
                       )}
                     </View>
                   ))}
@@ -271,7 +316,7 @@ export default function RecordingDetailScreen() {
                   <TouchableOpacity style={[styles.modalBtn, { backgroundColor: '#f5f5f5' }]} onPress={() => setAddPersonModal(false)}>
                     <Text style={[styles.modalBtnText, { color: '#8a8a8a' }]}>cancel</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.modalBtn} onPress={() => setAddPersonModal(false)}>
+                  <TouchableOpacity style={styles.modalBtn} onPress={savePeopleAndClose}>
                     <Text style={styles.modalBtnText}>done</Text>
                   </TouchableOpacity>
                 </View>
@@ -434,7 +479,9 @@ const styles = StyleSheet.create({
   removeBtn: { padding: 4 },
   addMoreBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start' },
   addMoreText: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#0ccfcf' },
-  itemFormBlock: { width: '100%', backgroundColor: '#fafafa', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 4, borderWidth: 1, borderColor: '#f0f0f0' },
+  suggestionBox: { backgroundColor: '#ffffff', borderRadius: 8, borderWidth: 1, borderColor: '#f0f0f0', marginTop: -4, marginBottom: 6, overflow: 'hidden' },
+  suggestionItem: { paddingHorizontal: 12, paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
+  suggestionText: { fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#425252' }, { width: '100%', backgroundColor: '#fafafa', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 4, borderWidth: 1, borderColor: '#f0f0f0' },
   itemFormInput: { paddingVertical: 10, fontFamily: 'RobotoMono_400Regular', fontSize: 16, color: '#425252' },
   itemFormDivider: { height: 1, backgroundColor: '#f0f0f0' },
   itemFormLabel: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#929090', textTransform: 'uppercase', letterSpacing: 0.5, alignSelf: 'flex-start' },
