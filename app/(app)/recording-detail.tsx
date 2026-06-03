@@ -235,7 +235,7 @@ const styles = StyleSheet.create({
   titleBlock: { marginBottom: 16 },
   recordingsLabel: { fontFamily: 'ChillaxMedium', fontSize: 11, color: '#929090', marginBottom: 2 },
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
-  recordingName: { fontFamily: 'Avenelle', fontSize: 32, color: '#425252', lineHeight: 36, letterSpacing: -1, flex: 1 },
+  recordingName: { fontFamily: 'Avenelle', fontSize: 32, color: '#0ccfcf', lineHeight: 36, letterSpacing: -1, flex: 1 },
   amount: { fontFamily: 'RobotoMono_400Regular', fontSize: 20, flexShrink: 0 },
   actionRow: { flexDirection: 'row', gap: 10, marginBottom: 24 },
   actionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 999, borderWidth: 1, borderColor: '#e8e8e8', backgroundColor: '#fafafa' },
