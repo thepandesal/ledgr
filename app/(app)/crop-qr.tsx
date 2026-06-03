@@ -2,7 +2,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Dimensions, PanResponder, Ani
 import { Image } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { cropEvents } from '../../src/lib/cropEvents';
 
