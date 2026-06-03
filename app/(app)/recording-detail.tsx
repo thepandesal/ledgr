@@ -30,8 +30,11 @@ export default function RecordingDetailScreen() {
   const [deletePersonConfirm, setDeletePersonConfirm] = useState<{ idx: number; name: string; affectedItems: number } | null>(null);
 
   // Add item form state
-  const [itemName, setItemName] = useState('');
-  const [itemCost, setItemCost] = useState('');
+  const [itemForms, setItemForms] = useState<{ name: string; cost: string }[]>([{ name: '', cost: '' }]);
+  const addItemForm = () => setItemForms(prev => [...prev, { name: '', cost: '' }]);
+  const updateItemForm = (i: number, field: 'name' | 'cost', val: string) =>
+    setItemForms(prev => { const n = [...prev]; n[i] = { ...n[i], [field]: val }; return n; });
+  const removeItemForm = (i: number) => setItemForms(prev => prev.filter((_, idx) => idx !== i));
 
   // Add subitem form state
   const [addSubitemModal, setAddSubitemModal] = useState(false);
@@ -161,20 +164,17 @@ export default function RecordingDetailScreen() {
   const filledPeople = people.filter(p => p.trim());
 
   const saveItem = async () => {
-    if (!itemName.trim() || !itemCost) return;
+    const valid = itemForms.filter(f => f.name.trim() && f.cost);
+    if (valid.length === 0) return;
     const { data: { user } } = await supabase.auth.getUser();
     if (!user || !recordingId) return;
-    const { data, error } = await supabase.from('split_items').insert({
-      recording_id: recordingId,
-      user_id: user.id,
-      name: itemName.trim(),
-      cost: parseFloat(itemCost),
-      people: [],
-    }).select().single();
+    const { data, error } = await supabase.from('split_items').insert(
+      valid.map(f => ({ recording_id: recordingId, user_id: user.id, name: f.name.trim(), cost: parseFloat(f.cost), people: [] }))
+    ).select();
     if (!error && data) {
-      setItems(prev => [...prev, { id: data.id, name: data.name, cost: Number(data.cost), subitems: [] }]);
+      setItems(prev => [...prev, ...data.map((r: any) => ({ id: r.id, name: r.name, cost: Number(r.cost), subitems: [] }))]);
     }
-    setItemName(''); setItemCost('');
+    setItemForms([{ name: '', cost: '' }]);
     setAddItemModal(false);
   };
 
@@ -287,7 +287,12 @@ export default function RecordingDetailScreen() {
           <Text style={styles.sectionHeader}>split bill</Text>
           <View style={styles.splitBtnGrid}>
             {[
-              { icon: 'add-circle-outline', label: 'add item', onPress: () => filledPeople.length > 0 ? setAddItemModal(true) : null, disabled: filledPeople.length === 0 },
+              { icon: 'add-circle-outline', label: 'add item', onPress: () => {
+                const totalItemsCost = items.reduce((s, i) => s + i.subitems.reduce((ss, sub) => ss + sub.cost, 0), 0);
+                const recordingAmount = recording ? Number(recording.amount) : 0;
+                const isFullyAllocated = Math.abs(totalItemsCost - recordingAmount) < 0.01 && recordingAmount > 0;
+                if (filledPeople.length > 0 && !isFullyAllocated) setAddItemModal(true);
+              }, disabled: filledPeople.length === 0 || Math.abs(items.reduce((s, i) => s + i.subitems.reduce((ss, sub) => ss + sub.cost, 0), 0) - (recording ? Number(recording.amount) : 0)) < 0.01 },
               { icon: 'people-outline', label: 'add people', onPress: () => openPeopleModal(), disabled: false },
               { icon: 'image-outline', label: 'save image', onPress: () => setCookingModal(true), disabled: false },
               { icon: 'person-add-outline', label: 'save person', onPress: () => setCookingModal(true), disabled: false },
@@ -330,81 +335,101 @@ export default function RecordingDetailScreen() {
 
           {/* Items */}
           <Text style={styles.sectionHeader}>items</Text>
-          {items.length === 0 ? (
-            <View style={styles.cookingBox}>
-              <Text style={styles.cookingText}>no items yet</Text>
-            </View>
-          ) : (
-            <View style={styles.itemsList}>
-              {items.map((item, idx) => (
-                <View key={item.id}>
-                  {/* Item card */}
-                  <View style={styles.itemCard}>
-                    <Text style={styles.itemNumber}>{idx + 1}</Text>
-                    <View style={styles.itemMiddle}>
-                      <Text style={styles.itemName} numberOfLines={1}>{truncate(item.name, MAX_ITEM_NAME)}</Text>
-                      <Text style={styles.itemCost}>{item.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
-                    </View>
-                    <TouchableOpacity
-                      style={styles.addSubitemBtn}
-                      onPress={() => {
-                        setActiveItemId(item.id);
-                        const used = item.subitems.reduce((s, sub) => s + sub.cost, 0);
-                        const remaining = item.cost - used;
-                        setSubitemCost(remaining > 0 ? remaining.toFixed(2) : '');
-                        setSubitemName(''); setSubitemPeople([]);
-                        setAddSubitemModal(true);
-                      }}
-                    >
-                      <Ionicons name="add" size={13} color="#0ccfcf" />
-                      <Text style={styles.addSubitemBtnText}>subitem</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => deleteItem(item.id)} style={styles.itemDelete}>
-                      <Ionicons name="close" size={14} color="#c0c0c0" />
-                    </TouchableOpacity>
+          {(() => {
+            const totalItemsCost = items.reduce((s, i) => s + i.subitems.reduce((ss, sub) => ss + sub.cost, 0), 0);
+            const recordingAmount = recording ? Number(recording.amount) : 0;
+            const isFullyAllocated = Math.abs(totalItemsCost - recordingAmount) < 0.01 && recordingAmount > 0;
+            return (
+              <>
+                {items.length === 0 ? (
+                  <View style={styles.cookingBox}>
+                    <Text style={styles.cookingText}>no items yet</Text>
                   </View>
-
-                  {/* Subitem cards */}
-                  {item.subitems.map(sub => {
-                    const perPerson = sub.people.length > 0 ? sub.cost / sub.people.length : 0;
-                    return (
-                      <View key={sub.id} style={styles.subitemCard}>
-                        <Text style={styles.subitemArrow}>↳</Text>
-                        <View style={styles.itemMiddle}>
-                          <Text style={styles.subitemName} numberOfLines={1}>{truncate(sub.name, MAX_ITEM_NAME)}</Text>
-                          <Text style={styles.subitemCostText}>{sub.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
-                        </View>
-                        <View style={styles.itemRight}>
-                          <View style={styles.itemPeopleRow}>
-                            {sub.people.slice(0, 3).map((p, pi) => (
-                              <TouchableOpacity
-                                key={pi}
-                                style={styles.personCircle}
-                                onPress={() => setTooltip(tooltip?.name === p ? null : { name: p })}
-                              >
-                                <Text style={styles.personCircleLetter}>{p[0]?.toUpperCase()}</Text>
-                              </TouchableOpacity>
-                            ))}
-                            {sub.people.length > 3 && (
-                              <View style={styles.personCircleExtra}>
-                                <Text style={styles.personCircleLetter}>+{sub.people.length - 3}</Text>
-                              </View>
-                            )}
+                ) : (
+                  <View style={styles.itemsList}>
+                    {items.map((item, idx) => {
+                      const subitemTotal = item.subitems.reduce((s, sub) => s + sub.cost, 0);
+                      const itemFull = Math.abs(subitemTotal - item.cost) < 0.01;
+                      return (
+                        <View key={item.id}>
+                          <View style={styles.itemCard}>
+                            <Text style={styles.itemNumber}>{idx + 1}</Text>
+                            <View style={styles.itemMiddle}>
+                              <Text style={styles.itemName} numberOfLines={1}>{truncate(item.name, MAX_ITEM_NAME)}</Text>
+                              <Text style={styles.itemCost}>{item.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+                            </View>
+                            <TouchableOpacity
+                              style={[styles.addSubitemBtn, itemFull && { borderColor: '#c0c0c0', opacity: 0.4 }]}
+                              onPress={() => {
+                                if (itemFull) return;
+                                setActiveItemId(item.id);
+                                const used = item.subitems.reduce((s, sub) => s + sub.cost, 0);
+                                const remaining = item.cost - used;
+                                setSubitemCost(remaining > 0 ? remaining.toFixed(2) : '');
+                                setSubitemName(''); setSubitemPeople([]);
+                                setAddSubitemModal(true);
+                              }}
+                              activeOpacity={itemFull ? 1 : 0.8}
+                            >
+                              <Ionicons name="add" size={13} color={itemFull ? '#c0c0c0' : '#0ccfcf'} />
+                              <Text style={[styles.addSubitemBtnText, itemFull && { color: '#c0c0c0' }]}>subitem</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => deleteItem(item.id)} style={styles.itemDelete}>
+                              <Ionicons name="close" size={14} color="#c0c0c0" />
+                            </TouchableOpacity>
                           </View>
-                          <Text style={styles.itemSplit}>
-                            {sub.people.length} {sub.people.length === 1 ? 'person' : 'people'}, {perPerson.toLocaleString('en-US', { minimumFractionDigits: 2 })} each
-                          </Text>
+                          {item.subitems.map(sub => {
+                            const perPerson = sub.people.length > 0 ? sub.cost / sub.people.length : 0;
+                            return (
+                              <View key={sub.id} style={styles.subitemCard}>
+                                <Text style={styles.subitemArrow}>↳</Text>
+                                <View style={styles.itemMiddle}>
+                                  <Text style={styles.subitemName} numberOfLines={1}>{truncate(sub.name, MAX_ITEM_NAME)}</Text>
+                                  <Text style={styles.subitemCostText}>{sub.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+                                </View>
+                                <View style={styles.itemRight}>
+                                  <View style={styles.itemPeopleRow}>
+                                    {sub.people.slice(0, 3).map((p, pi) => (
+                                      <TouchableOpacity key={pi} style={styles.personCircle} onPress={() => setTooltip(tooltip?.name === p ? null : { name: p })}>
+                                        <Text style={styles.personCircleLetter}>{p[0]?.toUpperCase()}</Text>
+                                      </TouchableOpacity>
+                                    ))}
+                                    {sub.people.length > 3 && (
+                                      <View style={styles.personCircleExtra}>
+                                        <Text style={styles.personCircleLetter}>+{sub.people.length - 3}</Text>
+                                      </View>
+                                    )}
+                                  </View>
+                                  <Text style={styles.itemSplit}>
+                                    {sub.people.length} {sub.people.length === 1 ? 'person' : 'people'}, {perPerson.toLocaleString('en-US', { minimumFractionDigits: 2 })} each
+                                  </Text>
+                                </View>
+                                <TouchableOpacity onPress={() => deleteSubitem(item.id, sub.id)} style={styles.itemDelete}>
+                                  <Ionicons name="close" size={12} color="#c0c0c0" />
+                                </TouchableOpacity>
+                              </View>
+                            );
+                          })}
                         </View>
-                        <TouchableOpacity onPress={() => deleteSubitem(item.id, sub.id)} style={styles.itemDelete}>
-                          <Ionicons name="close" size={12} color="#c0c0c0" />
-                        </TouchableOpacity>
-                      </View>
-                    );
-                  })}
-                </View>
-              ))}
-            </View>
-          )}
+                      );
+                    })}
+                    {/* Total row */}
+                    <View style={styles.itemsTotalRow}>
+                      <Text style={styles.itemsTotalLabel}>total allocated</Text>
+                      <View style={styles.itemsTotalDots} />
+                      <Text style={[styles.itemsTotalValue, isFullyAllocated && { color: '#2ab671' }]}>
+                        {totalItemsCost.toLocaleString('en-US', { minimumFractionDigits: 2 })} / {recordingAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+                {/* Disable add item if fully allocated */}
+                {isFullyAllocated && (
+                  <Text style={styles.allocatedNote}>all amount allocated</Text>
+                )}
+              </>
+            );
+          })()}
 
         </ScrollView>
       </SafeAreaView>
@@ -479,34 +504,49 @@ export default function RecordingDetailScreen() {
           <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setAddItemModal(false)}>
             <TouchableOpacity activeOpacity={1} onPress={e => e.stopPropagation()}>
               <View style={styles.modalBox}>
-                <Text style={styles.modalTitle}>add item</Text>
-                <View style={styles.itemFormBlock}>
-                  <TextInput
-                    style={styles.itemFormInput}
-                    placeholder="item name"
-                    placeholderTextColor="#c0c0c0"
-                    value={itemName}
-                    onChangeText={v => setItemName(v.slice(0, MAX_ITEM_NAME))}
-                    autoFocus
-                  />
-                  <View style={styles.itemFormDivider} />
-                  <TextInput
-                    style={styles.itemFormInput}
-                    placeholder="item cost"
-                    placeholderTextColor="#c0c0c0"
-                    value={itemCost}
-                    onChangeText={setItemCost}
-                    keyboardType="decimal-pad"
-                  />
-                </View>
+                <Text style={styles.modalTitle}>add items</Text>
+                <ScrollView style={{ width: '100%', maxHeight: 300 }} showsVerticalScrollIndicator={false}>
+                  {itemForms.map((form, i) => (
+                    <View key={i} style={styles.itemFormRow}>
+                      <View style={styles.itemFormBlock}>
+                        <TextInput
+                          style={styles.itemFormInput}
+                          placeholder="item name"
+                          placeholderTextColor="#c0c0c0"
+                          value={form.name}
+                          onChangeText={v => updateItemForm(i, 'name', v.slice(0, MAX_ITEM_NAME))}
+                          autoFocus={i === 0}
+                        />
+                        <View style={styles.itemFormDivider} />
+                        <TextInput
+                          style={styles.itemFormInput}
+                          placeholder="cost"
+                          placeholderTextColor="#c0c0c0"
+                          value={form.cost}
+                          onChangeText={v => updateItemForm(i, 'cost', v)}
+                          keyboardType="decimal-pad"
+                        />
+                      </View>
+                      {itemForms.length > 1 && (
+                        <TouchableOpacity onPress={() => removeItemForm(i)} style={styles.removeBtn}>
+                          <Ionicons name="close" size={14} color="#929090" />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  ))}
+                </ScrollView>
+                <TouchableOpacity style={styles.addMoreBtn} onPress={addItemForm}>
+                  <Ionicons name="add" size={13} color="#0ccfcf" />
+                  <Text style={styles.addMoreText}>add more</Text>
+                </TouchableOpacity>
                 <View style={styles.modalBtns}>
-                  <TouchableOpacity style={[styles.modalBtn, { backgroundColor: '#f5f5f5' }]} onPress={() => setAddItemModal(false)}>
+                  <TouchableOpacity style={[styles.modalBtn, { backgroundColor: '#f5f5f5' }]} onPress={() => { setAddItemModal(false); setItemForms([{ name: '', cost: '' }]); }}>
                     <Text style={[styles.modalBtnText, { color: '#8a8a8a' }]}>cancel</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[styles.modalBtn, (!itemName.trim() || !itemCost) && { opacity: 0.4 }]}
+                    style={[styles.modalBtn, itemForms.every(f => !f.name.trim() || !f.cost) && { opacity: 0.4 }]}
                     onPress={saveItem}
-                    disabled={!itemName.trim() || !itemCost}
+                    disabled={itemForms.every(f => !f.name.trim() || !f.cost)}
                   >
                     <Text style={styles.modalBtnText}>save</Text>
                   </TouchableOpacity>
@@ -686,11 +726,11 @@ const styles = StyleSheet.create({
   personChipText: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#425252' },
   personChipDelete: { padding: 2 },
   itemsList: { gap: 10, marginBottom: 24 },
-  itemCard: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#fafafa', borderRadius: 14, padding: 12, borderWidth: 1, borderColor: '#f0f0f0' },
-  itemNumber: { fontFamily: 'RobotoMono_700Bold', fontSize: 13, color: '#0ccfcf', width: 20, flexShrink: 0 },
+  itemCard: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#ffffff', borderRadius: 999, paddingVertical: 10, paddingHorizontal: 14, borderWidth: 1, borderStyle: 'dashed', borderColor: '#929090' },
+  itemNumber: { fontFamily: 'RobotoMono_700Bold', fontSize: 12, color: '#0ccfcf', width: 18, flexShrink: 0 },
   itemMiddle: { flex: 1, gap: 2 },
-  itemName: { fontFamily: 'RobotoMono_700Bold', fontSize: 11, color: '#425252' },
-  itemCost: { fontFamily: 'RobotoMono_400Regular', fontSize: 13, color: '#425252' },
+  itemName: { fontFamily: 'RobotoMono_700Bold', fontSize: 12, color: '#425252' },
+  itemCost: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#929090' },
   itemRight: { alignItems: 'flex-end', gap: 4, flexShrink: 0 },
   itemPeopleRow: { flexDirection: 'row', gap: 3 },
   personCircle: { width: 22, height: 22, borderRadius: 11, backgroundColor: '#0ccfcf', justifyContent: 'center', alignItems: 'center' },
@@ -698,7 +738,11 @@ const styles = StyleSheet.create({
   personCircleLetter: { fontFamily: 'RobotoMono_700Bold', fontSize: 9, color: '#fff' },
   itemSplit: { fontFamily: 'RobotoMono_400Regular', fontSize: 9, color: '#929090' },
   itemDelete: { padding: 4, flexShrink: 0 },
-  addSubitemBtn: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999, borderWidth: 1, borderColor: '#0ccfcf', flexShrink: 0 },
+  itemsTotalRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 14, marginTop: 4 },
+  itemsTotalLabel: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#929090', flexShrink: 0 },
+  itemsTotalDots: { flex: 1, borderBottomWidth: 1, borderStyle: 'dotted', borderColor: '#c0c0c0', marginHorizontal: 8 },
+  itemsTotalValue: { fontFamily: 'RobotoMono_700Bold', fontSize: 10, color: '#425252', flexShrink: 0 },
+  allocatedNote: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#2ab671', textAlign: 'center', marginTop: 4, marginBottom: 8 }, { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999, borderWidth: 1, borderColor: '#0ccfcf', flexShrink: 0 },
   addSubitemBtnText: { fontFamily: 'RobotoMono_400Regular', fontSize: 9, color: '#0ccfcf' },
   subitemCard: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#ffffff', borderRadius: 10, padding: 10, borderWidth: 1, borderColor: '#f0f0f0', marginTop: 4, marginLeft: 28 },
   subitemArrow: { fontSize: 12, color: '#c0c0c0', flexShrink: 0 },
@@ -723,6 +767,7 @@ const styles = StyleSheet.create({
   suggestionBox: { backgroundColor: '#ffffff', borderRadius: 8, borderWidth: 1, borderColor: '#f0f0f0', marginTop: -4, marginBottom: 6, overflow: 'hidden' },
   suggestionItem: { paddingHorizontal: 12, paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
   suggestionText: { fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#425252' },
+  itemFormRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
   itemFormBlock: { width: '100%', backgroundColor: '#fafafa', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 4, borderWidth: 1, borderColor: '#f0f0f0' },
   itemFormInput: { paddingVertical: 10, fontFamily: 'RobotoMono_400Regular', fontSize: 16, color: '#425252' },
   itemFormDivider: { height: 1, backgroundColor: '#f0f0f0' },
