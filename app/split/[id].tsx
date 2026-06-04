@@ -7,29 +7,85 @@ import { Ionicons } from '@expo/vector-icons';
 
 export default function SplitSharePage() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
-  const [qrModal, setQrModal] = useState(false);
+  const [recording, setRecording] = useState<any>(null);
+  const [perPerson, setPerPerson] = useState<{ name: string; total: number }[]>([]);
+  const [items, setItems] = useState<any[]>([]);
+  const [payment, setPayment] = useState<any>(null);
+  const [receiptId, setReceiptId] = useState<string | null>(null);
   const [receiptPhotos, setReceiptPhotos] = useState<string[]>([]);
   const [receiptModal, setReceiptModal] = useState(false);
   const [receiptLoading, setReceiptLoading] = useState(false);
+  const [qrModal, setQrModal] = useState(false);
 
   useEffect(() => {
     if (!id) return;
-    supabase.from('split_shares').select('data').eq('id', id).single()
-      .then(({ data: row, error }) => {
-        if (error || !row) setNotFound(true);
-        else setData(row.data);
-        setLoading(false);
-      });
+    loadAll();
   }, [id]);
 
+  const loadAll = async () => {
+    // Get recording_id from split_shares
+    const { data: share, error } = await supabase.from('split_shares').select('recording_id').eq('id', id).single();
+    if (error || !share) { setNotFound(true); setLoading(false); return; }
+    const rid = share.recording_id;
+
+    // Fetch everything in parallel
+    const [recRes, splitsRes, itemsRes, receiptRes] = await Promise.all([
+      supabase.from('recordings').select('*, account:account_id(account_name, bank, account_number, qr_code)').eq('id', rid).single(),
+      supabase.from('bill_splits').select('person_name').eq('recording_id', rid).order('created_at'),
+      supabase.from('split_items').select('*, split_subitems(*)').eq('recording_id', rid).order('created_at'),
+      supabase.from('receipt_entries').select('id').eq('recording_id', rid).single(),
+    ]);
+
+    if (!recRes.data) { setNotFound(true); setLoading(false); return; }
+    setRecording(recRes.data);
+
+    // Payment account
+    if (recRes.data.account) {
+      setPayment({
+        accountName: recRes.data.account.account_name,
+        bank: recRes.data.account.bank,
+        accountNumber: recRes.data.account.account_number,
+        qrCode: recRes.data.account.qr_code ?? null,
+      });
+    }
+
+    // Receipt
+    if (receiptRes.data) setReceiptId(receiptRes.data.id);
+
+    // Items
+    const loadedItems = (itemsRes.data ?? []).map((item: any) => ({
+      ...item,
+      subitems: item.split_subitems ?? [],
+    }));
+    setItems(loadedItems);
+
+    // Per person calculation
+    const people = (splitsRes.data ?? []).map((r: any) => r.person_name);
+    const perPersonMap: Record<string, number> = {};
+    people.forEach(p => { perPersonMap[p] = 0; });
+    loadedItems.forEach((item: any) => {
+      const subs = item.subitems ?? [];
+      if (subs.length === 0) {
+        const pp = (item.people ?? []).length > 0 ? Number(item.cost) / item.people.length : 0;
+        (item.people ?? []).forEach((p: string) => { if (perPersonMap[p] !== undefined) perPersonMap[p] += pp; });
+      } else {
+        subs.forEach((sub: any) => {
+          const pp = (sub.people ?? []).length > 0 ? Number(sub.cost) / sub.people.length : 0;
+          (sub.people ?? []).forEach((p: string) => { if (perPersonMap[p] !== undefined) perPersonMap[p] += pp; });
+        });
+      }
+    });
+    setPerPerson(Object.entries(perPersonMap).map(([name, total]) => ({ name, total })));
+    setLoading(false);
+  };
+
   const openReceipt = async () => {
-    if (!data?.receiptId) return;
+    if (!receiptId) return;
     setReceiptLoading(true);
     setReceiptModal(true);
-    const { data: photos } = await supabase.from('receipt_photos').select('storage_path').eq('entry_id', data.receiptId).order('created_at');
+    const { data: photos } = await supabase.from('receipt_photos').select('storage_path').eq('entry_id', receiptId).order('created_at');
     if (photos && photos.length > 0) {
       const urls = await Promise.all(photos.map(async (p: any) => {
         const { data: signed } = await supabase.storage.from('receipts').createSignedUrl(p.storage_path, 3600);
@@ -41,36 +97,36 @@ export default function SplitSharePage() {
   };
 
   if (loading) return <View style={s.center}><ActivityIndicator color="#0ccfcf" /></View>;
-  if (notFound || !data) return (
+  if (notFound || !recording) return (
     <View style={s.center}>
       <Text style={{ fontSize: 40 }}>🔍</Text>
       <Text style={s.notFound}>split not found</Text>
     </View>
   );
 
-  const amtColor = data.recordingType === 'expense' ? '#ed6a6a' : data.recordingType === 'income' ? '#2ab671' : '#425252';
-  const perPerson: any[] = Array.isArray(data.perPerson) ? data.perPerson : [];
-  const items: any[] = Array.isArray(data.items) ? data.items : [];
+  const amtColor = recording.type === 'expense' ? '#ed6a6a' : recording.type === 'income' ? '#2ab671' : '#425252';
+  const formattedDate = recording.transaction_date
+    ? new Date(recording.transaction_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    : '';
 
   return (
     <>
       <ScrollView style={s.container} contentContainerStyle={s.scroll}>
-
         <Text style={s.appLabel}>ledgr</Text>
-        <Text style={s.recName}>{String(data.recordingName ?? '').toLowerCase()}</Text>
-        <Text style={[s.recAmount, { color: amtColor }]}>{Number(data.recordingAmount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
-        <Text style={s.recDate}>{data.date ?? ''}</Text>
+        <Text style={s.recName}>{String(recording.name ?? '').toLowerCase()}</Text>
+        <Text style={[s.recAmount, { color: amtColor }]}>{Number(recording.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+        <Text style={s.recDate}>{formattedDate}</Text>
 
         {/* Per Person Pay */}
         {perPerson.length > 0 && <>
           <Text style={s.sectionHeader}>per person pay</Text>
           <View style={s.card}>
-            {perPerson.map((p: any, i: number) => (
+            {perPerson.map((p, i) => (
               <View key={i}>
                 <View style={s.infoRow}>
-                  <Text style={s.infoLabel}>{p.name ?? ''}</Text>
+                  <Text style={s.infoLabel}>{p.name}</Text>
                   <View style={s.dots} />
-                  <Text style={s.infoValue}>{Number(p.total ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+                  <Text style={s.infoValue}>{p.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
                 </View>
                 <View style={s.divider} />
               </View>
@@ -78,7 +134,9 @@ export default function SplitSharePage() {
             <View style={s.infoRow}>
               <Text style={[s.infoLabel, { color: '#425252', fontFamily: 'RobotoMono_700Bold' }]}>total</Text>
               <View style={s.dots} />
-              <Text style={[s.infoValue, { color: '#0ccfcf' }]}>{perPerson.reduce((sum: number, p: any) => sum + Number(p.total ?? 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+              <Text style={[s.infoValue, { color: '#0ccfcf' }]}>
+                {perPerson.reduce((sum, p) => sum + p.total, 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              </Text>
             </View>
           </View>
         </>}
@@ -86,47 +144,45 @@ export default function SplitSharePage() {
         {/* Item Information */}
         {items.length > 0 && <>
           <Text style={s.sectionHeader}>item information</Text>
-          {items.map((item: any, ii: number) => {
-            const subitems: any[] = Array.isArray(item.subitems) ? item.subitems : [];
-            const itemPeople: any[] = Array.isArray(item.people) ? item.people : [];
+          {items.map((item, ii) => {
+            const subs: any[] = item.subitems ?? [];
+            const itemPeople: any[] = item.people ?? [];
             return (
               <View key={ii} style={s.itemBlock}>
                 <View style={s.itemHeader}>
                   <Text style={s.itemName}>{String(item.name ?? '').toLowerCase()}</Text>
                   <Text style={s.itemCost}>{Number(item.cost ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
                 </View>
-                {subitems.length === 0 && itemPeople.length > 0 ? (
+                {subs.length === 0 && itemPeople.length > 0 ? (
                   <View style={s.itemPeopleRow}>
-                    {itemPeople.map((p: any, pi: number) => (
+                    {itemPeople.map((p, pi) => (
                       <View key={pi} style={s.chip}><Text style={s.chipText}>{p}</Text></View>
                     ))}
                     <Text style={s.subSplit}>
                       {itemPeople.length} {itemPeople.length === 1 ? 'person' : 'people'} · {(Number(item.cost ?? 0) / itemPeople.length).toLocaleString('en-US', { minimumFractionDigits: 2 })} each
                     </Text>
                   </View>
-                ) : (
-                  subitems.map((sub: any, si: number) => {
-                    const subPeople: any[] = Array.isArray(sub.people) ? sub.people : [];
-                    const pp = subPeople.length > 0 ? Number(sub.cost ?? 0) / subPeople.length : Number(sub.cost ?? 0);
-                    return (
-                      <View key={si} style={s.subRow}>
-                        <Text style={s.arrow}>↳</Text>
-                        <View style={{ flex: 1, gap: 3 }}>
-                          <View style={s.subTop}>
-                            <Text style={s.subName}>{String(sub.name ?? '').toLowerCase()}</Text>
-                            <Text style={s.subCost}>{Number(sub.cost ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
-                          </View>
-                          <Text style={s.subSplit}>{subPeople.length} {subPeople.length === 1 ? 'person' : 'people'} · {pp.toLocaleString('en-US', { minimumFractionDigits: 2 })} each</Text>
-                          <View style={s.chips}>
-                            {subPeople.map((p: any, pi: number) => (
-                              <View key={pi} style={s.chip}><Text style={s.chipText}>{p}</Text></View>
-                            ))}
-                          </View>
+                ) : subs.map((sub, si) => {
+                  const subPeople: any[] = sub.people ?? [];
+                  const pp = subPeople.length > 0 ? Number(sub.cost ?? 0) / subPeople.length : Number(sub.cost ?? 0);
+                  return (
+                    <View key={si} style={s.subRow}>
+                      <Text style={s.arrow}>↳</Text>
+                      <View style={{ flex: 1, gap: 3 }}>
+                        <View style={s.subTop}>
+                          <Text style={s.subName}>{String(sub.name ?? '').toLowerCase()}</Text>
+                          <Text style={s.subCost}>{Number(sub.cost ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+                        </View>
+                        <Text style={s.subSplit}>{subPeople.length} {subPeople.length === 1 ? 'person' : 'people'} · {pp.toLocaleString('en-US', { minimumFractionDigits: 2 })} each</Text>
+                        <View style={s.chips}>
+                          {subPeople.map((p, pi) => (
+                            <View key={pi} style={s.chip}><Text style={s.chipText}>{p}</Text></View>
+                          ))}
                         </View>
                       </View>
-                    );
-                  })
-                )}
+                    </View>
+                  );
+                })}
               </View>
             );
           })}
@@ -134,11 +190,8 @@ export default function SplitSharePage() {
 
         {/* Receipt */}
         <Text style={s.sectionHeader}>receipt</Text>
-        {data.receiptId ? (
-          <TouchableOpacity
-            style={s.receiptBtn}
-            onPress={openReceipt}
-          >
+        {receiptId ? (
+          <TouchableOpacity style={s.receiptBtn} onPress={openReceipt}>
             <Ionicons name="receipt-outline" size={16} color="#0ccfcf" />
             <Text style={s.receiptBtnText}>tap to view receipt photos</Text>
             <Ionicons name="arrow-forward" size={14} color="#0ccfcf" />
@@ -151,25 +204,23 @@ export default function SplitSharePage() {
         )}
 
         {/* Payment Information */}
-        {data.payment && (
+        {payment && (
           <>
             <Text style={s.sectionHeader}>payment information</Text>
             <View style={s.card}>
               <View style={s.payRow}>
                 <View style={{ gap: 3, flex: 1 }}>
-                  <Text style={s.payName}>{data.payment.accountName ?? ''}</Text>
-                  <Text style={s.payBank}>{data.payment.bank ?? ''}</Text>
-                  <Text style={s.payNumber}>{data.payment.accountNumber ?? ''}</Text>
+                  <Text style={s.payName}>{payment.accountName ?? ''}</Text>
+                  <Text style={s.payBank}>{payment.bank ?? ''}</Text>
+                  <Text style={s.payNumber}>{payment.accountNumber ?? ''}</Text>
                 </View>
-                {data.payment.qrCode
+                {payment.qrCode
                   ? <TouchableOpacity onPress={() => setQrModal(true)}>
-                      <Image source={{ uri: data.payment.qrCode }} style={s.qr} resizeMode="contain" />
+                      <Image source={{ uri: payment.qrCode }} style={s.qr} resizeMode="contain" />
                     </TouchableOpacity>
                   : null}
               </View>
-              {data.payment.qrCode && (
-                <Text style={s.qrHint}>tap the QR code to expand</Text>
-              )}
+              {payment.qrCode && <Text style={s.qrHint}>tap the QR code to expand</Text>}
             </View>
           </>
         )}
@@ -201,7 +252,7 @@ export default function SplitSharePage() {
       <Modal visible={qrModal} transparent animationType="fade" onRequestClose={() => setQrModal(false)}>
         <BlurView intensity={60} tint="dark" style={s.qrOverlay}>
           <TouchableOpacity style={s.qrOverlay} activeOpacity={1} onPress={() => setQrModal(false)}>
-            <Image source={{ uri: data?.payment?.qrCode ?? '' }} style={s.qrLarge} resizeMode="contain" />
+            <Image source={{ uri: payment?.qrCode ?? '' }} style={s.qrLarge} resizeMode="contain" />
             <Text style={s.qrTap}>tap anywhere to close</Text>
           </TouchableOpacity>
         </BlurView>

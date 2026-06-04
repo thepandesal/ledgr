@@ -38,8 +38,6 @@ export default function RecordingDetailScreen() {
   const [captureHtml, setCaptureHtml] = useState<string | null>(null);
   const webviewRef = useRef<any>(null);
   const [copiedToast, setCopiedToast] = useState(false);
-  const [shareStale, setShareStale] = useState(false);
-  const [lastSharedFingerprint, setLastSharedFingerprint] = useState<string | null>(null);
   const [tooltip, setTooltip] = useState<{ name: string } | null>(null);
   const [contacts, setContacts] = useState<string[]>([]);
   const [suggestions, setSuggestions] = useState<string[]>([]);
@@ -117,7 +115,6 @@ export default function RecordingDetailScreen() {
     loadPeople();
     loadItems();
     loadLinkedReceipt();
-    loadExistingShare();
     loadPaymentData();
   }, []);
 
@@ -228,14 +225,7 @@ export default function RecordingDetailScreen() {
   };
 
   const loadExistingShare = async () => {
-    if (!recordingId) return;
-    const { data } = await supabase.from('split_shares').select('data').eq('recording_id', recordingId).single();
-    if (!data) return;
-    const fp = JSON.stringify({
-      people: [...(data.data?.perPerson?.map((p: any) => p.name) ?? [])].sort(),
-      items: [...(data.data?.items?.map((i: any) => i.name) ?? [])].sort(),
-    });
-    setLastSharedFingerprint(fp);
+    // no-op: share data is now fetched live on the share page
   };
 
   const loadLinkedReceipt = async () => {
@@ -421,37 +411,18 @@ export default function RecordingDetailScreen() {
     if (!recording) return;
     setShareLoading(true);
     try {
-      // Fetch receipt fresh from DB to ensure it's current
-      const { data: freshReceipt } = await supabase
-        .from('receipt_entries').select('id').eq('recording_id', recordingId).single();
-      const shareData = { ...buildShareData(), receiptId: freshReceipt?.id ?? null };
-      // Upsert — same link forever per recording
-      // Try update first, if no rows affected then insert
-      const { data: existing } = await supabase
-        .from('split_shares').select('id').eq('recording_id', recordingId).single();
-      let row;
-      if (existing) {
-        const { data: updated, error: updateErr } = await supabase
-          .from('split_shares').update({ data: shareData }).eq('recording_id', recordingId).select().single();
-        if (updateErr) throw updateErr;
-        row = updated;
-      } else {
-        const { data: inserted, error: insertErr } = await supabase
-          .from('split_shares').insert({ recording_id: recordingId, data: shareData }).select().single();
-        if (insertErr) throw insertErr;
-        row = inserted;
+      // Just get or create a stable share row — no data stored, page fetches live
+      const { data: existing } = await supabase.from('split_shares').select('id').eq('recording_id', recordingId).single();
+      let shareId = existing?.id;
+      if (!shareId) {
+        const { data: inserted, error } = await supabase.from('split_shares').insert({ recording_id: recordingId }).select('id').single();
+        if (error) throw error;
+        shareId = inserted?.id;
       }
-      if (!row) throw new Error('failed to save share');
-      const fp = JSON.stringify({
-        people: [...people.filter(p => p.trim())].sort(),
-        items: [...items.map(i => i.name)].sort(),
-      });
-      setLastSharedFingerprint(fp);
-      setShareStale(false);
+      if (!shareId) throw new Error('failed to create share');
       const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://ledgr-six.vercel.app';
-      const shareUrl = `${baseUrl}/split/${row.id}`;
+      const shareUrl = `${baseUrl}/split/${shareId}`;
       setSaveImageModal(false);
-      // Try native share first (works on iOS Safari), fallback to clipboard
       if (typeof navigator !== 'undefined' && navigator.share) {
         await navigator.share({ title: 'Split breakdown', url: shareUrl });
       } else if (typeof navigator !== 'undefined' && navigator.clipboard) {
@@ -459,7 +430,6 @@ export default function RecordingDetailScreen() {
         setCopiedToast(true);
         setTimeout(() => setCopiedToast(false), 2500);
       } else {
-        // Textarea hack for older browsers
         const el = document.createElement('textarea');
         el.value = shareUrl;
         el.style.position = 'fixed';
@@ -668,15 +638,7 @@ export default function RecordingDetailScreen() {
   };
 
   const checkStale = (currentPeople: string[], currentItems: Item[]) => {
-    setLastSharedFingerprint(prev => {
-      if (!prev) return prev;
-      const fp = JSON.stringify({
-        people: [...currentPeople.filter(p => p.trim())].sort(),
-        items: [...currentItems.map(i => i.name)].sort(),
-      });
-      setShareStale(fp !== prev);
-      return prev;
-    });
+    // no-op: stale tracking removed, share page fetches live
   };
 
   const deleteItem = async (id: string) => {
@@ -1320,7 +1282,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                     disabled={shareLoading}
                   >
                     <Ionicons name="link-outline" size={18} color="#0ccfcf" />
-                    <Text style={styles.shareOptionText}>{shareLoading ? 'saving...' : shareStale ? 'update & share link' : 'share link'}</Text>
+                    <Text style={styles.shareOptionText}>{shareLoading ? 'sharing...' : 'share link'}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.shareOptionBtn}
