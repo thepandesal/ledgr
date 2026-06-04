@@ -247,7 +247,10 @@ export default function RecordingDetailScreen() {
     if (!recording) return;
     setShareLoading(true);
     try {
-      const shareData = buildShareData();
+      // Fetch receipt fresh from DB to ensure it's current
+      const { data: freshReceipt } = await supabase
+        .from('receipt_entries').select('id').eq('recording_id', recordingId).single();
+      const shareData = { ...buildShareData(), receiptId: freshReceipt?.id ?? null };
       // Upsert — same link forever per recording
       // Try update first, if no rows affected then insert
       const { data: existing } = await supabase
