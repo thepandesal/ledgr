@@ -818,6 +818,10 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
     return { expense: 'Expense', income: 'Income', savings: 'Savings' }[type] ?? type;
   };
 
+  const isPayableLocked = recording?.type === 'payable' && (recording?.status === 'partial' || recording?.status === 'paid');
+  const isReceivableLocked = recording?.type === 'receivable' && (recording?.status === 'partial' || recording?.status === 'received');
+  const isSplitLocked = isPayableLocked || isReceivableLocked;
+
   const PREVIEW_LIMIT = 4;
   const visiblePeople = filledPeople.slice(0, PREVIEW_LIMIT);
   const extraCount = filledPeople.length - PREVIEW_LIMIT;
@@ -1010,14 +1014,20 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
               )}
             </>
           ) : (<>
+          {isSplitLocked && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#fff8f0', borderRadius: 10, padding: 12, marginBottom: 16, borderWidth: 1, borderColor: '#f0e0c0' }}>
+              <Ionicons name="lock-closed-outline" size={14} color="#929090" />
+              <Text style={{ fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#929090', flex: 1 }}>split bill is locked while payments are in progress</Text>
+            </View>
+          )}
           <View style={styles.splitBtnGrid}>
             {[
               { icon: 'add-circle-outline', label: 'add item', onPress: () => {
                 const total = items.reduce((s, i) => s + i.cost, 0);
                 const recAmt = recording ? Number(recording.amount) : 0;
                 if (filledPeople.length > 0 && !(Math.abs(total - recAmt) < 0.01 && recAmt > 0)) setAddItemModal(true);
-              }, disabled: filledPeople.length === 0 || (Math.abs(items.reduce((s, i) => s + i.cost, 0) - (recording ? Number(recording.amount) : 0)) < 0.01 && items.length > 0) },
-              { icon: 'people-outline', label: 'add people', onPress: () => openPeopleModal(), disabled: false },
+              }, disabled: isSplitLocked || filledPeople.length === 0 || (Math.abs(items.reduce((s, i) => s + i.cost, 0) - (recording ? Number(recording.amount) : 0)) < 0.01 && items.length > 0) },
+              { icon: 'people-outline', label: 'add people', onPress: () => openPeopleModal(), disabled: isSplitLocked },
               { icon: 'share-outline', label: 'share', onPress: () => openSaveImage(), disabled: filledPeople.length === 0 || items.length === 0 || items.every(i => i.subitems.length === 0) },
               { icon: 'person-add-outline', label: 'save person', onPress: () => setCookingModal(true), disabled: false },
             ].map(b => (
@@ -1043,9 +1053,11 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                 {visiblePeople.map((person, i) => (
                   <View key={i} style={styles.personChip}>
                     <Text style={styles.personChipText}>{person}</Text>
+                    {!isSplitLocked && (
                     <TouchableOpacity onPress={() => requestDeletePerson(people.findIndex(p => p === person))} style={styles.personChipDelete}>
                       <Ionicons name="close" size={10} color="#929090" />
                     </TouchableOpacity>
+                    )}
                   </View>
                 ))}
                 {extraCount > 0 && (
@@ -1115,7 +1127,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                                 </Text>
                               </View>
                             )}
-                            <TouchableOpacity style={styles.addSubitemBtn} onPress={() => openEditSubitems(item)}>
+                            <TouchableOpacity style={[styles.addSubitemBtn, isSplitLocked && { opacity: 0.3 }]} onPress={() => !isSplitLocked && openEditSubitems(item)}>
                               <Ionicons name="add" size={13} color="#0ccfcf" />
                               <Text style={styles.addSubitemBtnText}>subitem</Text>
                             </TouchableOpacity>
