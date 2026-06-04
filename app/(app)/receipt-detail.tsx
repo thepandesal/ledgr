@@ -201,6 +201,9 @@ export default function ReceiptDetailScreen() {
               {photos.map((p, i) => (
                 <TouchableOpacity key={p.id} onPress={() => openCarousel(i)} activeOpacity={0.85} style={s.cell}>
                   <Image source={{ uri: p.url }} style={s.cellImg} resizeMode="cover" />
+                  <TouchableOpacity style={s.cellDelete} onPress={() => deletePhoto(p)}>
+                    <Ionicons name="close-circle" size={18} color="#ed6a6a" />
+                  </TouchableOpacity>
                 </TouchableOpacity>
               ))}
             </View>
@@ -322,6 +325,7 @@ const s = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GAP, marginBottom: 24 },
   cell: { width: CELL, height: CELL, borderRadius: 8, overflow: 'hidden', backgroundColor: '#f5f5f5' },
   cellImg: { width: '100%', height: '100%' },
+  cellDelete: { position: 'absolute', top: 3, right: 3 },
   emptyGrid: { alignItems: 'center', paddingVertical: 32, gap: 8, marginBottom: 24 },
   emptyText: { fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#c0c0c0' },
   makeRecordingBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#425252', borderRadius: 999, paddingVertical: 13 },
