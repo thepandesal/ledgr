@@ -37,6 +37,8 @@ export default function RecordingDetailScreen() {
   const [captureHtml, setCaptureHtml] = useState<string | null>(null);
   const webviewRef = useRef<any>(null);
   const [copiedToast, setCopiedToast] = useState(false);
+  const [shareStale, setShareStale] = useState(false);
+  const [lastSharedFingerprint, setLastSharedFingerprint] = useState<string | null>(null);
   const [tooltip, setTooltip] = useState<{ name: string } | null>(null);
   const [contacts, setContacts] = useState<string[]>([]);
   const [suggestions, setSuggestions] = useState<string[]>([]);
@@ -60,6 +62,9 @@ export default function RecordingDetailScreen() {
   const removeSubitemForm = (itemIdx: number, subIdx: number) =>
     setItemForms(prev => { const n = [...prev]; n[itemIdx] = { ...n[itemIdx], subitemForms: n[itemIdx].subitemForms.filter((_, idx) => idx !== subIdx) }; return n; });
 
+  const makeFingerprint = (p: string[], i: Item[]) =>
+    JSON.stringify({ people: [...p].sort(), items: i.map(x => x.id).sort() });
+
   useEffect(() => {
     Animated.timing(slideAnim, { toValue: 0, duration: 280, useNativeDriver: true }).start();
     loadRecording();
@@ -67,7 +72,19 @@ export default function RecordingDetailScreen() {
     loadPeople();
     loadItems();
     loadLinkedReceipt();
+    loadExistingShare();
   }, []);
+
+  const loadExistingShare = async () => {
+    if (!recordingId) return;
+    const { data } = await supabase.from('split_shares').select('data').eq('recording_id', recordingId).single();
+    if (!data) return;
+    const fp = JSON.stringify({
+      people: [...(data.data?.perPerson?.map((p: any) => p.name) ?? [])].sort(),
+      items: [...(data.data?.items?.map((i: any) => i.name) ?? [])].sort(),
+    });
+    setLastSharedFingerprint(fp);
+  };
 
   const loadLinkedReceipt = async () => {
     if (!recordingId) return;
@@ -111,7 +128,11 @@ export default function RecordingDetailScreen() {
     if (!recordingId) return;
     const { data } = await supabase.from('bill_splits')
       .select('person_name').eq('recording_id', recordingId).order('created_at');
-    if (data && data.length > 0) setPeople(data.map((r: any) => r.person_name));
+    if (data && data.length > 0) {
+      const loaded = data.map((r: any) => r.person_name);
+      setPeople(loaded);
+      setItems(prev => { checkStale(loaded, prev); return prev; });
+    }
   };
 
   const loadItems = async () => {
@@ -268,6 +289,12 @@ export default function RecordingDetailScreen() {
         row = inserted;
       }
       if (!row) throw new Error('failed to save share');
+      const fp = JSON.stringify({
+        people: [...people.filter(p => p.trim())].sort(),
+        items: [...items.map(i => i.name)].sort(),
+      });
+      setLastSharedFingerprint(fp);
+      setShareStale(false);
       const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://ledgr-six.vercel.app';
       const shareUrl = `${baseUrl}/split/${row.id}`;
       setSaveImageModal(false);
@@ -399,6 +426,7 @@ export default function RecordingDetailScreen() {
     setAddPersonModal(false);
     setSuggestions([]);
     setActiveSuggestionIdx(null);
+    checkStale(filled, items);
   };
 
   const filledPeople = people.filter(p => p.trim());
@@ -435,7 +463,11 @@ export default function RecordingDetailScreen() {
         }
         newItems.push({ id: savedItem.id, name: savedItem.name, cost: Number(savedItem.cost), people: savedItem.people ?? [], subitems });
       }
-      setItems(prev => [...prev, ...newItems]);
+        setItems(prev => {
+        const next = [...prev, ...newItems];
+        checkStale(people, next);
+        return next;
+      });
     }
     setItemForms([{ name: '', cost: '', people: [], subitemForms: [] }]);
     setAddItemModal(false);
@@ -475,9 +507,25 @@ export default function RecordingDetailScreen() {
     setEditSubitemsItemId(null);
   };
 
+  const checkStale = (currentPeople: string[], currentItems: Item[]) => {
+    setLastSharedFingerprint(prev => {
+      if (!prev) return prev;
+      const fp = JSON.stringify({
+        people: [...currentPeople.filter(p => p.trim())].sort(),
+        items: [...currentItems.map(i => i.name)].sort(),
+      });
+      setShareStale(fp !== prev);
+      return prev;
+    });
+  };
+
   const deleteItem = async (id: string) => {
     await supabase.from('split_items').delete().eq('id', id);
-    setItems(prev => prev.filter(item => item.id !== id));
+    setItems(prev => {
+      const next = prev.filter(item => item.id !== id);
+      checkStale(people, next);
+      return next;
+    });
   };
 
   const deleteSubitem = async (itemId: string, subitemId: string) => {
@@ -1016,7 +1064,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                     disabled={shareLoading}
                   >
                     <Ionicons name="link-outline" size={18} color="#0ccfcf" />
-                    <Text style={styles.shareOptionText}>{shareLoading ? 'saving...' : 'save & share link'}</Text>
+                    <Text style={styles.shareOptionText}>{shareLoading ? 'saving...' : shareStale ? 'update & share link' : 'share link'}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.shareOptionBtn}
