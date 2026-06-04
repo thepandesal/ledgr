@@ -268,13 +268,27 @@ export default function RecordingDetailScreen() {
       const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://ledgr-six.vercel.app';
       const shareUrl = `${baseUrl}/split/${row.id}`;
       setSaveImageModal(false);
-      if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      // Try native share first (works on iOS Safari), fallback to clipboard
+      if (typeof navigator !== 'undefined' && navigator.share) {
+        await navigator.share({ title: 'Split breakdown', url: shareUrl });
+      } else if (typeof navigator !== 'undefined' && navigator.clipboard) {
         await navigator.clipboard.writeText(shareUrl);
+        setCopiedToast(true);
+        setTimeout(() => setCopiedToast(false), 2500);
       } else {
-        Clipboard.setString(shareUrl);
+        // Textarea hack for older browsers
+        const el = document.createElement('textarea');
+        el.value = shareUrl;
+        el.style.position = 'fixed';
+        el.style.opacity = '0';
+        document.body.appendChild(el);
+        el.focus();
+        el.select();
+        document.execCommand('copy');
+        document.body.removeChild(el);
+        setCopiedToast(true);
+        setTimeout(() => setCopiedToast(false), 2500);
       }
-      setCopiedToast(true);
-      setTimeout(() => setCopiedToast(false), 2500);
     } catch (e: any) { console.log(e); } finally { setShareLoading(false); }
   };
 
