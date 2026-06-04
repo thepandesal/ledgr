@@ -212,11 +212,22 @@ export default function RecordingDetailScreen() {
     try {
       const shareData = buildShareData();
       // Upsert — same link forever per recording
-      const { data: row, error } = await supabase
-        .from('split_shares')
-        .upsert({ recording_id: recordingId, data: shareData }, { onConflict: 'recording_id' })
-        .select().single();
-      if (error || !row) throw error;
+      // Try update first, if no rows affected then insert
+      const { data: existing } = await supabase
+        .from('split_shares').select('id').eq('recording_id', recordingId).single();
+      let row;
+      if (existing) {
+        const { data: updated, error: updateErr } = await supabase
+          .from('split_shares').update({ data: shareData }).eq('recording_id', recordingId).select().single();
+        if (updateErr) throw updateErr;
+        row = updated;
+      } else {
+        const { data: inserted, error: insertErr } = await supabase
+          .from('split_shares').insert({ recording_id: recordingId, data: shareData }).select().single();
+        if (insertErr) throw insertErr;
+        row = inserted;
+      }
+      if (!row) throw new Error('failed to save share');
       const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://ledgr-six.vercel.app';
       const shareUrl = `${baseUrl}/split/${row.id}`;
       setSaveImageModal(false);
