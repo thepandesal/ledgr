@@ -276,7 +276,7 @@ function AccountForm({ userId, initial, onClose, onSaved }: {
 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <KeyboardAvoidingView style={{ flex: 1, justifyContent: 'flex-end' }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={onClose} />
         <View style={styles.formSheet}>
           <View style={styles.formHeader}>
@@ -398,7 +398,7 @@ const styles = StyleSheet.create({
   menuItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingVertical: 14 },
   menuItemText: { fontFamily: 'RobotoMono_400Regular', fontSize: 13, color: '#425252' },
   menuDivider: { height: 1, backgroundColor: '#f0f0f0' },
-  formSheet: { backgroundColor: '#ffffff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 48, maxHeight: '88%' },
+  formSheet: { backgroundColor: '#ffffff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 48, maxHeight: '88%', flexShrink: 1 },
   formHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 },
   formLabel: { fontFamily: 'ChillaxMedium', fontSize: 11, color: '#929090' },
   formTitle: { fontFamily: 'Avenelle', fontSize: 28, color: '#425252', letterSpacing: -0.5, lineHeight: 32 },
