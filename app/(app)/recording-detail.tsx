@@ -752,6 +752,17 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                             </TouchableOpacity>
                           )}
                         </View>
+                        {(() => {
+                          const currentTotal = items.reduce((s, i) => s + i.cost, 0);
+                          const otherFormsTotal = itemForms.reduce((s, f, fi) => fi !== itemIdx ? s + parseFloat(f.cost || '0') : s, 0);
+                          const thisTotal = parseFloat(form.cost || '0');
+                          const newTotal = currentTotal + otherFormsTotal + thisTotal;
+                          const recAmt = recording ? Number(recording.amount) : 0;
+                          if (recAmt > 0 && newTotal > recAmt + 0.01) {
+                            return <Text style={styles.subitemError}>exceeds {recAmt.toFixed(2)} by {(newTotal - recAmt).toFixed(2)}</Text>;
+                          }
+                          return null;
+                        })()}
 
                         {/* People chips at item level (only when no subitems) */}
                         {form.subitemForms.length === 0 && (
@@ -841,7 +852,12 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                     <Text style={[styles.modalBtnText, { color: '#8a8a8a' }]}>cancel</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[styles.modalBtn, itemForms.every(f => !f.name.trim() || !f.cost) && { opacity: 0.4 }]}
+                    style={[styles.modalBtn, (itemForms.every(f => !f.name.trim() || !f.cost) || (() => {
+                      const currentTotal = items.reduce((s, i) => s + i.cost, 0);
+                      const newTotal = currentTotal + itemForms.reduce((s, f) => s + parseFloat(f.cost || '0'), 0);
+                      const recAmt = recording ? Number(recording.amount) : 0;
+                      return recAmt > 0 && newTotal > recAmt + 0.01;
+                    })()) && { opacity: 0.4 }]}
                     onPress={saveItem}
                     disabled={itemForms.every(f => !f.name.trim() || !f.cost)}
                   >
