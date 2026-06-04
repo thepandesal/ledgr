@@ -81,9 +81,10 @@ export default function CaptureReceiptScreen() {
       for (const uri of photos) {
         const fileName = `${user.id}/${rId}/${Date.now()}_${Math.random().toString(36).slice(2)}.jpg`;
         const base64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
+        const byteArray = decode(base64);
         const { error: uploadError } = await supabase.storage
           .from('receipts')
-          .upload(fileName, decode(base64), { contentType: 'image/jpeg', upsert: false });
+          .upload(fileName, byteArray, { contentType: 'image/jpeg', upsert: false });
         if (uploadError) throw uploadError;
         await supabase.from('receipt_photos').insert({ receipt_id: rId, storage_path: fileName });
       }

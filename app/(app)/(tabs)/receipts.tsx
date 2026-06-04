@@ -24,18 +24,28 @@ export default function ReceiptsScreen() {
   const loadReceipts = async () => {
     setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) { setLoading(false); return; }
 
     const { data: recs } = await supabase
       .from('receipts')
-      .select('*, recording:recording_id(name, type, amount)')
+      .select('*')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false });
 
     if (!recs) { setLoading(false); return; }
 
-    // Load photos for each receipt
     const full: Receipt[] = await Promise.all(recs.map(async (r: any) => {
+      // Fetch linked recording separately
+      let recording = null;
+      if (r.recording_id) {
+        const { data: rec } = await supabase
+          .from('recordings')
+          .select('name, type, amount')
+          .eq('id', r.recording_id)
+          .single();
+        recording = rec;
+      }
+
       const { data: photos } = await supabase
         .from('receipt_photos')
         .select('id, storage_path')
@@ -44,13 +54,11 @@ export default function ReceiptsScreen() {
         .limit(3);
 
       const photosWithUrls = await Promise.all((photos ?? []).map(async (p: any) => {
-        const { data } = supabase.storage.from('receipts').getPublicUrl(p.storage_path);
-        // Use signed URL for private bucket
         const { data: signed } = await supabase.storage.from('receipts').createSignedUrl(p.storage_path, 3600);
         return { ...p, url: signed?.signedUrl ?? '' };
       }));
 
-      return { ...r, photos: photosWithUrls };
+      return { ...r, recording, photos: photosWithUrls };
     }));
 
     setReceipts(full);
