@@ -9,9 +9,9 @@ import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../../src/lib/supabase';
 import { BlurView } from 'expo-blur';
 
-const { width: SW } = Dimensions.get('window');
-const COLS = 4;
-const GAP = 8;
+const { width: SW, height: SH } = Dimensions.get('window');
+const COLS = 5;
+const GAP = 6;
 const CELL = (SW - 64 - GAP * (COLS - 1)) / COLS;
 
 interface Photo { id: string; url: string; path: string; }
@@ -27,7 +27,7 @@ export default function ReceiptDetailScreen() {
   const [carouselIdx, setCarouselIdx] = useState<number | null>(null);
   const [renameModal, setRenameModal] = useState(false);
   const [renameVal, setRenameVal] = useState('');
-  const carouselRef = useRef<FlatList>(null);
+  const carouselRef = useRef<any>(null);
 
   useEffect(() => {
     Animated.timing(slideAnim, { toValue: 0, duration: 280, useNativeDriver: false }).start();
@@ -78,10 +78,7 @@ export default function ReceiptDetailScreen() {
     setCarouselIdx(null);
   };
 
-  const openCarousel = (idx: number) => {
-    setCarouselIdx(idx);
-    setTimeout(() => carouselRef.current?.scrollToIndex({ index: idx, animated: false }), 50);
-  };
+  const openCarousel = (idx: number) => setCarouselIdx(idx);
 
   const formatDate = (d: string) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
@@ -182,22 +179,20 @@ export default function ReceiptDetailScreen() {
               </TouchableOpacity>
             </View>
             <View style={{ flex: 1, justifyContent: 'center' }}>
-              <FlatList
-                ref={carouselRef}
-                data={photos}
-                keyExtractor={p => p.id}
+              <ScrollView
+                ref={carouselRef as any}
                 horizontal
                 pagingEnabled
                 showsHorizontalScrollIndicator={false}
-                initialScrollIndex={carouselIdx ?? 0}
-                getItemLayout={(_, index) => ({ length: SW, offset: SW * index, index })}
+                contentOffset={{ x: (carouselIdx ?? 0) * SW, y: 0 }}
                 onMomentumScrollEnd={e => setCarouselIdx(Math.round(e.nativeEvent.contentOffset.x / SW))}
-                renderItem={({ item }) => (
-                  <View style={{ width: SW, alignItems: 'center', justifyContent: 'center' }}>
-                    <Image source={{ uri: item.url }} style={{ width: SW - 32, height: SW - 32, borderRadius: 16 }} resizeMode="contain" />
+              >
+                {photos.map(item => (
+                  <View key={item.id} style={{ width: SW, height: SH * 0.6, justifyContent: 'center', alignItems: 'center' }}>
+                    <Image source={{ uri: item.url }} style={{ width: SW - 32, height: SH * 0.55, borderRadius: 16 }} resizeMode="contain" />
                   </View>
-                )}
-              />
+                ))}
+              </ScrollView>
             </View>
             {photos.length > 1 && (
               <View style={s.dots}>
