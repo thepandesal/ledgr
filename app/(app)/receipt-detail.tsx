@@ -17,7 +17,7 @@ export default function ReceiptDetailScreen() {
   const [activePhoto, setActivePhoto] = useState(0);
 
   useEffect(() => {
-    Animated.timing(slideAnim, { toValue: 0, duration: 280, useNativeDriver: true }).start();
+    Animated.timing(slideAnim, { toValue: 0, duration: 280, useNativeDriver: false }).start();
     loadReceipt();
   }, []);
 
@@ -46,7 +46,7 @@ export default function ReceiptDetailScreen() {
   };
 
   const handleBack = () => {
-    Animated.timing(slideAnim, { toValue: width, duration: 250, useNativeDriver: true }).start(() => router.back());
+    Animated.timing(slideAnim, { toValue: width, duration: 250, useNativeDriver: false }).start(() => router.back());
   };
 
   const deleteReceipt = () => {
@@ -196,5 +196,6 @@ const styles = StyleSheet.create({
   addMorePhotosBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#fafafa', borderRadius: 999, paddingVertical: 12, borderWidth: 1, borderColor: '#e8e8e8' },
   addMorePhotosText: { fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#425252' },
 });
+
 
 

@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { supabase } from '../../src/lib/supabase';
 
 const { width } = Dimensions.get('window');
@@ -18,11 +18,11 @@ export default function CaptureReceiptScreen() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    Animated.timing(slideAnim, { toValue: 0, duration: 280, useNativeDriver: true }).start();
+    Animated.timing(slideAnim, { toValue: 0, duration: 280, useNativeDriver: false }).start();
   }, []);
 
   const handleBack = () => {
-    Animated.timing(slideAnim, { toValue: width, duration: 250, useNativeDriver: true }).start(() => router.back());
+    Animated.timing(slideAnim, { toValue: width, duration: 250, useNativeDriver: false }).start(() => router.back());
   };
 
   const compress = async (uri: string) => {
@@ -198,5 +198,6 @@ const styles = StyleSheet.create({
   saveBtn: { backgroundColor: '#425252', borderRadius: 999, paddingVertical: 12, paddingHorizontal: 24 },
   saveBtnText: { fontFamily: 'RobotoMono_700Bold', fontSize: 13, color: '#fff' },
 });
+
 
 
