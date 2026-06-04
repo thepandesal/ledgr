@@ -211,6 +211,8 @@ export default function RecordingDetailScreen() {
     setShareLoading(true);
     try {
       const shareData = buildShareData();
+      // Delete existing share for this recording to keep DB clean
+      await supabase.from('split_shares').delete().eq('recording_id', recordingId);
       const { data: row, error } = await supabase.from('split_shares').insert({ recording_id: recordingId, data: shareData }).select().single();
       if (error || !row) throw error;
       const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://ledgr-six.vercel.app';
