@@ -108,6 +108,28 @@ export default function SplitSharePage() {
           })}
         </>}
 
+        {/* Receipt */}
+        <Text style={s.sectionHeader}>receipt</Text>
+        {data.receiptId ? (
+          <TouchableOpacity
+            style={s.receiptBtn}
+            onPress={() => {
+              if (typeof window !== 'undefined') {
+                window.open(`${window.location.origin}/receipt-view/${data.receiptId}`, '_blank');
+              }
+            }}
+          >
+            <Ionicons name="receipt-outline" size={16} color="#0ccfcf" />
+            <Text style={s.receiptBtnText}>tap to view receipt photos</Text>
+            <Ionicons name="arrow-forward" size={14} color="#0ccfcf" />
+          </TouchableOpacity>
+        ) : (
+          <View style={s.receiptUnavailable}>
+            <Ionicons name="receipt-outline" size={16} color="#c0c0c0" />
+            <Text style={s.receiptUnavailableText}>receipt not available</Text>
+          </View>
+        )}
+
         {/* Payment Information */}
         {data.payment && (
           <>
@@ -175,6 +197,10 @@ const s = StyleSheet.create({
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
   chip: { backgroundColor: '#f0f0f0', borderRadius: 999, paddingVertical: 3, paddingHorizontal: 8 },
   chipText: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#425252' },
+  receiptBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#f0fffe', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: '#0ccfcf', marginBottom: 24 },
+  receiptBtnText: { fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#0ccfcf', flex: 1 },
+  receiptUnavailable: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#fafafa', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: '#f0f0f0', marginBottom: 24 },
+  receiptUnavailableText: { fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#c0c0c0' },
   payRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12 },
   payName: { fontFamily: 'ChillaxMedium', fontSize: 14, color: '#425252' },
   payBank: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#929090' },
