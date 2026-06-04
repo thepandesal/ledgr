@@ -69,7 +69,6 @@ export default function AddRecordingScreen() {
   // Receivable-specific
   const [decreasedFromAccount, setDecreasedFromAccount] = useState<any>(null);
   const [receiveToAccount, setReceiveToAccount] = useState<any>(null);
-  const [createLinkedExpense, setCreateLinkedExpense] = useState(false);
   const [showDecreasedFromModal, setShowDecreasedFromModal] = useState(false);
   const [showReceiveToModal, setShowReceiveToModal] = useState(false);
   const [decreasedSearch, setDecreasedSearch] = useState('');
@@ -148,7 +147,6 @@ export default function AddRecordingScreen() {
 
   const handleSave = async () => {
     if (!recName.trim() || !amount) { setError('name and amount are required.'); return; }
-    if (type === 'receivable' && createLinkedExpense && !decreasedFromAccount) { setError('select a "decreased from" account to create the linked expense.'); return; }
     setLoading(true); setError('');
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -178,8 +176,8 @@ export default function AddRecordingScreen() {
           receive_to_account_id: type === 'receivable' ? receiveToAccount?.id || null : null,
         }).select('id').single();
         if (err) throw err;
-        // Auto-create linked expense for receivable
-        if (type === 'receivable' && createLinkedExpense && newRec) {
+        // Auto-create linked expense for receivable if decreased_from is set
+        if (type === 'receivable' && decreasedFromAccount && newRec) {
           await supabase.from('recordings').insert({
             space_id: spaceId, user_id: user!.id, name: recName.trim(), type: 'expense',
             amount: parseFloat(amount), transaction_date: date,
@@ -352,29 +350,33 @@ export default function AddRecordingScreen() {
             </View>
           </TouchableOpacity>
 
-          {/* Account */}
-          <Text style={styles.label}>account <Text style={styles.optional}>(optional)</Text></Text>
-          <TouchableOpacity style={styles.pickerSelector} onPress={() => { setAccountSearch(''); setShowAccountModal(true); }}>
-            {selectedAccount ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
-                <View style={[styles.catDot, { backgroundColor: selectedAccount.color ?? '#e8e8e8' }]} />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.pickerSelectorText}>{selectedAccount.account_name}</Text>
-                  <Text style={styles.pickerSelectorSub}>{selectedAccount.bank}</Text>
+          {/* Account — hidden for receivable since it uses decreased_from and receive_to */}
+          {type !== 'receivable' && (
+            <>
+              <Text style={styles.label}>account <Text style={styles.optional}>(optional)</Text></Text>
+              <TouchableOpacity style={styles.pickerSelector} onPress={() => { setAccountSearch(''); setShowAccountModal(true); }}>
+                {selectedAccount ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                    <View style={[styles.catDot, { backgroundColor: selectedAccount.color ?? '#e8e8e8' }]} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.pickerSelectorText}>{selectedAccount.account_name}</Text>
+                      <Text style={styles.pickerSelectorSub}>{selectedAccount.bank}</Text>
+                    </View>
+                  </View>
+                ) : (
+                  <Text style={styles.pickerSelectorPlaceholder}>select account</Text>
+                )}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  {selectedAccount && (
+                    <TouchableOpacity onPress={() => setSelectedAccount(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                      <Ionicons name="close" size={14} color="#929090" />
+                    </TouchableOpacity>
+                  )}
+                  <Ionicons name="chevron-down" size={14} color="#c0c0c0" />
                 </View>
-              </View>
-            ) : (
-              <Text style={styles.pickerSelectorPlaceholder}>select account</Text>
-            )}
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              {selectedAccount && (
-                <TouchableOpacity onPress={() => setSelectedAccount(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                  <Ionicons name="close" size={14} color="#929090" />
-                </TouchableOpacity>
-              )}
-              <Ionicons name="chevron-down" size={14} color="#c0c0c0" />
-            </View>
-          </TouchableOpacity>
+              </TouchableOpacity>
+            </>
+          )}
 
           {/* Notes */}
           <Text style={styles.label}>notes <Text style={styles.optional}>(optional)</Text></Text>
@@ -476,15 +478,8 @@ export default function AddRecordingScreen() {
                 </View>
               </TouchableOpacity>
 
-              <View style={[styles.switchRow, { marginTop: 8 }]}>
-                <View>
-                  <Text style={styles.switchLabel}>create linked expense?</Text>
-                  <Text style={styles.switchSub}>records money leaving your account</Text>
-                </View>
-                <Switch value={createLinkedExpense} onValueChange={setCreateLinkedExpense} trackColor={{ true: '#0ccfcf' }} thumbColor="#fff" />
-              </View>
-              {createLinkedExpense && !decreasedFromAccount && (
-                <Text style={{ fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#ed6a6a', marginTop: 4 }}>select a "decreased from" account to create the expense</Text>
+              {decreasedFromAccount && (
+                <Text style={{ fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#0ccfcf', marginTop: 4 }}>a linked expense will be created automatically</Text>
               )}
             </>
           )}
