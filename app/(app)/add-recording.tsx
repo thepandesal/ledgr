@@ -62,6 +62,10 @@ export default function AddRecordingScreen() {
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [categorySearch, setCategorySearch] = useState('');
   const [accountSearch, setAccountSearch] = useState('');
+  const [selectedReceiptId, setSelectedReceiptId] = useState<string | null>(null);
+  const [selectedReceiptNote, setSelectedReceiptNote] = useState<string | null>(null);
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const [unlinkedReceipts, setUnlinkedReceipts] = useState<any[]>([]);
 
   const isLoanType = type === 'receivable' || type === 'payable';
   const selectedType = TYPES.find(t => t.key === type)!;
@@ -159,10 +163,21 @@ export default function AddRecordingScreen() {
       if (receiptId) {
         const { data: savedRec } = await supabase.from('recordings').select('id').order('created_at', { ascending: false }).limit(1).single();
         if (savedRec) await supabase.from('receipt_entries').update({ recording_id: savedRec.id }).eq('id', receiptId);
+      } else if (!editId && selectedReceiptId) {
+        const { data: savedRec } = await supabase.from('recordings').select('id').order('created_at', { ascending: false }).limit(1).single();
+        if (savedRec) await supabase.from('receipt_entries').update({ recording_id: savedRec.id }).eq('id', selectedReceiptId);
       }
       setPendingFocusDate(date);
       handleBack();
     } catch (e: any) { setError(e.message); setLoading(false); }
+  };
+
+  const openReceiptModal = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data } = await supabase.from('receipt_entries').select('id, note, created_at').eq('user_id', user.id).is('recording_id', null).order('created_at', { ascending: false });
+    setUnlinkedReceipts(data ?? []);
+    setShowReceiptModal(true);
   };
 
   const toggleDay = (day: number) => setRecurringDays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]);
@@ -394,6 +409,25 @@ export default function AddRecordingScreen() {
             </>
           )}
 
+          {/* Receipt */}
+          <Text style={styles.label}>receipt <Text style={styles.optional}>(optional)</Text></Text>
+          <TouchableOpacity style={styles.pickerSelector} onPress={() => selectedReceiptId ? setSelectedReceiptId(null) : openReceiptModal()}>
+            {selectedReceiptId ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                <Ionicons name="folder-outline" size={16} color="#0ccfcf" />
+                <Text style={styles.pickerSelectorText}>{selectedReceiptNote ?? 'receipt linked'}</Text>
+              </View>
+            ) : (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                <Ionicons name="receipt-outline" size={16} color="#c0c0c0" />
+                <Text style={styles.pickerSelectorPlaceholder}>link a receipt</Text>
+              </View>
+            )}
+            {selectedReceiptId
+              ? <Ionicons name="close" size={14} color="#929090" />
+              : <Ionicons name="chevron-down" size={14} color="#c0c0c0" />}
+          </TouchableOpacity>
+
           <TouchableOpacity
             style={[styles.saveBtn, (!recName.trim() || !amount) && styles.saveBtnDisabled]}
             onPress={handleSave}
@@ -479,6 +513,40 @@ export default function AddRecordingScreen() {
                   ))}
                 </ScrollView>
                 <TouchableOpacity style={styles.pickerModalCancel} onPress={() => setShowAccountModal(false)}>
+                  <Text style={styles.pickerModalCancelText}>cancel</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </BlurView>
+      </Modal>
+
+      {/* Receipt Modal */}
+      <Modal visible={showReceiptModal} transparent animationType="fade" onRequestClose={() => setShowReceiptModal(false)}>
+        <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}>
+          <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowReceiptModal(false)}>
+            <TouchableOpacity activeOpacity={1} onPress={e => e.stopPropagation()}>
+              <View style={styles.pickerModal}>
+                <Text style={styles.pickerModalTitle}>link a receipt</Text>
+                <ScrollView style={styles.pickerModalList} showsVerticalScrollIndicator={false}>
+                  {unlinkedReceipts.length === 0 ? (
+                    <Text style={styles.pickerModalEmpty}>no unlinked receipts found</Text>
+                  ) : unlinkedReceipts.map(r => (
+                    <TouchableOpacity
+                      key={r.id}
+                      style={[styles.pickerModalItem, selectedReceiptId === r.id && styles.pickerModalItemActive]}
+                      onPress={() => { setSelectedReceiptId(r.id); setSelectedReceiptNote(r.note ?? 'untitled'); setShowReceiptModal(false); }}
+                    >
+                      <Ionicons name="folder-outline" size={16} color={selectedReceiptId === r.id ? '#fff' : '#0ccfcf'} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.pickerModalItemText, selectedReceiptId === r.id && { color: '#fff', fontFamily: 'RobotoMono_700Bold' }]}>{r.note ?? 'untitled'}</Text>
+                        <Text style={[styles.pickerModalItemSub, selectedReceiptId === r.id && { color: 'rgba(255,255,255,0.7)' }]}>{new Date(r.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</Text>
+                      </View>
+                      {selectedReceiptId === r.id && <Ionicons name="checkmark" size={14} color="#fff" />}
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+                <TouchableOpacity style={styles.pickerModalCancel} onPress={() => setShowReceiptModal(false)}>
                   <Text style={styles.pickerModalCancelText}>cancel</Text>
                 </TouchableOpacity>
               </View>

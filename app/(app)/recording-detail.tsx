@@ -839,6 +839,15 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
             <InfoRow label="Date of transaction" value={formatDate(recording?.transaction_date)} />
             <InfoRow label="Transaction type" value={typeLabel(recording?.type ?? '', recording?.status ?? '')} />
             <InfoRow label="Bank / Account" value={truncate(recording?.account?.account_name ?? '—', 16)} />
+            {recording?.notes ? (
+              <>
+                <View style={{ height: 1, backgroundColor: '#f0f0f0', marginVertical: 2 }} />
+                <View style={{ paddingVertical: 8 }}>
+                  <Text style={{ fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#929090', marginBottom: 4 }}>Notes</Text>
+                  <Text style={{ fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#425252', lineHeight: 18 }}>{recording.notes}</Text>
+                </View>
+              </>
+            ) : null}
             {linkedPayable && (
               <>
                 <View style={{ height: 1, backgroundColor: '#f0f0f0', marginVertical: 2 }} />
