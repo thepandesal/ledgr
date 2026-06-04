@@ -52,7 +52,7 @@ export default function SpaceDetailScreen() {
   const circleAnim = useRef(new Animated.Value(0)).current;
   const contentSlide = useRef(new Animated.Value(0)).current;
 
-  const [viewMode, setViewMode] = useState<ViewMode>('daily');
+  const [viewMode, setViewMode] = useState<ViewMode>('monthly');
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [recordings, setRecordings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
