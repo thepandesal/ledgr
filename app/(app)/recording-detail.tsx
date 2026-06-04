@@ -31,6 +31,7 @@ export default function RecordingDetailScreen() {
   const [shareAccounts, setShareAccounts] = useState<any[]>([]);
   const [shareSelectedAccount, setShareSelectedAccount] = useState<any>(null);
   const [shareLoading, setShareLoading] = useState(false);
+  const [shareRowId, setShareRowId] = useState<string | null>(null);
   const [linkedReceipt, setLinkedReceipt] = useState<any>(null);
   const [receiptPhotos, setReceiptPhotos] = useState<{ id: string; url: string }[]>([]);
   const [linkReceiptModal, setLinkReceiptModal] = useState(false);
@@ -125,6 +126,9 @@ export default function RecordingDetailScreen() {
     loadItems();
     loadLinkedReceipt();
     loadPaymentData();
+    // Pre-fetch share row ID so share button is instant
+    supabase.from('split_shares').select('id').eq('recording_id', recordingId).single()
+      .then(({ data }) => { if (data) setShareRowId(data.id); });
   }, []);
 
   const loadPaymentData = async () => {
@@ -495,17 +499,20 @@ export default function RecordingDetailScreen() {
     if (!recording) return;
     setShareLoading(true);
     try {
-      // Just get or create a stable share row — no data stored, page fetches live
-      const { data: existing } = await supabase.from('split_shares').select('id').eq('recording_id', recordingId).single();
-      let shareId = existing?.id;
-      if (!shareId) {
-        const { data: inserted, error } = await supabase.from('split_shares').insert({ recording_id: recordingId }).select('id').single();
-        if (error) throw error;
-        shareId = inserted?.id;
+      let sid = shareRowId;
+      if (!sid) {
+        const { data: existing } = await supabase.from('split_shares').select('id').eq('recording_id', recordingId).single();
+        sid = existing?.id ?? null;
+        if (!sid) {
+          const { data: inserted, error } = await supabase.from('split_shares').insert({ recording_id: recordingId }).select('id').single();
+          if (error) throw error;
+          sid = inserted?.id ?? null;
+        }
+        if (sid) setShareRowId(sid);
       }
-      if (!shareId) throw new Error('failed to create share');
+      if (!sid) throw new Error('failed to create share');
       const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://ledgr-six.vercel.app';
-      const shareUrl = `${baseUrl}/split/${shareId}`;
+      const shareUrl = `${baseUrl}/split/${sid}`;
       setSaveImageModal(false);
       if (typeof navigator !== 'undefined' && navigator.share) {
         await navigator.share({ title: 'Split breakdown', url: shareUrl });
