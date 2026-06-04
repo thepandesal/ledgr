@@ -1256,7 +1256,6 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                 <Text style={styles.modalBtnText}>{savingPeople ? 'saving...' : 'done'}</Text>
               </TouchableOpacity>
             </View>
-          </View>
         </BlurView>
       </Modal>
       {/* Add item modal */}
@@ -1467,8 +1466,6 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                   <Text style={[styles.pickerBtnText, { color: '#8a8a8a' }]}>cancel</Text>
                 </TouchableOpacity>
               </View>
-            </TouchableOpacity>
-          </TouchableOpacity>
         </BlurView>
       </Modal>
 
