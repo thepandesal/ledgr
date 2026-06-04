@@ -10,8 +10,8 @@ import { supabase } from '../../src/lib/supabase';
 import { BlurView } from 'expo-blur';
 
 const { width: SW } = Dimensions.get('window');
-const GRID_GAP = 6;
-const GRID_COLS = 4;
+const GRID_GAP = 4;
+const GRID_COLS = 5;
 const CELL = (SW - 64 - GRID_GAP * (GRID_COLS - 1)) / GRID_COLS;
 
 interface Photo { id: string; url: string; path: string; }
@@ -175,36 +175,47 @@ export default function ReceiptDetailScreen() {
 
       {/* Carousel modal */}
       {carouselIdx !== null && (
-        <View style={s.carouselModal}>
-          <BlurView intensity={90} tint="dark" style={StyleSheet.absoluteFill} />
-          <SafeAreaView style={{ flex: 1 }}>
-            <View style={s.carouselHeader}>
-              <TouchableOpacity onPress={() => setCarouselIdx(null)} style={s.carouselClose}>
-                <Ionicons name="close" size={24} color="#fff" />
-              </TouchableOpacity>
-              <Text style={s.carouselCount}>{(carouselIdx ?? 0) + 1} / {photos.length}</Text>
-              <TouchableOpacity onPress={() => deletePhoto(photos[carouselIdx ?? 0])} style={s.carouselClose}>
-                <Ionicons name="trash-outline" size={20} color="#ed6a6a" />
-              </TouchableOpacity>
-            </View>
-            <FlatList
-              ref={carouselRef}
-              data={photos}
-              keyExtractor={p => p.id}
-              horizontal
-              pagingEnabled
-              showsHorizontalScrollIndicator={false}
-              initialScrollIndex={carouselIdx}
-              getItemLayout={(_, index) => ({ length: SW, offset: SW * index, index })}
-              onMomentumScrollEnd={e => setCarouselIdx(Math.round(e.nativeEvent.contentOffset.x / SW))}
-              renderItem={({ item }) => (
-                <View style={{ width: SW, justifyContent: 'center', alignItems: 'center' }}>
-                  <Image source={{ uri: item.url }} style={{ width: SW, height: SW }} resizeMode="contain" />
+        <Modal visible transparent animationType="fade" onRequestClose={() => setCarouselIdx(null)}>
+          <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill}>
+            <SafeAreaView style={{ flex: 1 }}>
+              <View style={s.carouselHeader}>
+                <TouchableOpacity onPress={() => setCarouselIdx(null)} style={s.carouselClose}>
+                  <Ionicons name="close" size={24} color="#fff" />
+                </TouchableOpacity>
+                <Text style={s.carouselCount}>{(carouselIdx ?? 0) + 1} / {photos.length}</Text>
+                <TouchableOpacity onPress={() => deletePhoto(photos[carouselIdx ?? 0])} style={s.carouselClose}>
+                  <Ionicons name="trash-outline" size={20} color="#ed6a6a" />
+                </TouchableOpacity>
+              </View>
+              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                <FlatList
+                  ref={carouselRef}
+                  data={photos}
+                  keyExtractor={p => p.id}
+                  horizontal
+                  pagingEnabled
+                  showsHorizontalScrollIndicator={false}
+                  initialScrollIndex={carouselIdx}
+                  getItemLayout={(_, index) => ({ length: SW, offset: SW * index, index })}
+                  onMomentumScrollEnd={e => setCarouselIdx(Math.round(e.nativeEvent.contentOffset.x / SW))}
+                  renderItem={({ item }) => (
+                    <View style={{ width: SW, height: SW, justifyContent: 'center', alignItems: 'center' }}>
+                      <Image source={{ uri: item.url }} style={{ width: SW - 32, height: SW - 32, borderRadius: 14 }} resizeMode="contain" />
+                    </View>
+                  )}
+                />
+              </View>
+              {/* Dot indicators */}
+              {photos.length > 1 && (
+                <View style={s.carouselDots}>
+                  {photos.map((_, i) => (
+                    <View key={i} style={[s.carouselDot, i === carouselIdx && s.carouselDotActive]} />
+                  ))}
                 </View>
               )}
-            />
-          </SafeAreaView>
-        </View>
+            </SafeAreaView>
+          </BlurView>
+        </Modal>
       )}
 
       {/* Rename modal */}
@@ -263,10 +274,12 @@ const s = StyleSheet.create({
   actionBtnText: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#425252' },
   makeRecordingBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#425252', borderRadius: 999, paddingVertical: 14, marginTop: 8 },
   makeRecordingText: { fontFamily: 'RobotoMono_700Bold', fontSize: 13, color: '#fff' },
-  carouselModal: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   carouselHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 12 },
   carouselClose: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
   carouselCount: { fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: 'rgba(255,255,255,0.7)' },
+  carouselDots: { flexDirection: 'row', justifyContent: 'center', gap: 6, paddingBottom: 24 },
+  carouselDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.3)' },
+  carouselDotActive: { backgroundColor: '#fff', width: 16 },
   modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   modalBox: { backgroundColor: '#ffffff', borderRadius: 20, padding: 20, width: 300, gap: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 20, elevation: 10 },
   modalTitle: { fontFamily: 'ChillaxMedium', fontSize: 16, color: '#425252' },
