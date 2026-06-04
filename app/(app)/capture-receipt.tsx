@@ -67,32 +67,39 @@ export default function CaptureReceiptScreen() {
     setSaving(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) { setSaving(false); return; }
 
-      // Create or use existing receipt
+      // Create or use existing receipt entry
       let rId = receiptId;
       if (!rId) {
         const { data: rec, error } = await supabase.from('receipt_entries').insert({ user_id: user.id }).select().single();
-        if (error || !rec) throw error;
+        if (error || !rec) { Alert.alert('Error', error?.message ?? 'Failed to create receipt'); setSaving(false); return; }
         rId = rec.id;
       }
 
-      // Upload each photo to Supabase Storage
+      // Upload each photo to Supabase Storage bucket 'receipts'
       for (const uri of photos) {
         const fileName = `${user.id}/${rId}/${Date.now()}_${Math.random().toString(36).slice(2)}.jpg`;
-        const base64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
-        const byteArray = decode(base64);
+        let uploadData: Uint8Array | Blob;
+        if (typeof window !== 'undefined' && uri.startsWith('blob:')) {
+          // Web: use fetch to get blob
+          const response = await fetch(uri);
+          uploadData = await response.blob();
+        } else {
+          // Native: read as base64 and decode
+          const base64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
+          uploadData = decode(base64);
+        }
         const { error: uploadError } = await supabase.storage
-          .from('receipt_entries')
-          .upload(fileName, byteArray, { contentType: 'image/jpeg', upsert: false });
-        if (uploadError) throw uploadError;
+          .from('receipts')
+          .upload(fileName, uploadData, { contentType: 'image/jpeg', upsert: false });
+        if (uploadError) { Alert.alert('Upload Error', uploadError.message); setSaving(false); return; }
         await supabase.from('receipt_photos').insert({ entry_id: rId, storage_path: fileName });
       }
 
       router.replace({ pathname: '/(app)/(tabs)/receipts' } as any);
     } catch (e: any) {
-      Alert.alert('Error', e.message);
-    } finally {
+      Alert.alert('Error', e?.message ?? 'Something went wrong');
       setSaving(false);
     }
   };

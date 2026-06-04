@@ -37,7 +37,7 @@ export default function ReceiptDetailScreen() {
 
     if (photoRows) {
       const withUrls = await Promise.all(photoRows.map(async (p: any) => {
-        const { data } = await supabase.storage.from('receipt_entries').createSignedUrl(p.storage_path, 3600);
+        const { data } = await supabase.storage.from('receipts').createSignedUrl(p.storage_path, 3600);
         return { id: p.id, url: data?.signedUrl ?? '', path: p.storage_path };
       }));
       setPhotos(withUrls);
@@ -55,7 +55,7 @@ export default function ReceiptDetailScreen() {
       { text: 'Delete', style: 'destructive', onPress: async () => {
         // Delete photos from storage
         for (const p of photos) {
-          await supabase.storage.from('receipt_entries').remove([p.path]);
+          await supabase.storage.from('receipts').remove([p.path]);
         }
         await supabase.from('receipt_entries').delete().eq('id', receiptId);
         handleBack();
@@ -196,6 +196,7 @@ const styles = StyleSheet.create({
   addMorePhotosBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#fafafa', borderRadius: 999, paddingVertical: 12, borderWidth: 1, borderColor: '#e8e8e8' },
   addMorePhotosText: { fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#425252' },
 });
+
 
 
 
