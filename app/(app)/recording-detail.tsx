@@ -55,6 +55,7 @@ export default function RecordingDetailScreen() {
   const [payLoading, setPayLoading] = useState(false);
   const [linkedPayments, setLinkedPayments] = useState<any[]>([]);
   const [linkedPayable, setLinkedPayable] = useState<any>(null);
+  const [payablePerPerson, setPayablePerPerson] = useState<Record<string, number>>({});
 
   // Add item form state
   const [itemForms, setItemForms] = useState<{ name: string; cost: string; people: string[]; subitemForms: { name: string; people: string[] }[] }[]>([{ name: '', cost: '', people: [], subitemForms: [] }]);
@@ -110,12 +111,31 @@ export default function RecordingDetailScreen() {
     if (!rec) return;
     if (rec.type === 'payable') {
       const { data: payments } = await supabase.from('recordings')
-        .select('id, name, amount, transaction_date, payment_from_account_id, accounts:payment_from_account_id(account_name, bank)')
+        .select('id, name, amount, transaction_date, payment_to, payment_from_account_id, accounts:payment_from_account_id(account_name, bank)')
         .eq('linked_recording_id', recordingId).eq('type', 'expense').order('transaction_date', { ascending: false });
       if (payments) setLinkedPayments(payments);
     } else if (rec.type === 'expense' && rec.linked_recording_id) {
       const { data: payable } = await supabase.from('recordings').select('id, name, amount, status, paid_amount').eq('id', rec.linked_recording_id).single();
       if (payable) setLinkedPayable(payable);
+      // load per-person split data from the payable's bill_splits + split_items
+      const { data: splits } = await supabase.from('bill_splits').select('person_name').eq('recording_id', rec.linked_recording_id);
+      const { data: splitItems } = await supabase.from('split_items').select('*, split_subitems(*)').eq('recording_id', rec.linked_recording_id);
+      if (splits && splitItems) {
+        const perPersonMap: Record<string, number> = {};
+        splitItems.forEach((item: any) => {
+          const subs = item.split_subitems ?? [];
+          if (subs.length === 0) {
+            const pp = (item.people ?? []).length > 0 ? Number(item.cost) / item.people.length : 0;
+            (item.people ?? []).forEach((p: string) => { perPersonMap[p] = (perPersonMap[p] || 0) + pp; });
+          } else {
+            subs.forEach((sub: any) => {
+              const pp = (sub.people ?? []).length > 0 ? Number(sub.cost) / sub.people.length : 0;
+              (sub.people ?? []).forEach((p: string) => { perPersonMap[p] = (perPersonMap[p] || 0) + pp; });
+            });
+          }
+        });
+        setPayablePerPerson(perPersonMap);
+      }
     }
   };
 
@@ -175,6 +195,7 @@ export default function RecordingDetailScreen() {
         payment_from_account_id: payAccount?.id ?? recording.account_id,
         linked_recording_id: recordingId,
         category_id: recording.category_id ?? null,
+        payment_to: payMode === 'split' && paySelectedPeople.length > 0 ? paySelectedPeople.join(', ') : null,
       });
       const prevPaid = Number(recording.paid_amount ?? 0);
       const newPaid = prevPaid + amount;
@@ -821,6 +842,11 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                         <Text style={{ fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#929090' }}>
                           {formatDate(p.transaction_date)} · {p.accounts?.account_name ?? '—'}
                         </Text>
+                        {p.payment_to && (
+                          <Text style={{ fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#0ccfcf', marginTop: 2 }}>
+                            {p.payment_to}
+                          </Text>
+                        )}
                       </View>
                       <Ionicons name="chevron-forward" size={12} color="#c0c0c0" />
                     </View>
@@ -834,11 +860,27 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
           {/* Split bill */}
           <Text style={styles.sectionHeader}>split bill</Text>
           {linkedPayable ? (
-            <TouchableOpacity style={styles.linkedPayableBtn} onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: linkedPayable.id } } as any)}>
-              <Ionicons name="git-branch-outline" size={12} color="#929090" />
-              <Text style={styles.linkedPayableBtnText}>view split bill on payable</Text>
-              <Ionicons name="arrow-forward" size={11} color="#929090" />
-            </TouchableOpacity>
+            <>
+              <TouchableOpacity style={styles.linkedPayableBtn} onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: linkedPayable.id } } as any)}>
+                <Ionicons name="git-branch-outline" size={12} color="#929090" />
+                <Text style={styles.linkedPayableBtnText}>view split bill on payable</Text>
+                <Ionicons name="arrow-forward" size={11} color="#929090" />
+              </TouchableOpacity>
+              {Object.keys(payablePerPerson).length > 0 && (
+                <View style={styles.infoBlock}>
+                  {Object.entries(payablePerPerson).map(([name, total], i, arr) => (
+                    <View key={name}>
+                      <View style={infoStyles.row}>
+                        <Text style={infoStyles.label}>{name}</Text>
+                        <View style={infoStyles.dots} />
+                        <Text style={infoStyles.value}>{total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+                      </View>
+                      {i < arr.length - 1 && <View style={{ height: 1, backgroundColor: '#f0f0f0' }} />}
+                    </View>
+                  ))}
+                </View>
+              )}
+            </>
           ) : (<>
           <View style={styles.splitBtnGrid}>
             {[
