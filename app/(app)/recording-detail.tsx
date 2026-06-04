@@ -1201,57 +1201,62 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
       )}
 
       {/* Add people modal */}
-      <Modal visible={addPersonModal} transparent animationType="fade" onRequestClose={() => setAddPersonModal(false)}>
+      <Modal visible={addPersonModal} transparent animationType="slide" onRequestClose={() => { setPeople(savedPeople); setAddPersonModal(false); setSuggestions([]); }}>
         <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}>
-          <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setAddPersonModal(false)}>
-            <TouchableOpacity activeOpacity={1} onPress={e => e.stopPropagation()}>
-              <View style={styles.modalBox}>
-                <Text style={styles.modalTitle}>people</Text>
-                <ScrollView style={{ width: '100%', maxHeight: 260 }} showsVerticalScrollIndicator={false}>
-                  {people.map((p, i) => (
-                    <View key={i}>
-                      <View style={styles.personRow}>
-                        <TextInput
-                          style={styles.personInput}
-                          placeholder={`person ${i + 1}`}
-                          placeholderTextColor="#c0c0c0"
-                          value={p}
-                          onChangeText={v => updatePerson(i, v)}
-                          returnKeyType="next"
-                        />
-                        {people.length > 1 && (
-                          <TouchableOpacity onPress={() => requestDeletePerson(i)} style={styles.removeBtn}>
-                            <Ionicons name="close" size={14} color="#929090" />
-                          </TouchableOpacity>
-                        )}
-                      </View>
-                      {activeSuggestionIdx === i && suggestions.length > 0 && (
-                        <View style={styles.suggestionBox}>
-                          {suggestions.map((s, si) => (
-                            <TouchableOpacity key={si} style={styles.suggestionItem} onPress={() => pickSuggestion(i, s)}>
-                              <Text style={styles.suggestionText}>{s}</Text>
-                            </TouchableOpacity>
-                          ))}
-                        </View>
-                      )}
-                    </View>
-                  ))}
-                </ScrollView>
-                <TouchableOpacity style={styles.addMoreBtn} onPress={addPerson}>
-                  <Ionicons name="add" size={13} color="#0ccfcf" />
-                  <Text style={styles.addMoreText}>add more</Text>
-                </TouchableOpacity>
-                <View style={styles.modalBtns}>
-                  <TouchableOpacity style={[styles.modalBtn, { backgroundColor: '#f5f5f5' }]} onPress={() => { setPeople(savedPeople); setAddPersonModal(false); setSuggestions([]); }}>
-                    <Text style={[styles.modalBtnText, { color: '#8a8a8a' }]}>cancel</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={[styles.modalBtn, savingPeople && { opacity: 0.6 }]} onPress={savePeopleAndClose} disabled={savingPeople}>
-                    <Text style={styles.modalBtnText}>{savingPeople ? 'saving...' : 'done'}</Text>
-                  </TouchableOpacity>
-                </View>
+          <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => { setPeople(savedPeople); setAddPersonModal(false); setSuggestions([]); }} />
+          <View style={styles.sheet}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+              <View>
+                <Text style={styles.sheetSub}>split bill</Text>
+                <Text style={styles.sheetTitle}>people</Text>
               </View>
+              <TouchableOpacity onPress={() => { setPeople(savedPeople); setAddPersonModal(false); setSuggestions([]); }}>
+                <Ionicons name="close" size={22} color="#929090" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={{ width: '100%', maxHeight: 260 }} showsVerticalScrollIndicator={false}>
+              {people.map((p, i) => (
+                <View key={i}>
+                  <View style={styles.personRow}>
+                    <TextInput
+                      style={styles.personInput}
+                      placeholder={`person ${i + 1}`}
+                      placeholderTextColor="#c0c0c0"
+                      value={p}
+                      onChangeText={v => updatePerson(i, v)}
+                      returnKeyType="next"
+                    />
+                    {people.length > 1 && (
+                      <TouchableOpacity onPress={() => requestDeletePerson(i)} style={styles.removeBtn}>
+                        <Ionicons name="close" size={14} color="#929090" />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                  {activeSuggestionIdx === i && suggestions.length > 0 && (
+                    <View style={styles.suggestionBox}>
+                      {suggestions.map((s, si) => (
+                        <TouchableOpacity key={si} style={styles.suggestionItem} onPress={() => pickSuggestion(i, s)}>
+                          <Text style={styles.suggestionText}>{s}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+                </View>
+              ))}
+            </ScrollView>
+            <TouchableOpacity style={styles.addMoreBtn} onPress={addPerson}>
+              <Ionicons name="add" size={13} color="#0ccfcf" />
+              <Text style={styles.addMoreText}>add more</Text>
             </TouchableOpacity>
-          </TouchableOpacity>
+            <View style={[styles.modalBtns, { marginTop: 16 }]}>
+              <TouchableOpacity style={[styles.modalBtn, { backgroundColor: '#f5f5f5' }]} onPress={() => { setPeople(savedPeople); setAddPersonModal(false); setSuggestions([]); }}>
+                <Text style={[styles.modalBtnText, { color: '#8a8a8a' }]}>cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.modalBtn, savingPeople && { opacity: 0.6 }]} onPress={savePeopleAndClose} disabled={savingPeople}>
+                <Text style={styles.modalBtnText}>{savingPeople ? 'saving...' : 'done'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </BlurView>
       </Modal>
       {/* Add item modal */}
@@ -1275,88 +1280,74 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
       />
 
       {/* Edit subitems modal */}
-      <Modal visible={!!editSubitemsItemId} transparent animationType="fade" onRequestClose={() => setEditSubitemsItemId(null)}>
+      <Modal visible={!!editSubitemsItemId} transparent animationType="slide" onRequestClose={() => setEditSubitemsItemId(null)}>
         <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}>
-          <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setEditSubitemsItemId(null)}>
-            <TouchableOpacity activeOpacity={1} onPress={e => e.stopPropagation()}>
-              <View style={styles.modalBox}>
-                {(() => {
-                  const item = items.find(i => i.id === editSubitemsItemId);
-                  if (!item) return null;
-                  const totalSubs = item.subitems.length + editSubitemForms.filter(s => s.name.trim()).length;
-                  const equalCost = totalSubs > 0 ? item.cost / totalSubs : item.cost;
-                  return (
-                    <>
-                      <Text style={styles.modalTitle}>add subitems</Text>
-                      <Text style={styles.subitemRemaining}>
-                        {item.name} · {item.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                      </Text>
-                      {item.subitems.length > 0 && (
-                        <Text style={styles.subitemRemaining}>
-                          {item.subitems.length} existing · will become {equalCost.toLocaleString('en-US', { minimumFractionDigits: 2 })} each
-                        </Text>
-                      )}
-                      <ScrollView style={{ width: '100%', maxHeight: 280 }} showsVerticalScrollIndicator={false}>
-                        {editSubitemForms.map((sub, i) => (
-                          <View key={i} style={styles.subitemFormRow}>
-                            <Text style={styles.subitemArrow}>↳</Text>
-                            <View style={{ flex: 1, gap: 6 }}>
-                              <View style={styles.subitemFormInputRow}>
-                                <TextInput
-                                  style={styles.subitemFormInput}
-                                  placeholder="subitem name"
-                                  placeholderTextColor="#c0c0c0"
-                                  value={sub.name}
-                                  onChangeText={v => updateEditSubitemForm(i, v)}
-                                  autoFocus={i === 0}
-                                />
-                                {sub.name.trim() && (
-                                  <Text style={styles.subitemAutoHint}>
-                                    {equalCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                                  </Text>
-                                )}
-                                {editSubitemForms.length > 1 && (
-                                  <TouchableOpacity onPress={() => removeEditSubitemForm(i)} style={styles.removeBtn}>
-                                    <Ionicons name="close" size={12} color="#c0c0c0" />
-                                  </TouchableOpacity>
-                                )}
-                              </View>
-                              <View style={styles.itemPeopleSelect}>
-                                {filledPeople.map((p, pi) => {
-                                  const sel = sub.people.includes(p);
-                                  return (
-                                    <TouchableOpacity key={pi} style={[styles.personSelectChip, sel && styles.personSelectChipActive]} onPress={() => toggleEditSubitemPerson(i, p)}>
-                                      <Text style={[styles.personSelectText, sel && styles.personSelectTextActive]}>{p}</Text>
-                                    </TouchableOpacity>
-                                  );
-                                })}
-                              </View>
-                            </View>
+          <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setEditSubitemsItemId(null)} />
+          <View style={styles.sheet}>
+            {(() => {
+              const item = items.find(i => i.id === editSubitemsItemId);
+              if (!item) return null;
+              const totalSubs = item.subitems.length + editSubitemForms.filter(s => s.name.trim()).length;
+              const equalCost = totalSubs > 0 ? item.cost / totalSubs : item.cost;
+              return (
+                <>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+                    <View>
+                      <Text style={styles.sheetSub}>split bill</Text>
+                      <Text style={styles.sheetTitle}>add subitems</Text>
+                    </View>
+                    <TouchableOpacity onPress={() => setEditSubitemsItemId(null)}>
+                      <Ionicons name="close" size={22} color="#929090" />
+                    </TouchableOpacity>
+                  </View>
+                  <Text style={styles.subitemRemaining}>{item.name} · {item.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+                  {item.subitems.length > 0 && (
+                    <Text style={styles.subitemRemaining}>{item.subitems.length} existing · will become {equalCost.toLocaleString('en-US', { minimumFractionDigits: 2 })} each</Text>
+                  )}
+                  <ScrollView style={{ width: '100%', maxHeight: 280 }} showsVerticalScrollIndicator={false}>
+                    {editSubitemForms.map((sub, i) => (
+                      <View key={i} style={styles.subitemFormRow}>
+                        <Text style={styles.subitemArrow}>↳</Text>
+                        <View style={{ flex: 1, gap: 6 }}>
+                          <View style={styles.subitemFormInputRow}>
+                            <TextInput style={styles.subitemFormInput} placeholder="subitem name" placeholderTextColor="#c0c0c0" value={sub.name} onChangeText={v => updateEditSubitemForm(i, v)} autoFocus={i === 0} />
+                            {sub.name.trim() && <Text style={styles.subitemAutoHint}>{equalCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>}
+                            {editSubitemForms.length > 1 && (
+                              <TouchableOpacity onPress={() => removeEditSubitemForm(i)} style={styles.removeBtn}>
+                                <Ionicons name="close" size={12} color="#c0c0c0" />
+                              </TouchableOpacity>
+                            )}
                           </View>
-                        ))}
-                      </ScrollView>
-                      <TouchableOpacity style={styles.addMoreBtn} onPress={addEditSubitemForm}>
-                        <Ionicons name="add" size={11} color="#0ccfcf" />
-                        <Text style={styles.addMoreText}>add more</Text>
-                      </TouchableOpacity>
-                      <View style={styles.modalBtns}>
-                        <TouchableOpacity style={[styles.modalBtn, { backgroundColor: '#f5f5f5' }]} onPress={() => setEditSubitemsItemId(null)}>
-                          <Text style={[styles.modalBtnText, { color: '#8a8a8a' }]}>cancel</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[styles.modalBtn, editSubitemForms.every(s => !s.name.trim()) && { opacity: 0.4 }]}
-                          onPress={saveEditSubitems}
-                          disabled={editSubitemForms.every(s => !s.name.trim())}
-                        >
-                          <Text style={styles.modalBtnText}>save</Text>
-                        </TouchableOpacity>
+                          <View style={styles.itemPeopleSelect}>
+                            {filledPeople.map((p, pi) => {
+                              const sel = sub.people.includes(p);
+                              return (
+                                <TouchableOpacity key={pi} style={[styles.personSelectChip, sel && styles.personSelectChipActive]} onPress={() => toggleEditSubitemPerson(i, p)}>
+                                  <Text style={[styles.personSelectText, sel && styles.personSelectTextActive]}>{p}</Text>
+                                </TouchableOpacity>
+                              );
+                            })}
+                          </View>
+                        </View>
                       </View>
-                    </>
-                  );
-                })()}
-              </View>
-            </TouchableOpacity>
-          </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                  <TouchableOpacity style={styles.addMoreBtn} onPress={addEditSubitemForm}>
+                    <Ionicons name="add" size={11} color="#0ccfcf" />
+                    <Text style={styles.addMoreText}>add more</Text>
+                  </TouchableOpacity>
+                  <View style={[styles.modalBtns, { marginTop: 16 }]}>
+                    <TouchableOpacity style={[styles.modalBtn, { backgroundColor: '#f5f5f5' }]} onPress={() => setEditSubitemsItemId(null)}>
+                      <Text style={[styles.modalBtnText, { color: '#8a8a8a' }]}>cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[styles.modalBtn, editSubitemForms.every(s => !s.name.trim()) && { opacity: 0.4 }]} onPress={saveEditSubitems} disabled={editSubitemForms.every(s => !s.name.trim())}>
+                      <Text style={styles.modalBtnText}>save</Text>
+                    </TouchableOpacity>
+                  </View>
+                </>
+              );
+            })()}
+          </View>
         </BlurView>
       </Modal>
 
@@ -1441,12 +1432,17 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
       </Modal>
 
       {/* Link receipt modal */}
-      <Modal visible={linkReceiptModal} transparent animationType="fade" onRequestClose={() => setLinkReceiptModal(false)}>
+      <Modal visible={linkReceiptModal} transparent animationType="slide" onRequestClose={() => setLinkReceiptModal(false)}>
         <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}>
-          <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setLinkReceiptModal(false)}>
-            <TouchableOpacity activeOpacity={1} onPress={e => e.stopPropagation()}>
-              <View style={[styles.modalBox, { width: 320 }]}>
-                <Text style={styles.modalTitle}>link a receipt</Text>
+          <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setLinkReceiptModal(false)} />
+          <View style={styles.sheet}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+              <View>
+                <Text style={styles.sheetSub}>receipt</Text>
+                <Text style={styles.sheetTitle}>link a receipt</Text>
+              </View>
+              <TouchableOpacity onPress={() => setLinkReceiptModal(false)}><Ionicons name="close" size={22} color="#929090" /></TouchableOpacity>
+            </View>
                 {linkReceiptEntries.length === 0 ? (
                   <Text style={{ fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#929090', textAlign: 'center', paddingVertical: 16 }}>no unlinked receipts found</Text>
                 ) : (
@@ -1477,7 +1473,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
       </Modal>
 
       {/* Pay modal */}
-      <Modal visible={payModal} transparent animationType="fade" onRequestClose={() => setPayModal(false)}>
+      <Modal visible={payModal} transparent animationType="slide" onRequestClose={() => setPayModal(false)}>
         <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}>
           <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setPayModal(false)}>
             <TouchableOpacity activeOpacity={1} onPress={e => e.stopPropagation()}>
@@ -1682,7 +1678,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
       </Modal>
 
       {/* Collect modal */}
-      <Modal visible={collectModal} transparent animationType="fade" onRequestClose={() => setCollectModal(false)}>
+      <Modal visible={collectModal} transparent animationType="slide" onRequestClose={() => setCollectModal(false)}>
         <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}>
           <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setCollectModal(false)}>
             <TouchableOpacity activeOpacity={1} onPress={e => e.stopPropagation()}>
@@ -1869,6 +1865,9 @@ const styles = StyleSheet.create({
   tooltipText: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#fff' },
   modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   modalBox: { backgroundColor: '#ffffff', borderRadius: 20, padding: 20, width: 300, gap: 12, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 20, elevation: 10 },
+  sheet: { backgroundColor: '#ffffff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 48, maxHeight: '85%' },
+  sheetTitle: { fontFamily: 'Avenelle', fontSize: 26, color: '#425252', letterSpacing: -0.5, lineHeight: 30, marginBottom: 4 },
+  sheetSub: { fontFamily: 'ChillaxMedium', fontSize: 11, color: '#929090', marginBottom: 0 },
   modalTitle: { fontFamily: 'ChillaxMedium', fontSize: 16, color: '#425252', alignSelf: 'flex-start' },
   modalBtns: { flexDirection: 'row', gap: 10, width: '100%' },
   modalBtn: { flex: 1, backgroundColor: '#425252', borderRadius: 999, paddingVertical: 11, alignItems: 'center' },
