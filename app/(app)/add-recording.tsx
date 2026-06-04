@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../../src/lib/supabase';
 import { BlurView } from 'expo-blur';
+import { setPendingFocusDate } from './space-detail';
 
 const { width } = Dimensions.get('window');
 
@@ -32,6 +33,18 @@ export default function AddRecordingScreen() {
   const [date, setDate] = useState(defaultDate ?? new Date().toISOString().split('T')[0]);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [dateInputVal, setDateInputVal] = useState('');
+
+  const MONTHS = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+  const parsedDate = date ? date.split('-') : ['', '', ''];
+  const [pickerMonth, setPickerMonth] = useState(parseInt(parsedDate[1] ?? '1') - 1);
+  const [pickerDay, setPickerDay] = useState(parsedDate[2] ?? '');
+  const [pickerYear, setPickerYear] = useState(parsedDate[0] ?? '');
+
+  const applyDate = (m: number, d: string, y: string) => {
+    const mm = String(m + 1).padStart(2, '0');
+    const dd = String(d).padStart(2, '0');
+    if (y.length === 4 && parseInt(d) > 0 && parseInt(d) <= 31) setDate(`${y}-${mm}-${dd}`);
+  };
   const [notes, setNotes] = useState('');
   const [categories, setCategories] = useState<any[]>([]);
   const [accounts, setAccounts] = useState<any[]>([]);
@@ -41,17 +54,25 @@ export default function AddRecordingScreen() {
   const [recurringDate, setRecurringDate] = useState('1');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [categoryInput, setCategoryInput] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<any>(null);
-  const [categorySuggestions, setCategorySuggestions] = useState<any[]>([]);
-  const [accountInput, setAccountInput] = useState('');
   const [selectedAccount, setSelectedAccount] = useState<any>(null);
-  const [accountSuggestions, setAccountSuggestions] = useState<any[]>([]);
   const [personName, setPersonName] = useState('');
   const [receiptPhotos, setReceiptPhotos] = useState<string[]>([]);
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [showAccountModal, setShowAccountModal] = useState(false);
+  const [categorySearch, setCategorySearch] = useState('');
+  const [accountSearch, setAccountSearch] = useState('');
 
   const isLoanType = type === 'receivable' || type === 'payable';
   const selectedType = TYPES.find(t => t.key === type)!;
+
+  const filteredCategories = categorySearch.trim()
+    ? categories.filter(c => c.name.toLowerCase().includes(categorySearch.toLowerCase()))
+    : categories;
+
+  const filteredAccounts = accountSearch.trim()
+    ? accounts.filter(a => a.account_name.toLowerCase().includes(accountSearch.toLowerCase()))
+    : accounts;
 
   useEffect(() => {
     Animated.timing(slideAnim, { toValue: 0, duration: 280, useNativeDriver: true }).start();
@@ -88,6 +109,10 @@ export default function AddRecordingScreen() {
         setRecName(rec.name); setType(rec.type); setAmount(String(rec.amount));
         setDate(rec.transaction_date); setNotes(rec.notes ?? '');
         setPersonName(rec.person_name ?? '');
+        const dp = rec.transaction_date.split('-');
+        setPickerMonth(parseInt(dp[1]) - 1);
+        setPickerDay(dp[2]);
+        setPickerYear(dp[0]);
         if (rec.categories) setSelectedCategory(rec.categories);
         if (rec.account) setSelectedAccount(rec.account);
         if (rec.is_recurring) {
@@ -100,16 +125,6 @@ export default function AddRecordingScreen() {
 
   const handleBack = () => {
     Animated.timing(slideAnim, { toValue: width, duration: 250, useNativeDriver: true }).start(() => router.back());
-  };
-
-  const handleCategoryInput = (val: string) => {
-    setCategoryInput(val); setSelectedCategory(null);
-    setCategorySuggestions(val.trim() ? categories.filter(c => c.name.toLowerCase().includes(val.toLowerCase())) : []);
-  };
-
-  const handleAccountInput = (val: string) => {
-    setAccountInput(val); setSelectedAccount(null);
-    setAccountSuggestions(val.trim() ? accounts.filter(a => a.account_name.toLowerCase().includes(val.toLowerCase())) : []);
   };
 
   const handleSave = async () => {
@@ -141,11 +156,11 @@ export default function AddRecordingScreen() {
         });
         if (err) throw err;
       }
-      // Link receipt if coming from receipt screen
       if (receiptId) {
         const { data: savedRec } = await supabase.from('recordings').select('id').order('created_at', { ascending: false }).limit(1).single();
         if (savedRec) await supabase.from('receipt_entries').update({ recording_id: savedRec.id }).eq('id', receiptId);
       }
+      setPendingFocusDate(date);
       handleBack();
     } catch (e: any) { setError(e.message); setLoading(false); }
   };
@@ -169,7 +184,6 @@ export default function AddRecordingScreen() {
 
         <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
 
-          {/* Receipt photo carousel */}
           {receiptPhotos.length > 0 && (
             <View style={styles.receiptCarousel}>
               <Text style={styles.receiptCarouselLabel}>receipt reference</Text>
@@ -204,7 +218,7 @@ export default function AddRecordingScreen() {
           </View>
 
           {/* Info block */}
-          <View style={styles.infoBlock}>
+          <View style={[styles.infoBlock, { marginTop: 20 }]}>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>name</Text>
               <TextInput
@@ -234,74 +248,100 @@ export default function AddRecordingScreen() {
               </View>
             </View>
             <View style={styles.infoDivider} />
-            <TouchableOpacity style={styles.infoRow} onPress={() => { setDateInputVal(date); setShowDatePicker(true); }}>
+            <View style={[styles.infoRow, { flexDirection: 'column', alignItems: 'flex-start', gap: 8, paddingVertical: 12 }]}>
               <Text style={styles.infoLabel}>date</Text>
-              <Text style={styles.infoValue}>{date}</Text>
-            </TouchableOpacity>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, width: '100%' }}>
+                {MONTHS.map((m, i) => (
+                  <TouchableOpacity
+                    key={m}
+                    style={[styles.typeBtn, pickerMonth === i && { backgroundColor: '#0ccfcf', borderColor: '#0ccfcf' }]}
+                    onPress={() => { setPickerMonth(i); applyDate(i, pickerDay, pickerYear); }}
+                  >
+                    <Text style={[styles.typeBtnText, pickerMonth === i && { color: '#fff', fontFamily: 'RobotoMono_700Bold' }]}>{m}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <View style={{ flexDirection: 'row', gap: 10, width: '100%' }}>
+                <TextInput
+                  style={[styles.infoInput, { backgroundColor: '#f5f5f5', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, borderWidth: 1, borderColor: '#f0f0f0', width: 60 }]}
+                  placeholder="dd"
+                  placeholderTextColor="#c0c0c0"
+                  value={pickerDay}
+                  onChangeText={v => { setPickerDay(v); applyDate(pickerMonth, v, pickerYear); }}
+                  keyboardType="number-pad"
+                  maxLength={2}
+                />
+                <TextInput
+                  style={[styles.infoInput, { backgroundColor: '#f5f5f5', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, borderWidth: 1, borderColor: '#f0f0f0', width: 80 }]}
+                  placeholder="yyyy"
+                  placeholderTextColor="#c0c0c0"
+                  value={pickerYear}
+                  onChangeText={v => { setPickerYear(v); applyDate(pickerMonth, pickerDay, v); }}
+                  keyboardType="number-pad"
+                  maxLength={4}
+                />
+              </View>
+            </View>
           </View>
 
           {/* Category */}
           <Text style={styles.label}>category <Text style={styles.optional}>(optional)</Text></Text>
-          {selectedCategory ? (
-            <View style={styles.badgeRow}>
-              <View style={[styles.badge, { backgroundColor: selectedCategory.color }]}>
-                <Ionicons name={selectedCategory.icon} size={12} color="#1c1d1d" />
-                <Text style={styles.badgeText}>{selectedCategory.name}</Text>
-                <TouchableOpacity onPress={() => { setSelectedCategory(null); setCategoryInput(''); }}>
-                  <Ionicons name="close" size={12} color="#1c1d1d" />
-                </TouchableOpacity>
-              </View>
-            </View>
-          ) : (
-            <>
-              <TextInput style={styles.input} placeholder="search categories..." placeholderTextColor="#c0c0c0" value={categoryInput} onChangeText={handleCategoryInput} />
-              {categorySuggestions.length > 0 && (
-                <View style={styles.dropdown}>
-                  {categorySuggestions.map(c => (
-                    <TouchableOpacity key={c.id} style={styles.dropdownItem} onPress={() => { setSelectedCategory(c); setCategoryInput(''); setCategorySuggestions([]); }}>
-                      <View style={[styles.catDot, { backgroundColor: c.color }]}><Ionicons name={c.icon} size={11} color="#1c1d1d" /></View>
-                      <Text style={styles.dropdownText}>{c.name}</Text>
-                    </TouchableOpacity>
-                  ))}
+          <TouchableOpacity style={styles.pickerSelector} onPress={() => { setCategorySearch(''); setShowCategoryModal(true); }}>
+            {selectedCategory ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                <View style={[styles.catDot, { backgroundColor: selectedCategory.color }]}>
+                  <Ionicons name={selectedCategory.icon} size={11} color="#1c1d1d" />
                 </View>
+                <Text style={styles.pickerSelectorText}>{selectedCategory.name}</Text>
+              </View>
+            ) : (
+              <Text style={styles.pickerSelectorPlaceholder}>select category</Text>
+            )}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              {selectedCategory && (
+                <TouchableOpacity onPress={() => setSelectedCategory(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Ionicons name="close" size={14} color="#929090" />
+                </TouchableOpacity>
               )}
-            </>
-          )}
+              <Ionicons name="chevron-down" size={14} color="#c0c0c0" />
+            </View>
+          </TouchableOpacity>
 
           {/* Account */}
           <Text style={styles.label}>account <Text style={styles.optional}>(optional)</Text></Text>
-          {selectedAccount ? (
-            <View style={styles.badgeRow}>
-              <View style={[styles.badge, { backgroundColor: selectedAccount.color }]}>
-                <Text style={styles.badgeText}>{selectedAccount.account_name}</Text>
-                <Text style={[styles.badgeText, { fontFamily: 'RobotoMono_400Regular', fontSize: 10 }]}>· {selectedAccount.bank}</Text>
-                <TouchableOpacity onPress={() => { setSelectedAccount(null); setAccountInput(''); }}>
-                  <Ionicons name="close" size={12} color="#1c1d1d" />
-                </TouchableOpacity>
-              </View>
-            </View>
-          ) : (
-            <>
-              <TextInput style={styles.input} placeholder="search accounts..." placeholderTextColor="#c0c0c0" value={accountInput} onChangeText={handleAccountInput} />
-              {accountSuggestions.length > 0 && (
-                <View style={styles.dropdown}>
-                  {accountSuggestions.map(a => (
-                    <TouchableOpacity key={a.id} style={styles.dropdownItem} onPress={() => { setSelectedAccount(a); setAccountInput(''); setAccountSuggestions([]); }}>
-                      <View style={[styles.catDot, { backgroundColor: a.color }]} />
-                      <View>
-                        <Text style={styles.dropdownText}>{a.account_name}</Text>
-                        <Text style={styles.dropdownSub}>{a.bank}</Text>
-                      </View>
-                    </TouchableOpacity>
-                  ))}
+          <TouchableOpacity style={styles.pickerSelector} onPress={() => { setAccountSearch(''); setShowAccountModal(true); }}>
+            {selectedAccount ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                <View style={[styles.catDot, { backgroundColor: selectedAccount.color ?? '#e8e8e8' }]} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.pickerSelectorText}>{selectedAccount.account_name}</Text>
+                  <Text style={styles.pickerSelectorSub}>{selectedAccount.bank}</Text>
                 </View>
+              </View>
+            ) : (
+              <Text style={styles.pickerSelectorPlaceholder}>select account</Text>
+            )}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              {selectedAccount && (
+                <TouchableOpacity onPress={() => setSelectedAccount(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Ionicons name="close" size={14} color="#929090" />
+                </TouchableOpacity>
               )}
-            </>
-          )}
+              <Ionicons name="chevron-down" size={14} color="#c0c0c0" />
+            </View>
+          </TouchableOpacity>
 
           {/* Notes */}
           <Text style={styles.label}>notes <Text style={styles.optional}>(optional)</Text></Text>
-          <TextInput style={[styles.input, styles.textArea]} placeholder="add a note..." placeholderTextColor="#c0c0c0" value={notes} onChangeText={setNotes} multiline numberOfLines={3} />
+          <TextInput
+            style={[styles.input, styles.textArea]}
+            placeholder="add a note..."
+            placeholderTextColor="#c0c0c0"
+            value={notes}
+            onChangeText={setNotes}
+            multiline
+            numberOfLines={3}
+          />
 
           {/* Person */}
           {isLoanType && (
@@ -366,42 +406,87 @@ export default function AddRecordingScreen() {
         </ScrollView>
       </SafeAreaView>
 
-      {/* Date Picker Modal */}
-      <Modal visible={showDatePicker} transparent animationType="fade" onRequestClose={() => setShowDatePicker(false)}>
+      {/* Category Modal */}
+      <Modal visible={showCategoryModal} transparent animationType="fade" onRequestClose={() => setShowCategoryModal(false)}>
         <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}>
-          <TouchableOpacity style={styles.pickerOverlay} activeOpacity={1} onPress={() => setShowDatePicker(false)}>
+          <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowCategoryModal(false)}>
             <TouchableOpacity activeOpacity={1} onPress={e => e.stopPropagation()}>
-              <View style={styles.pickerBox}>
-                <Text style={styles.pickerTitle}>pick a date</Text>
+              <View style={styles.pickerModal}>
+                <Text style={styles.pickerModalTitle}>category</Text>
                 <TextInput
-                  style={styles.pickerInput}
-                  placeholder="YYYY-MM-DD"
-                  placeholderTextColor="#b0b0b0"
-                  value={dateInputVal}
-                  onChangeText={setDateInputVal}
-                  autoFocus
-                  returnKeyType="done"
-                  onSubmitEditing={() => {
-                    const parsed = new Date(dateInputVal);
-                    if (!isNaN(parsed.getTime())) { setDate(dateInputVal); setShowDatePicker(false); }
-                  }}
+                  style={styles.pickerModalSearch}
+                  placeholder="search..."
+                  placeholderTextColor="#c0c0c0"
+                  value={categorySearch}
+                  onChangeText={setCategorySearch}
                 />
-                <View style={{ flexDirection: 'row', gap: 10 }}>
-                  <TouchableOpacity style={[styles.pickerBtn, { flex: 1, backgroundColor: '#f5f5f5' }]} onPress={() => setShowDatePicker(false)}>
-                    <Text style={[styles.pickerBtnText, { color: '#8a8a8a' }]}>cancel</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={[styles.pickerBtn, { flex: 1 }]} onPress={() => {
-                    const parsed = new Date(dateInputVal);
-                    if (!isNaN(parsed.getTime())) { setDate(dateInputVal); setShowDatePicker(false); }
-                  }}>
-                    <Text style={styles.pickerBtnText}>set date</Text>
-                  </TouchableOpacity>
-                </View>
+                <ScrollView style={styles.pickerModalList} showsVerticalScrollIndicator={false}>
+                  {filteredCategories.length === 0 ? (
+                    <Text style={styles.pickerModalEmpty}>no categories found</Text>
+                  ) : filteredCategories.map(c => (
+                    <TouchableOpacity
+                      key={c.id}
+                      style={[styles.pickerModalItem, selectedCategory?.id === c.id && styles.pickerModalItemActive]}
+                      onPress={() => { setSelectedCategory(c); setShowCategoryModal(false); }}
+                    >
+                      <View style={[styles.catDot, { backgroundColor: c.color }]}>
+                        <Ionicons name={c.icon} size={11} color="#1c1d1d" />
+                      </View>
+                      <Text style={[styles.pickerModalItemText, selectedCategory?.id === c.id && { color: '#fff', fontFamily: 'RobotoMono_700Bold' }]}>{c.name}</Text>
+                      {selectedCategory?.id === c.id && <Ionicons name="checkmark" size={14} color="#fff" style={{ marginLeft: 'auto' }} />}
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+                <TouchableOpacity style={styles.pickerModalCancel} onPress={() => setShowCategoryModal(false)}>
+                  <Text style={styles.pickerModalCancelText}>cancel</Text>
+                </TouchableOpacity>
               </View>
             </TouchableOpacity>
           </TouchableOpacity>
         </BlurView>
       </Modal>
+
+      {/* Account Modal */}
+      <Modal visible={showAccountModal} transparent animationType="fade" onRequestClose={() => setShowAccountModal(false)}>
+        <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}>
+          <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowAccountModal(false)}>
+            <TouchableOpacity activeOpacity={1} onPress={e => e.stopPropagation()}>
+              <View style={styles.pickerModal}>
+                <Text style={styles.pickerModalTitle}>account</Text>
+                <TextInput
+                  style={styles.pickerModalSearch}
+                  placeholder="search..."
+                  placeholderTextColor="#c0c0c0"
+                  value={accountSearch}
+                  onChangeText={setAccountSearch}
+                />
+                <ScrollView style={styles.pickerModalList} showsVerticalScrollIndicator={false}>
+                  {filteredAccounts.length === 0 ? (
+                    <Text style={styles.pickerModalEmpty}>no accounts found</Text>
+                  ) : filteredAccounts.map(a => (
+                    <TouchableOpacity
+                      key={a.id}
+                      style={[styles.pickerModalItem, selectedAccount?.id === a.id && styles.pickerModalItemActive]}
+                      onPress={() => { setSelectedAccount(a); setShowAccountModal(false); }}
+                    >
+                      <View style={[styles.catDot, { backgroundColor: a.color ?? '#e8e8e8' }]} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.pickerModalItemText, selectedAccount?.id === a.id && { color: '#fff', fontFamily: 'RobotoMono_700Bold' }]}>{a.account_name}</Text>
+                        <Text style={[styles.pickerModalItemSub, selectedAccount?.id === a.id && { color: 'rgba(255,255,255,0.7)' }]}>{a.bank} · {a.account_number}</Text>
+                      </View>
+                      {selectedAccount?.id === a.id && <Ionicons name="checkmark" size={14} color="#fff" />}
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+                <TouchableOpacity style={styles.pickerModalCancel} onPress={() => setShowAccountModal(false)}>
+                  <Text style={styles.pickerModalCancelText}>cancel</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </BlurView>
+      </Modal>
+
     </Animated.View>
   );
 }
@@ -433,14 +518,7 @@ const styles = StyleSheet.create({
   amountSign: { fontFamily: 'RobotoMono_700Bold', fontSize: 16 },
   input: { backgroundColor: '#fafafa', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 11, fontFamily: 'RobotoMono_400Regular', fontSize: 16, color: '#425252', borderWidth: 1, borderColor: '#f0f0f0' },
   textArea: { minHeight: 72, textAlignVertical: 'top' },
-  dropdown: { backgroundColor: '#fafafa', borderRadius: 10, marginTop: 4, overflow: 'hidden', borderWidth: 1, borderColor: '#f0f0f0' },
-  dropdownItem: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
-  dropdownText: { fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#425252' },
-  dropdownSub: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#929090', marginTop: 1 },
   catDot: { width: 22, height: 22, borderRadius: 11, justifyContent: 'center', alignItems: 'center' },
-  badgeRow: { flexDirection: 'row' },
-  badge: { flexDirection: 'row', alignItems: 'center', borderRadius: 999, paddingVertical: 6, paddingHorizontal: 12, gap: 6 },
-  badgeText: { fontFamily: 'RobotoMono_700Bold', fontSize: 11, color: '#1c1d1d' },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   chip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: '#e8e8e8', backgroundColor: '#fafafa' },
   chipActive: { backgroundColor: '#0ccfcf', borderColor: '#0ccfcf' },
@@ -452,6 +530,25 @@ const styles = StyleSheet.create({
   saveBtn: { backgroundColor: '#425252', borderRadius: 999, paddingVertical: 14, alignItems: 'center', marginTop: 24 },
   saveBtnDisabled: { opacity: 0.4 },
   saveBtnText: { fontFamily: 'RobotoMono_700Bold', fontSize: 13, color: '#fff' },
+  // Picker selector button
+  pickerSelector: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#fafafa', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1, borderColor: '#f0f0f0' },
+  pickerSelectorText: { fontFamily: 'RobotoMono_400Regular', fontSize: 16, color: '#425252' },
+  pickerSelectorSub: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#929090', marginTop: 1 },
+  pickerSelectorPlaceholder: { fontFamily: 'RobotoMono_400Regular', fontSize: 16, color: '#c0c0c0' },
+  // Picker modal
+  modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  pickerModal: { backgroundColor: '#ffffff', borderRadius: 20, padding: 20, width: 300, gap: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 20, elevation: 10 },
+  pickerModalTitle: { fontFamily: 'ChillaxMedium', fontSize: 16, color: '#425252' },
+  pickerModalSearch: { backgroundColor: '#f5f5f5', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontFamily: 'RobotoMono_400Regular', fontSize: 16, color: '#425252', borderWidth: 1, borderColor: '#f0f0f0' },
+  pickerModalList: { maxHeight: 220 },
+  pickerModalEmpty: { fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#c0c0c0', textAlign: 'center', paddingVertical: 16 },
+  pickerModalItem: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, paddingHorizontal: 4, borderRadius: 10 },
+  pickerModalItemActive: { backgroundColor: '#425252', paddingHorizontal: 10 },
+  pickerModalItemText: { fontFamily: 'RobotoMono_400Regular', fontSize: 13, color: '#425252', flex: 1 },
+  pickerModalItemSub: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#929090' },
+  pickerModalCancel: { backgroundColor: '#f5f5f5', borderRadius: 999, paddingVertical: 11, alignItems: 'center' },
+  pickerModalCancelText: { fontFamily: 'RobotoMono_700Bold', fontSize: 13, color: '#8a8a8a' },
+  // Date picker
   pickerOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   pickerBox: { backgroundColor: '#ffffff', borderRadius: 20, padding: 24, width: '80%', gap: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 20, elevation: 10 },
   pickerTitle: { fontFamily: 'ChillaxMedium', fontSize: 16, color: '#425252' },
@@ -459,4 +556,3 @@ const styles = StyleSheet.create({
   pickerBtn: { backgroundColor: '#425252', borderRadius: 999, paddingVertical: 11, alignItems: 'center' },
   pickerBtnText: { fontFamily: 'RobotoMono_700Bold', fontSize: 12, color: '#fff' },
 });
-

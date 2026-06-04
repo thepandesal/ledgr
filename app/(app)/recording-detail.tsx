@@ -45,6 +45,9 @@ export default function RecordingDetailScreen() {
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [activeSuggestionIdx, setActiveSuggestionIdx] = useState<number | null>(null);
   const [deletePersonConfirm, setDeletePersonConfirm] = useState<{ idx: number; name: string; affectedItems: number } | null>(null);
+  const [savingPeople, setSavingPeople] = useState(false);
+  const [showAllPeopleModal, setShowAllPeopleModal] = useState(false);
+  const [savedPeople, setSavedPeople] = useState<string[]>([]); // tracks last saved state for cancel
   const [payModal, setPayModal] = useState(false);
   const [payMode, setPayMode] = useState<'full' | 'manual' | 'split'>('full');
   const [payManualAmount, setPayManualAmount] = useState('');
@@ -56,7 +59,7 @@ export default function RecordingDetailScreen() {
   const [payLoading, setPayLoading] = useState(false);
   const [linkedPayments, setLinkedPayments] = useState<any[]>([]);
   const [linkedPayable, setLinkedPayable] = useState<any>(null);
-  const [payablePerPerson, setPayablePerPerson] = useState<Record<string, number>>({});
+  const [payablePerPerson, setPayablePerPerson] = useState<{ map: Record<string, number>; paidFor: string[] }>({ map: {}, paidFor: [] });
 
   // Add item form state
   const [itemForms, setItemForms] = useState<{ name: string; cost: string; people: string[]; subitemForms: { name: string; people: string[] }[] }[]>([{ name: '', cost: '', people: [], subitemForms: [] }]);
@@ -133,24 +136,22 @@ export default function RecordingDetailScreen() {
       // load per-person split data from the payable's bill_splits + split_items
       const { data: rec2 } = await supabase.from('recordings').select('payment_to').eq('id', recordingId).single();
       const paidFor: string[] = rec2?.payment_to ? rec2.payment_to.split(', ').map((s: string) => s.trim()) : [];
-      if (paidFor.length > 0) {
-        const { data: splitItems } = await supabase.from('split_items').select('*, split_subitems(*)').eq('recording_id', rec.linked_recording_id);
-        if (splitItems) {
-          const perPersonMap: Record<string, number> = {};
-          splitItems.forEach((item: any) => {
-            const subs = item.split_subitems ?? [];
-            if (subs.length === 0) {
-              const pp = (item.people ?? []).length > 0 ? Number(item.cost) / item.people.length : 0;
-              (item.people ?? []).forEach((p: string) => { if (paidFor.includes(p)) perPersonMap[p] = (perPersonMap[p] || 0) + pp; });
-            } else {
-              subs.forEach((sub: any) => {
-                const pp = (sub.people ?? []).length > 0 ? Number(sub.cost) / sub.people.length : 0;
-                (sub.people ?? []).forEach((p: string) => { if (paidFor.includes(p)) perPersonMap[p] = (perPersonMap[p] || 0) + pp; });
-              });
-            }
-          });
-          setPayablePerPerson(perPersonMap);
-        }
+      const { data: splitItems } = await supabase.from('split_items').select('*, split_subitems(*)').eq('recording_id', rec.linked_recording_id);
+      if (splitItems) {
+        const perPersonMap: Record<string, number> = {};
+        splitItems.forEach((item: any) => {
+          const subs = item.split_subitems ?? [];
+          if (subs.length === 0) {
+            const pp = (item.people ?? []).length > 0 ? Number(item.cost) / item.people.length : 0;
+            (item.people ?? []).forEach((p: string) => { perPersonMap[p] = (perPersonMap[p] || 0) + pp; });
+          } else {
+            subs.forEach((sub: any) => {
+              const pp = (sub.people ?? []).length > 0 ? Number(sub.cost) / sub.people.length : 0;
+              (sub.people ?? []).forEach((p: string) => { perPersonMap[p] = (perPersonMap[p] || 0) + pp; });
+            });
+          }
+        });
+        setPayablePerPerson({ map: perPersonMap, paidFor });
       }
     }
   };
@@ -282,6 +283,7 @@ export default function RecordingDetailScreen() {
     if (data && data.length > 0) {
       const loaded = data.map((r: any) => r.person_name);
       setPeople(loaded);
+      setSavedPeople(loaded);
       setItems(prev => { checkStale(loaded, prev); return prev; });
     }
   };
@@ -527,6 +529,7 @@ export default function RecordingDetailScreen() {
 
   const openPeopleModal = () => {
     if (people.length === 0) setPeople(['', '', '']);
+    setSavedPeople([...people]);
     setAddPersonModal(true);
   };
   const addPerson = () => setPeople(prev => [...prev, '']);
@@ -564,16 +567,22 @@ export default function RecordingDetailScreen() {
   const savePeopleAndClose = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user || !recordingId) return;
-    const filled = people.filter(p => p.trim());
-    // delete existing and reinsert
+    // Deduplicate: keep unique non-empty names (case-insensitive)
+    const seen = new Set<string>();
+    const filled = people
+      .map(p => p.trim())
+      .filter(p => { if (!p) return false; const k = p.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; });
+    setSavingPeople(true);
     await supabase.from('bill_splits').delete().eq('recording_id', recordingId);
     if (filled.length > 0) {
       await supabase.from('bill_splits').insert(
-        filled.map(name => ({ recording_id: recordingId, user_id: user.id, person_name: name.trim() }))
+        filled.map(name => ({ recording_id: recordingId, user_id: user.id, person_name: name }))
       );
     }
-    // save new contacts
     for (const p of filled) await saveContact(p);
+    setPeople(filled);
+    setSavedPeople(filled);
+    setSavingPeople(false);
     setAddPersonModal(false);
     setSuggestions([]);
     setActiveSuggestionIdx(null);
@@ -761,8 +770,8 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
             </View>
           </View>
 
-          {/* Action buttons */}
-          <View style={styles.actionRow}>
+          {/* Action buttons — row 1: receipt solo, row 2: pay bill + delete */}
+          <View style={[styles.actionRow, { marginBottom: 8 }]}>
             <TouchableOpacity
               style={styles.actionBtn}
               onPress={() => {
@@ -782,6 +791,8 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                 <Text style={styles.actionBtnText}>link receipt</Text>
               </TouchableOpacity>
             )}
+          </View>
+          <View style={styles.actionRow}>
             {recording?.type === 'payable' && recording?.status !== 'paid' && (
               <TouchableOpacity style={styles.actionBtn} onPress={openPayModal}>
                 <Ionicons name="cash-outline" size={15} color="#425252" />
@@ -882,18 +893,24 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                 <Text style={styles.linkedPayableBtnText}>view split bill on payable</Text>
                 <Ionicons name="arrow-forward" size={11} color="#929090" />
               </TouchableOpacity>
-              {Object.keys(payablePerPerson).length > 0 && (
+              {Object.keys(payablePerPerson.map).length > 0 && (
                 <View style={styles.infoBlock}>
-                  {Object.entries(payablePerPerson).map(([name, total], i, arr) => (
-                    <View key={name}>
-                      <View style={infoStyles.row}>
-                        <Text style={infoStyles.label}>{name}</Text>
-                        <View style={infoStyles.dots} />
-                        <Text style={infoStyles.value}>{total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+                  {Object.entries(payablePerPerson.map).map(([name, total], i, arr) => {
+                    const wasPaid = payablePerPerson.paidFor.includes(name);
+                    return (
+                      <View key={name}>
+                        <View style={infoStyles.row}>
+                          <Text style={[infoStyles.label, wasPaid && { color: '#2ab671' }]}>{name}</Text>
+                          <View style={infoStyles.dots} />
+                          <Text style={[infoStyles.value, wasPaid && { color: '#2ab671' }]}>{total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+                          {wasPaid
+                            ? <Ionicons name="checkmark-circle" size={13} color="#2ab671" style={{ marginLeft: 6 }} />
+                            : <Ionicons name="ellipse-outline" size={13} color="#c0c0c0" style={{ marginLeft: 6 }} />}
+                        </View>
+                        {i < arr.length - 1 && <View style={{ height: 1, backgroundColor: '#f0f0f0' }} />}
                       </View>
-                      {i < arr.length - 1 && <View style={{ height: 1, backgroundColor: '#f0f0f0' }} />}
-                    </View>
-                  ))}
+                    );
+                  })}
                 </View>
               )}
             </>
@@ -937,9 +954,9 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                   </View>
                 ))}
                 {extraCount > 0 && (
-                  <View style={styles.personChip}>
+                  <TouchableOpacity style={styles.personChip} onPress={() => setShowAllPeopleModal(true)}>
                     <Text style={styles.personChipText}>+{extraCount} more</Text>
-                  </View>
+                  </TouchableOpacity>
                 )}
               </View>
             )}
@@ -1117,11 +1134,11 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                   <Text style={styles.addMoreText}>add more</Text>
                 </TouchableOpacity>
                 <View style={styles.modalBtns}>
-                  <TouchableOpacity style={[styles.modalBtn, { backgroundColor: '#f5f5f5' }]} onPress={() => setAddPersonModal(false)}>
+                  <TouchableOpacity style={[styles.modalBtn, { backgroundColor: '#f5f5f5' }]} onPress={() => { setPeople(savedPeople); setAddPersonModal(false); setSuggestions([]); }}>
                     <Text style={[styles.modalBtnText, { color: '#8a8a8a' }]}>cancel</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.modalBtn} onPress={savePeopleAndClose}>
-                    <Text style={styles.modalBtnText}>done</Text>
+                  <TouchableOpacity style={[styles.modalBtn, savingPeople && { opacity: 0.6 }]} onPress={savePeopleAndClose} disabled={savingPeople}>
+                    <Text style={styles.modalBtnText}>{savingPeople ? 'saving...' : 'done'}</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -1527,6 +1544,29 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                     </View>
                   </>
                 )}
+              </View>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </BlurView>
+      </Modal>
+
+      {/* All people preview modal */}
+      <Modal visible={showAllPeopleModal} transparent animationType="fade" onRequestClose={() => setShowAllPeopleModal(false)}>
+        <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}>
+          <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowAllPeopleModal(false)}>
+            <TouchableOpacity activeOpacity={1} onPress={e => e.stopPropagation()}>
+              <View style={styles.modalBox}>
+                <Text style={styles.modalTitle}>people</Text>
+                <View style={[styles.itemPeopleSelect, { paddingBottom: 4 }]}>
+                  {filledPeople.map((p, i) => (
+                    <View key={i} style={styles.personChip}>
+                      <Text style={styles.personChipText}>{p}</Text>
+                    </View>
+                  ))}
+                </View>
+                <TouchableOpacity style={[styles.modalBtn, { width: '100%', backgroundColor: '#f5f5f5' }]} onPress={() => setShowAllPeopleModal(false)}>
+                  <Text style={[styles.modalBtnText, { color: '#8a8a8a' }]}>close</Text>
+                </TouchableOpacity>
               </View>
             </TouchableOpacity>
           </TouchableOpacity>
