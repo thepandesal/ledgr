@@ -147,6 +147,9 @@ export default function SplitSharePage() {
                     </TouchableOpacity>
                   : null}
               </View>
+              {data.payment.qrCode && (
+                <Text style={s.qrHint}>tap the QR code to expand</Text>
+              )}
             </View>
           </>
         )}
@@ -201,6 +204,7 @@ const s = StyleSheet.create({
   receiptBtnText: { fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#0ccfcf', flex: 1 },
   receiptUnavailable: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#fafafa', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: '#f0f0f0', marginBottom: 24 },
   receiptUnavailableText: { fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#c0c0c0' },
+  qrHint: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#c0c0c0', textAlign: 'right', paddingBottom: 8 },
   payRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12 },
   payName: { fontFamily: 'ChillaxMedium', fontSize: 14, color: '#425252' },
   payBank: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#929090' },
