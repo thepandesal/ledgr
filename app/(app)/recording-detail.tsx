@@ -211,14 +211,15 @@ export default function RecordingDetailScreen() {
     setShareLoading(true);
     try {
       const shareData = buildShareData();
-      // Delete existing share for this recording to keep DB clean
-      await supabase.from('split_shares').delete().eq('recording_id', recordingId);
-      const { data: row, error } = await supabase.from('split_shares').insert({ recording_id: recordingId, data: shareData }).select().single();
+      // Upsert — same link forever per recording
+      const { data: row, error } = await supabase
+        .from('split_shares')
+        .upsert({ recording_id: recordingId, data: shareData }, { onConflict: 'recording_id' })
+        .select().single();
       if (error || !row) throw error;
       const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://ledgr-six.vercel.app';
       const shareUrl = `${baseUrl}/split/${row.id}`;
       setSaveImageModal(false);
-      // Copy to clipboard
       if (typeof navigator !== 'undefined' && navigator.clipboard) {
         await navigator.clipboard.writeText(shareUrl);
       } else {
@@ -878,7 +879,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                     disabled={shareLoading}
                   >
                     <Ionicons name="link-outline" size={18} color="#0ccfcf" />
-                    <Text style={styles.shareOptionText}>share link</Text>
+                    <Text style={styles.shareOptionText}>{shareLoading ? 'saving...' : 'save & share link'}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.shareOptionBtn}
