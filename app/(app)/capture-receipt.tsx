@@ -11,7 +11,7 @@ const { width } = Dimensions.get('window');
 
 export default function CaptureReceiptScreen() {
   const router = useRouter();
-  const { receiptId, galleryOnly } = useLocalSearchParams<{ receiptId?: string; galleryOnly?: string }>();
+  const { receiptId, galleryOnly, recordingId, recordingName, recordingDate } = useLocalSearchParams<{ receiptId?: string; galleryOnly?: string; recordingId?: string; recordingName?: string; recordingDate?: string }>();
   const slideAnim = useRef(new Animated.Value(width)).current;
 
   const [photos, setPhotos] = useState<string[]>([]); // local URIs
@@ -73,7 +73,14 @@ export default function CaptureReceiptScreen() {
       // Create or use existing receipt entry
       let rId = receiptId;
       if (!rId) {
-        const { data: rec, error } = await supabase.from('receipt_entries').insert({ user_id: user.id }).select().single();
+        const note = recordingDate && recordingName
+          ? `${new Date(recordingDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}: ${recordingName}`
+          : new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+        const { data: rec, error } = await supabase.from('receipt_entries').insert({
+          user_id: user.id,
+          note,
+          recording_id: recordingId ?? null,
+        }).select().single();
         if (error || !rec) { Alert.alert('Error', error?.message ?? 'Failed to create receipt'); setSaving(false); return; }
         rId = rec.id;
       }

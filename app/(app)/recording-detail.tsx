@@ -1,5 +1,5 @@
 import AddItemModal from './AddItemModal';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Animated, Dimensions, ScrollView, TextInput, Modal, Share, Linking, Platform, Clipboard } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Animated, Dimensions, ScrollView, TextInput, Modal, Share, Linking, Platform, Clipboard, Image } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
@@ -30,6 +30,8 @@ export default function RecordingDetailScreen() {
   const [shareAccounts, setShareAccounts] = useState<any[]>([]);
   const [shareSelectedAccount, setShareSelectedAccount] = useState<any>(null);
   const [shareLoading, setShareLoading] = useState(false);
+  const [linkedReceipt, setLinkedReceipt] = useState<any>(null);
+  const [receiptPhotos, setReceiptPhotos] = useState<{ id: string; url: string }[]>([]);
   const [captureHtml, setCaptureHtml] = useState<string | null>(null);
   const webviewRef = useRef<any>(null);
   const [copiedToast, setCopiedToast] = useState(false);
@@ -62,7 +64,23 @@ export default function RecordingDetailScreen() {
     loadContacts();
     loadPeople();
     loadItems();
+    loadLinkedReceipt();
   }, []);
+
+  const loadLinkedReceipt = async () => {
+    if (!recordingId) return;
+    const { data: entry } = await supabase.from('receipt_entries').select('id, note, created_at').eq('recording_id', recordingId).single();
+    if (!entry) return;
+    setLinkedReceipt(entry);
+    const { data: photos } = await supabase.from('receipt_photos').select('id, storage_path').eq('entry_id', entry.id).order('created_at').limit(5);
+    if (photos) {
+      const urls = await Promise.all(photos.map(async (p: any) => {
+        const { data } = await supabase.storage.from('receipts').createSignedUrl(p.storage_path, 3600);
+        return { id: p.id, url: data?.signedUrl ?? '' };
+      }));
+      setReceiptPhotos(urls.filter(u => u.url));
+    }
+  };
 
   const loadRecording = async () => {
     if (!recordingId) return;
@@ -511,15 +529,46 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
 
           {/* Action buttons */}
           <View style={styles.actionRow}>
-            <TouchableOpacity style={styles.actionBtn} onPress={() => setCookingModal(true)}>
+            <TouchableOpacity
+              style={styles.actionBtn}
+              onPress={() => {
+                if (linkedReceipt) {
+                  router.push({ pathname: '/(app)/receipt-detail', params: { receiptId: linkedReceipt.id } } as any);
+                } else {
+                  router.push({ pathname: '/(app)/capture-receipt', params: { recordingId, recordingName: recording?.name, recordingDate: recording?.transaction_date } } as any);
+                }
+              }}
+            >
               <Ionicons name="receipt-outline" size={15} color="#425252" />
-              <Text style={styles.actionBtnText}>upload / view receipt</Text>
+              <Text style={styles.actionBtnText}>{linkedReceipt ? 'view receipt' : 'add receipt'}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.actionBtn, styles.actionBtnDanger]} onPress={() => setCookingModal(true)}>
               <Ionicons name="trash-outline" size={15} color="#ed6a6a" />
               <Text style={[styles.actionBtnText, { color: '#ed6a6a' }]}>delete</Text>
             </TouchableOpacity>
           </View>
+
+          {/* Receipt thumbnail strip */}
+          {linkedReceipt && receiptPhotos.length > 0 && (
+            <View style={styles.receiptStrip}>
+              <View style={styles.receiptStripHeader}>
+                <Text style={styles.receiptStripLabel}>receipt</Text>
+                <TouchableOpacity onPress={async () => {
+                  await supabase.from('receipt_entries').update({ recording_id: null }).eq('id', linkedReceipt.id);
+                  setLinkedReceipt(null); setReceiptPhotos([]);
+                }}>
+                  <Text style={styles.receiptUnlink}>unlink</Text>
+                </TouchableOpacity>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 8 }}>
+                {receiptPhotos.map(p => (
+                  <TouchableOpacity key={p.id} onPress={() => router.push({ pathname: '/(app)/receipt-detail', params: { receiptId: linkedReceipt.id } } as any)}>
+                    <Image source={{ uri: p.url }} style={styles.receiptThumbImg} resizeMode="cover" />
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          )}
 
           {/* Information */}
           <Text style={styles.sectionHeader}>information</Text>
@@ -1088,6 +1137,11 @@ const styles = StyleSheet.create({
   personSelectText: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#929090' },
   personSelectTextActive: { color: '#fff', fontFamily: 'RobotoMono_700Bold' },
   subitemRemaining: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#929090', alignSelf: 'flex-start' },
+  receiptStrip: { backgroundColor: '#fafafa', borderRadius: 14, padding: 12, borderWidth: 1, borderColor: '#f0f0f0', marginBottom: 16 },
+  receiptStripHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  receiptStripLabel: { fontFamily: 'ChillaxMedium', fontSize: 13, color: '#0ccfcf' },
+  receiptUnlink: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#ed6a6a' },
+  receiptThumbImg: { width: 64, height: 64, borderRadius: 8, marginRight: 8 },
   toast: { position: 'absolute', bottom: 48, alignSelf: 'center', backgroundColor: '#425252', borderRadius: 999, paddingVertical: 10, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', gap: 8 },
   toastText: { fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#fff' },
   shareOptionsRow: { flexDirection: 'row', gap: 10, width: '100%', marginBottom: 4 },

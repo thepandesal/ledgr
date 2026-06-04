@@ -25,11 +25,16 @@ export default function ReceiptDetailScreen() {
   const slideAnim = useRef(new Animated.Value(SW)).current;
 
   const [entry, setEntry] = useState<any>(null);
+  const [linkedRecordingName, setLinkedRecordingName] = useState('');
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [loading, setLoading] = useState(true);
   const [carouselIdx, setCarouselIdx] = useState<number | null>(null);
   const [renameModal, setRenameModal] = useState(false);
   const [renameVal, setRenameVal] = useState('');
+  const [linkModal, setLinkModal] = useState(false);
+  const [linkDate, setLinkDate] = useState(new Date().toISOString().split('T')[0]);
+  const [linkRecordings, setLinkRecordings] = useState<any[]>([]);
+  const [linkSearch, setLinkSearch] = useState('');
   const carouselRef = useRef<any>(null);
 
   useEffect(() => {
@@ -39,7 +44,13 @@ export default function ReceiptDetailScreen() {
 
   const load = async () => {
     const { data: e } = await supabase.from('receipt_entries').select('*').eq('id', receiptId).single();
-    if (e) setEntry(e);
+    if (e) {
+      setEntry(e);
+      if (e.recording_id) {
+        const { data: rec } = await supabase.from('recordings').select('name, type').eq('id', e.recording_id).single();
+        if (rec) setLinkedRecordingName(rec.name);
+      }
+    }
     const { data: rows } = await supabase.from('receipt_photos').select('id, storage_path').eq('entry_id', receiptId).order('created_at');
     if (rows) {
       const withUrls = await Promise.all(rows.map(async (p: any) => {
@@ -147,6 +158,37 @@ export default function ReceiptDetailScreen() {
 
   const formatDate = (d: string) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
+  const loadRecordingsForDate = async (date: string) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data } = await supabase.from('recordings').select('id, name, type, amount, transaction_date').eq('transaction_date', date).eq('user_id', user.id).order('created_at', { ascending: false });
+    setLinkRecordings(data ?? []);
+  };
+
+  const openLinkModal = () => {
+    setLinkDate(new Date().toISOString().split('T')[0]);
+    setLinkSearch('');
+    loadRecordingsForDate(new Date().toISOString().split('T')[0]);
+    setLinkModal(true);
+  };
+
+  const linkToRecording = async (rec: any) => {
+    await supabase.from('receipt_entries').update({ recording_id: rec.id }).eq('id', receiptId);
+    setEntry((prev: any) => ({ ...prev, recording_id: rec.id }));
+    setLinkedRecordingName(rec.name);
+    setLinkModal(false);
+  };
+
+  const unlink = async () => {
+    await supabase.from('receipt_entries').update({ recording_id: null }).eq('id', receiptId);
+    setEntry((prev: any) => ({ ...prev, recording_id: null }));
+    setLinkedRecordingName('');
+  };
+
+  const filteredRecordings = linkSearch.trim()
+    ? linkRecordings.filter(r => r.name.toLowerCase().includes(linkSearch.toLowerCase()))
+    : linkRecordings;
+
   if (loading) return (
     <Animated.View style={[s.container, { transform: [{ translateX: slideAnim }] }]}>
       <SafeAreaView style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
@@ -213,21 +255,32 @@ export default function ReceiptDetailScreen() {
               <Text style={s.emptyText}>no photos yet</Text>
             </View>
           )}
-
-          {/* Make recording */}
-          {!entry?.recording_id && (
-            <>
-              <Text style={s.sectionHeader}>recording</Text>
-              <TouchableOpacity
-                style={s.makeRecordingBtn}
-                onPress={() => router.push({ pathname: '/(app)/add-recording', params: { from: 'receipt', receiptId, defaultDate: new Date().toISOString().split('T')[0] } } as any)}
-                activeOpacity={0.85}
-              >
-                <Ionicons name="add-circle-outline" size={16} color="#fff" />
-                <Text style={s.makeRecordingText}>make a recording</Text>
-              </TouchableOpacity>
-            </>
-          )}
+          {/* Recording section */}
+          <Text style={s.sectionHeader}>recording</Text>
+          {entry?.recording_id ? (
+            <View style={s.linkedRecordingCard}>
+              <View style={{ flex: 1 }}>
+                <Text style={s.linkedRecordingName} numberOfLines={1}>{linkedRecordingName.toLowerCase()}</Text>
+                <TouchableOpacity onPress={unlink}>
+                  <Text style={s.unlinkText}>unlink recording</Text>
+                </TouchableOpacity>
+              </View>
+              <TouchableOpacity onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: entry.recording_id } } as any)}>
+                <Ionicons name="arrow-forward size={16} color=#c0c0c0 />
+ </TouchableOpacity>
+ </View>
+ ) : (
+ <View style={s.recordingActions}>
+ <TouchableOpacity style={s.makeRecordingBtn} onPress={() => router.push({ pathname: '/(app)/add-recording', params: { from: 'receipt', receiptId, defaultDate: new Date().toISOString().split('T')[0] } } as any)} activeOpacity={0.85}>
+ <Ionicons name=add-circle-outline size={16} color=#fff />
+ <Text style={s.makeRecordingText}>make a recording</Text>
+ </TouchableOpacity>
+ <TouchableOpacity style={s.linkExistingBtn} onPress={openLinkModal} activeOpacity={0.85}>
+ <Ionicons name=link-outline size={16} color=#425252 />
+ <Text style={s.linkExistingText}>link existing</Text>
+ </TouchableOpacity>
+ </View>
+ )}
 
         </ScrollView>
       </SafeAreaView>
@@ -277,6 +330,54 @@ export default function ReceiptDetailScreen() {
  </ScrollView>
  )}
  </SafeAreaView>
+ </BlurView>
+ </Modal>
+      {/* Link to recording modal */}
+      <Modal visible={linkModal} transparent animationType="fade onRequestClose={() => setLinkModal(false)}>
+ <BlurView intensity={40} tint=light style={StyleSheet.absoluteFill}>
+ <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={() => setLinkModal(false)}>
+ <TouchableOpacity activeOpacity={1} onPress={e => e.stopPropagation()}>
+ <View style={[s.modalBox, { width: 340 }]}>
+ <Text style={s.modalTitle}>link to recording</Text>
+ {/* Search */}
+ <View style={s.modalInputBlock}>
+ <TextInput style={s.modalInput} placeholder=search by name... placeholderTextColor=#c0c0c0 value={linkSearch} onChangeText={setLinkSearch} />
+ </View>
+ {/* Date picker */}
+ <View style={s.linkDateRow}>
+ <TouchableOpacity onPress={() => { const d = new Date(linkDate); d.setDate(d.getDate()-1); const s2 = d.toISOString().split('T')[0]; setLinkDate(s2); loadRecordingsForDate(s2); }}>
+ <Ionicons name=chevron-back size={18} color=#929090 />
+ </TouchableOpacity>
+ <Text style={s.linkDateText}>{new Date(linkDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</Text>
+ <TouchableOpacity onPress={() => { const d = new Date(linkDate); d.setDate(d.getDate()+1); const s2 = d.toISOString().split('T')[0]; setLinkDate(s2); loadRecordingsForDate(s2); }}>
+ <Ionicons name=chevron-forward size={18} color=#929090 />
+ </TouchableOpacity>
+ </View>
+ {/* Recording list */}
+ <ScrollView style={{ maxHeight: 220, width: '100%' }} showsVerticalScrollIndicator={false}>
+ {filteredRecordings.length === 0 ? (
+ <Text style={s.linkEmpty}>no recordings on this date</Text>
+ ) : (
+ filteredRecordings.map((rec: any) => {
+ const hasReceipt = false; // could check but keep simple
+ return (
+ <TouchableOpacity key={rec.id} style={[s.linkRecItem]} onPress={() => linkToRecording(rec)}>
+ <View style={{ flex: 1 }}>
+ <Text style={s.linkRecName} numberOfLines={1}>{rec.name.toLowerCase()}</Text>
+ <Text style={s.linkRecMeta}>{rec.type} \u00b7 {Number(rec.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+ </View>
+ <Ionicons name=link-outline size={14} color=#0ccfcf />
+ </TouchableOpacity>
+ );
+ })
+ )}
+ </ScrollView>
+ <TouchableOpacity style={s.modalCancelBtn} onPress={() => setLinkModal(false)}>
+ <Text style={s.modalCancelText}>cancel</Text>
+ </TouchableOpacity>
+ </View>
+ </TouchableOpacity>
+ </TouchableOpacity>
  </BlurView>
  </Modal>
       {/* Rename modal */}
@@ -339,6 +440,18 @@ const s = StyleSheet.create({
   thumbItem: { width: 56, height: 56, borderRadius: 8, overflow: 'hidden', borderWidth: 2, borderColor: 'transparent' },
   thumbItemActive: { borderColor: '#0ccfcf' },
   thumbImg: { width: '100%', height: '100%' },
+  linkedRecordingCard: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#fafafa', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#f0f0f0' },
+  linkedRecordingName: { fontFamily: 'Avenelle', fontSize: 16, color: '#425252', letterSpacing: -0.5 },
+  unlinkText: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#ed6a6a', marginTop: 3 },
+  recordingActions: { gap: 8 },
+  linkExistingBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#fafafa', borderRadius: 999, paddingVertical: 13, borderWidth: 1, borderColor: '#e8e8e8' },
+  linkExistingText: { fontFamily: 'RobotoMono_700Bold', fontSize: 13, color: '#425252' },
+  linkDateRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4, width: '100%' },
+  linkDateText: { fontFamily: 'Avenelle', fontSize: 15, color: '#425252' },
+  linkRecItem: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
+  linkRecName: { fontFamily: 'RobotoMono_700Bold', fontSize: 12, color: '#425252' },
+  linkRecMeta: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#929090', marginTop: 2 },
+  linkEmpty: { fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#c0c0c0', textAlign: 'center', paddingVertical: 16 },
   modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   modalBox: { backgroundColor: '#ffffff', borderRadius: 20, padding: 20, width: 300, gap: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 20, elevation: 10 },
   modalTitle: { fontFamily: 'ChillaxMedium', fontSize: 16, color: '#425252' },
