@@ -93,9 +93,10 @@ export default function RecordingDetailScreen() {
       id: r.id,
       name: r.name,
       cost: Number(r.cost),
+      people: Array.isArray(r.people) ? r.people : [],
       subitems: subitems
         .filter((s: any) => s.item_id === r.id)
-        .map((s: any) => ({ id: s.id, name: s.name, cost: Number(s.cost), people: s.people })),
+        .map((s: any) => ({ id: s.id, name: s.name, cost: Number(s.cost), people: Array.isArray(s.people) ? s.people : [] })),
     })));
   };
 
@@ -568,12 +569,12 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                             {item.subitems.length === 0 && item.people.length > 0 && (
                               <View style={styles.itemRight}>
                                 <View style={styles.itemPeopleRow}>
-                                  {item.people.slice(0, 3).map((p, pi) => (
+                                  {(item.people ?? []).slice(0, 3).map((p, pi) => (
                                     <TouchableOpacity key={pi} style={styles.personCircle} onPress={() => setTooltip(tooltip?.name === p ? null : { name: p })}>
                                       <Text style={styles.personCircleLetter}>{p[0]?.toUpperCase()}</Text>
                                     </TouchableOpacity>
                                   ))}
-                                  {item.people.length > 3 && (
+                                  {(item.people?.length ?? 0) > 3 && (
                                     <View style={styles.personCircleExtra}>
                                       <Text style={styles.personCircleLetter}>+{item.people.length - 3}</Text>
                                     </View>
@@ -603,14 +604,14 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                                 </View>
                                 <View style={styles.itemRight}>
                                   <View style={styles.itemPeopleRow}>
-                                    {sub.people.slice(0, 3).map((p, pi) => (
+                                    {(sub.people ?? []).slice(0, 3).map((p, pi) => (
                                       <TouchableOpacity key={pi} style={styles.personCircle} onPress={() => setTooltip(tooltip?.name === p ? null : { name: p })}>
                                         <Text style={styles.personCircleLetter}>{p[0]?.toUpperCase()}</Text>
                                       </TouchableOpacity>
                                     ))}
-                                    {sub.people.length > 3 && (
+                                    {(sub.people?.length ?? 0) > 3 && (
                                       <View style={styles.personCircleExtra}>
-                                        <Text style={styles.personCircleLetter}>+{sub.people.length - 3}</Text>
+                                        <Text style={styles.personCircleLetter}>+{(sub.people?.length ?? 0) - 3}</Text>
                                       </View>
                                     )}
                                   </View>
@@ -1172,6 +1173,7 @@ const styles = StyleSheet.create({
   subitemError: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#ed6a6a', alignSelf: 'flex-start' },
   splitPreview: { fontFamily: 'RobotoMono_700Bold', fontSize: 12, color: '#0ccfcf', alignSelf: 'flex-start' },
 });
+
 
 
 
