@@ -1,7 +1,6 @@
 import {
   View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Animated,
-  Dimensions, ScrollView, Image, ActivityIndicator, Alert,
-  Modal, TextInput
+  Dimensions, ScrollView, Image, ActivityIndicator, Alert, Modal, TextInput
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -35,7 +34,6 @@ export default function ReceiptDetailScreen() {
   const [linkDate, setLinkDate] = useState(new Date().toISOString().split('T')[0]);
   const [linkRecordings, setLinkRecordings] = useState<any[]>([]);
   const [linkSearch, setLinkSearch] = useState('');
-  const carouselRef = useRef<any>(null);
 
   useEffect(() => {
     Animated.timing(slideAnim, { toValue: 0, duration: 280, useNativeDriver: false }).start();
@@ -47,7 +45,7 @@ export default function ReceiptDetailScreen() {
     if (e) {
       setEntry(e);
       if (e.recording_id) {
-        const { data: rec } = await supabase.from('recordings').select('name, type').eq('id', e.recording_id).single();
+        const { data: rec } = await supabase.from('recordings').select('name').eq('id', e.recording_id).single();
         if (rec) setLinkedRecordingName(rec.name);
       }
     }
@@ -92,8 +90,6 @@ export default function ReceiptDetailScreen() {
     setCarouselIdx(null);
   };
 
-  const openCarousel = (idx: number) => setCarouselIdx(idx);
-
   const compress = async (uri: string) => {
     const r = await ImageManipulator.manipulateAsync(uri, [{ resize: { width: 1200 } }], { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG });
     return r.uri;
@@ -107,8 +103,8 @@ export default function ReceiptDetailScreen() {
     const result = new Uint8Array(bytes);
     let j = 0;
     for (let i = 0; i < base64.length; i += 4) {
-      const a = lookup[base64.charCodeAt(i)], b = lookup[base64.charCodeAt(i+1)];
-      const c = lookup[base64.charCodeAt(i+2)], d = lookup[base64.charCodeAt(i+3)];
+      const a = lookup[base64.charCodeAt(i)], b = lookup[base64.charCodeAt(i + 1)];
+      const c = lookup[base64.charCodeAt(i + 2)], d = lookup[base64.charCodeAt(i + 3)];
       result[j++] = (a << 2) | (b >> 4);
       result[j++] = ((b & 15) << 4) | (c >> 2);
       result[j++] = ((c & 3) << 6) | d;
@@ -156,20 +152,27 @@ export default function ReceiptDetailScreen() {
     }
   };
 
-  const formatDate = (d: string) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-
   const loadRecordingsForDate = async (date: string) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
-    const { data } = await supabase.from('recordings').select('id, name, type, amount, transaction_date').eq('transaction_date', date).eq('user_id', user.id).order('created_at', { ascending: false });
+    const { data } = await supabase.from('recordings').select('id, name, type, amount').eq('transaction_date', date).eq('user_id', user.id).order('created_at', { ascending: false });
     setLinkRecordings(data ?? []);
   };
 
   const openLinkModal = () => {
-    setLinkDate(new Date().toISOString().split('T')[0]);
+    const today = new Date().toISOString().split('T')[0];
+    setLinkDate(today);
     setLinkSearch('');
-    loadRecordingsForDate(new Date().toISOString().split('T')[0]);
+    loadRecordingsForDate(today);
     setLinkModal(true);
+  };
+
+  const changeDate = (delta: number) => {
+    const d = new Date(linkDate);
+    d.setDate(d.getDate() + delta);
+    const newDate = d.toISOString().split('T')[0];
+    setLinkDate(newDate);
+    loadRecordingsForDate(newDate);
   };
 
   const linkToRecording = async (rec: any) => {
@@ -189,6 +192,9 @@ export default function ReceiptDetailScreen() {
     ? linkRecordings.filter(r => r.name.toLowerCase().includes(linkSearch.toLowerCase()))
     : linkRecordings;
 
+  const formatDate = (d: string) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const typeColor = (type: string) => type === 'expense' ? '#ed6a6a' : type === 'income' ? '#2ab671' : '#425252';
+
   if (loading) return (
     <Animated.View style={[s.container, { transform: [{ translateX: slideAnim }] }]}>
       <SafeAreaView style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
@@ -201,7 +207,6 @@ export default function ReceiptDetailScreen() {
     <Animated.View style={[s.container, { transform: [{ translateX: slideAnim }] }]}>
       <SafeAreaView style={s.inner}>
 
-        {/* Header — same style as recording-detail */}
         <TouchableOpacity onPress={handleBack} style={s.backBtn}>
           <Ionicons name="arrow-back" size={22} color="#8a8a8a" />
         </TouchableOpacity>
@@ -211,37 +216,35 @@ export default function ReceiptDetailScreen() {
           <View style={s.titleRow}>
             <TouchableOpacity style={s.titleNameBtn} onPress={() => { setRenameVal(entry?.note ?? ''); setRenameModal(true); }}>
               <Text style={s.pageName} numberOfLines={1}>{(entry?.note ?? 'untitled').toLowerCase()}</Text>
-              <Ionicons name="pencil-outline" size={12} color="rgba(255,255,255,0.5)" />
+              <Ionicons name="pencil-outline" size={12} color="#c0c0c0" />
             </TouchableOpacity>
             <Text style={s.pageDate}>{formatDate(entry?.created_at ?? '')}</Text>
           </View>
         </View>
 
-        {/* Action buttons */}
         <View style={s.actionRow}>
           <TouchableOpacity style={s.actionBtn} onPress={addFromCamera}>
-            <Ionicons name="camera-outline size={15} color=#425252 />
- <Text style={s.actionBtnText}>camera</Text>
- </TouchableOpacity>
- <TouchableOpacity style={s.actionBtn} onPress={addFromGallery}>
- <Ionicons name=images-outline size={15} color=#425252 />
- <Text style={s.actionBtnText}>photos</Text>
- </TouchableOpacity>
- <TouchableOpacity style={[s.actionBtn, s.actionBtnDanger]} onPress={deleteEntry}>
- <Ionicons name=trash-outline size={15} color=#ed6a6a />
- <Text style={[s.actionBtnText, { color: '#ed6a6a' }]}>delete</Text>
- </TouchableOpacity>
- </View>
+            <Ionicons name="camera-outline" size={15} color="#425252" />
+            <Text style={s.actionBtnText}>camera</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={s.actionBtn} onPress={addFromGallery}>
+            <Ionicons name="images-outline" size={15} color="#425252" />
+            <Text style={s.actionBtnText}>photos</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[s.actionBtn, s.actionBtnDanger]} onPress={deleteEntry}>
+            <Ionicons name="trash-outline" size={15} color="#ed6a6a" />
+            <Text style={[s.actionBtnText, { color: '#ed6a6a' }]}>delete</Text>
+          </TouchableOpacity>
+        </View>
+
         <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
 
-          {/* Section header */}
           <Text style={s.sectionHeader}>photos</Text>
 
-          {/* Photo grid */}
           {photos.length > 0 ? (
             <View style={s.grid}>
               {photos.map((p, i) => (
-                <TouchableOpacity key={p.id} onPress={() => openCarousel(i)} activeOpacity={0.85} style={s.cell}>
+                <TouchableOpacity key={p.id} onPress={() => setCarouselIdx(i)} activeOpacity={0.85} style={s.cell}>
                   <Image source={{ uri: p.url }} style={s.cellImg} resizeMode="cover" />
                   <TouchableOpacity style={s.cellDelete} onPress={() => deletePhoto(p)}>
                     <Ionicons name="close-circle" size={18} color="#ed6a6a" />
@@ -255,131 +258,124 @@ export default function ReceiptDetailScreen() {
               <Text style={s.emptyText}>no photos yet</Text>
             </View>
           )}
-          {/* Recording section */}
+
           <Text style={s.sectionHeader}>recording</Text>
+
           {entry?.recording_id ? (
-            <View style={s.linkedRecordingCard}>
+            <View style={s.linkedCard}>
               <View style={{ flex: 1 }}>
-                <Text style={s.linkedRecordingName} numberOfLines={1}>{linkedRecordingName.toLowerCase()}</Text>
+                <Text style={s.linkedName} numberOfLines={1}>{linkedRecordingName.toLowerCase()}</Text>
                 <TouchableOpacity onPress={unlink}>
                   <Text style={s.unlinkText}>unlink recording</Text>
                 </TouchableOpacity>
               </View>
               <TouchableOpacity onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: entry.recording_id } } as any)}>
-                <Ionicons name="arrow-forward size={16} color=#c0c0c0 />
- </TouchableOpacity>
- </View>
- ) : (
- <View style={s.recordingActions}>
- <TouchableOpacity style={s.makeRecordingBtn} onPress={() => router.push({ pathname: '/(app)/add-recording', params: { from: 'receipt', receiptId, defaultDate: new Date().toISOString().split('T')[0] } } as any)} activeOpacity={0.85}>
- <Ionicons name=add-circle-outline size={16} color=#fff />
- <Text style={s.makeRecordingText}>make a recording</Text>
- </TouchableOpacity>
- <TouchableOpacity style={s.linkExistingBtn} onPress={openLinkModal} activeOpacity={0.85}>
- <Ionicons name=link-outline size={16} color=#425252 />
- <Text style={s.linkExistingText}>link existing</Text>
- </TouchableOpacity>
- </View>
- )}
+                <Ionicons name="arrow-forward" size={16} color="#c0c0c0" />
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={s.recordingActions}>
+              <TouchableOpacity style={s.makeRecordingBtn} onPress={() => router.push({ pathname: '/(app)/add-recording', params: { from: 'receipt', receiptId, defaultDate: new Date().toISOString().split('T')[0] } } as any)} activeOpacity={0.85}>
+                <Ionicons name="add-circle-outline" size={16} color="#fff" />
+                <Text style={s.makeRecordingText}>make a recording</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.linkBtn} onPress={openLinkModal} activeOpacity={0.85}>
+                <Ionicons name="link-outline" size={16} color="#425252" />
+                <Text style={s.linkBtnText}>link existing recording</Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
         </ScrollView>
       </SafeAreaView>
 
-      {/* Carousel - Windows Photo Viewer style */}
-      <Modal visible={carouselIdx !== null} transparent animationType="fade onRequestClose={() => setCarouselIdx(null)}>
- <BlurView intensity={60} tint=light style={StyleSheet.absoluteFill}>
- <SafeAreaView style={{ flex: 1 }}>
- {/* Header */}
- <View style={s.carouselHeader}>
- <TouchableOpacity onPress={() => setCarouselIdx(null)} style={s.carouselBtn}>
- <Ionicons name=close size={22} color=#425252 />
- </TouchableOpacity>
- <Text style={s.carouselCount}>{(carouselIdx ?? 0) + 1} / {photos.length}</Text>
- <TouchableOpacity onPress={() => deletePhoto(photos[carouselIdx ?? 0])} style={s.carouselBtn}>
- <Ionicons name=trash-outline size={18} color=#ed6a6a />
- </TouchableOpacity>
- </View>
- {/* Main photo with arrows */}
- <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
- <Image
- source={{ uri: photos[carouselIdx ?? 0]?.url ?? '' }}
- style={{ width: SW - 32, height: SH * 0.55, borderRadius: 16 }}
- resizeMode=contain
- />
- {/* Left arrow */}
- {(carouselIdx ?? 0) > 0 && (
- <TouchableOpacity style={s.arrowLeft} onPress={() => setCarouselIdx(i => (i ?? 1) - 1)}>
- <Ionicons name=chevron-back size={28} color=#425252 />
- </TouchableOpacity>
- )}
- {/* Right arrow */}
- {(carouselIdx ?? 0) < photos.length - 1 && (
- <TouchableOpacity style={s.arrowRight} onPress={() => setCarouselIdx(i => (i ?? 0) + 1)}>
- <Ionicons name=chevron-forward size={28} color=#425252 />
- </TouchableOpacity>
- )}
- </View>
- {/* Thumbnail strip */}
- {photos.length > 1 && (
- <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.thumbStrip}>
- {photos.map((p, i) => (
- <TouchableOpacity key={p.id} onPress={() => setCarouselIdx(i)} style={[s.thumbItem, i === carouselIdx && s.thumbItemActive]}>
- <Image source={{ uri: p.url }} style={s.thumbImg} resizeMode=cover />
- </TouchableOpacity>
- ))}
- </ScrollView>
- )}
- </SafeAreaView>
- </BlurView>
- </Modal>
-      {/* Link to recording modal */}
-      <Modal visible={linkModal} transparent animationType="fade onRequestClose={() => setLinkModal(false)}>
- <BlurView intensity={40} tint=light style={StyleSheet.absoluteFill}>
- <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={() => setLinkModal(false)}>
- <TouchableOpacity activeOpacity={1} onPress={e => e.stopPropagation()}>
- <View style={[s.modalBox, { width: 340 }]}>
- <Text style={s.modalTitle}>link to recording</Text>
- {/* Search */}
- <View style={s.modalInputBlock}>
- <TextInput style={s.modalInput} placeholder=search by name... placeholderTextColor=#c0c0c0 value={linkSearch} onChangeText={setLinkSearch} />
- </View>
- {/* Date picker */}
- <View style={s.linkDateRow}>
- <TouchableOpacity onPress={() => { const d = new Date(linkDate); d.setDate(d.getDate()-1); const s2 = d.toISOString().split('T')[0]; setLinkDate(s2); loadRecordingsForDate(s2); }}>
- <Ionicons name=chevron-back size={18} color=#929090 />
- </TouchableOpacity>
- <Text style={s.linkDateText}>{new Date(linkDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</Text>
- <TouchableOpacity onPress={() => { const d = new Date(linkDate); d.setDate(d.getDate()+1); const s2 = d.toISOString().split('T')[0]; setLinkDate(s2); loadRecordingsForDate(s2); }}>
- <Ionicons name=chevron-forward size={18} color=#929090 />
- </TouchableOpacity>
- </View>
- {/* Recording list */}
- <ScrollView style={{ maxHeight: 220, width: '100%' }} showsVerticalScrollIndicator={false}>
- {filteredRecordings.length === 0 ? (
- <Text style={s.linkEmpty}>no recordings on this date</Text>
- ) : (
- filteredRecordings.map((rec: any) => {
- const hasReceipt = false; // could check but keep simple
- return (
- <TouchableOpacity key={rec.id} style={[s.linkRecItem]} onPress={() => linkToRecording(rec)}>
- <View style={{ flex: 1 }}>
- <Text style={s.linkRecName} numberOfLines={1}>{rec.name.toLowerCase()}</Text>
- <Text style={s.linkRecMeta}>{rec.type} \u00b7 {Number(rec.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
- </View>
- <Ionicons name=link-outline size={14} color=#0ccfcf />
- </TouchableOpacity>
- );
- })
- )}
- </ScrollView>
- <TouchableOpacity style={s.modalCancelBtn} onPress={() => setLinkModal(false)}>
- <Text style={s.modalCancelText}>cancel</Text>
- </TouchableOpacity>
- </View>
- </TouchableOpacity>
- </TouchableOpacity>
- </BlurView>
- </Modal>
+      {/* Carousel */}
+      <Modal visible={carouselIdx !== null} transparent animationType="fade" onRequestClose={() => setCarouselIdx(null)}>
+        <BlurView intensity={60} tint="light" style={StyleSheet.absoluteFill}>
+          <SafeAreaView style={{ flex: 1 }}>
+            <View style={s.carouselHeader}>
+              <TouchableOpacity onPress={() => setCarouselIdx(null)} style={s.carouselBtn}>
+                <Ionicons name="close" size={22} color="#425252" />
+              </TouchableOpacity>
+              <Text style={s.carouselCount}>{(carouselIdx ?? 0) + 1} / {photos.length}</Text>
+              <TouchableOpacity onPress={() => deletePhoto(photos[carouselIdx ?? 0])} style={s.carouselBtn}>
+                <Ionicons name="trash-outline" size={18} color="#ed6a6a" />
+              </TouchableOpacity>
+            </View>
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+              <Image
+                source={{ uri: photos[carouselIdx ?? 0]?.url ?? '' }}
+                style={{ width: SW - 32, height: SH * 0.55, borderRadius: 16 }}
+                resizeMode="contain"
+              />
+              {(carouselIdx ?? 0) > 0 && (
+                <TouchableOpacity style={s.arrowLeft} onPress={() => setCarouselIdx(prev => (prev ?? 1) - 1)}>
+                  <Ionicons name="chevron-back" size={28} color="#425252" />
+                </TouchableOpacity>
+              )}
+              {(carouselIdx ?? 0) < photos.length - 1 && (
+                <TouchableOpacity style={s.arrowRight} onPress={() => setCarouselIdx(prev => (prev ?? 0) + 1)}>
+                  <Ionicons name="chevron-forward" size={28} color="#425252" />
+                </TouchableOpacity>
+              )}
+            </View>
+            {photos.length > 1 && (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.thumbStrip}>
+                {photos.map((p, i) => (
+                  <TouchableOpacity key={p.id} onPress={() => setCarouselIdx(i)} style={[s.thumbItem, i === carouselIdx && s.thumbItemActive]}>
+                    <Image source={{ uri: p.url }} style={s.thumbImg} resizeMode="cover" />
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            )}
+          </SafeAreaView>
+        </BlurView>
+      </Modal>
+
+      {/* Link modal */}
+      <Modal visible={linkModal} transparent animationType="fade" onRequestClose={() => setLinkModal(false)}>
+        <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}>
+          <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={() => setLinkModal(false)}>
+            <TouchableOpacity activeOpacity={1} onPress={e => e.stopPropagation()}>
+              <View style={[s.modalBox, { width: 340 }]}>
+                <Text style={s.modalTitle}>link to recording</Text>
+                <View style={s.modalInputBlock}>
+                  <TextInput style={s.modalInput} placeholder="search by name..." placeholderTextColor="#c0c0c0" value={linkSearch} onChangeText={setLinkSearch} />
+                </View>
+                <View style={s.linkDateRow}>
+                  <TouchableOpacity onPress={() => changeDate(-1)} style={s.carouselBtn}>
+                    <Ionicons name="chevron-back" size={18} color="#929090" />
+                  </TouchableOpacity>
+                  <Text style={s.linkDateText}>{new Date(linkDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</Text>
+                  <TouchableOpacity onPress={() => changeDate(1)} style={s.carouselBtn}>
+                    <Ionicons name="chevron-forward" size={18} color="#929090" />
+                  </TouchableOpacity>
+                </View>
+                <ScrollView style={{ maxHeight: 220, width: '100%' }} showsVerticalScrollIndicator={false}>
+                  {filteredRecordings.length === 0 ? (
+                    <Text style={s.linkEmpty}>no recordings on this date</Text>
+                  ) : (
+                    filteredRecordings.map((rec: any) => (
+                      <TouchableOpacity key={rec.id} style={s.linkRecItem} onPress={() => linkToRecording(rec)}>
+                        <View style={[s.linkTypeDot, { backgroundColor: typeColor(rec.type) }]} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={s.linkRecName} numberOfLines={1}>{rec.name.toLowerCase()}</Text>
+                          <Text style={s.linkRecMeta}>{rec.type} · {Number(rec.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+                        </View>
+                        <Ionicons name="link-outline" size={14} color="#0ccfcf" />
+                      </TouchableOpacity>
+                    ))
+                  )}
+                </ScrollView>
+                <TouchableOpacity style={s.modalCancelBtn} onPress={() => setLinkModal(false)}>
+                  <Text style={s.modalCancelText}>cancel</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </BlurView>
+      </Modal>
+
       {/* Rename modal */}
       <Modal visible={renameModal} transparent animationType="fade" onRequestClose={() => setRenameModal(false)}>
         <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}>
@@ -429,26 +425,27 @@ const s = StyleSheet.create({
   cellDelete: { position: 'absolute', top: 3, right: 3 },
   emptyGrid: { alignItems: 'center', paddingVertical: 32, gap: 8, marginBottom: 24 },
   emptyText: { fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#c0c0c0' },
+  linkedCard: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#fafafa', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: '#f0f0f0', marginBottom: 16 },
+  linkedName: { fontFamily: 'Avenelle', fontSize: 16, color: '#425252', letterSpacing: -0.5 },
+  unlinkText: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#ed6a6a', marginTop: 3 },
+  recordingActions: { gap: 10, marginBottom: 16 },
   makeRecordingBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#425252', borderRadius: 999, paddingVertical: 13 },
   makeRecordingText: { fontFamily: 'RobotoMono_700Bold', fontSize: 13, color: '#fff' },
+  linkBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#fafafa', borderRadius: 999, paddingVertical: 13, borderWidth: 1, borderColor: '#e8e8e8' },
+  linkBtnText: { fontFamily: 'RobotoMono_700Bold', fontSize: 13, color: '#425252' },
   carouselHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 12 },
   carouselBtn: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
   carouselCount: { fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#425252' },
-  arrowLeft: { position: 'absolute', left: 8, backgroundColor: 'rgba(255,255,255,0.8)', borderRadius: 999, width: 44, height: 44, justifyContent: 'center', alignItems: 'center' },
-  arrowRight: { position: 'absolute', right: 8, backgroundColor: 'rgba(255,255,255,0.8)', borderRadius: 999, width: 44, height: 44, justifyContent: 'center', alignItems: 'center' },
+  arrowLeft: { position: 'absolute', left: 8, backgroundColor: 'rgba(255,255,255,0.85)', borderRadius: 999, width: 44, height: 44, justifyContent: 'center', alignItems: 'center' },
+  arrowRight: { position: 'absolute', right: 8, backgroundColor: 'rgba(255,255,255,0.85)', borderRadius: 999, width: 44, height: 44, justifyContent: 'center', alignItems: 'center' },
   thumbStrip: { paddingHorizontal: 16, paddingVertical: 12, gap: 8, alignItems: 'center' },
   thumbItem: { width: 56, height: 56, borderRadius: 8, overflow: 'hidden', borderWidth: 2, borderColor: 'transparent' },
   thumbItemActive: { borderColor: '#0ccfcf' },
   thumbImg: { width: '100%', height: '100%' },
-  linkedRecordingCard: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#fafafa', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#f0f0f0' },
-  linkedRecordingName: { fontFamily: 'Avenelle', fontSize: 16, color: '#425252', letterSpacing: -0.5 },
-  unlinkText: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#ed6a6a', marginTop: 3 },
-  recordingActions: { gap: 8 },
-  linkExistingBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#fafafa', borderRadius: 999, paddingVertical: 13, borderWidth: 1, borderColor: '#e8e8e8' },
-  linkExistingText: { fontFamily: 'RobotoMono_700Bold', fontSize: 13, color: '#425252' },
-  linkDateRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4, width: '100%' },
+  linkDateRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', paddingVertical: 4 },
   linkDateText: { fontFamily: 'Avenelle', fontSize: 15, color: '#425252' },
   linkRecItem: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
+  linkTypeDot: { width: 8, height: 8, borderRadius: 4, flexShrink: 0 },
   linkRecName: { fontFamily: 'RobotoMono_700Bold', fontSize: 12, color: '#425252' },
   linkRecMeta: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#929090', marginTop: 2 },
   linkEmpty: { fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#c0c0c0', textAlign: 'center', paddingVertical: 16 },
