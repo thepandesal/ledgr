@@ -27,7 +27,7 @@ export default function ReceiptsScreen() {
     if (!user) { setLoading(false); return; }
 
     const { data: recs } = await supabase
-      .from('receipts')
+      .from('receipt_entries')
       .select('*')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false });
@@ -49,12 +49,12 @@ export default function ReceiptsScreen() {
       const { data: photos } = await supabase
         .from('receipt_photos')
         .select('id, storage_path')
-        .eq('receipt_id', r.id)
+        .eq('entry_id', r.id)
         .order('created_at')
         .limit(3);
 
       const photosWithUrls = await Promise.all((photos ?? []).map(async (p: any) => {
-        const { data: signed } = await supabase.storage.from('receipts').createSignedUrl(p.storage_path, 3600);
+        const { data: signed } = await supabase.storage.from('receipt_entries').createSignedUrl(p.storage_path, 3600);
         return { ...p, url: signed?.signedUrl ?? '' };
       }));
 
@@ -185,3 +185,5 @@ const s = StyleSheet.create({
   makeRecordingBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
   makeRecordingText: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#0ccfcf' },
 });
+
+

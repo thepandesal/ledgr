@@ -72,7 +72,7 @@ export default function CaptureReceiptScreen() {
       // Create or use existing receipt
       let rId = receiptId;
       if (!rId) {
-        const { data: rec, error } = await supabase.from('receipts').insert({ user_id: user.id }).select().single();
+        const { data: rec, error } = await supabase.from('receipt_entries').insert({ user_id: user.id }).select().single();
         if (error || !rec) throw error;
         rId = rec.id;
       }
@@ -83,10 +83,10 @@ export default function CaptureReceiptScreen() {
         const base64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
         const byteArray = decode(base64);
         const { error: uploadError } = await supabase.storage
-          .from('receipts')
+          .from('receipt_entries')
           .upload(fileName, byteArray, { contentType: 'image/jpeg', upsert: false });
         if (uploadError) throw uploadError;
-        await supabase.from('receipt_photos').insert({ receipt_id: rId, storage_path: fileName });
+        await supabase.from('receipt_photos').insert({ entry_id: rId, storage_path: fileName });
       }
 
       router.replace({ pathname: '/(app)/(tabs)/receipts' } as any);
@@ -198,3 +198,5 @@ const styles = StyleSheet.create({
   saveBtn: { backgroundColor: '#425252', borderRadius: 999, paddingVertical: 12, paddingHorizontal: 24 },
   saveBtnText: { fontFamily: 'RobotoMono_700Bold', fontSize: 13, color: '#fff' },
 });
+
+

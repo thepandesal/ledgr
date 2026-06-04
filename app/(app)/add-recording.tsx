@@ -63,7 +63,7 @@ export default function AddRecordingScreen() {
     const { data } = await supabase.from('receipt_photos').select('storage_path').eq('receipt_id', receiptId);
     if (data) {
       const urls = await Promise.all(data.map(async (p: any) => {
-        const { data: signed } = await supabase.storage.from('receipts').createSignedUrl(p.storage_path, 3600);
+        const { data: signed } = await supabase.storage.from('receipt_entries').createSignedUrl(p.storage_path, 3600);
         return signed?.signedUrl ?? '';
       }));
       setReceiptPhotos(urls.filter(Boolean));
@@ -144,7 +144,7 @@ export default function AddRecordingScreen() {
       // Link receipt if coming from receipt screen
       if (receiptId) {
         const { data: savedRec } = await supabase.from('recordings').select('id').order('created_at', { ascending: false }).limit(1).single();
-        if (savedRec) await supabase.from('receipts').update({ recording_id: savedRec.id }).eq('id', receiptId);
+        if (savedRec) await supabase.from('receipt_entries').update({ recording_id: savedRec.id }).eq('id', receiptId);
       }
       handleBack();
     } catch (e: any) { setError(e.message); setLoading(false); }
@@ -459,3 +459,4 @@ const styles = StyleSheet.create({
   pickerBtn: { backgroundColor: '#425252', borderRadius: 999, paddingVertical: 11, alignItems: 'center' },
   pickerBtnText: { fontFamily: 'RobotoMono_700Bold', fontSize: 12, color: '#fff' },
 });
+
