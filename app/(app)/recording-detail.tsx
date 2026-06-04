@@ -24,6 +24,7 @@ export default function RecordingDetailScreen() {
   const [addPersonModal, setAddPersonModal] = useState(false);
   const [addItemModal, setAddItemModal] = useState(false);
   const [editSubitemsItemId, setEditSubitemsItemId] = useState<string | null>(null);
+  const [editingItemCost, setEditingItemCost] = useState<{ id: string; value: string } | null>(null);
   const [cookingModal, setCookingModal] = useState(false);
   const [saveImageModal, setSaveImageModal] = useState(false);
   const [shareAccounts, setShareAccounts] = useState<any[]>([]);
@@ -443,6 +444,25 @@ export default function RecordingDetailScreen() {
     }
   };
 
+  const updateItemCost = async (itemId: string, newCost: number) => {
+    if (isNaN(newCost) || newCost <= 0) return;
+    await supabase.from('split_items').update({ cost: newCost }).eq('id', itemId);
+    const item = items.find(i => i.id === itemId);
+    if (!item) return;
+    // Redistribute subitem costs equally if subitems exist
+    if (item.subitems.length > 0) {
+      const equalCost = newCost / item.subitems.length;
+      await Promise.all(item.subitems.map(s => supabase.from('split_subitems').update({ cost: equalCost }).eq('id', s.id)));
+      setItems(prev => prev.map(i => i.id === itemId
+        ? { ...i, cost: newCost, subitems: i.subitems.map(s => ({ ...s, cost: equalCost })) }
+        : i
+      ));
+    } else {
+      setItems(prev => prev.map(i => i.id === itemId ? { ...i, cost: newCost } : i));
+    }
+    setEditingItemCost(null);
+  };
+
 const truncate = (str: string, max: number) => str && str.length > max ? str.slice(0, max) + '...' : str;
 
   const amountColor = () => {
@@ -579,7 +599,23 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                             <Text style={styles.itemNumber}>{idx + 1}</Text>
                             <View style={styles.itemMiddle}>
                               <Text style={styles.itemName} numberOfLines={1}>{truncate(item.name, MAX_ITEM_NAME)}</Text>
-                              <Text style={styles.itemCost}>{item.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+                              {editingItemCost?.id === item.id ? (
+                                <TextInput
+                                  style={[styles.itemCost, { borderBottomWidth: 1, borderBottomColor: '#0ccfcf', minWidth: 60 }]}
+                                  value={editingItemCost.value}
+                                  onChangeText={v => setEditingItemCost({ id: item.id, value: v })}
+                                  keyboardType="decimal-pad"
+                                  autoFocus
+                                  onBlur={() => updateItemCost(item.id, parseFloat(editingItemCost.value))}
+                                  onSubmitEditing={() => updateItemCost(item.id, parseFloat(editingItemCost.value))}
+                                />
+                              ) : (
+                                <TouchableOpacity onPress={() => setEditingItemCost({ id: item.id, value: String(item.cost) })}>
+                                  <Text style={[styles.itemCost, { textDecorationLine: 'underline', textDecorationStyle: 'dotted', textDecorationColor: '#c0c0c0' }]}>
+                                    {item.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                  </Text>
+                                </TouchableOpacity>
+                              )}
                             </View>
                             {item.subitems.length === 0 && item.people.length > 0 && (
                               <View style={styles.itemRight}>
