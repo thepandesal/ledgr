@@ -72,9 +72,14 @@ export default function SplitSharePage() {
                   <View style={s.dots} />
                   <Text style={s.infoValue}>{Number(p.total ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
                 </View>
-                {i < perPerson.length - 1 && <View style={s.divider} />}
+                <View style={s.divider} />
               </View>
             ))}
+            <View style={s.infoRow}>
+              <Text style={[s.infoLabel, { color: '#425252', fontFamily: 'RobotoMono_700Bold' }]}>total</Text>
+              <View style={s.dots} />
+              <Text style={[s.infoValue, { color: '#0ccfcf' }]}>{perPerson.reduce((sum: number, p: any) => sum + Number(p.total ?? 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+            </View>
           </View>
         </>}
 
