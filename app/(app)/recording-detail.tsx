@@ -707,27 +707,6 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
             </View>
           </View>
 
-          {/* Pay bill banner — payable only */}
-          {recording?.type === 'payable' && recording?.status !== 'paid' && (
-            <TouchableOpacity style={styles.payBillBanner} onPress={openPayModal}>
-              <Ionicons name="cash-outline" size={15} color="#fff" />
-              <Text style={styles.payBillBannerText}>pay bill</Text>
-              <View style={styles.payBillBannerBadge}>
-                <Text style={styles.payBillBannerBadgeText}>
-                  {recording.status === 'partial'
-                    ? `${Number(recording.paid_amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} / ${Number(recording.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
-                    : Number(recording.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          )}
-          {recording?.type === 'payable' && recording?.status === 'paid' && (
-            <View style={styles.paidBanner}>
-              <Ionicons name="checkmark-circle" size={15} color="#2ab671" />
-              <Text style={styles.paidBannerText}>fully paid</Text>
-            </View>
-          )}
-
           {/* Action buttons */}
           <View style={styles.actionRow}>
             <TouchableOpacity
@@ -748,6 +727,18 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                 <Ionicons name="link-outline" size={15} color="#425252" />
                 <Text style={styles.actionBtnText}>link receipt</Text>
               </TouchableOpacity>
+            )}
+            {recording?.type === 'payable' && recording?.status !== 'paid' && (
+              <TouchableOpacity style={styles.actionBtn} onPress={openPayModal}>
+                <Ionicons name="cash-outline" size={15} color="#425252" />
+                <Text style={styles.actionBtnText}>pay bill</Text>
+              </TouchableOpacity>
+            )}
+            {recording?.type === 'payable' && recording?.status === 'paid' && (
+              <View style={[styles.actionBtn, { borderColor: '#2ab671', backgroundColor: '#f0fff8' }]}>
+                <Ionicons name="checkmark-circle" size={15} color="#2ab671" />
+                <Text style={[styles.actionBtnText, { color: '#2ab671' }]}>fully paid</Text>
+              </View>
             )}
             <TouchableOpacity style={[styles.actionBtn, styles.actionBtnDanger]} onPress={() => setCookingModal(true)}>
               <Ionicons name="trash-outline" size={15} color="#ed6a6a" />
@@ -1561,12 +1552,6 @@ const styles = StyleSheet.create({
   accountOptionName: { fontFamily: 'ChillaxMedium', fontSize: 13, color: '#425252' },
   accountOptionBank: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#929090' },
   subitemError: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#ed6a6a', alignSelf: 'flex-start' },
-  payBillBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#425252', borderRadius: 12, padding: 14, marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.10, shadowRadius: 0, elevation: 2 },
-  payBillBannerText: { fontFamily: 'RobotoMono_700Bold', fontSize: 12, color: '#fff', flex: 1 },
-  payBillBannerBadge: { backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 999, paddingVertical: 3, paddingHorizontal: 10 },
-  payBillBannerBadgeText: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#fff' },
-  paidBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#f0fff8', borderRadius: 12, padding: 14, marginBottom: 16, borderWidth: 1, borderColor: '#2ab671' },
-  paidBannerText: { fontFamily: 'RobotoMono_700Bold', fontSize: 12, color: '#2ab671' },
   linkedPayableBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 999, borderWidth: 1, borderColor: '#e8e8e8', backgroundColor: '#fafafa', marginBottom: 16 },
   linkedPayableBtnText: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#929090' },
   splitPreview: { fontFamily: 'RobotoMono_700Bold', fontSize: 12, color: '#0ccfcf', alignSelf: 'flex-start' },
