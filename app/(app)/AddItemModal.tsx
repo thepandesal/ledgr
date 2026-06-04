@@ -143,17 +143,19 @@ export default function AddItemModal({
                         <View key={subIdx} style={s.subitemBlock}>
                           <View style={s.subitemInputRow}>
                             <Text style={s.subArrow}>↳</Text>
-                            <TextInput
-                              style={s.subitemInput}
-                              placeholder={`subitem ${subIdx + 1}`}
-                              placeholderTextColor="#c0c0c0"
-                              value={sub.name}
-                              onChangeText={v => updateSubitemForm(itemIdx, subIdx, 'name', v.slice(0, MAX_ITEM_NAME))}
-                            />
-                            {form.cost && sub.name.trim() && (
-                              <Text style={s.subitemCostHint}>{equalCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
-                            )}
-                            <TouchableOpacity onPress={() => removeSubitemForm(itemIdx, subIdx)} style={{ padding: 4 }}>
+                            <View style={{ flex: 1, gap: 4 }}>
+                              <TextInput
+                                style={s.subitemInput}
+                                placeholder={`subitem ${subIdx + 1}`}
+                                placeholderTextColor="#c0c0c0"
+                                value={sub.name}
+                                onChangeText={v => updateSubitemForm(itemIdx, subIdx, 'name', v.slice(0, MAX_ITEM_NAME))}
+                              />
+                              {form.cost && sub.name.trim() && (
+                                <Text style={s.subitemCostHint}>{equalCost.toLocaleString('en-US', { minimumFractionDigits: 2 })} each</Text>
+                              )}
+                            </View>
+                            <TouchableOpacity onPress={() => removeSubitemForm(itemIdx, subIdx)} style={{ padding: 4, flexShrink: 0 }}>
                               <Ionicons name="close" size={12} color="#c0c0c0" />
                             </TouchableOpacity>
                           </View>
@@ -235,7 +237,7 @@ const s = StyleSheet.create({
   subitemInputRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   subArrow: { fontSize: 12, color: '#c0c0c0', flexShrink: 0 },
   subitemInput: { flex: 1, fontFamily: 'RobotoMono_400Regular', fontSize: 16, color: '#425252', backgroundColor: '#ffffff', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, borderWidth: 1, borderColor: '#e8e8e8' },
-  subitemCostHint: { fontFamily: 'RobotoMono_700Bold', fontSize: 10, color: '#0ccfcf', flexShrink: 0 },
+  subitemCostHint: { fontFamily: 'RobotoMono_700Bold', fontSize: 10, color: '#0ccfcf', marginLeft: 2 },
   addSubLink: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 8 },
   addSubLinkText: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#0ccfcf' },
   addItemLink: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 14, justifyContent: 'center' },
