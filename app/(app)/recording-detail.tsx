@@ -1,9 +1,9 @@
 import AddItemModal from './AddItemModal';
 import { setPendingFocusDate } from './space-detail';
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Animated, Dimensions, ScrollView, TextInput, Modal, Share, Linking, Platform, Clipboard, Image } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../../src/lib/supabase';
 import { BlurView } from 'expo-blur';
 
@@ -130,6 +130,11 @@ export default function RecordingDetailScreen() {
     supabase.from('split_shares').select('id').eq('recording_id', recordingId).single()
       .then(({ data }) => { if (data) setShareRowId(data.id); });
   }, []);
+
+  useFocusEffect(useCallback(() => {
+    loadRecording();
+    loadPaymentData();
+  }, [recordingId]));
 
   const loadPaymentData = async () => {
     if (!recordingId) return;
@@ -405,14 +410,15 @@ export default function RecordingDetailScreen() {
   };
 
   const openSaveImage = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    const { data: accs } = await supabase.from('accounts').select().eq('user_id', user.id).order('account_name');
-    if (accs) setShareAccounts(accs);
-    // default to recording's account
-    const recAccount = accs?.find((a: any) => a.id === recording?.account_id) ?? accs?.[0] ?? null;
-    setShareSelectedAccount(recAccount);
     setSaveImageModal(true);
+    if (shareAccounts.length === 0) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data: accs } = await supabase.from('accounts').select().eq('user_id', user.id).order('account_name');
+      if (accs) setShareAccounts(accs);
+      const recAccount = accs?.find((a: any) => a.id === recording?.account_id) ?? accs?.[0] ?? null;
+      setShareSelectedAccount(recAccount);
+    }
   };
 
   const buildShareData = () => {
@@ -514,24 +520,38 @@ export default function RecordingDetailScreen() {
       const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://ledgr-six.vercel.app';
       const shareUrl = `${baseUrl}/split/${sid}`;
       setSaveImageModal(false);
+      // Small delay so modal closes before share sheet opens
+      await new Promise(r => setTimeout(r, 150));
       if (typeof navigator !== 'undefined' && navigator.share) {
-        await navigator.share({ title: 'Split breakdown', url: shareUrl });
-      } else if (typeof navigator !== 'undefined' && navigator.clipboard) {
-        await navigator.clipboard.writeText(shareUrl);
-        setCopiedToast(true);
-        setTimeout(() => setCopiedToast(false), 2500);
+        try { await navigator.share({ title: recording.name, url: shareUrl }); } catch (_) {}
       } else {
-        const el = document.createElement('textarea');
-        el.value = shareUrl;
-        el.style.position = 'fixed';
-        el.style.opacity = '0';
-        document.body.appendChild(el);
-        el.focus();
-        el.select();
-        document.execCommand('copy');
-        document.body.removeChild(el);
-        setCopiedToast(true);
-        setTimeout(() => setCopiedToast(false), 2500);
+        // Try clipboard API, fall back to prompt
+        let copied = false;
+        if (typeof navigator !== 'undefined' && navigator.clipboard) {
+          try { await navigator.clipboard.writeText(shareUrl); copied = true; } catch (_) {}
+        }
+        if (!copied) {
+          // textarea hack
+          try {
+            const el = document.createElement('textarea');
+            el.value = shareUrl;
+            el.setAttribute('readonly', '');
+            el.style.cssText = 'position:fixed;top:0;left:0;opacity:0;';
+            document.body.appendChild(el);
+            el.focus();
+            el.select();
+            el.setSelectionRange(0, 99999);
+            copied = document.execCommand('copy');
+            document.body.removeChild(el);
+          } catch (_) {}
+        }
+        if (!copied) {
+          // Last resort: prompt so user can copy manually
+          if (typeof window !== 'undefined') window.prompt('Copy the link:', shareUrl);
+        } else {
+          setCopiedToast(true);
+          setTimeout(() => setCopiedToast(false), 2500);
+        }
       }
     } catch (e: any) { console.log(e); } finally { setShareLoading(false); }
   };
