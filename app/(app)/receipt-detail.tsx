@@ -333,7 +333,7 @@ export default function ReceiptDetailScreen() {
       </Modal>
 
       {/* Link modal */}
-      <Modal visible={linkModal} transparent animationType="fade" onRequestClose={() => setLinkModal(false)}>
+      <Modal visible={linkModal} transparent animationType="slide" onRequestClose={() => setLinkModal(false)}>
         <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}>
           <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={() => setLinkModal(false)}>
             <TouchableOpacity activeOpacity={1} onPress={e => e.stopPropagation()}>
@@ -377,7 +377,7 @@ export default function ReceiptDetailScreen() {
       </Modal>
 
       {/* Rename modal */}
-      <Modal visible={renameModal} transparent animationType="fade" onRequestClose={() => setRenameModal(false)}>
+      <Modal visible={renameModal} transparent animationType="slide" onRequestClose={() => setRenameModal(false)}>
         <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}>
           <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={() => setRenameModal(false)}>
             <TouchableOpacity activeOpacity={1} onPress={e => e.stopPropagation()}>
@@ -452,6 +452,9 @@ const s = StyleSheet.create({
   modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   modalBox: { backgroundColor: '#ffffff', borderRadius: 20, padding: 20, width: 300, gap: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 20, elevation: 10 },
   modalTitle: { fontFamily: 'ChillaxMedium', fontSize: 16, color: '#425252' },
+  sheet: { backgroundColor: '#ffffff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 48, maxHeight: '85%' },
+  sheetTitle: { fontFamily: 'Avenelle', fontSize: 26, color: '#425252', letterSpacing: -0.5, lineHeight: 30, marginBottom: 4 },
+  sheetSub: { fontFamily: 'ChillaxMedium', fontSize: 11, color: '#929090' },
   modalInputBlock: { backgroundColor: '#fafafa', borderRadius: 12, paddingHorizontal: 14, borderWidth: 1, borderColor: '#f0f0f0' },
   modalInput: { fontFamily: 'RobotoMono_400Regular', fontSize: 16, color: '#425252', paddingVertical: 12 },
   modalBtns: { flexDirection: 'row', gap: 10 },

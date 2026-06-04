@@ -150,36 +150,41 @@ export default function ReceiptsScreen() {
       )}
 
       {/* Add folder modal */}
-      <Modal visible={addModal} transparent animationType="fade" onRequestClose={() => setAddModal(false)}>
+      <Modal visible={addModal} transparent animationType="slide" onRequestClose={() => { setAddModal(false); setFolderName(''); }}>
         <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}>
-          <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={() => setAddModal(false)}>
-            <TouchableOpacity activeOpacity={1} onPress={e => e.stopPropagation()}>
-              <View style={s.modalBox}>
-                <Text style={s.modalTitle}>new receipt</Text>
-                <View style={s.modalInputBlock}>
-                  <TextInput
-                    style={s.modalInput}
-                    placeholder="folder name (optional)"
-                    placeholderTextColor="#c0c0c0"
-                    value={folderName}
-                    onChangeText={setFolderName}
-                    autoFocus
-                    returnKeyType="done"
-                    onSubmitEditing={createEntry}
-                  />
-                </View>
-                <Text style={s.modalHint}>leave empty to use current time</Text>
-                <View style={s.modalBtns}>
-                  <TouchableOpacity style={s.modalCancelBtn} onPress={() => { setAddModal(false); setFolderName(''); }}>
-                    <Text style={s.modalCancelText}>cancel</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={[s.modalSaveBtn, creating && { opacity: 0.6 }]} onPress={createEntry} disabled={creating}>
-                    <Text style={s.modalSaveText}>{creating ? 'creating...' : 'create'}</Text>
-                  </TouchableOpacity>
-                </View>
+          <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => { setAddModal(false); setFolderName(''); }} />
+          <View style={s.sheet}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+              <View>
+                <Text style={s.sheetSub}>receipts</Text>
+                <Text style={s.sheetTitle}>new receipt</Text>
               </View>
-            </TouchableOpacity>
-          </TouchableOpacity>
+              <TouchableOpacity onPress={() => { setAddModal(false); setFolderName(''); }}>
+                <Ionicons name="close" size={22} color="#929090" />
+              </TouchableOpacity>
+            </View>
+            <View style={s.modalInputBlock}>
+              <TextInput
+                style={s.modalInput}
+                placeholder="folder name (optional)"
+                placeholderTextColor="#c0c0c0"
+                value={folderName}
+                onChangeText={setFolderName}
+                autoFocus
+                returnKeyType="done"
+                onSubmitEditing={createEntry}
+              />
+            </View>
+            <Text style={s.modalHint}>leave empty to use current time</Text>
+            <View style={[s.modalBtns, { marginTop: 16 }]}>
+              <TouchableOpacity style={s.modalCancelBtn} onPress={() => { setAddModal(false); setFolderName(''); }}>
+                <Text style={s.modalCancelText}>cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[s.modalSaveBtn, creating && { opacity: 0.6 }]} onPress={createEntry} disabled={creating}>
+                <Text style={s.modalSaveText}>{creating ? 'creating...' : 'create'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </BlurView>
       </Modal>
     </SafeAreaView>
@@ -211,6 +216,9 @@ const s = StyleSheet.create({
   unlinkedText: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#c0c0c0', marginTop: 2 },
   modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   modalBox: { backgroundColor: '#ffffff', borderRadius: 20, padding: 20, width: 300, gap: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 20, elevation: 10 },
+  sheet: { backgroundColor: '#ffffff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 48 },
+  sheetTitle: { fontFamily: 'Avenelle', fontSize: 26, color: '#425252', letterSpacing: -0.5, lineHeight: 30, marginBottom: 4 },
+  sheetSub: { fontFamily: 'ChillaxMedium', fontSize: 11, color: '#929090' },
   modalTitle: { fontFamily: 'ChillaxMedium', fontSize: 16, color: '#425252' },
   modalInputBlock: { backgroundColor: '#fafafa', borderRadius: 12, paddingHorizontal: 14, borderWidth: 1, borderColor: '#f0f0f0' },
   modalInput: { fontFamily: 'RobotoMono_400Regular', fontSize: 16, color: '#425252', paddingVertical: 12 },
