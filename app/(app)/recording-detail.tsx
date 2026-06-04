@@ -58,6 +58,15 @@ export default function RecordingDetailScreen() {
   const [linkedPayments, setLinkedPayments] = useState<any[]>([]);
   const [linkedPayable, setLinkedPayable] = useState<any>(null);
   const [payablePerPerson, setPayablePerPerson] = useState<{ map: Record<string, number>; paidFor: string[] }>({ map: {}, paidFor: [] });
+  const [collectModal, setCollectModal] = useState(false);
+  const [collectMode, setCollectMode] = useState<'full' | 'manual' | 'split'>('full');
+  const [collectManualAmount, setCollectManualAmount] = useState('');
+  const [collectSelectedPeople, setCollectSelectedPeople] = useState<string[]>([]);
+  const [collectAccounts, setCollectAccounts] = useState<any[]>([]);
+  const [collectAccount, setCollectAccount] = useState<any>(null);
+  const [collectDate, setCollectDate] = useState(new Date().toISOString().split('T')[0]);
+  const [collectComplete, setCollectComplete] = useState<boolean | null>(null);
+  const [collectLoading, setCollectLoading] = useState(false);
 
   // Add item form state
   const [itemForms, setItemForms] = useState<{ name: string; cost: string; people: string[]; subitemForms: { name: string; people: string[] }[] }[]>([{ name: '', cost: '', people: [], subitemForms: [] }]);
@@ -127,10 +136,14 @@ export default function RecordingDetailScreen() {
         .select('id, name, amount, transaction_date, payment_to, payment_from_account_id, accounts:payment_from_account_id(account_name, bank)')
         .eq('linked_recording_id', recordingId).eq('type', 'expense').order('transaction_date', { ascending: false });
       if (payments) setLinkedPayments(payments);
-    } else if (rec.type === 'expense' && rec.linked_recording_id) {
+    } else if (rec.type === 'receivable') {
+      const { data: payments } = await supabase.from('recordings')
+        .select('id, name, amount, transaction_date, payment_to, payment_from_account_id, accounts:payment_from_account_id(account_name, bank)')
+        .eq('linked_recording_id', recordingId).eq('type', 'return').order('transaction_date', { ascending: false });
+      if (payments) setLinkedPayments(payments);
+    } else if ((rec.type === 'expense' || rec.type === 'return') && rec.linked_recording_id) {
       const { data: payable } = await supabase.from('recordings').select('id, name, amount, status, paid_amount').eq('id', rec.linked_recording_id).single();
       if (payable) setLinkedPayable(payable);
-      // load per-person split data from the payable's bill_splits + split_items
       const { data: rec2 } = await supabase.from('recordings').select('payment_to').eq('id', recordingId).single();
       const paidFor: string[] = rec2?.payment_to ? rec2.payment_to.split(', ').map((s: string) => s.trim()) : [];
       const { data: splitItems } = await supabase.from('split_items').select('*, split_subitems(*)').eq('recording_id', rec.linked_recording_id);
@@ -151,6 +164,77 @@ export default function RecordingDetailScreen() {
         setPayablePerPerson({ map: perPersonMap, paidFor });
       }
     }
+  };
+
+  const openCollectModal = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data: accs } = await supabase.from('accounts').select().eq('user_id', user.id).order('account_name');
+    if (accs) setCollectAccounts(accs);
+    const defaultAcc = accs?.find((a: any) => a.id === recording?.receive_to_account_id) ?? accs?.find((a: any) => a.id === recording?.account_id) ?? accs?.[0] ?? null;
+    setCollectAccount(defaultAcc);
+    setCollectMode('full');
+    setCollectManualAmount('');
+    setCollectSelectedPeople([]);
+    setCollectDate(new Date().toISOString().split('T')[0]);
+    setCollectComplete(null);
+    setCollectModal(true);
+  };
+
+  const getCollectAmount = () => {
+    if (collectMode === 'full') return Number(recording?.amount ?? 0);
+    if (collectMode === 'manual') return parseFloat(collectManualAmount || '0') || 0;
+    if (collectMode === 'split') {
+      const perPersonMap: Record<string, number> = {};
+      items.forEach(item => {
+        if (item.subitems.length === 0) {
+          const pp = item.people.length > 0 ? item.cost / item.people.length : 0;
+          item.people.forEach(p => { perPersonMap[p] = (perPersonMap[p] || 0) + pp; });
+        } else {
+          item.subitems.forEach(sub => {
+            const pp = sub.people.length > 0 ? sub.cost / sub.people.length : 0;
+            sub.people.forEach(p => { perPersonMap[p] = (perPersonMap[p] || 0) + pp; });
+          });
+        }
+      });
+      return collectSelectedPeople.reduce((s, name) => s + (perPersonMap[name] ?? 0), 0);
+    }
+    return 0;
+  };
+
+  const confirmCollect = async () => {
+    if (collectComplete === null || !recording) return;
+    const amount = getCollectAmount();
+    if (!amount || amount <= 0) return;
+    setCollectLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      await supabase.from('recordings').insert({
+        space_id: recording.space_id,
+        user_id: user.id,
+        name: recording.name,
+        type: 'return',
+        amount,
+        transaction_date: collectDate,
+        status: 'received',
+        account_id: collectAccount?.id ?? recording.account_id,
+        payment_from_account_id: collectAccount?.id ?? recording.account_id,
+        linked_recording_id: recordingId,
+        category_id: recording.category_id ?? null,
+        payment_to: collectMode === 'split' && collectSelectedPeople.length > 0 ? collectSelectedPeople.join(', ') : null,
+      });
+      const prevPaid = Number(recording.paid_amount ?? 0);
+      const newPaid = prevPaid + amount;
+      await supabase.from('recordings').update({
+        status: collectComplete ? 'received' : 'partial',
+        paid_amount: newPaid,
+      }).eq('id', recordingId);
+      setRecording((prev: any) => ({ ...prev, status: collectComplete ? 'received' : 'partial', paid_amount: newPaid }));
+      setCollectModal(false);
+      loadPaymentData();
+    } catch (e) { console.log(e); }
+    finally { setCollectLoading(false); }
   };
 
   const openPayModal = async () => {
@@ -691,7 +775,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
   const amountColor = () => {
     if (!recording) return '#929090';
     if (recording.type === 'expense') return '#ed6a6a';
-    if (recording.type === 'income' || recording.type === 'savings') return '#2ab671';
+    if (recording.type === 'income' || recording.type === 'savings' || recording.type === 'return') return '#2ab671';
     return '#425252';
   };
 
@@ -703,6 +787,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
   const typeLabel = (type: string, status: string) => {
     if (type === 'payable') return `Payable · ${status === 'paid' ? 'Paid' : status === 'partial' ? 'Partial' : 'Unpaid'}`;
     if (type === 'receivable') return `Receivable · ${status === 'received' ? 'Received' : status === 'partial' ? 'Partial' : 'Pending'}`;
+    if (type === 'return') return 'Return';
     return { expense: 'Expense', income: 'Income', savings: 'Savings' }[type] ?? type;
   };
 
@@ -767,6 +852,18 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                 <Text style={[styles.actionBtnText, { color: '#2ab671' }]}>fully paid</Text>
               </View>
             )}
+            {recording?.type === 'receivable' && recording?.status !== 'received' && (
+              <TouchableOpacity style={styles.actionBtn} onPress={openCollectModal}>
+                <Ionicons name="arrow-down-circle-outline" size={15} color="#425252" />
+                <Text style={styles.actionBtnText}>collect</Text>
+              </TouchableOpacity>
+            )}
+            {recording?.type === 'receivable' && recording?.status === 'received' && (
+              <View style={[styles.actionBtn, { borderColor: '#2ab671', backgroundColor: '#f0fff8' }]}>
+                <Ionicons name="checkmark-circle" size={15} color="#2ab671" />
+                <Text style={[styles.actionBtnText, { color: '#2ab671' }]}>fully received</Text>
+              </View>
+            )}
             <TouchableOpacity style={[styles.actionBtn, styles.actionBtnDanger]} onPress={() => setDeleteConfirm(true)}>
               <Ionicons name="trash-outline" size={15} color="#ed6a6a" />
               <Text style={[styles.actionBtnText, { color: '#ed6a6a' }]}>delete</Text>
@@ -813,22 +910,22 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
             {linkedPayable && (
               <>
                 <View style={{ height: 1, backgroundColor: '#f0f0f0', marginVertical: 2 }} />
-                <InfoRow label="linked payable" value={truncate(linkedPayable.name, 16)} />
+                <InfoRow label={recording?.type === 'return' ? 'linked receivable' : 'linked payable'} value={truncate(linkedPayable.name, 16)} />
               </>
             )}
           </View>
           {linkedPayable && (
             <TouchableOpacity style={styles.linkedPayableBtn} onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: linkedPayable.id } } as any)}>
               <Ionicons name="link-outline" size={12} color="#929090" />
-              <Text style={styles.linkedPayableBtnText}>view payable</Text>
+              <Text style={styles.linkedPayableBtnText}>{recording?.type === 'return' ? 'view receivable' : 'view payable'}</Text>
               <Ionicons name="arrow-forward" size={11} color="#929090" />
             </TouchableOpacity>
           )}
 
-          {/* Payment history — payable only */}
-          {recording?.type === 'payable' && linkedPayments.length > 0 && (
+          {/* Payment/collection history */}
+          {(recording?.type === 'payable' || recording?.type === 'receivable') && linkedPayments.length > 0 && (
             <>
-              <Text style={styles.sectionHeader}>payments</Text>
+              <Text style={styles.sectionHeader}>{recording.type === 'receivable' ? 'collections' : 'payments'}</Text>
               <View style={styles.infoBlock}>
                 {linkedPayments.map((p: any, i: number) => (
                   <TouchableOpacity key={p.id} onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: p.id } } as any)}>
@@ -861,7 +958,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
             <>
               <TouchableOpacity style={styles.linkedPayableBtn} onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: linkedPayable.id } } as any)}>
                 <Ionicons name="git-branch-outline" size={12} color="#929090" />
-                <Text style={styles.linkedPayableBtnText}>view split bill on payable</Text>
+                <Text style={styles.linkedPayableBtnText}>{recording?.type === 'return' ? 'view split bill on receivable' : 'view split bill on payable'}</Text>
                 <Ionicons name="arrow-forward" size={11} color="#929090" />
               </TouchableOpacity>
               {Object.keys(payablePerPerson.map).length > 0 && (
@@ -1538,6 +1635,83 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                 <TouchableOpacity style={[styles.modalBtn, { width: '100%', backgroundColor: '#f5f5f5' }]} onPress={() => setShowAllPeopleModal(false)}>
                   <Text style={[styles.modalBtnText, { color: '#8a8a8a' }]}>close</Text>
                 </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </BlurView>
+      </Modal>
+
+      {/* Collect modal */}
+      <Modal visible={collectModal} transparent animationType="fade" onRequestClose={() => setCollectModal(false)}>
+        <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}>
+          <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setCollectModal(false)}>
+            <TouchableOpacity activeOpacity={1} onPress={e => e.stopPropagation()}>
+              <View style={[styles.modalBox, { width: 320 }]}>
+                <Text style={styles.modalTitle}>collect payment</Text>
+                <Text style={styles.subitemRemaining}>
+                  {(recording?.name ?? '').toLowerCase()} · {Number(recording?.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 6, width: '100%' }}>
+                  {(['full', 'manual', ...(filledPeople.length > 0 && items.length > 0 ? ['split'] : [])] as const).map(mode => (
+                    <TouchableOpacity key={mode} style={[styles.personSelectChip, { flex: 1, justifyContent: 'center' }, collectMode === mode && styles.personSelectChipActive]} onPress={() => setCollectMode(mode as any)}>
+                      <Text style={[styles.personSelectText, collectMode === mode && styles.personSelectTextActive]}>{mode}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                {collectMode === 'full' && (
+                  <Text style={[styles.subitemRemaining, { color: '#2ab671', fontSize: 15 }]}>{Number(recording?.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+                )}
+                {collectMode === 'manual' && (
+                  <TextInput style={[styles.personInput, { width: '100%' }]} placeholder="0.00" placeholderTextColor="#c0c0c0" value={collectManualAmount} onChangeText={setCollectManualAmount} keyboardType="decimal-pad" autoFocus />
+                )}
+                {collectMode === 'split' && (
+                  <View style={{ width: '100%', gap: 6 }}>
+                    <Text style={styles.subitemRemaining}>select who paid</Text>
+                    <View style={styles.itemPeopleSelect}>
+                      {filledPeople.map((p, i) => {
+                        const sel = collectSelectedPeople.includes(p);
+                        return (
+                          <TouchableOpacity key={i} style={[styles.personSelectChip, sel && styles.personSelectChipActive]} onPress={() => setCollectSelectedPeople(prev => sel ? prev.filter(x => x !== p) : [...prev, p])}>
+                            <Text style={[styles.personSelectText, sel && styles.personSelectTextActive]}>{p}</Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                    {collectSelectedPeople.length > 0 && (
+                      <Text style={[styles.subitemRemaining, { color: '#2ab671' }]}>total: {getCollectAmount().toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+                    )}
+                  </View>
+                )}
+                <Text style={[styles.subitemRemaining, { marginTop: 4 }]}>receiving into</Text>
+                <ScrollView style={{ width: '100%', maxHeight: 130 }} showsVerticalScrollIndicator={false}>
+                  {collectAccounts.map((acc: any) => (
+                    <TouchableOpacity key={acc.id} style={[styles.accountOption, collectAccount?.id === acc.id && styles.accountOptionActive]} onPress={() => setCollectAccount(acc)}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.accountOptionName, collectAccount?.id === acc.id && { color: '#fff' }]}>{acc.account_name}</Text>
+                        <Text style={[styles.accountOptionBank, collectAccount?.id === acc.id && { color: 'rgba(255,255,255,0.7)' }]}>{acc.bank} · {acc.account_number}</Text>
+                      </View>
+                      {collectAccount?.id === acc.id && <Ionicons name="checkmark" size={14} color="#fff" />}
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+                <Text style={[styles.subitemRemaining, { marginTop: 4 }]}>collection date</Text>
+                <TextInput style={[styles.personInput, { width: '100%' }]} placeholder="YYYY-MM-DD" placeholderTextColor="#c0c0c0" value={collectDate} onChangeText={setCollectDate} />
+                <Text style={[styles.subitemRemaining, { marginTop: 4 }]}>complete collection?</Text>
+                <View style={{ flexDirection: 'row', gap: 8, width: '100%' }}>
+                  {([true, false] as const).map(val => (
+                    <TouchableOpacity key={String(val)} style={[styles.personSelectChip, { flex: 1, justifyContent: 'center' }, collectComplete === val && styles.personSelectChipActive]} onPress={() => setCollectComplete(val)}>
+                      <Text style={[styles.personSelectText, collectComplete === val && styles.personSelectTextActive]}>{val ? 'yes, complete' : 'no, partial'}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <View style={[styles.modalBtns, { marginTop: 4 }]}>
+                  <TouchableOpacity style={[styles.modalBtn, { backgroundColor: '#f5f5f5' }]} onPress={() => setCollectModal(false)}>
+                    <Text style={[styles.modalBtnText, { color: '#8a8a8a' }]}>cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[styles.modalBtn, (collectComplete === null || getCollectAmount() <= 0 || collectLoading) && { opacity: 0.4 }]} onPress={confirmCollect} disabled={collectComplete === null || getCollectAmount() <= 0 || collectLoading}>
+                    <Text style={styles.modalBtnText}>{collectLoading ? 'saving...' : 'confirm'}</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             </TouchableOpacity>
           </TouchableOpacity>

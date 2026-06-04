@@ -66,6 +66,21 @@ export default function AddRecordingScreen() {
   const [selectedReceiptNote, setSelectedReceiptNote] = useState<string | null>(null);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [unlinkedReceipts, setUnlinkedReceipts] = useState<any[]>([]);
+  // Receivable-specific
+  const [decreasedFromAccount, setDecreasedFromAccount] = useState<any>(null);
+  const [receiveToAccount, setReceiveToAccount] = useState<any>(null);
+  const [createLinkedExpense, setCreateLinkedExpense] = useState(false);
+  const [showDecreasedFromModal, setShowDecreasedFromModal] = useState(false);
+  const [showReceiveToModal, setShowReceiveToModal] = useState(false);
+  const [decreasedSearch, setDecreasedSearch] = useState('');
+  const [receiveToSearch, setReceiveToSearch] = useState('');
+
+  const filteredDecreased = decreasedSearch.trim()
+    ? accounts.filter(a => a.account_name.toLowerCase().includes(decreasedSearch.toLowerCase()))
+    : accounts;
+  const filteredReceiveTo = receiveToSearch.trim()
+    ? accounts.filter(a => a.account_name.toLowerCase().includes(receiveToSearch.toLowerCase()))
+    : accounts;
 
   const isLoanType = type === 'receivable' || type === 'payable';
   const selectedType = TYPES.find(t => t.key === type)!;
@@ -133,6 +148,7 @@ export default function AddRecordingScreen() {
 
   const handleSave = async () => {
     if (!recName.trim() || !amount) { setError('name and amount are required.'); return; }
+    if (type === 'receivable' && createLinkedExpense && !decreasedFromAccount) { setError('select a "decreased from" account to create the linked expense.'); return; }
     setLoading(true); setError('');
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -147,18 +163,32 @@ export default function AddRecordingScreen() {
         const statusMap: Record<string, string> = {
           expense: 'paid', income: 'received', savings: 'saved', payable: 'unpaid', receivable: 'pending',
         };
-        const { error: err } = await supabase.from('recordings').insert({
+        const { data: newRec, error: err } = await supabase.from('recordings').insert({
           space_id: spaceId, user_id: user!.id, name: recName.trim(), type,
           amount: parseFloat(amount), transaction_date: date,
           notes: notes.trim() || null, category_id: selectedCategory?.id || null,
-          account_id: selectedAccount?.id || null, status: statusMap[type] ?? 'paid',
+          account_id: type === 'receivable' ? receiveToAccount?.id || null : selectedAccount?.id || null,
+          status: statusMap[type] ?? 'paid',
           person_name: isLoanType ? personName.trim() || null : null,
           is_recurring: isLoanType ? isRecurring : false,
           recurring_frequency: isLoanType && isRecurring ? frequency : null,
           recurring_days: isLoanType && isRecurring && frequency === 'weekly' ? recurringDays : null,
           recurring_date: isLoanType && isRecurring && ['monthly', 'yearly'].includes(frequency) ? parseInt(recurringDate) : null,
-        });
+          decreased_from_account_id: type === 'receivable' ? decreasedFromAccount?.id || null : null,
+          receive_to_account_id: type === 'receivable' ? receiveToAccount?.id || null : null,
+        }).select('id').single();
         if (err) throw err;
+        // Auto-create linked expense for receivable
+        if (type === 'receivable' && createLinkedExpense && newRec) {
+          await supabase.from('recordings').insert({
+            space_id: spaceId, user_id: user!.id, name: recName.trim(), type: 'expense',
+            amount: parseFloat(amount), transaction_date: date,
+            notes: notes.trim() || null, category_id: selectedCategory?.id || null,
+            account_id: decreasedFromAccount?.id || null,
+            status: 'paid',
+            linked_recording_id: newRec.id,
+          });
+        }
       }
       if (receiptId) {
         const { data: savedRec } = await supabase.from('recordings').select('id').order('created_at', { ascending: false }).limit(1).single();
@@ -409,6 +439,56 @@ export default function AddRecordingScreen() {
             </>
           )}
 
+          {/* Receivable extra fields */}
+          {type === 'receivable' && (
+            <>
+              <Text style={styles.label}>decreased from <Text style={styles.optional}>(where you lent from)</Text></Text>
+              <TouchableOpacity style={styles.pickerSelector} onPress={() => { setDecreasedSearch(''); setShowDecreasedFromModal(true); }}>
+                {decreasedFromAccount ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                    <View style={[styles.catDot, { backgroundColor: decreasedFromAccount.color ?? '#e8e8e8' }]} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.pickerSelectorText}>{decreasedFromAccount.account_name}</Text>
+                      <Text style={styles.pickerSelectorSub}>{decreasedFromAccount.bank}</Text>
+                    </View>
+                  </View>
+                ) : <Text style={styles.pickerSelectorPlaceholder}>select account</Text>}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  {decreasedFromAccount && <TouchableOpacity onPress={() => setDecreasedFromAccount(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}><Ionicons name="close" size={14} color="#929090" /></TouchableOpacity>}
+                  <Ionicons name="chevron-down" size={14} color="#c0c0c0" />
+                </View>
+              </TouchableOpacity>
+
+              <Text style={styles.label}>expecting to receive in <Text style={styles.optional}>(where you expect it back)</Text></Text>
+              <TouchableOpacity style={styles.pickerSelector} onPress={() => { setReceiveToSearch(''); setShowReceiveToModal(true); }}>
+                {receiveToAccount ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                    <View style={[styles.catDot, { backgroundColor: receiveToAccount.color ?? '#e8e8e8' }]} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.pickerSelectorText}>{receiveToAccount.account_name}</Text>
+                      <Text style={styles.pickerSelectorSub}>{receiveToAccount.bank}</Text>
+                    </View>
+                  </View>
+                ) : <Text style={styles.pickerSelectorPlaceholder}>select account</Text>}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  {receiveToAccount && <TouchableOpacity onPress={() => setReceiveToAccount(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}><Ionicons name="close" size={14} color="#929090" /></TouchableOpacity>}
+                  <Ionicons name="chevron-down" size={14} color="#c0c0c0" />
+                </View>
+              </TouchableOpacity>
+
+              <View style={[styles.switchRow, { marginTop: 8 }]}>
+                <View>
+                  <Text style={styles.switchLabel}>create linked expense?</Text>
+                  <Text style={styles.switchSub}>records money leaving your account</Text>
+                </View>
+                <Switch value={createLinkedExpense} onValueChange={setCreateLinkedExpense} trackColor={{ true: '#0ccfcf' }} thumbColor="#fff" />
+              </View>
+              {createLinkedExpense && !decreasedFromAccount && (
+                <Text style={{ fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#ed6a6a', marginTop: 4 }}>select a "decreased from" account to create the expense</Text>
+              )}
+            </>
+          )}
+
           {/* Receipt */}
           <Text style={styles.label}>receipt <Text style={styles.optional}>(optional)</Text></Text>
           <TouchableOpacity style={styles.pickerSelector} onPress={() => selectedReceiptId ? setSelectedReceiptId(null) : openReceiptModal()}>
@@ -547,6 +627,64 @@ export default function AddRecordingScreen() {
                   ))}
                 </ScrollView>
                 <TouchableOpacity style={styles.pickerModalCancel} onPress={() => setShowReceiptModal(false)}>
+                  <Text style={styles.pickerModalCancelText}>cancel</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </BlurView>
+      </Modal>
+
+      {/* Decreased From Modal */}
+      <Modal visible={showDecreasedFromModal} transparent animationType="fade" onRequestClose={() => setShowDecreasedFromModal(false)}>
+        <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}>
+          <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowDecreasedFromModal(false)}>
+            <TouchableOpacity activeOpacity={1} onPress={e => e.stopPropagation()}>
+              <View style={styles.pickerModal}>
+                <Text style={styles.pickerModalTitle}>decreased from</Text>
+                <TextInput style={styles.pickerModalSearch} placeholder="search..." placeholderTextColor="#c0c0c0" value={decreasedSearch} onChangeText={setDecreasedSearch} />
+                <ScrollView style={styles.pickerModalList} showsVerticalScrollIndicator={false}>
+                  {filteredDecreased.map(a => (
+                    <TouchableOpacity key={a.id} style={[styles.pickerModalItem, decreasedFromAccount?.id === a.id && styles.pickerModalItemActive]} onPress={() => { setDecreasedFromAccount(a); setShowDecreasedFromModal(false); }}>
+                      <View style={[styles.catDot, { backgroundColor: a.color ?? '#e8e8e8' }]} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.pickerModalItemText, decreasedFromAccount?.id === a.id && { color: '#fff', fontFamily: 'RobotoMono_700Bold' }]}>{a.account_name}</Text>
+                        <Text style={[styles.pickerModalItemSub, decreasedFromAccount?.id === a.id && { color: 'rgba(255,255,255,0.7)' }]}>{a.bank} · {a.account_number}</Text>
+                      </View>
+                      {decreasedFromAccount?.id === a.id && <Ionicons name="checkmark" size={14} color="#fff" />}
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+                <TouchableOpacity style={styles.pickerModalCancel} onPress={() => setShowDecreasedFromModal(false)}>
+                  <Text style={styles.pickerModalCancelText}>cancel</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </BlurView>
+      </Modal>
+
+      {/* Receive To Modal */}
+      <Modal visible={showReceiveToModal} transparent animationType="fade" onRequestClose={() => setShowReceiveToModal(false)}>
+        <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}>
+          <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowReceiveToModal(false)}>
+            <TouchableOpacity activeOpacity={1} onPress={e => e.stopPropagation()}>
+              <View style={styles.pickerModal}>
+                <Text style={styles.pickerModalTitle}>expecting to receive in</Text>
+                <TextInput style={styles.pickerModalSearch} placeholder="search..." placeholderTextColor="#c0c0c0" value={receiveToSearch} onChangeText={setReceiveToSearch} />
+                <ScrollView style={styles.pickerModalList} showsVerticalScrollIndicator={false}>
+                  {filteredReceiveTo.map(a => (
+                    <TouchableOpacity key={a.id} style={[styles.pickerModalItem, receiveToAccount?.id === a.id && styles.pickerModalItemActive]} onPress={() => { setReceiveToAccount(a); setShowReceiveToModal(false); }}>
+                      <View style={[styles.catDot, { backgroundColor: a.color ?? '#e8e8e8' }]} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.pickerModalItemText, receiveToAccount?.id === a.id && { color: '#fff', fontFamily: 'RobotoMono_700Bold' }]}>{a.account_name}</Text>
+                        <Text style={[styles.pickerModalItemSub, receiveToAccount?.id === a.id && { color: 'rgba(255,255,255,0.7)' }]}>{a.bank} · {a.account_number}</Text>
+                      </View>
+                      {receiveToAccount?.id === a.id && <Ionicons name="checkmark" size={14} color="#fff" />}
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+                <TouchableOpacity style={styles.pickerModalCancel} onPress={() => setShowReceiveToModal(false)}>
                   <Text style={styles.pickerModalCancelText}>cancel</Text>
                 </TouchableOpacity>
               </View>
