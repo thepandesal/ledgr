@@ -1,6 +1,6 @@
 import {
   View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Animated,
-  Dimensions, ScrollView, Image, FlatList, ActivityIndicator, Alert,
+  Dimensions, ScrollView, Image, ActivityIndicator, Alert,
   Modal, TextInput
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -8,6 +8,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../../src/lib/supabase';
 import { BlurView } from 'expo-blur';
+import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
+import * as FileSystem from 'expo-file-system/legacy';
 
 const { width: SW, height: SH } = Dimensions.get('window');
 const COLS = 5;
@@ -80,6 +83,68 @@ export default function ReceiptDetailScreen() {
 
   const openCarousel = (idx: number) => setCarouselIdx(idx);
 
+  const compress = async (uri: string) => {
+    const r = await ImageManipulator.manipulateAsync(uri, [{ resize: { width: 1200 } }], { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG });
+    return r.uri;
+  };
+
+  const decode = (base64: string): Uint8Array => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+    const lookup = new Uint8Array(256);
+    for (let i = 0; i < chars.length; i++) lookup[chars.charCodeAt(i)] = i;
+    const bytes = Math.floor(base64.length * 0.75);
+    const result = new Uint8Array(bytes);
+    let j = 0;
+    for (let i = 0; i < base64.length; i += 4) {
+      const a = lookup[base64.charCodeAt(i)], b = lookup[base64.charCodeAt(i+1)];
+      const c = lookup[base64.charCodeAt(i+2)], d = lookup[base64.charCodeAt(i+3)];
+      result[j++] = (a << 2) | (b >> 4);
+      result[j++] = ((b & 15) << 4) | (c >> 2);
+      result[j++] = ((c & 3) << 6) | d;
+    }
+    return result;
+  };
+
+  const uploadPhoto = async (uri: string) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const fileName = `${user.id}/${receiptId}/${Date.now()}_${Math.random().toString(36).slice(2)}.jpg`;
+    let uploadData: Uint8Array | Blob;
+    if (typeof window !== 'undefined' && (uri.startsWith('blob:') || uri.startsWith('data:'))) {
+      const res = await fetch(uri); uploadData = await res.blob();
+    } else {
+      const b64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
+      uploadData = decode(b64);
+    }
+    const { error } = await supabase.storage.from('receipts').upload(fileName, uploadData, { contentType: 'image/jpeg' });
+    if (error) throw error;
+    const { data: row } = await supabase.from('receipt_photos').insert({ entry_id: receiptId, storage_path: fileName }).select().single();
+    const { data: signed } = await supabase.storage.from('receipts').createSignedUrl(fileName, 3600);
+    if (row && signed) setPhotos(prev => [...prev, { id: row.id, url: signed.signedUrl, path: fileName }]);
+  };
+
+  const addFromGallery = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') { Alert.alert('Permission needed', 'Photo library access required.'); return; }
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsMultipleSelection: true, quality: 1 });
+    if (!result.canceled) {
+      for (const asset of result.assets) {
+        const compressed = await compress(asset.uri);
+        await uploadPhoto(compressed);
+      }
+    }
+  };
+
+  const addFromCamera = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') { Alert.alert('Permission needed', 'Camera access required.'); return; }
+    const result = await ImagePicker.launchCameraAsync({ quality: 1 });
+    if (!result.canceled && result.assets[0]) {
+      const compressed = await compress(result.assets[0].uri);
+      await uploadPhoto(compressed);
+    }
+  };
+
   const formatDate = (d: string) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
   if (loading) return (
@@ -110,22 +175,21 @@ export default function ReceiptDetailScreen() {
           </View>
         </View>
 
-        {/* Action buttons — same as recording-detail actionRow */}
+        {/* Action buttons */}
         <View style={s.actionRow}>
-          <TouchableOpacity style={s.actionBtn} onPress={() => router.push({ pathname: '/(app)/capture-receipt', params: { receiptId } } as any)}>
-            <Ionicons name="camera-outline" size={15} color="#425252" />
-            <Text style={s.actionBtnText}>add from camera</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={s.actionBtn} onPress={() => router.push({ pathname: '/(app)/capture-receipt', params: { receiptId, galleryOnly: '1' } } as any)}>
-            <Ionicons name="images-outline" size={15} color="#425252" />
-            <Text style={s.actionBtnText}>add from photos</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[s.actionBtn, s.actionBtnDanger]} onPress={deleteEntry}>
-            <Ionicons name="trash-outline" size={15} color="#ed6a6a" />
-            <Text style={[s.actionBtnText, { color: '#ed6a6a' }]}>delete</Text>
-          </TouchableOpacity>
-        </View>
-
+          <TouchableOpacity style={s.actionBtn} onPress={addFromCamera}>
+            <Ionicons name="camera-outline size={15} color=#425252 />
+ <Text style={s.actionBtnText}>camera</Text>
+ </TouchableOpacity>
+ <TouchableOpacity style={s.actionBtn} onPress={addFromGallery}>
+ <Ionicons name=images-outline size={15} color=#425252 />
+ <Text style={s.actionBtnText}>photos</Text>
+ </TouchableOpacity>
+ <TouchableOpacity style={[s.actionBtn, s.actionBtnDanger]} onPress={deleteEntry}>
+ <Ionicons name=trash-outline size={15} color=#ed6a6a />
+ <Text style={[s.actionBtnText, { color: '#ed6a6a' }]}>delete</Text>
+ </TouchableOpacity>
+ </View>
         <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
 
           {/* Section header */}
@@ -165,44 +229,53 @@ export default function ReceiptDetailScreen() {
         </ScrollView>
       </SafeAreaView>
 
-      {/* Carousel */}
-      <Modal visible={carouselIdx !== null} transparent animationType="fade" onRequestClose={() => setCarouselIdx(null)}>
-        <BlurView intensity={60} tint="light" style={StyleSheet.absoluteFill}>
-          <SafeAreaView style={{ flex: 1 }}>
-            <View style={s.carouselHeader}>
-              <TouchableOpacity onPress={() => setCarouselIdx(null)} style={s.carouselBtn}>
-                <Ionicons name="close" size={22} color="#425252" />
-              </TouchableOpacity>
-              <Text style={s.carouselCount}>{(carouselIdx ?? 0) + 1} / {photos.length}</Text>
-              <TouchableOpacity onPress={() => deletePhoto(photos[carouselIdx ?? 0])} style={s.carouselBtn}>
-                <Ionicons name="trash-outline" size={18} color="#ed6a6a" />
-              </TouchableOpacity>
-            </View>
-            <View style={{ flex: 1, justifyContent: 'center' }}>
-              <ScrollView
-                ref={carouselRef as any}
-                horizontal
-                pagingEnabled
-                showsHorizontalScrollIndicator={false}
-                contentOffset={{ x: (carouselIdx ?? 0) * SW, y: 0 }}
-                onMomentumScrollEnd={e => setCarouselIdx(Math.round(e.nativeEvent.contentOffset.x / SW))}
-              >
-                {photos.map(item => (
-                  <View key={item.id} style={{ width: SW, height: SH * 0.6, justifyContent: 'center', alignItems: 'center' }}>
-                    <Image source={{ uri: item.url }} style={{ width: SW - 32, height: SH * 0.55, borderRadius: 16 }} resizeMode="contain" />
-                  </View>
-                ))}
-              </ScrollView>
-            </View>
-            {photos.length > 1 && (
-              <View style={s.dots}>
-                {photos.map((_, i) => <View key={i} style={[s.dot, i === carouselIdx && s.dotActive]} />)}
-              </View>
-            )}
-          </SafeAreaView>
-        </BlurView>
-      </Modal>
-
+      {/* Carousel - Windows Photo Viewer style */}
+      <Modal visible={carouselIdx !== null} transparent animationType="fade onRequestClose={() => setCarouselIdx(null)}>
+ <BlurView intensity={60} tint=light style={StyleSheet.absoluteFill}>
+ <SafeAreaView style={{ flex: 1 }}>
+ {/* Header */}
+ <View style={s.carouselHeader}>
+ <TouchableOpacity onPress={() => setCarouselIdx(null)} style={s.carouselBtn}>
+ <Ionicons name=close size={22} color=#425252 />
+ </TouchableOpacity>
+ <Text style={s.carouselCount}>{(carouselIdx ?? 0) + 1} / {photos.length}</Text>
+ <TouchableOpacity onPress={() => deletePhoto(photos[carouselIdx ?? 0])} style={s.carouselBtn}>
+ <Ionicons name=trash-outline size={18} color=#ed6a6a />
+ </TouchableOpacity>
+ </View>
+ {/* Main photo with arrows */}
+ <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+ <Image
+ source={{ uri: photos[carouselIdx ?? 0]?.url ?? '' }}
+ style={{ width: SW - 32, height: SH * 0.55, borderRadius: 16 }}
+ resizeMode=contain
+ />
+ {/* Left arrow */}
+ {(carouselIdx ?? 0) > 0 && (
+ <TouchableOpacity style={s.arrowLeft} onPress={() => setCarouselIdx(i => (i ?? 1) - 1)}>
+ <Ionicons name=chevron-back size={28} color=#425252 />
+ </TouchableOpacity>
+ )}
+ {/* Right arrow */}
+ {(carouselIdx ?? 0) < photos.length - 1 && (
+ <TouchableOpacity style={s.arrowRight} onPress={() => setCarouselIdx(i => (i ?? 0) + 1)}>
+ <Ionicons name=chevron-forward size={28} color=#425252 />
+ </TouchableOpacity>
+ )}
+ </View>
+ {/* Thumbnail strip */}
+ {photos.length > 1 && (
+ <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.thumbStrip}>
+ {photos.map((p, i) => (
+ <TouchableOpacity key={p.id} onPress={() => setCarouselIdx(i)} style={[s.thumbItem, i === carouselIdx && s.thumbItemActive]}>
+ <Image source={{ uri: p.url }} style={s.thumbImg} resizeMode=cover />
+ </TouchableOpacity>
+ ))}
+ </ScrollView>
+ )}
+ </SafeAreaView>
+ </BlurView>
+ </Modal>
       {/* Rename modal */}
       <Modal visible={renameModal} transparent animationType="fade" onRequestClose={() => setRenameModal(false)}>
         <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}>
@@ -256,9 +329,12 @@ const s = StyleSheet.create({
   carouselHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 12 },
   carouselBtn: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
   carouselCount: { fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#425252' },
-  dots: { flexDirection: 'row', justifyContent: 'center', gap: 5, paddingBottom: 24 },
-  dot: { width: 5, height: 5, borderRadius: 3, backgroundColor: '#c0c0c0' },
-  dotActive: { backgroundColor: '#0ccfcf', width: 14 },
+  arrowLeft: { position: 'absolute', left: 8, backgroundColor: 'rgba(255,255,255,0.8)', borderRadius: 999, width: 44, height: 44, justifyContent: 'center', alignItems: 'center' },
+  arrowRight: { position: 'absolute', right: 8, backgroundColor: 'rgba(255,255,255,0.8)', borderRadius: 999, width: 44, height: 44, justifyContent: 'center', alignItems: 'center' },
+  thumbStrip: { paddingHorizontal: 16, paddingVertical: 12, gap: 8, alignItems: 'center' },
+  thumbItem: { width: 56, height: 56, borderRadius: 8, overflow: 'hidden', borderWidth: 2, borderColor: 'transparent' },
+  thumbItemActive: { borderColor: '#0ccfcf' },
+  thumbImg: { width: '100%', height: '100%' },
   modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   modalBox: { backgroundColor: '#ffffff', borderRadius: 20, padding: 20, width: 300, gap: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 20, elevation: 10 },
   modalTitle: { fontFamily: 'ChillaxMedium', fontSize: 16, color: '#425252' },
