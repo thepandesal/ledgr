@@ -32,6 +32,8 @@ export default function RecordingDetailScreen() {
   const [shareLoading, setShareLoading] = useState(false);
   const [linkedReceipt, setLinkedReceipt] = useState<any>(null);
   const [receiptPhotos, setReceiptPhotos] = useState<{ id: string; url: string }[]>([]);
+  const [linkReceiptModal, setLinkReceiptModal] = useState(false);
+  const [linkReceiptEntries, setLinkReceiptEntries] = useState<any[]>([]);
   const [captureHtml, setCaptureHtml] = useState<string | null>(null);
   const webviewRef = useRef<any>(null);
   const [copiedToast, setCopiedToast] = useState(false);
@@ -80,6 +82,21 @@ export default function RecordingDetailScreen() {
       }));
       setReceiptPhotos(urls.filter(u => u.url));
     }
+  };
+
+  const openLinkReceiptModal = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data } = await supabase.from('receipt_entries').select('id, note, created_at').eq('user_id', user.id).is('recording_id', null).order('created_at', { ascending: false });
+    setLinkReceiptEntries(data ?? []);
+    setLinkReceiptModal(true);
+  };
+
+  const linkReceiptToRecording = async (entry: any) => {
+    await supabase.from('receipt_entries').update({ recording_id: recordingId }).eq('id', entry.id);
+    setLinkedReceipt(entry);
+    setLinkReceiptModal(false);
+    loadLinkedReceipt();
   };
 
   const loadRecording = async () => {
@@ -542,6 +559,12 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
               <Ionicons name="receipt-outline" size={15} color="#425252" />
               <Text style={styles.actionBtnText}>{linkedReceipt ? 'view receipt' : 'add receipt'}</Text>
             </TouchableOpacity>
+            {!linkedReceipt && (
+              <TouchableOpacity style={styles.actionBtn} onPress={openLinkReceiptModal}>
+                <Ionicons name="link-outline" size={15} color="#425252" />
+                <Text style={styles.actionBtnText}>link receipt</Text>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity style={[styles.actionBtn, styles.actionBtnDanger]} onPress={() => setCookingModal(true)}>
               <Ionicons name="trash-outline" size={15} color="#ed6a6a" />
               <Text style={[styles.actionBtnText, { color: '#ed6a6a' }]}>delete</Text>
@@ -989,6 +1012,42 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
 
                 <TouchableOpacity style={[styles.modalBtn, { width: '100%', backgroundColor: '#f5f5f5' }]} onPress={() => setSaveImageModal(false)}>
                   <Text style={[styles.modalBtnText, { color: '#8a8a8a' }]}>cancel</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </BlurView>
+      </Modal>
+
+      {/* Link receipt modal */}
+      <Modal visible={linkReceiptModal} transparent animationType="fade" onRequestClose={() => setLinkReceiptModal(false)}>
+        <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}>
+          <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setLinkReceiptModal(false)}>
+            <TouchableOpacity activeOpacity={1} onPress={e => e.stopPropagation()}>
+              <View style={[styles.modalBox, { width: 320 }]}>
+                <Text style={styles.modalTitle}>link a receipt</Text>
+                {linkReceiptEntries.length === 0 ? (
+                  <Text style={{ fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#929090', textAlign: 'center', paddingVertical: 16 }}>no unlinked receipts found</Text>
+                ) : (
+                  <ScrollView style={{ width: '100%', maxHeight: 280 }} showsVerticalScrollIndicator={false}>
+                    {linkReceiptEntries.map((entry: any) => (
+                      <TouchableOpacity
+                        key={entry.id}
+                        style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' }}
+                        onPress={() => linkReceiptToRecording(entry)}
+                      >
+                        <Ionicons name="folder-outline" size={18} color="#0ccfcf" />
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontFamily: 'ChillaxMedium', fontSize: 13, color: '#425252' }} numberOfLines={1}>{entry.note ?? 'untitled'}</Text>
+                          <Text style={{ fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#929090' }}>{new Date(entry.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</Text>
+                        </View>
+                        <Ionicons name="link-outline" size={14} color="#0ccfcf" />
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                )}
+                <TouchableOpacity style={[styles.pickerBtn, { flex: undefined, backgroundColor: '#f5f5f5' }]} onPress={() => setLinkReceiptModal(false)}>
+                  <Text style={[styles.pickerBtnText, { color: '#8a8a8a' }]}>cancel</Text>
                 </TouchableOpacity>
               </View>
             </TouchableOpacity>
