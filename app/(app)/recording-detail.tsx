@@ -1,4 +1,5 @@
 import AddItemModal from './AddItemModal';
+import { setPendingFocusDate } from './space-detail';
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Animated, Dimensions, ScrollView, TextInput, Modal, Share, Linking, Platform, Clipboard, Image } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -80,16 +81,19 @@ export default function RecordingDetailScreen() {
   const confirmDelete = async (keepLinked: boolean) => {
     setDeleteLoading(true);
     try {
+      const recordingDate = recording?.transaction_date ?? null;
       await supabase.from('recordings').delete().eq('id', recordingId);
       if (!keepLinked && linkedPayable) {
-        // revert payable: subtract this expense amount, reset status if needed
         const revertPaid = Math.max(0, Number(linkedPayable.paid_amount ?? 0) - Number(recording?.amount ?? 0));
         await supabase.from('recordings').update({
           paid_amount: revertPaid,
           status: revertPaid <= 0 ? 'unpaid' : 'partial',
         }).eq('id', linkedPayable.id);
       }
-      handleBack();
+      if (recordingDate) setPendingFocusDate(recordingDate);
+      Animated.timing(slideAnim, { toValue: width, duration: 250, useNativeDriver: true }).start(() => {
+        router.back();
+      });
     } catch (e) { console.log(e); }
     finally { setDeleteLoading(false); }
   };

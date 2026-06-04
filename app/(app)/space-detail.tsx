@@ -2,11 +2,15 @@ import {
   View, Text, StyleSheet, TouchableOpacity, Modal,
   SafeAreaView, Animated, Dimensions, ScrollView, ActivityIndicator,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../../src/lib/supabase';
 import { BlurView } from 'expo-blur';
+
+// Module-level store for cross-screen date focus signal
+export let pendingFocusDate: string | null = null;
+export function setPendingFocusDate(date: string | null) { pendingFocusDate = date; }
 
 const { width } = Dimensions.get('window');
 type ViewMode = 'daily' | 'weekly' | 'monthly';
@@ -77,6 +81,17 @@ export default function SpaceDetailScreen() {
   }, []);
 
   useEffect(() => { if (spaceId) loadRecordings(); }, [spaceId]);
+
+  useFocusEffect(useCallback(() => {
+    if (!spaceId) return;
+    loadRecordings();
+    if (pendingFocusDate) {
+      const parts = pendingFocusDate.split('-');
+      const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+      setSelectedDate(d);
+      setPendingFocusDate(null);
+    }
+  }, [spaceId]));
 
   useEffect(() => {
     if (tabLayouts.filter(Boolean).length < 3) return;
