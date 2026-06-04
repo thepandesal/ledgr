@@ -131,23 +131,26 @@ export default function RecordingDetailScreen() {
       const { data: payable } = await supabase.from('recordings').select('id, name, amount, status, paid_amount').eq('id', rec.linked_recording_id).single();
       if (payable) setLinkedPayable(payable);
       // load per-person split data from the payable's bill_splits + split_items
-      const { data: splits } = await supabase.from('bill_splits').select('person_name').eq('recording_id', rec.linked_recording_id);
-      const { data: splitItems } = await supabase.from('split_items').select('*, split_subitems(*)').eq('recording_id', rec.linked_recording_id);
-      if (splits && splitItems) {
-        const perPersonMap: Record<string, number> = {};
-        splitItems.forEach((item: any) => {
-          const subs = item.split_subitems ?? [];
-          if (subs.length === 0) {
-            const pp = (item.people ?? []).length > 0 ? Number(item.cost) / item.people.length : 0;
-            (item.people ?? []).forEach((p: string) => { perPersonMap[p] = (perPersonMap[p] || 0) + pp; });
-          } else {
-            subs.forEach((sub: any) => {
-              const pp = (sub.people ?? []).length > 0 ? Number(sub.cost) / sub.people.length : 0;
-              (sub.people ?? []).forEach((p: string) => { perPersonMap[p] = (perPersonMap[p] || 0) + pp; });
-            });
-          }
-        });
-        setPayablePerPerson(perPersonMap);
+      const { data: rec2 } = await supabase.from('recordings').select('payment_to').eq('id', recordingId).single();
+      const paidFor: string[] = rec2?.payment_to ? rec2.payment_to.split(', ').map((s: string) => s.trim()) : [];
+      if (paidFor.length > 0) {
+        const { data: splitItems } = await supabase.from('split_items').select('*, split_subitems(*)').eq('recording_id', rec.linked_recording_id);
+        if (splitItems) {
+          const perPersonMap: Record<string, number> = {};
+          splitItems.forEach((item: any) => {
+            const subs = item.split_subitems ?? [];
+            if (subs.length === 0) {
+              const pp = (item.people ?? []).length > 0 ? Number(item.cost) / item.people.length : 0;
+              (item.people ?? []).forEach((p: string) => { if (paidFor.includes(p)) perPersonMap[p] = (perPersonMap[p] || 0) + pp; });
+            } else {
+              subs.forEach((sub: any) => {
+                const pp = (sub.people ?? []).length > 0 ? Number(sub.cost) / sub.people.length : 0;
+                (sub.people ?? []).forEach((p: string) => { if (paidFor.includes(p)) perPersonMap[p] = (perPersonMap[p] || 0) + pp; });
+              });
+            }
+          });
+          setPayablePerPerson(perPersonMap);
+        }
       }
     }
   };
