@@ -10,8 +10,8 @@ import { supabase } from '../../src/lib/supabase';
 import { BlurView } from 'expo-blur';
 
 const { width: SW } = Dimensions.get('window');
-const GRID_GAP = 8;
-const GRID_COLS = 3;
+const GRID_GAP = 6;
+const GRID_COLS = 4;
 const CELL = (SW - 64 - GRID_GAP * (GRID_COLS - 1)) / GRID_COLS;
 
 interface Photo { id: string; url: string; path: string; }
