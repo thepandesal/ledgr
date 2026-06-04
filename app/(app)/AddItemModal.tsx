@@ -234,7 +234,7 @@ const s = StyleSheet.create({
   subitemBlock: { marginBottom: 10 },
   subitemInputRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   subArrow: { fontSize: 12, color: '#c0c0c0', flexShrink: 0 },
-  subitemInput: { flex: 1, fontFamily: 'RobotoMono_400Regular', fontSize: 14, color: '#425252', backgroundColor: '#ffffff', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, borderWidth: 1, borderColor: '#e8e8e8' },
+  subitemInput: { flex: 1, fontFamily: 'RobotoMono_400Regular', fontSize: 16, color: '#425252', backgroundColor: '#ffffff', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, borderWidth: 1, borderColor: '#e8e8e8' },
   subitemCostHint: { fontFamily: 'RobotoMono_700Bold', fontSize: 10, color: '#0ccfcf', flexShrink: 0 },
   addSubLink: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 8 },
   addSubLinkText: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#0ccfcf' },
