@@ -44,6 +44,17 @@ export default function RecordingDetailScreen() {
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [activeSuggestionIdx, setActiveSuggestionIdx] = useState<number | null>(null);
   const [deletePersonConfirm, setDeletePersonConfirm] = useState<{ idx: number; name: string; affectedItems: number } | null>(null);
+  const [payModal, setPayModal] = useState(false);
+  const [payMode, setPayMode] = useState<'full' | 'manual' | 'split'>('full');
+  const [payManualAmount, setPayManualAmount] = useState('');
+  const [paySelectedPeople, setPaySelectedPeople] = useState<string[]>([]);
+  const [payAccounts, setPayAccounts] = useState<any[]>([]);
+  const [payAccount, setPayAccount] = useState<any>(null);
+  const [payDate, setPayDate] = useState(new Date().toISOString().split('T')[0]);
+  const [payComplete, setPayComplete] = useState<boolean | null>(null);
+  const [payLoading, setPayLoading] = useState(false);
+  const [linkedPayments, setLinkedPayments] = useState<any[]>([]);
+  const [linkedPayable, setLinkedPayable] = useState<any>(null);
 
   // Add item form state
   const [itemForms, setItemForms] = useState<{ name: string; cost: string; people: string[]; subitemForms: { name: string; people: string[] }[] }[]>([{ name: '', cost: '', people: [], subitemForms: [] }]);
@@ -73,7 +84,93 @@ export default function RecordingDetailScreen() {
     loadItems();
     loadLinkedReceipt();
     loadExistingShare();
+    loadPaymentData();
   }, []);
+
+  const loadPaymentData = async () => {
+    if (!recordingId) return;
+    const { data: rec } = await supabase.from('recordings').select('type, linked_recording_id').eq('id', recordingId).single();
+    if (!rec) return;
+    if (rec.type === 'payable') {
+      const { data: payments } = await supabase.from('recordings')
+        .select('id, name, amount, transaction_date, payment_from_account_id, accounts:payment_from_account_id(account_name, bank)')
+        .eq('linked_recording_id', recordingId).eq('type', 'expense').order('transaction_date', { ascending: false });
+      if (payments) setLinkedPayments(payments);
+    } else if (rec.type === 'expense' && rec.linked_recording_id) {
+      const { data: payable } = await supabase.from('recordings').select('id, name, amount, status').eq('id', rec.linked_recording_id).single();
+      if (payable) setLinkedPayable(payable);
+    }
+  };
+
+  const openPayModal = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data: accs } = await supabase.from('accounts').select().eq('user_id', user.id).order('account_name');
+    if (accs) setPayAccounts(accs);
+    const defaultAcc = accs?.find((a: any) => a.id === recording?.account_id) ?? accs?.[0] ?? null;
+    setPayAccount(defaultAcc);
+    setPayMode('full');
+    setPayManualAmount('');
+    setPaySelectedPeople([]);
+    setPayDate(new Date().toISOString().split('T')[0]);
+    setPayComplete(null);
+    setPayModal(true);
+  };
+
+  const getPayAmount = () => {
+    if (payMode === 'full') return Number(recording?.amount ?? 0);
+    if (payMode === 'manual') return parseFloat(payManualAmount || '0') || 0;
+    if (payMode === 'split') {
+      const perPersonMap: Record<string, number> = {};
+      items.forEach(item => {
+        if (item.subitems.length === 0) {
+          const pp = item.people.length > 0 ? item.cost / item.people.length : 0;
+          item.people.forEach(p => { perPersonMap[p] = (perPersonMap[p] || 0) + pp; });
+        } else {
+          item.subitems.forEach(sub => {
+            const pp = sub.people.length > 0 ? sub.cost / sub.people.length : 0;
+            sub.people.forEach(p => { perPersonMap[p] = (perPersonMap[p] || 0) + pp; });
+          });
+        }
+      });
+      return paySelectedPeople.reduce((s, name) => s + (perPersonMap[name] ?? 0), 0);
+    }
+    return 0;
+  };
+
+  const confirmPayment = async () => {
+    if (payComplete === null || !recording) return;
+    const amount = getPayAmount();
+    if (!amount || amount <= 0) return;
+    setPayLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      await supabase.from('recordings').insert({
+        space_id: recording.space_id,
+        user_id: user.id,
+        name: recording.name,
+        type: 'expense',
+        amount,
+        transaction_date: payDate,
+        status: 'paid',
+        account_id: payAccount?.id ?? recording.account_id,
+        payment_from_account_id: payAccount?.id ?? recording.account_id,
+        linked_recording_id: recordingId,
+        category_id: recording.category_id ?? null,
+      });
+      const prevPaid = Number(recording.paid_amount ?? 0);
+      const newPaid = prevPaid + amount;
+      await supabase.from('recordings').update({
+        status: payComplete ? 'paid' : 'partial',
+        paid_amount: newPaid,
+      }).eq('id', recordingId);
+      setRecording((prev: any) => ({ ...prev, status: payComplete ? 'paid' : 'partial', paid_amount: newPaid }));
+      setPayModal(false);
+      loadPaymentData();
+    } catch (e) { console.log(e); }
+    finally { setPayLoading(false); }
+  };
 
   const loadExistingShare = async () => {
     if (!recordingId) return;
@@ -610,6 +707,27 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
             </View>
           </View>
 
+          {/* Pay bill banner — payable only */}
+          {recording?.type === 'payable' && recording?.status !== 'paid' && (
+            <TouchableOpacity style={styles.payBillBanner} onPress={openPayModal}>
+              <Ionicons name="cash-outline" size={15} color="#fff" />
+              <Text style={styles.payBillBannerText}>pay bill</Text>
+              <View style={styles.payBillBannerBadge}>
+                <Text style={styles.payBillBannerBadgeText}>
+                  {recording.status === 'partial'
+                    ? `${Number(recording.paid_amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} / ${Number(recording.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+                    : Number(recording.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          )}
+          {recording?.type === 'payable' && recording?.status === 'paid' && (
+            <View style={styles.paidBanner}>
+              <Ionicons name="checkmark-circle" size={15} color="#2ab671" />
+              <Text style={styles.paidBannerText}>fully paid</Text>
+            </View>
+          )}
+
           {/* Action buttons */}
           <View style={styles.actionRow}>
             <TouchableOpacity
@@ -665,7 +783,45 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
             <InfoRow label="Date of transaction" value={formatDate(recording?.transaction_date)} />
             <InfoRow label="Transaction type" value={typeLabel(recording?.type ?? '', recording?.status ?? '')} />
             <InfoRow label="Bank / Account" value={truncate(recording?.account?.account_name ?? '—', 16)} />
+            {linkedPayable && (
+              <>
+                <View style={{ height: 1, backgroundColor: '#f0f0f0', marginVertical: 2 }} />
+                <InfoRow label="linked payable" value={truncate(linkedPayable.name, 16)} />
+              </>
+            )}
           </View>
+          {linkedPayable && (
+            <TouchableOpacity style={styles.linkedPayableBtn} onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: linkedPayable.id } } as any)}>
+              <Ionicons name="link-outline" size={12} color="#929090" />
+              <Text style={styles.linkedPayableBtnText}>view payable</Text>
+              <Ionicons name="arrow-forward" size={11} color="#929090" />
+            </TouchableOpacity>
+          )}
+
+          {/* Payment history — payable only */}
+          {recording?.type === 'payable' && linkedPayments.length > 0 && (
+            <>
+              <Text style={styles.sectionHeader}>payments</Text>
+              <View style={styles.infoBlock}>
+                {linkedPayments.map((p: any, i: number) => (
+                  <TouchableOpacity key={p.id} onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: p.id } } as any)}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8, gap: 8 }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontFamily: 'RobotoMono_700Bold', fontSize: 11, color: '#ed6a6a' }}>
+                          {Number(p.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        </Text>
+                        <Text style={{ fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#929090' }}>
+                          {formatDate(p.transaction_date)} · {p.accounts?.account_name ?? '—'}
+                        </Text>
+                      </View>
+                      <Ionicons name="chevron-forward" size={12} color="#c0c0c0" />
+                    </View>
+                    {i < linkedPayments.length - 1 && <View style={{ height: 1, backgroundColor: '#f0f0f0' }} />}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </>
+          )}
 
           {/* Split bill */}
           <Text style={styles.sectionHeader}>split bill</Text>
@@ -1121,6 +1277,134 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
         </BlurView>
       </Modal>
 
+      {/* Pay modal */}
+      <Modal visible={payModal} transparent animationType="fade" onRequestClose={() => setPayModal(false)}>
+        <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}>
+          <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setPayModal(false)}>
+            <TouchableOpacity activeOpacity={1} onPress={e => e.stopPropagation()}>
+              <View style={[styles.modalBox, { width: 320 }]}>
+                <Text style={styles.modalTitle}>pay bill</Text>
+                <Text style={styles.subitemRemaining}>
+                  {(recording?.name ?? '').toLowerCase()} · {Number(recording?.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                </Text>
+
+                {/* Payment mode */}
+                <View style={{ flexDirection: 'row', gap: 6, width: '100%' }}>
+                  {(['full', 'manual', ...(filledPeople.length > 0 && items.length > 0 ? ['split'] : [])] as const).map(mode => (
+                    <TouchableOpacity
+                      key={mode}
+                      style={[styles.personSelectChip, { flex: 1, justifyContent: 'center' }, payMode === mode && styles.personSelectChipActive]}
+                      onPress={() => setPayMode(mode as any)}
+                    >
+                      <Text style={[styles.personSelectText, payMode === mode && styles.personSelectTextActive]}>
+                        {mode}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {payMode === 'full' && (
+                  <Text style={[styles.subitemRemaining, { color: '#0ccfcf', fontSize: 15 }]}>
+                    {Number(recording?.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                  </Text>
+                )}
+
+                {payMode === 'manual' && (
+                  <TextInput
+                    style={[styles.personInput, { width: '100%' }]}
+                    placeholder="0.00"
+                    placeholderTextColor="#c0c0c0"
+                    value={payManualAmount}
+                    onChangeText={setPayManualAmount}
+                    keyboardType="decimal-pad"
+                    autoFocus
+                  />
+                )}
+
+                {payMode === 'split' && (
+                  <View style={{ width: '100%', gap: 6 }}>
+                    <Text style={styles.subitemRemaining}>select who is paying</Text>
+                    <View style={styles.itemPeopleSelect}>
+                      {filledPeople.map((p, i) => {
+                        const sel = paySelectedPeople.includes(p);
+                        return (
+                          <TouchableOpacity key={i} style={[styles.personSelectChip, sel && styles.personSelectChipActive]}
+                            onPress={() => setPaySelectedPeople(prev => sel ? prev.filter(x => x !== p) : [...prev, p])}>
+                            <Text style={[styles.personSelectText, sel && styles.personSelectTextActive]}>{p}</Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                    {paySelectedPeople.length > 0 && (
+                      <Text style={[styles.subitemRemaining, { color: '#0ccfcf' }]}>
+                        total: {getPayAmount().toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      </Text>
+                    )}
+                  </View>
+                )}
+
+                {/* Account picker */}
+                <Text style={[styles.subitemRemaining, { marginTop: 4 }]}>payment account</Text>
+                <ScrollView style={{ width: '100%', maxHeight: 130 }} showsVerticalScrollIndicator={false}>
+                  {payAccounts.map((acc: any) => (
+                    <TouchableOpacity
+                      key={acc.id}
+                      style={[styles.accountOption, payAccount?.id === acc.id && styles.accountOptionActive]}
+                      onPress={() => setPayAccount(acc)}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.accountOptionName, payAccount?.id === acc.id && { color: '#fff' }]}>{acc.account_name}</Text>
+                        <Text style={[styles.accountOptionBank, payAccount?.id === acc.id && { color: 'rgba(255,255,255,0.7)' }]}>{acc.bank} · {acc.account_number}</Text>
+                      </View>
+                      {payAccount?.id === acc.id && <Ionicons name="checkmark" size={14} color="#fff" />}
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+
+                {/* Date */}
+                <Text style={[styles.subitemRemaining, { marginTop: 4 }]}>payment date</Text>
+                <TextInput
+                  style={[styles.personInput, { width: '100%' }]}
+                  placeholder="YYYY-MM-DD"
+                  placeholderTextColor="#c0c0c0"
+                  value={payDate}
+                  onChangeText={setPayDate}
+                />
+
+                {/* Complete? */}
+                <Text style={[styles.subitemRemaining, { marginTop: 4 }]}>complete payment?</Text>
+                <View style={{ flexDirection: 'row', gap: 8, width: '100%' }}>
+                  {([true, false] as const).map(val => (
+                    <TouchableOpacity
+                      key={String(val)}
+                      style={[styles.personSelectChip, { flex: 1, justifyContent: 'center' }, payComplete === val && styles.personSelectChipActive]}
+                      onPress={() => setPayComplete(val)}
+                    >
+                      <Text style={[styles.personSelectText, payComplete === val && styles.personSelectTextActive]}>
+                        {val ? 'yes, complete' : 'no, partial'}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                <View style={[styles.modalBtns, { marginTop: 4 }]}>
+                  <TouchableOpacity style={[styles.modalBtn, { backgroundColor: '#f5f5f5' }]} onPress={() => setPayModal(false)}>
+                    <Text style={[styles.modalBtnText, { color: '#8a8a8a' }]}>cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.modalBtn, (payComplete === null || getPayAmount() <= 0 || payLoading) && { opacity: 0.4 }]}
+                    onPress={confirmPayment}
+                    disabled={payComplete === null || getPayAmount() <= 0 || payLoading}
+                  >
+                    <Text style={styles.modalBtnText}>{payLoading ? 'saving...' : 'confirm'}</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </BlurView>
+      </Modal>
+
       {/* Cooking modal */}
       <Modal visible={cookingModal} transparent animationType="fade" onRequestClose={() => setCookingModal(false)}>
         <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}>
@@ -1277,6 +1561,14 @@ const styles = StyleSheet.create({
   accountOptionName: { fontFamily: 'ChillaxMedium', fontSize: 13, color: '#425252' },
   accountOptionBank: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#929090' },
   subitemError: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#ed6a6a', alignSelf: 'flex-start' },
+  payBillBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#425252', borderRadius: 12, padding: 14, marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.10, shadowRadius: 0, elevation: 2 },
+  payBillBannerText: { fontFamily: 'RobotoMono_700Bold', fontSize: 12, color: '#fff', flex: 1 },
+  payBillBannerBadge: { backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 999, paddingVertical: 3, paddingHorizontal: 10 },
+  payBillBannerBadgeText: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#fff' },
+  paidBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#f0fff8', borderRadius: 12, padding: 14, marginBottom: 16, borderWidth: 1, borderColor: '#2ab671' },
+  paidBannerText: { fontFamily: 'RobotoMono_700Bold', fontSize: 12, color: '#2ab671' },
+  linkedPayableBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 999, borderWidth: 1, borderColor: '#e8e8e8', backgroundColor: '#fafafa', marginBottom: 16 },
+  linkedPayableBtnText: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#929090' },
   splitPreview: { fontFamily: 'RobotoMono_700Bold', fontSize: 12, color: '#0ccfcf', alignSelf: 'flex-start' },
 });
 
