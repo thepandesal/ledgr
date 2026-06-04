@@ -3,20 +3,6 @@ import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../src/lib/supabase';
 import { BlurView } from 'expo-blur';
-import React from 'react';
-
-class ErrorBoundary extends React.Component<{children: React.ReactNode}, {error: string|null}> {
-  state = { error: null };
-  componentDidCatch(e: any) { this.setState({ error: e?.message ?? String(e) }); }
-  render() {
-    if (this.state.error) return (
-      <View style={{ flex:1, justifyContent:'center', alignItems:'center', padding:24 }}>
-        <Text style={{ fontFamily:'monospace', fontSize:12, color:'#ed6a6a' }}>{this.state.error}</Text>
-      </View>
-    );
-    return this.props.children;
-  }
-}
 
 export default function SplitSharePage() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -48,7 +34,6 @@ export default function SplitSharePage() {
   const items: any[] = Array.isArray(data.items) ? data.items : [];
 
   return (
-    <ErrorBoundary>
     <>
       <ScrollView style={s.container} contentContainerStyle={s.scroll}>
 
