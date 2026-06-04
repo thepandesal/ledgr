@@ -1,6 +1,6 @@
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView,
-  TextInput, ActivityIndicator, Switch, Animated, Dimensions, Modal,
+  TextInput, ActivityIndicator, Switch, Animated, Dimensions, Modal, FlatList, Image,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,7 +22,7 @@ const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const FREQUENCIES = ['daily', 'weekly', 'monthly', 'yearly'];
 
 export default function AddRecordingScreen() {
-  const { spaceId, spaceName, defaultDate, editId } = useLocalSearchParams<{ spaceId: string; spaceName: string; defaultDate: string; editId: string }>();
+  const { spaceId, spaceName, defaultDate, editId, receiptId } = useLocalSearchParams<{ spaceId: string; spaceName: string; defaultDate: string; editId: string; receiptId?: string }>();
   const router = useRouter();
   const slideAnim = useRef(new Animated.Value(width)).current;
 
@@ -48,6 +48,7 @@ export default function AddRecordingScreen() {
   const [selectedAccount, setSelectedAccount] = useState<any>(null);
   const [accountSuggestions, setAccountSuggestions] = useState<any[]>([]);
   const [personName, setPersonName] = useState('');
+  const [receiptPhotos, setReceiptPhotos] = useState<string[]>([]);
 
   const isLoanType = type === 'receivable' || type === 'payable';
   const selectedType = TYPES.find(t => t.key === type)!;
@@ -55,7 +56,19 @@ export default function AddRecordingScreen() {
   useEffect(() => {
     Animated.timing(slideAnim, { toValue: 0, duration: 280, useNativeDriver: true }).start();
     loadData();
+    if (receiptId) loadReceiptPhotos();
   }, []);
+
+  const loadReceiptPhotos = async () => {
+    const { data } = await supabase.from('receipt_photos').select('storage_path').eq('receipt_id', receiptId);
+    if (data) {
+      const urls = await Promise.all(data.map(async (p: any) => {
+        const { data: signed } = await supabase.storage.from('receipts').createSignedUrl(p.storage_path, 3600);
+        return signed?.signedUrl ?? '';
+      }));
+      setReceiptPhotos(urls.filter(Boolean));
+    }
+  };
 
   const loadData = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -128,6 +141,11 @@ export default function AddRecordingScreen() {
         });
         if (err) throw err;
       }
+      // Link receipt if coming from receipt screen
+      if (receiptId) {
+        const { data: savedRec } = await supabase.from('recordings').select('id').order('created_at', { ascending: false }).limit(1).single();
+        if (savedRec) await supabase.from('receipts').update({ recording_id: savedRec.id }).eq('id', receiptId);
+      }
       handleBack();
     } catch (e: any) { setError(e.message); setLoading(false); }
   };
@@ -150,6 +168,23 @@ export default function AddRecordingScreen() {
         </View>
 
         <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+
+          {/* Receipt photo carousel */}
+          {receiptPhotos.length > 0 && (
+            <View style={styles.receiptCarousel}>
+              <Text style={styles.receiptCarouselLabel}>receipt reference</Text>
+              <FlatList
+                data={receiptPhotos}
+                keyExtractor={(_, i) => String(i)}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ gap: 8 }}
+                renderItem={({ item }) => (
+                  <Image source={{ uri: item }} style={styles.receiptThumb} resizeMode="cover" />
+                )}
+              />
+            </View>
+          )}
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
@@ -379,6 +414,9 @@ const styles = StyleSheet.create({
   headerSub: { fontFamily: 'ChillaxMedium', fontSize: 10, color: '#929090' },
   headerTitle: { fontFamily: 'Avenelle', fontSize: 22, color: '#0ccfcf', letterSpacing: -0.5, lineHeight: 26 },
   body: { paddingHorizontal: 32, paddingTop: 20, paddingBottom: 60, gap: 4 },
+  receiptCarousel: { marginBottom: 8 },
+  receiptCarouselLabel: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#929090', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
+  receiptThumb: { width: 80, height: 80, borderRadius: 10 },
   error: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#ed6a6a', marginBottom: 8 },
   label: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#929090', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 16, marginBottom: 6 },
   optional: { fontFamily: 'RobotoMono_400Regular', color: '#c0c0c0', textTransform: 'none' },
