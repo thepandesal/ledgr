@@ -73,7 +73,25 @@ export default function RecordingDetailScreen() {
   const removeSubitemForm = (itemIdx: number, subIdx: number) =>
     setItemForms(prev => { const n = [...prev]; n[itemIdx] = { ...n[itemIdx], subitemForms: n[itemIdx].subitemForms.filter((_, idx) => idx !== subIdx) }; return n; });
 
-  const makeFingerprint = (p: string[], i: Item[]) =>
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
+  const confirmDelete = async (keepLinked: boolean) => {
+    setDeleteLoading(true);
+    try {
+      await supabase.from('recordings').delete().eq('id', recordingId);
+      if (!keepLinked && linkedPayable) {
+        // revert payable: subtract this expense amount, reset status if needed
+        const revertPaid = Math.max(0, Number(linkedPayable.paid_amount ?? 0) - Number(recording?.amount ?? 0));
+        await supabase.from('recordings').update({
+          paid_amount: revertPaid,
+          status: revertPaid <= 0 ? 'unpaid' : 'partial',
+        }).eq('id', linkedPayable.id);
+      }
+      handleBack();
+    } catch (e) { console.log(e); }
+    finally { setDeleteLoading(false); }
+  };
     JSON.stringify({ people: [...p].sort(), items: i.map(x => x.id).sort() });
 
   useEffect(() => {
@@ -740,7 +758,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                 <Text style={[styles.actionBtnText, { color: '#2ab671' }]}>fully paid</Text>
               </View>
             )}
-            <TouchableOpacity style={[styles.actionBtn, styles.actionBtnDanger]} onPress={() => setCookingModal(true)}>
+            <TouchableOpacity style={[styles.actionBtn, styles.actionBtnDanger]} onPress={() => setDeleteConfirm(true)}>
               <Ionicons name="trash-outline" size={15} color="#ed6a6a" />
               <Text style={[styles.actionBtnText, { color: '#ed6a6a' }]}>delete</Text>
             </TouchableOpacity>
@@ -816,6 +834,13 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
 
           {/* Split bill */}
           <Text style={styles.sectionHeader}>split bill</Text>
+          {linkedPayable ? (
+            <TouchableOpacity style={styles.linkedPayableBtn} onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: linkedPayable.id } } as any)}>
+              <Ionicons name="git-branch-outline" size={12} color="#929090" />
+              <Text style={styles.linkedPayableBtnText}>view split bill on payable</Text>
+              <Ionicons name="arrow-forward" size={11} color="#929090" />
+            </TouchableOpacity>
+          ) : (<>
           <View style={styles.splitBtnGrid}>
             {[
               { icon: 'add-circle-outline', label: 'add item', onPress: () => {
@@ -979,6 +1004,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
               </>
             );
           })()}
+          </>)}
 
         </ScrollView>
       </SafeAreaView>
@@ -1390,6 +1416,51 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                     <Text style={styles.modalBtnText}>{payLoading ? 'saving...' : 'confirm'}</Text>
                   </TouchableOpacity>
                 </View>
+              </View>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </BlurView>
+      </Modal>
+
+      {/* Delete confirm modal */}
+      <Modal visible={deleteConfirm} transparent animationType="fade" onRequestClose={() => setDeleteConfirm(false)}>
+        <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}>
+          <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setDeleteConfirm(false)}>
+            <TouchableOpacity activeOpacity={1} onPress={e => e.stopPropagation()}>
+              <View style={styles.modalBox}>
+                <Text style={styles.modalTitle}>delete recording</Text>
+                {linkedPayable ? (
+                  <>
+                    <Text style={styles.deleteWarning}>
+                      this expense is linked to the payable{' '}
+                      <Text style={{ fontFamily: 'RobotoMono_700Bold', color: '#425252' }}>{linkedPayable.name}</Text>.
+                      {' '}do you want to revert the payable status as well?
+                    </Text>
+                    <View style={styles.modalBtns}>
+                      <TouchableOpacity style={[styles.modalBtn, { backgroundColor: '#f5f5f5' }]} onPress={() => setDeleteConfirm(false)}>
+                        <Text style={[styles.modalBtnText, { color: '#8a8a8a' }]}>cancel</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={[styles.modalBtn, { backgroundColor: '#425252' }]} onPress={() => confirmDelete(true)} disabled={deleteLoading}>
+                        <Text style={styles.modalBtnText}>keep payable</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={[styles.modalBtn, { backgroundColor: '#ed6a6a' }]} onPress={() => confirmDelete(false)} disabled={deleteLoading}>
+                        <Text style={styles.modalBtnText}>revert</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.deleteWarning}>this cannot be undone.</Text>
+                    <View style={styles.modalBtns}>
+                      <TouchableOpacity style={[styles.modalBtn, { backgroundColor: '#f5f5f5' }]} onPress={() => setDeleteConfirm(false)}>
+                        <Text style={[styles.modalBtnText, { color: '#8a8a8a' }]}>cancel</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={[styles.modalBtn, { backgroundColor: '#ed6a6a' }]} onPress={() => confirmDelete(true)} disabled={deleteLoading}>
+                        <Text style={styles.modalBtnText}>{deleteLoading ? 'deleting...' : 'delete'}</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </>
+                )}
               </View>
             </TouchableOpacity>
           </TouchableOpacity>
