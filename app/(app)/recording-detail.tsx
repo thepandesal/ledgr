@@ -1061,7 +1061,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                   </View>
                 ))}
                 {extraCount > 0 && (
-                  <TouchableOpacity style={styles.personChip} onPress={() => setShowAllPeopleModal(true)}>
+                  <TouchableOpacity style={styles.personChip} onPress={() => isSplitLocked ? setShowAllPeopleModal(true) : openPeopleModal()}>
                     <Text style={styles.personChipText}>+{extraCount} more</Text>
                   </TouchableOpacity>
                 )}
