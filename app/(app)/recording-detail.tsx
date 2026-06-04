@@ -89,11 +89,10 @@ export default function RecordingDetailScreen() {
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
-  const confirmDelete = async (keepLinked: boolean, deleteReceipt = false) => {
+  const confirmDelete = async (keepLinked: boolean, deleteReceipt = false, deletePayable = false) => {
     setDeleteLoading(true);
     try {
       const recordingDate = recording?.transaction_date ?? null;
-      // Delete receipt if requested
       if (deleteReceipt && linkedReceipt) {
         const { data: photos } = await supabase.from('receipt_photos').select('storage_path').eq('entry_id', linkedReceipt.id);
         if (photos && photos.length > 0) {
@@ -103,7 +102,9 @@ export default function RecordingDetailScreen() {
         await supabase.from('receipt_entries').delete().eq('id', linkedReceipt.id);
       }
       await supabase.from('recordings').delete().eq('id', recordingId);
-      if (!keepLinked && linkedPayable) {
+      if (deletePayable && linkedPayable) {
+        await supabase.from('recordings').delete().eq('id', linkedPayable.id);
+      } else if (!keepLinked && linkedPayable) {
         const revertPaid = Math.max(0, Number(linkedPayable.paid_amount ?? 0) - Number(recording?.amount ?? 0));
         await supabase.from('recordings').update({
           paid_amount: revertPaid,
@@ -1615,17 +1616,17 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                     <Text style={styles.deleteWarning}>
                       this expense is linked to the payable{' '}
                       <Text style={{ fontFamily: 'RobotoMono_700Bold', color: '#425252' }}>{linkedPayable.name}</Text>.
-                      {' '}delete expense only, or also revert the payable back to unpaid?
+                      {' '}what do you want to do with the linked payable?
                     </Text>
                     <View style={styles.modalBtns}>
                       <TouchableOpacity style={[styles.modalBtn, { backgroundColor: '#f5f5f5' }]} onPress={() => setDeleteConfirm(false)}>
                         <Text style={[styles.modalBtnText, { color: '#8a8a8a' }]}>cancel</Text>
                       </TouchableOpacity>
-                      <TouchableOpacity style={[styles.modalBtn, { backgroundColor: '#425252' }]} onPress={() => confirmDelete(true)} disabled={deleteLoading}>
+                      <TouchableOpacity style={[styles.modalBtn, { backgroundColor: '#425252' }]} onPress={() => confirmDelete(false, false, false)} disabled={deleteLoading}>
                         <Text style={styles.modalBtnText}>expense only</Text>
                       </TouchableOpacity>
-                      <TouchableOpacity style={[styles.modalBtn, { backgroundColor: '#ed6a6a' }]} onPress={() => confirmDelete(false)} disabled={deleteLoading}>
-                        <Text style={styles.modalBtnText}>{deleteLoading ? '...' : 'revert both'}</Text>
+                      <TouchableOpacity style={[styles.modalBtn, { backgroundColor: '#ed6a6a' }]} onPress={() => confirmDelete(true, false, true)} disabled={deleteLoading}>
+                        <Text style={styles.modalBtnText}>{deleteLoading ? '...' : 'delete both'}</Text>
                       </TouchableOpacity>
                     </View>
                   </>
