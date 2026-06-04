@@ -11,7 +11,7 @@ const { width } = Dimensions.get('window');
 
 export default function CaptureReceiptScreen() {
   const router = useRouter();
-  const { receiptId } = useLocalSearchParams<{ receiptId?: string }>();
+  const { receiptId, galleryOnly } = useLocalSearchParams<{ receiptId?: string; galleryOnly?: string }>();
   const slideAnim = useRef(new Animated.Value(width)).current;
 
   const [photos, setPhotos] = useState<string[]>([]); // local URIs
@@ -19,6 +19,7 @@ export default function CaptureReceiptScreen() {
 
   useEffect(() => {
     Animated.timing(slideAnim, { toValue: 0, duration: 280, useNativeDriver: false }).start();
+    if (galleryOnly === '1') pickFromGallery();
   }, []);
 
   const handleBack = () => {

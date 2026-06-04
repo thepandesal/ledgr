@@ -1,77 +1,89 @@
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView, Image, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView, Image, ActivityIndicator, Modal, TextInput, Alert } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useState } from 'react';
 import { supabase } from '../../../src/lib/supabase';
+import { BlurView } from 'expo-blur';
 
-interface ReceiptPhoto { id: string; storage_path: string; url?: string; }
-interface Receipt {
+interface Entry {
   id: string;
   note: string | null;
   created_at: string;
   recording_id: string | null;
-  recording?: { name: string; type: string; amount: number; };
-  photos: ReceiptPhoto[];
+  recording?: { name: string; type: string } | null;
+  firstPhoto?: string;
+  photoCount: number;
 }
 
 export default function ReceiptsScreen() {
   const router = useRouter();
-  const [receipts, setReceipts] = useState<Receipt[]>([]);
+  const [entries, setEntries] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [addModal, setAddModal] = useState(false);
+  const [folderName, setFolderName] = useState('');
+  const [creating, setCreating] = useState(false);
 
-  useFocusEffect(useCallback(() => { loadReceipts(); }, []));
+  useFocusEffect(useCallback(() => { loadEntries(); }, []));
 
-  const loadReceipts = async () => {
+  const loadEntries = async () => {
     setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { setLoading(false); return; }
 
-    const { data: recs } = await supabase
+    const { data } = await supabase
       .from('receipt_entries')
       .select('*')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false });
 
-    if (!recs) { setLoading(false); return; }
+    if (!data) { setLoading(false); return; }
 
-    const full: Receipt[] = await Promise.all(recs.map(async (r: any) => {
-      // Fetch linked recording separately
+    const full: Entry[] = await Promise.all(data.map(async (e: any) => {
+      const { data: photos, count } = await supabase
+        .from('receipt_photos')
+        .select('storage_path', { count: 'exact' })
+        .eq('entry_id', e.id)
+        .order('created_at')
+        .limit(1);
+
+      let firstPhoto = '';
+      if (photos && photos.length > 0) {
+        const { data: signed } = await supabase.storage.from('receipts').createSignedUrl(photos[0].storage_path, 3600);
+        firstPhoto = signed?.signedUrl ?? '';
+      }
+
       let recording = null;
-      if (r.recording_id) {
-        const { data: rec } = await supabase
-          .from('recordings')
-          .select('name, type, amount')
-          .eq('id', r.recording_id)
-          .single();
+      if (e.recording_id) {
+        const { data: rec } = await supabase.from('recordings').select('name, type').eq('id', e.recording_id).single();
         recording = rec;
       }
 
-      const { data: photos } = await supabase
-        .from('receipt_photos')
-        .select('id, storage_path')
-        .eq('entry_id', r.id)
-        .order('created_at')
-        .limit(3);
-
-      const photosWithUrls = await Promise.all((photos ?? []).map(async (p: any) => {
-        const { data: signed } = await supabase.storage.from('receipts').createSignedUrl(p.storage_path, 3600);
-        return { ...p, url: signed?.signedUrl ?? '' };
-      }));
-
-      return { ...r, recording, photos: photosWithUrls };
+      return { ...e, firstPhoto, photoCount: count ?? 0, recording };
     }));
 
-    setReceipts(full);
+    setEntries(full);
     setLoading(false);
+  };
+
+  const createEntry = async () => {
+    setCreating(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+    const note = folderName.trim() || timeStr;
+    const { data: entry, error } = await supabase.from('receipt_entries').insert({ user_id: user.id, note }).select().single();
+    setCreating(false);
+    setAddModal(false);
+    setFolderName('');
+    if (!error && entry) {
+      router.push({ pathname: '/(app)/receipt-detail', params: { receiptId: entry.id } } as any);
+    }
   };
 
   const formatDate = (d: string) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
-  const typeColor = (type: string) => {
-    if (type === 'expense') return '#ed6a6a';
-    if (type === 'income' || type === 'savings') return '#2ab671';
-    return '#425252';
-  };
+  const typeColor = (type: string) => type === 'expense' ? '#ed6a6a' : type === 'income' ? '#2ab671' : '#425252';
 
   return (
     <SafeAreaView style={s.container}>
@@ -80,11 +92,7 @@ export default function ReceiptsScreen() {
           <Text style={s.headerSub}>your</Text>
           <Text style={s.headerTitle}>receipts</Text>
         </View>
-        <TouchableOpacity
-          style={s.addBtn}
-          onPress={() => router.push('/(app)/capture-receipt' as any)}
-          activeOpacity={0.85}
-        >
+        <TouchableOpacity style={s.addBtn} onPress={() => setAddModal(true)} activeOpacity={0.85}>
           <Ionicons name="add" size={14} color="#425252" />
           <Text style={s.addBtnText}>add receipt</Text>
         </TouchableOpacity>
@@ -92,62 +100,46 @@ export default function ReceiptsScreen() {
 
       {loading ? (
         <View style={s.center}><ActivityIndicator color="#0ccfcf" /></View>
-      ) : receipts.length === 0 ? (
+      ) : entries.length === 0 ? (
         <View style={s.center}>
           <Ionicons name="receipt-outline" size={40} color="#e8e8e8" />
           <Text style={s.emptyText}>no receipts yet</Text>
-          <TouchableOpacity style={s.emptyBtn} onPress={() => router.push('/(app)/capture-receipt' as any)}>
-            <Text style={s.emptyBtnText}>capture your first receipt</Text>
+          <TouchableOpacity style={s.emptyBtn} onPress={() => setAddModal(true)}>
+            <Text style={s.emptyBtnText}>add your first receipt</Text>
           </TouchableOpacity>
         </View>
       ) : (
         <ScrollView contentContainerStyle={s.list} showsVerticalScrollIndicator={false}>
-          {receipts.map(receipt => (
+          {entries.map(entry => (
             <TouchableOpacity
-              key={receipt.id}
-              style={s.receiptCard}
+              key={entry.id}
+              style={s.folderCard}
               activeOpacity={0.85}
-              onPress={() => router.push({ pathname: '/(app)/receipt-detail', params: { receiptId: receipt.id } } as any)}
+              onPress={() => router.push({ pathname: '/(app)/receipt-detail', params: { receiptId: entry.id } } as any)}
             >
-              {/* Photo thumbnails */}
-              <View style={s.thumbRow}>
-                {receipt.photos.length > 0 ? (
-                  receipt.photos.map((p, pi) => (
-                    <Image key={pi} source={{ uri: p.url }} style={s.thumb} resizeMode="cover" />
-                  ))
-                ) : (
-                  <View style={s.thumbEmpty}>
-                    <Ionicons name="image-outline" size={20} color="#c0c0c0" />
-                  </View>
-                )}
-                {receipt.photos.length === 0 && <View style={[s.thumbEmpty, { opacity: 0 }]} />}
-              </View>
+              {/* Folder thumbnail */}
+              {entry.firstPhoto ? (
+                <Image source={{ uri: entry.firstPhoto }} style={s.folderThumb} resizeMode="cover" />
+              ) : (
+                <View style={s.folderThumbEmpty}>
+                  <Ionicons name="image-outline" size={22} color="#c0c0c0" />
+                </View>
+              )}
 
               {/* Info */}
-              <View style={s.cardInfo}>
-                <Text style={s.cardDate}>{formatDate(receipt.created_at)}</Text>
-                <Text style={s.cardCount}>{receipt.photos.length} photo{receipt.photos.length !== 1 ? 's' : ''}</Text>
-
-                {/* Linked recording */}
-                {receipt.recording ? (
-                  <TouchableOpacity
-                    style={s.linkedBadge}
-                    onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: receipt.recording_id, from: 'receipts' } } as any)}
-                  >
-                    <View style={[s.linkedDot, { backgroundColor: typeColor(receipt.recording.type) }]} />
-                    <Text style={s.linkedText} numberOfLines={1}>
-                      {receipt.recording.name.toLowerCase()}
-                    </Text>
-                    <Ionicons name="arrow-forward" size={11} color="#929090" />
-                  </TouchableOpacity>
+              <View style={s.folderInfo}>
+                <Text style={s.folderDate}>{formatDate(entry.created_at)}</Text>
+                <Text style={s.folderName} numberOfLines={1}>
+                  {entry.note ?? formatDate(entry.created_at)}
+                </Text>
+                <Text style={s.folderCount}>{entry.photoCount} photo{entry.photoCount !== 1 ? 's' : ''}</Text>
+                {entry.recording ? (
+                  <View style={s.linkedBadge}>
+                    <View style={[s.linkedDot, { backgroundColor: typeColor(entry.recording.type) }]} />
+                    <Text style={s.linkedText} numberOfLines={1}>{entry.recording.name.toLowerCase()}</Text>
+                  </View>
                 ) : (
-                  <TouchableOpacity
-                    style={s.makeRecordingBtn}
-                    onPress={() => router.push({ pathname: '/(app)/add-recording', params: { from: 'receipts', receiptId: receipt.id } } as any)}
-                  >
-                    <Ionicons name="add" size={12} color="#0ccfcf" />
-                    <Text style={s.makeRecordingText}>make a recording</Text>
-                  </TouchableOpacity>
+                  <Text style={s.unlinkedText}>no recording linked</Text>
                 )}
               </View>
 
@@ -156,6 +148,40 @@ export default function ReceiptsScreen() {
           ))}
         </ScrollView>
       )}
+
+      {/* Add folder modal */}
+      <Modal visible={addModal} transparent animationType="fade" onRequestClose={() => setAddModal(false)}>
+        <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}>
+          <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={() => setAddModal(false)}>
+            <TouchableOpacity activeOpacity={1} onPress={e => e.stopPropagation()}>
+              <View style={s.modalBox}>
+                <Text style={s.modalTitle}>new receipt</Text>
+                <View style={s.modalInputBlock}>
+                  <TextInput
+                    style={s.modalInput}
+                    placeholder="folder name (optional)"
+                    placeholderTextColor="#c0c0c0"
+                    value={folderName}
+                    onChangeText={setFolderName}
+                    autoFocus
+                    returnKeyType="done"
+                    onSubmitEditing={createEntry}
+                  />
+                </View>
+                <Text style={s.modalHint}>leave empty to use current time</Text>
+                <View style={s.modalBtns}>
+                  <TouchableOpacity style={s.modalCancelBtn} onPress={() => { setAddModal(false); setFolderName(''); }}>
+                    <Text style={s.modalCancelText}>cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[s.modalSaveBtn, creating && { opacity: 0.6 }]} onPress={createEntry} disabled={creating}>
+                    <Text style={s.modalSaveText}>{creating ? 'creating...' : 'create'}</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </BlurView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -172,19 +198,26 @@ const s = StyleSheet.create({
   emptyBtn: { backgroundColor: '#425252', borderRadius: 999, paddingVertical: 10, paddingHorizontal: 20, marginTop: 8 },
   emptyBtnText: { fontFamily: 'RobotoMono_700Bold', fontSize: 12, color: '#fff' },
   list: { paddingHorizontal: 32, paddingBottom: 60, gap: 12 },
-  receiptCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#fafafa', borderRadius: 14, padding: 12, borderWidth: 1, borderColor: '#f0f0f0' },
-  thumbRow: { flexDirection: 'row', gap: 4 },
-  thumb: { width: 48, height: 48, borderRadius: 8 },
-  thumbEmpty: { width: 48, height: 48, borderRadius: 8, backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' },
-  cardInfo: { flex: 1, gap: 3 },
-  cardDate: { fontFamily: 'ChillaxMedium', fontSize: 13, color: '#425252' },
-  cardCount: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#929090' },
-  linkedBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#f5f5f5', borderRadius: 999, paddingVertical: 4, paddingHorizontal: 8, alignSelf: 'flex-start', marginTop: 2 },
+  folderCard: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: '#fafafa', borderRadius: 14, padding: 12, borderWidth: 1, borderColor: '#f0f0f0' },
+  folderThumb: { width: 60, height: 60, borderRadius: 10, flexShrink: 0 },
+  folderThumbEmpty: { width: 60, height: 60, borderRadius: 10, backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
+  folderInfo: { flex: 1, gap: 2 },
+  folderDate: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#929090' },
+  folderName: { fontFamily: 'ChillaxMedium', fontSize: 14, color: '#425252' },
+  folderCount: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#c0c0c0' },
+  linkedBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
   linkedDot: { width: 6, height: 6, borderRadius: 3 },
-  linkedText: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#425252', maxWidth: 120 },
-  makeRecordingBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
-  makeRecordingText: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#0ccfcf' },
+  linkedText: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#425252', maxWidth: 140 },
+  unlinkedText: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#c0c0c0', marginTop: 2 },
+  modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  modalBox: { backgroundColor: '#ffffff', borderRadius: 20, padding: 20, width: 300, gap: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 20, elevation: 10 },
+  modalTitle: { fontFamily: 'ChillaxMedium', fontSize: 16, color: '#425252' },
+  modalInputBlock: { backgroundColor: '#fafafa', borderRadius: 12, paddingHorizontal: 14, borderWidth: 1, borderColor: '#f0f0f0' },
+  modalInput: { fontFamily: 'RobotoMono_400Regular', fontSize: 16, color: '#425252', paddingVertical: 12 },
+  modalHint: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#c0c0c0' },
+  modalBtns: { flexDirection: 'row', gap: 10 },
+  modalCancelBtn: { flex: 1, backgroundColor: '#f5f5f5', borderRadius: 999, paddingVertical: 11, alignItems: 'center' },
+  modalCancelText: { fontFamily: 'RobotoMono_700Bold', fontSize: 13, color: '#8a8a8a' },
+  modalSaveBtn: { flex: 1, backgroundColor: '#425252', borderRadius: 999, paddingVertical: 11, alignItems: 'center' },
+  modalSaveText: { fontFamily: 'RobotoMono_700Bold', fontSize: 13, color: '#fff' },
 });
-
-
-
