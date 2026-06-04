@@ -3,6 +3,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../src/lib/supabase';
 import { BlurView } from 'expo-blur';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function SplitSharePage() {
   const { id } = useLocalSearchParams<{ id: string }>();
