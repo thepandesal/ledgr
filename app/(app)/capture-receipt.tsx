@@ -81,8 +81,11 @@ export default function CaptureReceiptScreen() {
       for (const uri of photos) {
         const fileName = `${user.id}/${rId}/${Date.now()}_${Math.random().toString(36).slice(2)}.jpg`;
         let uploadData: Uint8Array | Blob;
-        if (typeof window !== 'undefined' && uri.startsWith('blob:')) {
-          // Web: use fetch to get blob
+        if (typeof window !== 'undefined' && uri.startsWith('data:')) {
+          // Web data URI: convert to blob
+          const response = await fetch(uri);
+          uploadData = await response.blob();
+        } else if (typeof window !== 'undefined' && uri.startsWith('blob:')) {
           const response = await fetch(uri);
           uploadData = await response.blob();
         } else {
