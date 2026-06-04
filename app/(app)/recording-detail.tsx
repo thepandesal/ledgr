@@ -92,7 +92,6 @@ export default function RecordingDetailScreen() {
     } catch (e) { console.log(e); }
     finally { setDeleteLoading(false); }
   };
-    JSON.stringify({ people: [...p].sort(), items: i.map(x => x.id).sort() });
 
   useEffect(() => {
     Animated.timing(slideAnim, { toValue: 0, duration: 280, useNativeDriver: true }).start();
@@ -115,7 +114,7 @@ export default function RecordingDetailScreen() {
         .eq('linked_recording_id', recordingId).eq('type', 'expense').order('transaction_date', { ascending: false });
       if (payments) setLinkedPayments(payments);
     } else if (rec.type === 'expense' && rec.linked_recording_id) {
-      const { data: payable } = await supabase.from('recordings').select('id, name, amount, status').eq('id', rec.linked_recording_id).single();
+      const { data: payable } = await supabase.from('recordings').select('id, name, amount, status, paid_amount').eq('id', rec.linked_recording_id).single();
       if (payable) setLinkedPayable(payable);
     }
   };
