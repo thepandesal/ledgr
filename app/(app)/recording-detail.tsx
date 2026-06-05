@@ -71,6 +71,7 @@ export default function RecordingDetailScreen() {
   const [linkedPayments, setLinkedPayments] = useState<any[]>([]);
   const [linkedPayable, setLinkedPayable] = useState<any>(null);
   const [payablePerPerson, setPayablePerPerson] = useState<{ map: Record<string, number>; paidFor: string[] }>({ map: {}, paidFor: [] });
+  const [personPayStatus, setPersonPayStatus] = useState<{ person: string; paid: number; total: number }[]>([]);
   const [collectModal, setCollectModal] = useState(false);
   const [collectStep, setCollectStep] = useState<'account' | 'mode'>('account');
   const [collectMode, setCollectMode] = useState<'full' | 'manual' | 'split'>('full');
@@ -154,16 +155,48 @@ export default function RecordingDetailScreen() {
     if (!recordingId) return;
     const { data: rec } = await supabase.from('recordings').select('type, linked_recording_id').eq('id', recordingId).single();
     if (!rec) return;
-    if (rec.type === 'payable') {
+
+    if (rec.type === 'payable' || rec.type === 'receivable') {
+      const paymentType = rec.type === 'payable' ? 'expense' : 'return';
       const { data: payments } = await supabase.from('recordings')
         .select('id, name, amount, transaction_date, payment_to, payment_from_account_id, accounts:payment_from_account_id(account_name, bank)')
-        .eq('linked_recording_id', recordingId).eq('type', 'expense').order('transaction_date', { ascending: false });
-      if (payments) setLinkedPayments(payments);
-    } else if (rec.type === 'receivable') {
-      const { data: payments } = await supabase.from('recordings')
-        .select('id, name, amount, transaction_date, payment_to, payment_from_account_id, accounts:payment_from_account_id(account_name, bank)')
-        .eq('linked_recording_id', recordingId).eq('type', 'return').order('transaction_date', { ascending: false });
-      if (payments) setLinkedPayments(payments);
+        .eq('linked_recording_id', recordingId).eq('type', paymentType).order('transaction_date', { ascending: false });
+      if (payments) {
+        setLinkedPayments(payments);
+        // Load breakdowns for all payment records to build per-person status
+        const paymentIds = payments.map((p: any) => p.id);
+        if (paymentIds.length > 0) {
+          const { data: breakdowns } = await supabase.from('recording_breakdowns')
+            .select('person, amount, account_id, recording_id').in('recording_id', paymentIds);
+          if (breakdowns && breakdowns.length > 0) {
+            // Build per-person total paid map
+            const paidMap: Record<string, number> = {};
+            breakdowns.forEach((b: any) => {
+              paidMap[b.person] = (paidMap[b.person] || 0) + Number(b.amount);
+            });
+            // Get split totals per person
+            const { data: splitItems } = await supabase.from('split_items').select('*, split_subitems(*)').eq('recording_id', recordingId);
+            const totalMap: Record<string, number> = {};
+            (splitItems ?? []).forEach((item: any) => {
+              const subs = item.split_subitems ?? [];
+              const calc = (people: string[], cost: number) => {
+                const pp = people.length > 0 ? cost / people.length : 0;
+                people.forEach((p: string) => { totalMap[p] = (totalMap[p] || 0) + pp; });
+              };
+              if (subs.length === 0) calc(item.people ?? [], Number(item.cost));
+              else subs.forEach((s: any) => calc(s.people ?? [], Number(s.cost)));
+            });
+            const allPeople = [...new Set([...Object.keys(paidMap), ...Object.keys(totalMap)])];
+            setPersonPayStatus(allPeople.map(person => ({
+              person,
+              paid: paidMap[person] ?? 0,
+              total: totalMap[person] ?? 0,
+            })));
+          } else {
+            setPersonPayStatus([]);
+          }
+        }
+      }
     } else if ((rec.type === 'expense' || rec.type === 'return') && rec.linked_recording_id) {
       const { data: payable } = await supabase.from('recordings').select('id, name, amount, status, paid_amount').eq('id', rec.linked_recording_id).single();
       if (payable) setLinkedPayable(payable);
@@ -1074,6 +1107,42 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                   </TouchableOpacity>
                 ))}
               </View>
+
+              {/* Per-person payment status */}
+              {personPayStatus.length > 0 && (
+                <>
+                  <Text style={pageStyles.sectionHeader}>per person status</Text>
+                  <View style={pageStyles.infoBlock}>
+                    {personPayStatus.map((s, i) => {
+                      const fullyPaid = s.total > 0 && s.paid >= s.total - 0.01;
+                      const partial = s.paid > 0 && !fullyPaid;
+                      const statusColor = fullyPaid ? Colors.income : partial ? Colors.cyan : Colors.muted;
+                      return (
+                        <View key={s.person}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8, gap: 8 }}>
+                            <Ionicons
+                              name={fullyPaid ? 'checkmark-circle' : partial ? 'ellipse' : 'ellipse-outline'}
+                              size={16} color={statusColor}
+                            />
+                            <View style={{ flex: 1 }}>
+                              <Text style={{ fontFamily: Fonts.monoBold, fontSize: 12, color: Colors.text }}>{s.person}</Text>
+                              <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted }}>
+                                {s.paid > 0
+                                  ? `${s.paid.toLocaleString('en-US', { minimumFractionDigits: 2 })} of ${s.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+                                  : `owes ${s.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+                              </Text>
+                            </View>
+                            <Text style={{ fontFamily: Fonts.monoBold, fontSize: 11, color: statusColor }}>
+                              {fullyPaid ? 'paid' : partial ? 'partial' : 'unpaid'}
+                            </Text>
+                          </View>
+                          {i < personPayStatus.length - 1 && <View style={{ height: 1, backgroundColor: Colors.border }} />}
+                        </View>
+                      );
+                    })}
+                  </View>
+                </>
+              )}
             </>
           )}
 
