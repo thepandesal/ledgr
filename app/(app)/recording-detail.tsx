@@ -11,6 +11,9 @@ import BottomSheet from '@/components/ui/BottomSheet';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import { InfoRow } from '@/components/ui';
 import formStyles from '@/components/ui/formStyles';
+import pageStyles from '@/components/ui/pageStyles';
+import itemStyles from '@/components/ui/itemStyles';
+import accountStyles from '@/components/ui/accountStyles';
 import { Colors, Fonts } from '@/components/ui/theme';
 
 const { width } = Dimensions.get('window');
@@ -883,31 +886,31 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
   const extraCount = filledPeople.length - PREVIEW_LIMIT;
 
   return (
-    <Animated.View style={[styles.container, { transform: [{ translateX: slideAnim }] }]}>
-      <SafeAreaView style={styles.inner}>
-        <TouchableOpacity onPress={handleBack} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={22} color="#8a8a8a" />
+    <Animated.View style={[pageStyles.container, { transform: [{ translateX: slideAnim }] }]}>
+      <SafeAreaView style={pageStyles.inner}>
+        <TouchableOpacity onPress={handleBack} style={pageStyles.backBtn}>
+          <Ionicons name="arrow-back" size={22} color={Colors.muted} />
         </TouchableOpacity>
 
-        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={pageStyles.scroll} showsVerticalScrollIndicator={false}>
 
           {/* Header */}
-          <View style={styles.titleBlock}>
-            <Text style={styles.recordingsLabel}>recordings</Text>
-            <View style={styles.titleRow}>
-              <Text style={styles.recordingName} numberOfLines={1} ellipsizeMode="tail">
+          <View style={pageStyles.titleBlock}>
+            <Text style={pageStyles.pageLabel}>recordings</Text>
+            <View style={pageStyles.titleRow}>
+              <Text style={pageStyles.pageName} numberOfLines={1} ellipsizeMode="tail">
                 {truncate(recording?.name ?? '', MAX_NAME_CHARS).toLowerCase()}
               </Text>
-              <Text style={[styles.amount, { color: amountColor() }]}>
+              <Text style={[pageStyles.pageAmount, { color: amountColor() }]}>
                 {recording ? Number(recording.amount).toLocaleString('en-US', { minimumFractionDigits: 2 }) : '—'}
               </Text>
             </View>
           </View>
 
-          {/* Action buttons — row 1: receipt solo, row 2: pay bill + delete */}
-          <View style={[styles.actionRow, { marginBottom: 8 }]}>
+          {/* Action buttons */}
+          <View style={[pageStyles.actionRow, { marginBottom: 8 }]}>
             <TouchableOpacity
-              style={styles.actionBtn}
+              style={pageStyles.actionBtn}
               onPress={() => {
                 if (linkedReceipt) {
                   router.push({ pathname: '/(app)/receipt-detail', params: { receiptId: linkedReceipt.id } } as any);
@@ -916,63 +919,63 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                 }
               }}
             >
-              <Ionicons name="receipt-outline" size={15} color="#425252" />
-              <Text style={styles.actionBtnText}>{linkedReceipt ? 'view receipt' : 'add receipt'}</Text>
+              <Ionicons name="receipt-outline" size={15} color={Colors.text} />
+              <Text style={pageStyles.actionBtnText}>{linkedReceipt ? 'view receipt' : 'add receipt'}</Text>
             </TouchableOpacity>
             {!linkedReceipt && (
-              <TouchableOpacity style={styles.actionBtn} onPress={openLinkReceiptModal}>
-                <Ionicons name="link-outline" size={15} color="#425252" />
-                <Text style={styles.actionBtnText}>link receipt</Text>
+              <TouchableOpacity style={pageStyles.actionBtn} onPress={openLinkReceiptModal}>
+                <Ionicons name="link-outline" size={15} color={Colors.text} />
+                <Text style={pageStyles.actionBtnText}>link receipt</Text>
               </TouchableOpacity>
             )}
           </View>
-          <View style={styles.actionRow}>
+          <View style={pageStyles.actionRow}>
             {recording?.type === 'payable' && recording?.status !== 'paid' && (
-              <TouchableOpacity style={styles.actionBtn} onPress={openPayModal}>
-                <Ionicons name="cash-outline" size={15} color="#425252" />
-                <Text style={styles.actionBtnText}>pay bill</Text>
+              <TouchableOpacity style={pageStyles.actionBtn} onPress={openPayModal}>
+                <Ionicons name="cash-outline" size={15} color={Colors.text} />
+                <Text style={pageStyles.actionBtnText}>pay bill</Text>
               </TouchableOpacity>
             )}
             {recording?.type === 'payable' && recording?.status === 'paid' && (
-              <View style={[styles.actionBtn, { borderColor: '#2ab671', backgroundColor: '#f0fff8' }]}>
-                <Ionicons name="checkmark-circle" size={15} color="#2ab671" />
-                <Text style={[styles.actionBtnText, { color: '#2ab671' }]}>fully paid</Text>
+              <View style={[pageStyles.actionBtn, pageStyles.actionBtnSuccess]}>
+                <Ionicons name="checkmark-circle" size={15} color={Colors.success} />
+                <Text style={[pageStyles.actionBtnText, { color: Colors.success }]}>fully paid</Text>
               </View>
             )}
             {recording?.type === 'receivable' && recording?.status !== 'received' && (
-              <TouchableOpacity style={styles.actionBtn} onPress={openCollectModal}>
-                <Ionicons name="arrow-down-circle-outline" size={15} color="#425252" />
-                <Text style={styles.actionBtnText}>collect</Text>
+              <TouchableOpacity style={pageStyles.actionBtn} onPress={openCollectModal}>
+                <Ionicons name="arrow-down-circle-outline" size={15} color={Colors.text} />
+                <Text style={pageStyles.actionBtnText}>collect</Text>
               </TouchableOpacity>
             )}
             {recording?.type === 'receivable' && recording?.status === 'received' && (
-              <View style={[styles.actionBtn, { borderColor: '#2ab671', backgroundColor: '#f0fff8' }]}>
-                <Ionicons name="checkmark-circle" size={15} color="#2ab671" />
-                <Text style={[styles.actionBtnText, { color: '#2ab671' }]}>fully received</Text>
+              <View style={[pageStyles.actionBtn, pageStyles.actionBtnSuccess]}>
+                <Ionicons name="checkmark-circle" size={15} color={Colors.success} />
+                <Text style={[pageStyles.actionBtnText, { color: Colors.success }]}>fully received</Text>
               </View>
             )}
-            <TouchableOpacity style={[styles.actionBtn, styles.actionBtnDanger]} onPress={() => setDeleteConfirm(true)}>
-              <Ionicons name="trash-outline" size={15} color="#ed6a6a" />
-              <Text style={[styles.actionBtnText, { color: '#ed6a6a' }]}>delete</Text>
+            <TouchableOpacity style={[pageStyles.actionBtn, pageStyles.actionBtnDanger]} onPress={() => setDeleteConfirm(true)}>
+              <Ionicons name="trash-outline" size={15} color={Colors.danger} />
+              <Text style={[pageStyles.actionBtnText, { color: Colors.danger }]}>delete</Text>
             </TouchableOpacity>
           </View>
 
-          {/* Receipt thumbnail strip */}
+          {/* Receipt strip */}
           {linkedReceipt && receiptPhotos.length > 0 && (
-            <View style={styles.receiptStrip}>
-              <View style={styles.receiptStripHeader}>
-                <Text style={styles.receiptStripLabel}>receipt</Text>
+            <View style={accountStyles.receiptStrip}>
+              <View style={accountStyles.receiptStripHeader}>
+                <Text style={accountStyles.receiptStripLabel}>receipt</Text>
                 <TouchableOpacity onPress={async () => {
                   await supabase.from('receipt_entries').update({ recording_id: null }).eq('id', linkedReceipt.id);
                   setLinkedReceipt(null); setReceiptPhotos([]);
                 }}>
-                  <Text style={styles.receiptUnlink}>unlink</Text>
+                  <Text style={accountStyles.receiptUnlink}>unlink</Text>
                 </TouchableOpacity>
               </View>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 8 }}>
                 {receiptPhotos.map(p => (
                   <TouchableOpacity key={p.id} onPress={() => router.push({ pathname: '/(app)/receipt-detail', params: { receiptId: linkedReceipt.id } } as any)}>
-                    <Image source={{ uri: p.url }} style={styles.receiptThumbImg} resizeMode="cover" />
+                    <Image source={{ uri: p.url }} style={accountStyles.receiptThumb} resizeMode="cover" />
                   </TouchableOpacity>
                 ))}
               </ScrollView>
@@ -980,59 +983,59 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
           )}
 
           {/* Information */}
-          <Text style={styles.sectionHeader}>information</Text>
-          <View style={styles.infoBlock}>
+          <Text style={pageStyles.sectionHeader}>information</Text>
+          <View style={pageStyles.infoBlock}>
             <InfoRow label="Date of transaction" value={formatDate(recording?.transaction_date)} />
             <InfoRow label="Transaction type" value={typeLabel(recording?.type ?? '', recording?.status ?? '')} />
             <InfoRow label="Bank / Account" value={truncate(recording?.account?.account_name ?? '—', 16)} />
             {recording?.notes ? (
               <>
-                <View style={{ height: 1, backgroundColor: '#f0f0f0', marginVertical: 2 }} />
+                <View style={{ height: 1, backgroundColor: Colors.border, marginVertical: 2 }} />
                 <View style={{ paddingVertical: 8 }}>
-                  <Text style={{ fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#929090', marginBottom: 4 }}>Notes</Text>
-                  <Text style={{ fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#425252', lineHeight: 18 }}>{recording.notes}</Text>
+                  <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted, marginBottom: 4 }}>Notes</Text>
+                  <Text style={{ fontFamily: Fonts.mono, fontSize: 12, color: Colors.text, lineHeight: 18 }}>{recording.notes}</Text>
                 </View>
               </>
             ) : null}
             {linkedPayable && (
               <>
-                <View style={{ height: 1, backgroundColor: '#f0f0f0', marginVertical: 2 }} />
+                <View style={{ height: 1, backgroundColor: Colors.border, marginVertical: 2 }} />
                 <InfoRow label={recording?.type === 'return' ? 'linked receivable' : 'linked payable'} value={truncate(linkedPayable.name, 16)} />
               </>
             )}
           </View>
           {linkedPayable && (
-            <TouchableOpacity style={styles.linkedPayableBtn} onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: linkedPayable.id } } as any)}>
-              <Ionicons name="link-outline" size={12} color="#929090" />
-              <Text style={styles.linkedPayableBtnText}>{recording?.type === 'return' ? 'view receivable' : 'view payable'}</Text>
-              <Ionicons name="arrow-forward" size={11} color="#929090" />
+            <TouchableOpacity style={pageStyles.linkedBtn} onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: linkedPayable.id } } as any)}>
+              <Ionicons name="link-outline" size={12} color={Colors.muted} />
+              <Text style={pageStyles.linkedBtnText}>{recording?.type === 'return' ? 'view receivable' : 'view payable'}</Text>
+              <Ionicons name="arrow-forward" size={11} color={Colors.muted} />
             </TouchableOpacity>
           )}
 
           {/* Payment/collection history */}
           {(recording?.type === 'payable' || recording?.type === 'receivable') && linkedPayments.length > 0 && (
             <>
-              <Text style={styles.sectionHeader}>{recording.type === 'receivable' ? 'collections' : 'payments'}</Text>
-              <View style={styles.infoBlock}>
+              <Text style={pageStyles.sectionHeader}>{recording.type === 'receivable' ? 'collections' : 'payments'}</Text>
+              <View style={pageStyles.infoBlock}>
                 {linkedPayments.map((p: any, i: number) => (
                   <TouchableOpacity key={p.id} onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: p.id } } as any)}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8, gap: 8 }}>
                       <View style={{ flex: 1 }}>
-                        <Text style={{ fontFamily: 'RobotoMono_700Bold', fontSize: 11, color: '#ed6a6a' }}>
+                        <Text style={{ fontFamily: Fonts.monoBold, fontSize: 11, color: Colors.expense }}>
                           {Number(p.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                         </Text>
-                        <Text style={{ fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#929090' }}>
+                        <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted }}>
                           {formatDate(p.transaction_date)} · {p.accounts?.account_name ?? '—'}
                         </Text>
                         {p.payment_to && (
-                          <Text style={{ fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#0ccfcf', marginTop: 2 }}>
+                          <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: Colors.cyan, marginTop: 2 }}>
                             {p.payment_to}
                           </Text>
                         )}
                       </View>
-                      <Ionicons name="chevron-forward" size={12} color="#c0c0c0" />
+                      <Ionicons name="chevron-forward" size={12} color={Colors.faint} />
                     </View>
-                    {i < linkedPayments.length - 1 && <View style={{ height: 1, backgroundColor: '#f0f0f0' }} />}
+                    {i < linkedPayments.length - 1 && <View style={{ height: 1, backgroundColor: Colors.border }} />}
                   </TouchableOpacity>
                 ))}
               </View>
@@ -1040,16 +1043,16 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
           )}
 
           {/* Split bill */}
-          <Text style={styles.sectionHeader}>split bill</Text>
+          <Text style={pageStyles.sectionHeader}>split bill</Text>
           {linkedPayable ? (
             <>
-              <TouchableOpacity style={styles.linkedPayableBtn} onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: linkedPayable.id } } as any)}>
-                <Ionicons name="git-branch-outline" size={12} color="#929090" />
-                <Text style={styles.linkedPayableBtnText}>{recording?.type === 'return' ? 'view split bill on receivable' : 'view split bill on payable'}</Text>
-                <Ionicons name="arrow-forward" size={11} color="#929090" />
+              <TouchableOpacity style={pageStyles.linkedBtn} onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: linkedPayable.id } } as any)}>
+                <Ionicons name="git-branch-outline" size={12} color={Colors.muted} />
+                <Text style={pageStyles.linkedBtnText}>{recording?.type === 'return' ? 'view split bill on receivable' : 'view split bill on payable'}</Text>
+                <Ionicons name="arrow-forward" size={11} color={Colors.muted} />
               </TouchableOpacity>
               {Object.keys(payablePerPerson.map).length > 0 && (
-                <View style={styles.infoBlock}>
+                <View style={pageStyles.infoBlock}>
                   {Object.entries(payablePerPerson.map).map(([name, total], i, arr) => {
                     const wasPaid = payablePerPerson.paidFor.includes(name);
                     return (
@@ -1072,11 +1075,11 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
           ) : (<>
           {isSplitLocked && (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#fff8f0', borderRadius: 10, padding: 12, marginBottom: 16, borderWidth: 1, borderColor: '#f0e0c0' }}>
-              <Ionicons name="lock-closed-outline" size={14} color="#929090" />
-              <Text style={{ fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#929090', flex: 1 }}>split bill is locked while payments are in progress</Text>
+              <Ionicons name="lock-closed-outline" size={14} color={Colors.muted} />
+              <Text style={{ fontFamily: Fonts.mono, fontSize: 11, color: Colors.muted, flex: 1 }}>split bill is locked while payments are in progress</Text>
             </View>
           )}
-          <View style={styles.splitBtnGrid}>
+          <View style={itemStyles.splitBtnGrid}>
             {[
               { icon: 'add-circle-outline', label: 'add item', onPress: () => {
                 const total = items.reduce((s, i) => s + i.cost, 0);
@@ -1089,36 +1092,36 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
             ].map(b => (
               <TouchableOpacity
                 key={b.label}
-                style={[styles.splitBtn, b.disabled && styles.splitBtnDisabled]}
+                style={[itemStyles.splitBtn, b.disabled && itemStyles.splitBtnDisabled]}
                 onPress={b.onPress}
                 activeOpacity={b.disabled ? 1 : 0.8}
               >
-                <Ionicons name={b.icon as any} size={16} color={b.disabled ? '#c0c0c0' : '#425252'} />
-                <Text style={[styles.splitBtnText, b.disabled && { color: '#c0c0c0' }]}>{b.label}</Text>
+                <Ionicons name={b.icon as any} size={16} color={b.disabled ? Colors.faint : Colors.text} />
+                <Text style={[itemStyles.splitBtnText, b.disabled && { color: Colors.faint }]}>{b.label}</Text>
               </TouchableOpacity>
             ))}
           </View>
 
           {/* People */}
-          <Text style={styles.peopleHeader}>people</Text>
-          <View style={styles.peopleContainer}>
+          <Text style={itemStyles.peopleHeader}>people</Text>
+          <View style={itemStyles.peopleContainer}>
             {filledPeople.length === 0 ? (
-              <Text style={styles.peoplePlaceholder}>no people added yet</Text>
+              <Text style={itemStyles.peoplePlaceholder}>no people added yet</Text>
             ) : (
-              <View style={styles.peopleChips}>
+              <View style={itemStyles.peopleChips}>
                 {visiblePeople.map((person, i) => (
-                  <View key={i} style={styles.personChip}>
-                    <Text style={styles.personChipText}>{person}</Text>
+                  <View key={i} style={itemStyles.personChip}>
+                    <Text style={itemStyles.personChipText}>{person}</Text>
                     {!isSplitLocked && (
-                    <TouchableOpacity onPress={() => requestDeletePerson(people.findIndex(p => p === person))} style={styles.personChipDelete}>
-                      <Ionicons name="close" size={10} color="#929090" />
+                    <TouchableOpacity onPress={() => requestDeletePerson(people.findIndex(p => p === person))} style={itemStyles.personChipDelete}>
+                      <Ionicons name="close" size={10} color={Colors.muted} />
                     </TouchableOpacity>
                     )}
                   </View>
                 ))}
                 {extraCount > 0 && (
-                  <TouchableOpacity style={styles.personChip} onPress={() => isSplitLocked ? setShowAllPeopleModal(true) : openPeopleModal()}>
-                    <Text style={styles.personChipText}>+{extraCount} more</Text>
+                  <TouchableOpacity style={itemStyles.personChip} onPress={() => isSplitLocked ? setShowAllPeopleModal(true) : openPeopleModal()}>
+                    <Text style={itemStyles.personChipText}>+{extraCount} more</Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -1126,7 +1129,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
           </View>
 
           {/* Items */}
-          <Text style={styles.sectionHeader}>items</Text>
+          <Text style={pageStyles.sectionHeader}>items</Text>
           {(() => {
             const totalItemsCost = items.reduce((s, i) => s + i.cost, 0);
             const recordingAmount = recording ? Number(recording.amount) : 0;
@@ -1134,21 +1137,21 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
             return (
               <>
                 {items.length === 0 ? (
-                  <View style={styles.cookingBox}>
-                    <Text style={styles.cookingText}>no items yet</Text>
+                  <View style={pageStyles.emptyBox}>
+                    <Text style={pageStyles.emptyText}>no items yet</Text>
                   </View>
                 ) : (
-                  <View style={styles.itemsList}>
+                  <View style={itemStyles.itemsList}>
                     {items.map((item, idx) => {
                       return (
                         <View key={item.id}>
-                          <View style={styles.itemCard}>
-                            <Text style={styles.itemNumber}>{idx + 1}</Text>
-                            <View style={styles.itemMiddle}>
-                              <Text style={styles.itemName} numberOfLines={1}>{truncate(item.name, MAX_ITEM_NAME)}</Text>
+                          <View style={itemStyles.itemCard}>
+                            <Text style={itemStyles.itemNumber}>{idx + 1}</Text>
+                            <View style={itemStyles.itemMiddle}>
+                              <Text style={itemStyles.itemName} numberOfLines={1}>{truncate(item.name, MAX_ITEM_NAME)}</Text>
                               {editingItemCost?.id === item.id ? (
                                 <TextInput
-                                  style={[styles.itemCost, { borderBottomWidth: 1, borderBottomColor: '#0ccfcf', minWidth: 60 }]}
+                                  style={[itemStyles.itemCost, { borderBottomWidth: 1, borderBottomColor: Colors.cyan, minWidth: 60 }]}
                                   value={editingItemCost.value}
                                   onChangeText={v => setEditingItemCost({ id: item.id, value: v })}
                                   keyboardType="decimal-pad"
@@ -1158,67 +1161,67 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                                 />
                               ) : (
                                 <TouchableOpacity onPress={() => setEditingItemCost({ id: item.id, value: String(item.cost) })}>
-                                  <Text style={[styles.itemCost, { textDecorationLine: 'underline', textDecorationStyle: 'dotted', textDecorationColor: '#c0c0c0' }]}>
+                                  <Text style={[itemStyles.itemCost, { textDecorationLine: 'underline', textDecorationStyle: 'dotted', textDecorationColor: Colors.faint }]}>
                                     {item.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                                   </Text>
                                 </TouchableOpacity>
                               )}
                             </View>
                             {item.subitems.length === 0 && item.people.length > 0 && (
-                              <View style={styles.itemRight}>
-                                <View style={styles.itemPeopleRow}>
+                              <View style={itemStyles.itemRight}>
+                                <View style={itemStyles.peopleRow}>
                                   {(item.people ?? []).slice(0, 3).map((p, pi) => (
-                                    <TouchableOpacity key={pi} style={styles.personCircle} onPress={() => setTooltip(tooltip?.name === p ? null : { name: p })}>
-                                      <Text style={styles.personCircleLetter}>{p[0]?.toUpperCase()}</Text>
+                                    <TouchableOpacity key={pi} style={itemStyles.personCircle} onPress={() => setTooltip(tooltip?.name === p ? null : { name: p })}>
+                                      <Text style={itemStyles.personCircleLetter}>{p[0]?.toUpperCase()}</Text>
                                     </TouchableOpacity>
                                   ))}
                                   {(item.people?.length ?? 0) > 3 && (
-                                    <View style={styles.personCircleExtra}>
-                                      <Text style={styles.personCircleLetter}>+{item.people.length - 3}</Text>
+                                    <View style={itemStyles.personCircleExtra}>
+                                      <Text style={itemStyles.personCircleLetter}>+{item.people.length - 3}</Text>
                                     </View>
                                   )}
                                 </View>
-                                <Text style={styles.itemSplit}>
+                                <Text style={itemStyles.itemSplit}>
                                   {item.people.length} {item.people.length === 1 ? 'person' : 'people'}, {(item.cost / item.people.length).toLocaleString('en-US', { minimumFractionDigits: 2 })} each
                                 </Text>
                               </View>
                             )}
-                            <TouchableOpacity style={[styles.addSubitemBtn, isSplitLocked && { opacity: 0.3 }]} onPress={() => !isSplitLocked && openEditSubitems(item)}>
-                              <Ionicons name="add" size={13} color="#0ccfcf" />
-                              <Text style={styles.addSubitemBtnText}>subitem</Text>
+                            <TouchableOpacity style={[itemStyles.addSubitemBtn, isSplitLocked && { opacity: 0.3 }]} onPress={() => !isSplitLocked && openEditSubitems(item)}>
+                              <Ionicons name="add" size={13} color={Colors.cyan} />
+                              <Text style={itemStyles.addSubitemBtnText}>subitem</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity onPress={() => deleteItem(item.id)} style={styles.itemDelete}>
-                              <Ionicons name="close" size={14} color="#c0c0c0" />
+                            <TouchableOpacity onPress={() => deleteItem(item.id)} style={itemStyles.itemDelete}>
+                              <Ionicons name="close" size={14} color={Colors.faint} />
                             </TouchableOpacity>
                           </View>
                           {item.subitems.map(sub => {
                             const perPerson = sub.people.length > 0 ? sub.cost / sub.people.length : 0;
                             return (
-                              <View key={sub.id} style={styles.subitemCard}>
-                                <Text style={styles.subitemArrow}>↳</Text>
-                                <View style={styles.itemMiddle}>
-                                  <Text style={styles.subitemName} numberOfLines={1}>{truncate(sub.name, MAX_ITEM_NAME)}</Text>
-                                  <Text style={styles.subitemCostText}>{sub.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+                              <View key={sub.id} style={itemStyles.subitemCard}>
+                                <Text style={itemStyles.subitemArrow}>↳</Text>
+                                <View style={itemStyles.itemMiddle}>
+                                  <Text style={itemStyles.subitemName} numberOfLines={1}>{truncate(sub.name, MAX_ITEM_NAME)}</Text>
+                                  <Text style={itemStyles.subitemCost}>{sub.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
                                 </View>
-                                <View style={styles.itemRight}>
-                                  <View style={styles.itemPeopleRow}>
+                                <View style={itemStyles.itemRight}>
+                                  <View style={itemStyles.peopleRow}>
                                     {(sub.people ?? []).slice(0, 3).map((p, pi) => (
-                                      <TouchableOpacity key={pi} style={styles.personCircle} onPress={() => setTooltip(tooltip?.name === p ? null : { name: p })}>
-                                        <Text style={styles.personCircleLetter}>{p[0]?.toUpperCase()}</Text>
+                                      <TouchableOpacity key={pi} style={itemStyles.personCircle} onPress={() => setTooltip(tooltip?.name === p ? null : { name: p })}>
+                                        <Text style={itemStyles.personCircleLetter}>{p[0]?.toUpperCase()}</Text>
                                       </TouchableOpacity>
                                     ))}
                                     {(sub.people?.length ?? 0) > 3 && (
-                                      <View style={styles.personCircleExtra}>
-                                        <Text style={styles.personCircleLetter}>+{(sub.people?.length ?? 0) - 3}</Text>
+                                      <View style={itemStyles.personCircleExtra}>
+                                        <Text style={itemStyles.personCircleLetter}>+{(sub.people?.length ?? 0) - 3}</Text>
                                       </View>
                                     )}
                                   </View>
-                                  <Text style={styles.itemSplit}>
+                                  <Text style={itemStyles.itemSplit}>
                                     {sub.people.length} {sub.people.length === 1 ? 'person' : 'people'}, {perPerson.toLocaleString('en-US', { minimumFractionDigits: 2 })} each
                                   </Text>
                                 </View>
-                                <TouchableOpacity onPress={() => deleteSubitem(item.id, sub.id)} style={styles.itemDelete}>
-                                  <Ionicons name="close" size={12} color="#c0c0c0" />
+                                <TouchableOpacity onPress={() => deleteSubitem(item.id, sub.id)} style={itemStyles.itemDelete}>
+                                  <Ionicons name="close" size={12} color={Colors.faint} />
                                 </TouchableOpacity>
                               </View>
                             );
@@ -1226,17 +1229,17 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                         </View>
                       );
                     })}
-                    <View style={styles.itemsTotalRow}>
-                      <Text style={styles.itemsTotalLabel}>total allocated</Text>
-                      <View style={styles.itemsTotalDots} />
-                      <Text style={[styles.itemsTotalValue, isFullyAllocated && { color: '#2ab671' }]}>
+                    <View style={itemStyles.itemsTotalRow}>
+                      <Text style={itemStyles.itemsTotalLabel}>total allocated</Text>
+                      <View style={itemStyles.itemsTotalDots} />
+                      <Text style={[itemStyles.itemsTotalValue, isFullyAllocated && { color: Colors.income }]}>
                         {totalItemsCost.toLocaleString('en-US', { minimumFractionDigits: 2 })} / {recordingAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                       </Text>
                     </View>
                   </View>
                 )}
                 {isFullyAllocated && (
-                  <Text style={styles.allocatedNote}>all amount allocated</Text>
+                  <Text style={itemStyles.allocatedNote}>all amount allocated</Text>
                 )}
               </>
             );
@@ -1249,56 +1252,49 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
       {/* Tooltip */}
       {tooltip && (
         <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setTooltip(null)} activeOpacity={1}>
-          <View style={styles.tooltip}>
-            <Text style={styles.tooltipText}>{tooltip.name}</Text>
+          <View style={pageStyles.tooltip}>
+            <Text style={pageStyles.tooltipText}>{tooltip.name}</Text>
           </View>
         </TouchableOpacity>
       )}
 
       {/* Add people modal */}
       <BottomSheet visible={addPersonModal} onClose={() => { setPeople(savedPeople); setAddPersonModal(false); setSuggestions([]); }} sub="split bill" title="people">
-            <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 16 }}>
-              {people.map((p, i) => (
-                <View key={i}>
-                  <View style={styles.personRow}>
-                    <TextInput
-                      style={styles.personInput}
-                      placeholder={`person ${i + 1}`}
-                      placeholderTextColor="#c0c0c0"
-                      value={p}
-                      onChangeText={v => updatePerson(i, v)}
-                      returnKeyType="next"
-                    />
-                    {people.length > 1 && (
-                      <TouchableOpacity onPress={() => requestDeletePerson(i)} style={styles.removeBtn}>
-                        <Ionicons name="close" size={14} color="#929090" />
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                  {activeSuggestionIdx === i && suggestions.length > 0 && (
-                    <View style={styles.suggestionBox}>
-                      {suggestions.map((s, si) => (
-                        <TouchableOpacity key={si} style={styles.suggestionItem} onPress={() => pickSuggestion(i, s)}>
-                          <Text style={styles.suggestionText}>{s}</Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  )}
+        <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 16 }}>
+          {people.map((p, i) => (
+            <View key={i}>
+              <View style={styles.personRow}>
+                <TextInput style={formStyles.input} placeholder={`person ${i + 1}`} placeholderTextColor={Colors.faint} value={p} onChangeText={v => updatePerson(i, v)} returnKeyType="next" />
+                {people.length > 1 && (
+                  <TouchableOpacity onPress={() => requestDeletePerson(i)} style={styles.removeBtn}>
+                    <Ionicons name="close" size={14} color={Colors.muted} />
+                  </TouchableOpacity>
+                )}
+              </View>
+              {activeSuggestionIdx === i && suggestions.length > 0 && (
+                <View style={styles.suggestionBox}>
+                  {suggestions.map((s, si) => (
+                    <TouchableOpacity key={si} style={styles.suggestionItem} onPress={() => pickSuggestion(i, s)}>
+                      <Text style={styles.suggestionText}>{s}</Text>
+                    </TouchableOpacity>
+                  ))}
                 </View>
-              ))}
-            </ScrollView>
-            <TouchableOpacity style={styles.addMoreBtn} onPress={addPerson}>
-              <Ionicons name="add" size={13} color="#0ccfcf" />
-              <Text style={styles.addMoreText}>add more</Text>
-            </TouchableOpacity>
-            <View style={styles.sheetActions}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => { setPeople(savedPeople); setAddPersonModal(false); setSuggestions([]); }}>
-                <Text style={styles.cancelBtnText}>cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.modalBtn, savingPeople && { opacity: 0.6 }]} onPress={savePeopleAndClose} disabled={savingPeople}>
-                <Text style={styles.modalBtnText}>{savingPeople ? 'saving...' : 'done'}</Text>
-              </TouchableOpacity>
+              )}
             </View>
+          ))}
+        </ScrollView>
+        <TouchableOpacity style={styles.addMoreBtn} onPress={addPerson}>
+          <Ionicons name="add" size={13} color={Colors.cyan} />
+          <Text style={styles.addMoreText}>add more</Text>
+        </TouchableOpacity>
+        <View style={formStyles.actions}>
+          <TouchableOpacity style={formStyles.cancelBtn} onPress={() => { setPeople(savedPeople); setAddPersonModal(false); setSuggestions([]); }}>
+            <Text style={formStyles.cancelBtnText}>cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[formStyles.primaryBtn, savingPeople && { opacity: 0.6 }]} onPress={savePeopleAndClose} disabled={savingPeople}>
+            <Text style={formStyles.primaryBtnText}>{savingPeople ? 'saving...' : 'done'}</Text>
+          </TouchableOpacity>
+        </View>
       </BottomSheet>
       {/* Add item modal */}
       <AddItemModal
@@ -1322,61 +1318,59 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
 
       {/* Edit subitems modal */}
       <BottomSheet visible={!!editSubitemsItemId} onClose={() => setEditSubitemsItemId(null)} sub="split bill" title="add subitems">
-          {(() => {
-              const item = items.find(i => i.id === editSubitemsItemId);
-              if (!item) return null;
-              const totalSubs = item.subitems.length + editSubitemForms.filter(s => s.name.trim()).length;
-              const equalCost = totalSubs > 0 ? item.cost / totalSubs : item.cost;
-              return (
-                <>
-                  <Text style={styles.subitemRemaining}>{item.name} · {item.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
-                  {item.subitems.length > 0 && (
-                    <Text style={styles.subitemRemaining}>{item.subitems.length} existing · will become {equalCost.toLocaleString('en-US', { minimumFractionDigits: 2 })} each</Text>
-                  )}
-                  <ScrollView style={{ width: '100%', maxHeight: 280 }} showsVerticalScrollIndicator={false}>
-                    {editSubitemForms.map((sub, i) => (
-                      <View key={i} style={styles.subitemFormRow}>
-                        <Text style={styles.subitemArrow}>↳</Text>
-                        <View style={{ flex: 1, gap: 6 }}>
-                          <View style={styles.subitemFormInputRow}>
-                            <TextInput style={styles.subitemFormInput} placeholder="subitem name" placeholderTextColor="#c0c0c0" value={sub.name} onChangeText={v => updateEditSubitemForm(i, v)} autoFocus={i === 0} />
-                            {sub.name.trim() && <Text style={styles.subitemAutoHint}>{equalCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>}
-                            {editSubitemForms.length > 1 && (
-                              <TouchableOpacity onPress={() => removeEditSubitemForm(i)} style={styles.removeBtn}>
-                                <Ionicons name="close" size={12} color="#c0c0c0" />
-                              </TouchableOpacity>
-                            )}
-                          </View>
-                          <View style={styles.itemPeopleSelect}>
-                            {filledPeople.map((p, pi) => {
-                              const sel = sub.people.includes(p);
-                              return (
-                                <TouchableOpacity key={pi} style={[styles.personSelectChip, sel && styles.personSelectChipActive]} onPress={() => toggleEditSubitemPerson(i, p)}>
-                                  <Text style={[styles.personSelectText, sel && styles.personSelectTextActive]}>{p}</Text>
-                                </TouchableOpacity>
-                              );
-                            })}
-                          </View>
-                        </View>
+        {(() => {
+          const item = items.find(i => i.id === editSubitemsItemId);
+          if (!item) return null;
+          const totalSubs = item.subitems.length + editSubitemForms.filter(s => s.name.trim()).length;
+          const equalCost = totalSubs > 0 ? item.cost / totalSubs : item.cost;
+          return (
+            <>
+              <Text style={formStyles.hintMuted}>{item.name} · {item.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+              {item.subitems.length > 0 && <Text style={formStyles.hintMuted}>{item.subitems.length} existing · will become {equalCost.toLocaleString('en-US', { minimumFractionDigits: 2 })} each</Text>}
+              <ScrollView style={{ width: '100%', maxHeight: 280 }} showsVerticalScrollIndicator={false}>
+                {editSubitemForms.map((sub, i) => (
+                  <View key={i} style={styles.subitemFormRow}>
+                    <Text style={itemStyles.subitemArrow}>↳</Text>
+                    <View style={{ flex: 1, gap: 6 }}>
+                      <View style={styles.subitemFormInputRow}>
+                        <TextInput style={formStyles.input} placeholder="subitem name" placeholderTextColor={Colors.faint} value={sub.name} onChangeText={v => updateEditSubitemForm(i, v)} autoFocus={i === 0} />
+                        {sub.name.trim() && <Text style={formStyles.hint}>{equalCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>}
+                        {editSubitemForms.length > 1 && (
+                          <TouchableOpacity onPress={() => removeEditSubitemForm(i)} style={styles.removeBtn}>
+                            <Ionicons name="close" size={12} color={Colors.faint} />
+                          </TouchableOpacity>
+                        )}
                       </View>
-                    ))}
-                  </ScrollView>
-                  <TouchableOpacity style={styles.addMoreBtn} onPress={addEditSubitemForm}>
-                    <Ionicons name="add" size={11} color="#0ccfcf" />
-                    <Text style={styles.addMoreText}>add more</Text>
-                  </TouchableOpacity>
-                  <View style={styles.sheetActions}>
-                    <TouchableOpacity style={styles.cancelBtn} onPress={() => setEditSubitemsItemId(null)}>
-                      <Text style={styles.cancelBtnText}>cancel</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={[styles.modalBtn, editSubitemForms.every(s => !s.name.trim()) && { opacity: 0.4 }]} onPress={saveEditSubitems} disabled={editSubitemForms.every(s => !s.name.trim())}>
-                      <Text style={styles.modalBtnText}>save</Text>
-                    </TouchableOpacity>
+                      <View style={itemStyles.personSelectRow}>
+                        {filledPeople.map((p, pi) => {
+                          const sel = sub.people.includes(p);
+                          return (
+                            <TouchableOpacity key={pi} style={[itemStyles.personSelectChip, sel && itemStyles.personSelectChipActive]} onPress={() => toggleEditSubitemPerson(i, p)}>
+                              <Text style={[itemStyles.personSelectText, sel && itemStyles.personSelectTextActive]}>{p}</Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    </View>
                   </View>
-                </>
-              );
-            })()}
-          </BottomSheet>
+                ))}
+              </ScrollView>
+              <TouchableOpacity style={styles.addMoreBtn} onPress={addEditSubitemForm}>
+                <Ionicons name="add" size={11} color={Colors.cyan} />
+                <Text style={styles.addMoreText}>add more</Text>
+              </TouchableOpacity>
+              <View style={formStyles.actions}>
+                <TouchableOpacity style={formStyles.cancelBtn} onPress={() => setEditSubitemsItemId(null)}>
+                  <Text style={formStyles.cancelBtnText}>cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[formStyles.primaryBtn, editSubitemForms.every(s => !s.name.trim()) && { opacity: 0.4 }]} onPress={saveEditSubitems} disabled={editSubitemForms.every(s => !s.name.trim())}>
+                  <Text style={formStyles.primaryBtnText}>save</Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          );
+        })()}
+      </BottomSheet>
 
       {/* Delete person confirm */}
       <ConfirmModal
@@ -1401,185 +1395,114 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
         title="share split"
         actions={[{ label: 'cancel', onPress: () => setSaveImageModal(false), muted: true }]}
       >
-        <Text style={styles.subitemRemaining}>choose payment account</Text>
+        <Text style={formStyles.hintMuted}>choose payment account</Text>
         <ScrollView style={{ width: '100%', maxHeight: 180 }} showsVerticalScrollIndicator={false}>
           {shareAccounts.map((acc: any) => (
-            <TouchableOpacity
-              key={acc.id}
-              style={[styles.accountOption, shareSelectedAccount?.id === acc.id && styles.accountOptionActive]}
-              onPress={() => setShareSelectedAccount(acc)}
-            >
+            <TouchableOpacity key={acc.id} style={[accountStyles.option, shareSelectedAccount?.id === acc.id && accountStyles.optionActive]} onPress={() => setShareSelectedAccount(acc)}>
               <View style={{ flex: 1 }}>
-                <Text style={[styles.accountOptionName, shareSelectedAccount?.id === acc.id && { color: Colors.white }]}>{acc.account_name}</Text>
-                <Text style={[styles.accountOptionBank, shareSelectedAccount?.id === acc.id && { color: 'rgba(255,255,255,0.7)' }]}>{acc.bank} · {acc.account_number}</Text>
+                <Text style={[accountStyles.optionName, shareSelectedAccount?.id === acc.id && accountStyles.optionNameActive]}>{acc.account_name}</Text>
+                <Text style={[accountStyles.optionBank, shareSelectedAccount?.id === acc.id && accountStyles.optionBankActive]}>{acc.bank} · {acc.account_number}</Text>
               </View>
               {shareSelectedAccount?.id === acc.id && <Ionicons name="checkmark" size={14} color={Colors.white} />}
             </TouchableOpacity>
           ))}
-          {shareAccounts.length === 0 && (
-            <Text style={[styles.subitemRemaining, { textAlign: 'center', marginVertical: 8 }]}>no accounts saved</Text>
-          )}
+          {shareAccounts.length === 0 && <Text style={[formStyles.hintMuted, { textAlign: 'center', marginVertical: 8 }]}>no accounts saved</Text>}
         </ScrollView>
-        <View style={styles.shareOptionsRow}>
-          <TouchableOpacity style={styles.shareOptionBtn} onPress={generateShare} disabled={shareLoading}>
+        <View style={accountStyles.shareRow}>
+          <TouchableOpacity style={accountStyles.shareBtn} onPress={generateShare} disabled={shareLoading}>
             <Ionicons name="link-outline" size={18} color={Colors.cyan} />
-            <Text style={styles.shareOptionText}>{shareLoading ? 'sharing...' : 'share link'}</Text>
+            <Text style={accountStyles.shareBtnText}>{shareLoading ? 'sharing...' : 'share link'}</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.shareOptionBtn} onPress={saveAsImage} disabled={shareLoading}>
+          <TouchableOpacity style={accountStyles.shareBtn} onPress={saveAsImage} disabled={shareLoading}>
             <Ionicons name="image-outline" size={18} color={Colors.text} />
-            <Text style={[styles.shareOptionText, { color: Colors.text }]}>{shareLoading ? 'saving...' : 'save as pdf'}</Text>
+            <Text style={[accountStyles.shareBtnText, { color: Colors.text }]}>{shareLoading ? 'saving...' : 'save as pdf'}</Text>
           </TouchableOpacity>
         </View>
       </ConfirmModal>
 
       {/* Link receipt modal */}
       <BottomSheet visible={linkReceiptModal} onClose={() => setLinkReceiptModal(false)} sub="receipt" title="link a receipt">
-            <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 8 }}>
-                {linkReceiptEntries.length === 0 ? (
-                  <Text style={{ fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#929090', textAlign: 'center', paddingVertical: 16 }}>no unlinked receipts found</Text>
-                ) : (
-                  <ScrollView style={{ width: '100%', maxHeight: 280 }} showsVerticalScrollIndicator={false}>
-                    {linkReceiptEntries.map((entry: any) => (
-                      <TouchableOpacity
-                        key={entry.id}
-                        style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' }}
-                        onPress={() => linkReceiptToRecording(entry)}
-                      >
-                        <Ionicons name="folder-outline" size={18} color="#0ccfcf" />
-                        <View style={{ flex: 1 }}>
-                          <Text style={{ fontFamily: 'ChillaxMedium', fontSize: 13, color: '#425252' }} numberOfLines={1}>{entry.note ?? 'untitled'}</Text>
-                          <Text style={{ fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#929090' }}>{new Date(entry.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</Text>
-                        </View>
-                        <Ionicons name="link-outline" size={14} color="#0ccfcf" />
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                )}
-            </ScrollView>
-            <View style={styles.sheetActions}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => setLinkReceiptModal(false)}>
-                <Text style={styles.cancelBtnText}>cancel</Text>
+        <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 8 }}>
+          {linkReceiptEntries.length === 0 ? (
+            <Text style={formStyles.listEmpty}>no unlinked receipts found</Text>
+          ) : (
+            linkReceiptEntries.map((entry: any) => (
+              <TouchableOpacity key={entry.id} style={formStyles.listItem} onPress={() => linkReceiptToRecording(entry)}>
+                <Ionicons name="folder-outline" size={18} color={Colors.cyan} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontFamily: Fonts.heading, fontSize: 13, color: Colors.text }} numberOfLines={1}>{entry.note ?? 'untitled'}</Text>
+                  <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted }}>{new Date(entry.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</Text>
+                </View>
+                <Ionicons name="link-outline" size={14} color={Colors.cyan} />
               </TouchableOpacity>
-            </View>
+            ))
+          )}
+        </ScrollView>
+        <View style={formStyles.actions}>
+          <TouchableOpacity style={formStyles.cancelBtn} onPress={() => setLinkReceiptModal(false)}>
+            <Text style={formStyles.cancelBtnText}>cancel</Text>
+          </TouchableOpacity>
+        </View>
       </BottomSheet>
 
       {/* Pay modal */}
       <BottomSheet visible={payModal} onClose={() => setPayModal(false)} sub="payable" title="pay bill">
-                <Text style={styles.subitemRemaining}>
-                  {(recording?.name ?? '').toLowerCase()} · {Number(recording?.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                </Text>
-
-                {/* Payment mode */}
-                <View style={{ flexDirection: 'row', gap: 6, width: '100%' }}>
-                  {(['full', 'manual', ...(filledPeople.length > 0 && items.length > 0 ? ['split'] : [])] as const).map(mode => (
-                    <TouchableOpacity
-                      key={mode}
-                      style={[styles.personSelectChip, { flex: 1, justifyContent: 'center' }, payMode === mode && styles.personSelectChipActive]}
-                      onPress={() => setPayMode(mode as any)}
-                    >
-                      <Text style={[styles.personSelectText, payMode === mode && styles.personSelectTextActive]}>
-                        {mode}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-
-                {payMode === 'full' && (
-                  <Text style={[styles.subitemRemaining, { color: '#0ccfcf', fontSize: 15 }]}>
-                    {Number(recording?.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                  </Text>
-                )}
-
-                {payMode === 'manual' && (
-                  <TextInput
-                    style={[styles.personInput, { width: '100%' }]}
-                    placeholder="0.00"
-                    placeholderTextColor="#c0c0c0"
-                    value={payManualAmount}
-                    onChangeText={setPayManualAmount}
-                    keyboardType="decimal-pad"
-                    autoFocus
-                  />
-                )}
-
-                {payMode === 'split' && (
-                  <View style={{ width: '100%', gap: 6 }}>
-                    <Text style={styles.subitemRemaining}>select who is paying</Text>
-                    <View style={styles.itemPeopleSelect}>
-                      {filledPeople.map((p, i) => {
-                        const sel = paySelectedPeople.includes(p);
-                        return (
-                          <TouchableOpacity key={i} style={[styles.personSelectChip, sel && styles.personSelectChipActive]}
-                            onPress={() => setPaySelectedPeople(prev => sel ? prev.filter(x => x !== p) : [...prev, p])}>
-                            <Text style={[styles.personSelectText, sel && styles.personSelectTextActive]}>{p}</Text>
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </View>
-                    {paySelectedPeople.length > 0 && (
-                      <Text style={[styles.subitemRemaining, { color: '#0ccfcf' }]}>
-                        total: {getPayAmount().toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                      </Text>
-                    )}
-                  </View>
-                )}
-
-                {/* Account picker */}
-                <Text style={[styles.subitemRemaining, { marginTop: 4 }]}>payment account</Text>
-                <ScrollView style={{ width: '100%', maxHeight: 130 }} showsVerticalScrollIndicator={false}>
-                  {payAccounts.map((acc: any) => (
-                    <TouchableOpacity
-                      key={acc.id}
-                      style={[styles.accountOption, payAccount?.id === acc.id && styles.accountOptionActive]}
-                      onPress={() => setPayAccount(acc)}
-                    >
-                      <View style={{ flex: 1 }}>
-                        <Text style={[styles.accountOptionName, payAccount?.id === acc.id && { color: '#fff' }]}>{acc.account_name}</Text>
-                        <Text style={[styles.accountOptionBank, payAccount?.id === acc.id && { color: 'rgba(255,255,255,0.7)' }]}>{acc.bank} · {acc.account_number}</Text>
-                      </View>
-                      {payAccount?.id === acc.id && <Ionicons name="checkmark" size={14} color="#fff" />}
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-
-                {/* Date */}
-                <Text style={[styles.subitemRemaining, { marginTop: 4 }]}>payment date</Text>
-                <TextInput
-                  style={[styles.personInput, { width: '100%' }]}
-                  placeholder="YYYY-MM-DD"
-                  placeholderTextColor="#c0c0c0"
-                  value={payDate}
-                  onChangeText={setPayDate}
-                />
-
-                {/* Complete? */}
-                <Text style={[styles.subitemRemaining, { marginTop: 4 }]}>complete payment?</Text>
-                <View style={{ flexDirection: 'row', gap: 8, width: '100%' }}>
-                  {([true, false] as const).map(val => (
-                    <TouchableOpacity
-                      key={String(val)}
-                      style={[styles.personSelectChip, { flex: 1, justifyContent: 'center' }, payComplete === val && styles.personSelectChipActive]}
-                      onPress={() => setPayComplete(val)}
-                    >
-                      <Text style={[styles.personSelectText, payComplete === val && styles.personSelectTextActive]}>
-                        {val ? 'yes, complete' : 'no, partial'}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-
-                <View style={[styles.modalBtns, { marginTop: 4 }]}>
-                  <TouchableOpacity style={[styles.modalBtn, { backgroundColor: '#f5f5f5' }]} onPress={() => setPayModal(false)}>
-                    <Text style={[styles.modalBtnText, { color: '#8a8a8a' }]}>cancel</Text>
+        <Text style={formStyles.hintMuted}>{(recording?.name ?? '').toLowerCase()} · {Number(recording?.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+        <View style={{ flexDirection: 'row', gap: 6, width: '100%' }}>
+          {(['full', 'manual', ...(filledPeople.length > 0 && items.length > 0 ? ['split'] : [])] as const).map(mode => (
+            <TouchableOpacity key={mode} style={[itemStyles.personSelectChip, { flex: 1, justifyContent: 'center' }, payMode === mode && itemStyles.personSelectChipActive]} onPress={() => setPayMode(mode as any)}>
+              <Text style={[itemStyles.personSelectText, payMode === mode && itemStyles.personSelectTextActive]}>{mode}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        {payMode === 'full' && <Text style={[formStyles.hintMuted, { color: Colors.cyan, fontSize: 15 }]}>{Number(recording?.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>}
+        {payMode === 'manual' && <TextInput style={[formStyles.input, { width: '100%' }]} placeholder="0.00" placeholderTextColor={Colors.faint} value={payManualAmount} onChangeText={setPayManualAmount} keyboardType="decimal-pad" autoFocus />}
+        {payMode === 'split' && (
+          <View style={{ width: '100%', gap: 6 }}>
+            <Text style={formStyles.hintMuted}>select who is paying</Text>
+            <View style={itemStyles.personSelectRow}>
+              {filledPeople.map((p, i) => {
+                const sel = paySelectedPeople.includes(p);
+                return (
+                  <TouchableOpacity key={i} style={[itemStyles.personSelectChip, sel && itemStyles.personSelectChipActive]} onPress={() => setPaySelectedPeople(prev => sel ? prev.filter(x => x !== p) : [...prev, p])}>
+                    <Text style={[itemStyles.personSelectText, sel && itemStyles.personSelectTextActive]}>{p}</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.modalBtn, (payComplete === null || getPayAmount() <= 0 || payLoading) && { opacity: 0.4 }]}
-                    onPress={confirmPayment}
-                    disabled={payComplete === null || getPayAmount() <= 0 || payLoading}
-                  >
-                    <Text style={styles.modalBtnText}>{payLoading ? 'saving...' : 'confirm'}</Text>
-                  </TouchableOpacity>
-                </View>
+                );
+              })}
+            </View>
+            {paySelectedPeople.length > 0 && <Text style={[formStyles.hintMuted, { color: Colors.cyan }]}>total: {getPayAmount().toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>}
+          </View>
+        )}
+        <Text style={[formStyles.hintMuted, { marginTop: 4 }]}>payment account</Text>
+        <ScrollView style={{ width: '100%', maxHeight: 130 }} showsVerticalScrollIndicator={false}>
+          {payAccounts.map((acc: any) => (
+            <TouchableOpacity key={acc.id} style={[accountStyles.option, payAccount?.id === acc.id && accountStyles.optionActive]} onPress={() => setPayAccount(acc)}>
+              <View style={{ flex: 1 }}>
+                <Text style={[accountStyles.optionName, payAccount?.id === acc.id && accountStyles.optionNameActive]}>{acc.account_name}</Text>
+                <Text style={[accountStyles.optionBank, payAccount?.id === acc.id && accountStyles.optionBankActive]}>{acc.bank} · {acc.account_number}</Text>
+              </View>
+              {payAccount?.id === acc.id && <Ionicons name="checkmark" size={14} color={Colors.white} />}
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+        <Text style={[formStyles.hintMuted, { marginTop: 4 }]}>payment date</Text>
+        <TextInput style={[formStyles.input, { width: '100%' }]} placeholder="YYYY-MM-DD" placeholderTextColor={Colors.faint} value={payDate} onChangeText={setPayDate} />
+        <Text style={[formStyles.hintMuted, { marginTop: 4 }]}>complete payment?</Text>
+        <View style={{ flexDirection: 'row', gap: 8, width: '100%' }}>
+          {([true, false] as const).map(val => (
+            <TouchableOpacity key={String(val)} style={[itemStyles.personSelectChip, { flex: 1, justifyContent: 'center' }, payComplete === val && itemStyles.personSelectChipActive]} onPress={() => setPayComplete(val)}>
+              <Text style={[itemStyles.personSelectText, payComplete === val && itemStyles.personSelectTextActive]}>{val ? 'yes, complete' : 'no, partial'}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <View style={formStyles.actions}>
+          <TouchableOpacity style={formStyles.cancelBtn} onPress={() => setPayModal(false)}>
+            <Text style={formStyles.cancelBtnText}>cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[formStyles.primaryBtn, (payComplete === null || getPayAmount() <= 0 || payLoading) && { opacity: 0.4 }]} onPress={confirmPayment} disabled={payComplete === null || getPayAmount() <= 0 || payLoading}>
+            <Text style={formStyles.primaryBtnText}>{payLoading ? 'saving...' : 'confirm'}</Text>
+          </TouchableOpacity>
+        </View>
       </BottomSheet>
 
       {/* Delete confirm modal */}
@@ -1608,10 +1531,10 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
         title="people"
         actions={[{ label: 'close', onPress: () => setShowAllPeopleModal(false), muted: true }]}
       >
-        <View style={[styles.itemPeopleSelect, { paddingBottom: 4 }]}>
+        <View style={[itemStyles.personSelectRow, { paddingBottom: 4 }]}>
           {filledPeople.map((p, i) => (
-            <View key={i} style={styles.personChip}>
-              <Text style={styles.personChipText}>{p}</Text>
+            <View key={i} style={itemStyles.personChip}>
+              <Text style={itemStyles.personChipText}>{p}</Text>
             </View>
           ))}
         </View>
@@ -1619,70 +1542,62 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
 
       {/* Collect modal */}
       <BottomSheet visible={collectModal} onClose={() => setCollectModal(false)} sub="receivable" title="collect payment">
-                <Text style={styles.subitemRemaining}>
-                  {(recording?.name ?? '').toLowerCase()} · {Number(recording?.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                </Text>
-                <View style={{ flexDirection: 'row', gap: 6, width: '100%' }}>
-                  {(['full', 'manual', ...(filledPeople.length > 0 && items.length > 0 ? ['split'] : [])] as const).map(mode => (
-                    <TouchableOpacity key={mode} style={[styles.personSelectChip, { flex: 1, justifyContent: 'center' }, collectMode === mode && styles.personSelectChipActive]} onPress={() => setCollectMode(mode as any)}>
-                      <Text style={[styles.personSelectText, collectMode === mode && styles.personSelectTextActive]}>{mode}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-                {collectMode === 'full' && (
-                  <Text style={[styles.subitemRemaining, { color: '#2ab671', fontSize: 15 }]}>{Number(recording?.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
-                )}
-                {collectMode === 'manual' && (
-                  <TextInput style={[styles.personInput, { width: '100%' }]} placeholder="0.00" placeholderTextColor="#c0c0c0" value={collectManualAmount} onChangeText={setCollectManualAmount} keyboardType="decimal-pad" autoFocus />
-                )}
-                {collectMode === 'split' && (
-                  <View style={{ width: '100%', gap: 6 }}>
-                    <Text style={styles.subitemRemaining}>select who paid</Text>
-                    <View style={styles.itemPeopleSelect}>
-                      {filledPeople.map((p, i) => {
-                        const sel = collectSelectedPeople.includes(p);
-                        return (
-                          <TouchableOpacity key={i} style={[styles.personSelectChip, sel && styles.personSelectChipActive]} onPress={() => setCollectSelectedPeople(prev => sel ? prev.filter(x => x !== p) : [...prev, p])}>
-                            <Text style={[styles.personSelectText, sel && styles.personSelectTextActive]}>{p}</Text>
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </View>
-                    {collectSelectedPeople.length > 0 && (
-                      <Text style={[styles.subitemRemaining, { color: '#2ab671' }]}>total: {getCollectAmount().toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
-                    )}
-                  </View>
-                )}
-                <Text style={[styles.subitemRemaining, { marginTop: 4 }]}>receiving into</Text>
-                <ScrollView style={{ width: '100%', maxHeight: 130 }} showsVerticalScrollIndicator={false}>
-                  {collectAccounts.map((acc: any) => (
-                    <TouchableOpacity key={acc.id} style={[styles.accountOption, collectAccount?.id === acc.id && styles.accountOptionActive]} onPress={() => setCollectAccount(acc)}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={[styles.accountOptionName, collectAccount?.id === acc.id && { color: '#fff' }]}>{acc.account_name}</Text>
-                        <Text style={[styles.accountOptionBank, collectAccount?.id === acc.id && { color: 'rgba(255,255,255,0.7)' }]}>{acc.bank} · {acc.account_number}</Text>
-                      </View>
-                      {collectAccount?.id === acc.id && <Ionicons name="checkmark" size={14} color="#fff" />}
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-                <Text style={[styles.subitemRemaining, { marginTop: 4 }]}>collection date</Text>
-                <TextInput style={[styles.personInput, { width: '100%' }]} placeholder="YYYY-MM-DD" placeholderTextColor="#c0c0c0" value={collectDate} onChangeText={setCollectDate} />
-                <Text style={[styles.subitemRemaining, { marginTop: 4 }]}>complete collection?</Text>
-                <View style={{ flexDirection: 'row', gap: 8, width: '100%' }}>
-                  {([true, false] as const).map(val => (
-                    <TouchableOpacity key={String(val)} style={[styles.personSelectChip, { flex: 1, justifyContent: 'center' }, collectComplete === val && styles.personSelectChipActive]} onPress={() => setCollectComplete(val)}>
-                      <Text style={[styles.personSelectText, collectComplete === val && styles.personSelectTextActive]}>{val ? 'yes, complete' : 'no, partial'}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-                <View style={[styles.modalBtns, { marginTop: 4 }]}>
-                  <TouchableOpacity style={[styles.modalBtn, { backgroundColor: '#f5f5f5' }]} onPress={() => setCollectModal(false)}>
-                    <Text style={[styles.modalBtnText, { color: '#8a8a8a' }]}>cancel</Text>
+        <Text style={formStyles.hintMuted}>{(recording?.name ?? '').toLowerCase()} · {Number(recording?.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+        <View style={{ flexDirection: 'row', gap: 6, width: '100%' }}>
+          {(['full', 'manual', ...(filledPeople.length > 0 && items.length > 0 ? ['split'] : [])] as const).map(mode => (
+            <TouchableOpacity key={mode} style={[itemStyles.personSelectChip, { flex: 1, justifyContent: 'center' }, collectMode === mode && itemStyles.personSelectChipActive]} onPress={() => setCollectMode(mode as any)}>
+              <Text style={[itemStyles.personSelectText, collectMode === mode && itemStyles.personSelectTextActive]}>{mode}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        {collectMode === 'full' && <Text style={[formStyles.hintMuted, { color: Colors.income, fontSize: 15 }]}>{Number(recording?.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>}
+        {collectMode === 'manual' && <TextInput style={[formStyles.input, { width: '100%' }]} placeholder="0.00" placeholderTextColor={Colors.faint} value={collectManualAmount} onChangeText={setCollectManualAmount} keyboardType="decimal-pad" autoFocus />}
+        {collectMode === 'split' && (
+          <View style={{ width: '100%', gap: 6 }}>
+            <Text style={formStyles.hintMuted}>select who paid</Text>
+            <View style={itemStyles.personSelectRow}>
+              {filledPeople.map((p, i) => {
+                const sel = collectSelectedPeople.includes(p);
+                return (
+                  <TouchableOpacity key={i} style={[itemStyles.personSelectChip, sel && itemStyles.personSelectChipActive]} onPress={() => setCollectSelectedPeople(prev => sel ? prev.filter(x => x !== p) : [...prev, p])}>
+                    <Text style={[itemStyles.personSelectText, sel && itemStyles.personSelectTextActive]}>{p}</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={[styles.modalBtn, (collectComplete === null || getCollectAmount() <= 0 || collectLoading) && { opacity: 0.4 }]} onPress={confirmCollect} disabled={collectComplete === null || getCollectAmount() <= 0 || collectLoading}>
-                    <Text style={styles.modalBtnText}>{collectLoading ? 'saving...' : 'confirm'}</Text>
-                  </TouchableOpacity>
-                </View>
+                );
+              })}
+            </View>
+            {collectSelectedPeople.length > 0 && <Text style={[formStyles.hintMuted, { color: Colors.income }]}>total: {getCollectAmount().toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>}
+          </View>
+        )}
+        <Text style={[formStyles.hintMuted, { marginTop: 4 }]}>receiving into</Text>
+        <ScrollView style={{ width: '100%', maxHeight: 130 }} showsVerticalScrollIndicator={false}>
+          {collectAccounts.map((acc: any) => (
+            <TouchableOpacity key={acc.id} style={[accountStyles.option, collectAccount?.id === acc.id && accountStyles.optionActive]} onPress={() => setCollectAccount(acc)}>
+              <View style={{ flex: 1 }}>
+                <Text style={[accountStyles.optionName, collectAccount?.id === acc.id && accountStyles.optionNameActive]}>{acc.account_name}</Text>
+                <Text style={[accountStyles.optionBank, collectAccount?.id === acc.id && accountStyles.optionBankActive]}>{acc.bank} · {acc.account_number}</Text>
+              </View>
+              {collectAccount?.id === acc.id && <Ionicons name="checkmark" size={14} color={Colors.white} />}
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+        <Text style={[formStyles.hintMuted, { marginTop: 4 }]}>collection date</Text>
+        <TextInput style={[formStyles.input, { width: '100%' }]} placeholder="YYYY-MM-DD" placeholderTextColor={Colors.faint} value={collectDate} onChangeText={setCollectDate} />
+        <Text style={[formStyles.hintMuted, { marginTop: 4 }]}>complete collection?</Text>
+        <View style={{ flexDirection: 'row', gap: 8, width: '100%' }}>
+          {([true, false] as const).map(val => (
+            <TouchableOpacity key={String(val)} style={[itemStyles.personSelectChip, { flex: 1, justifyContent: 'center' }, collectComplete === val && itemStyles.personSelectChipActive]} onPress={() => setCollectComplete(val)}>
+              <Text style={[itemStyles.personSelectText, collectComplete === val && itemStyles.personSelectTextActive]}>{val ? 'yes, complete' : 'no, partial'}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <View style={formStyles.actions}>
+          <TouchableOpacity style={formStyles.cancelBtn} onPress={() => setCollectModal(false)}>
+            <Text style={formStyles.cancelBtnText}>cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[formStyles.primaryBtn, (collectComplete === null || getCollectAmount() <= 0 || collectLoading) && { opacity: 0.4 }]} onPress={confirmCollect} disabled={collectComplete === null || getCollectAmount() <= 0 || collectLoading}>
+            <Text style={formStyles.primaryBtnText}>{collectLoading ? 'saving...' : 'confirm'}</Text>
+          </TouchableOpacity>
+        </View>
       </BottomSheet>
 
       {/* Cooking modal */}
@@ -1693,26 +1608,26 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
         actions={[{ label: 'close', onPress: () => setCookingModal(false), muted: true }]}
       >
         <Text style={{ fontSize: 36 }}>🍳</Text>
-        <Text style={styles.cookingText}>we're cooking something</Text>
+        <Text style={{ fontFamily: Fonts.mono, fontSize: 12, color: Colors.muted, textAlign: 'center' }}>we're cooking something</Text>
       </ConfirmModal>
       {/* Copied toast */}
       {copiedToast && (
-        <View style={styles.toast} pointerEvents="none">
-          <Ionicons name="checkmark-circle" size={16} color="#fff" />
-          <Text style={styles.toastText}>link copied to clipboard</Text>
+        <View style={pageStyles.toast} pointerEvents="none">
+          <Ionicons name="checkmark-circle" size={16} color={Colors.white} />
+          <Text style={pageStyles.toastText}>link copied to clipboard</Text>
         </View>
       )}
 
       {/* Add receipt modal */}
       <BottomSheet visible={addReceiptModal} onClose={() => setAddReceiptModal(false)} sub="recording" title="add receipt">
-        <View style={styles.photoButtons}>
-          <TouchableOpacity style={styles.photoBtn} onPress={addReceiptFromCamera}>
-            <Ionicons name="camera-outline" size={28} color="#0ccfcf" />
-            <Text style={styles.photoBtnText}>camera</Text>
+        <View style={accountStyles.photoButtons}>
+          <TouchableOpacity style={accountStyles.photoBtn} onPress={addReceiptFromCamera}>
+            <Ionicons name="camera-outline" size={28} color={Colors.cyan} />
+            <Text style={accountStyles.photoBtnText}>camera</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.photoBtn} onPress={addReceiptFromGallery}>
-            <Ionicons name="images-outline" size={28} color="#425252" />
-            <Text style={[styles.photoBtnText, { color: '#425252' }]}>gallery</Text>
+          <TouchableOpacity style={accountStyles.photoBtn} onPress={addReceiptFromGallery}>
+            <Ionicons name="images-outline" size={28} color={Colors.text} />
+            <Text style={[accountStyles.photoBtnText, { color: Colors.text }]}>gallery</Text>
           </TouchableOpacity>
         </View>
         <View style={formStyles.actions}>
@@ -1741,113 +1656,19 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#ffffff', position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
-  inner: { flex: 1 },
-  backBtn: { paddingHorizontal: 28, paddingTop: 14, paddingBottom: 4 },
-  scroll: { paddingHorizontal: 32, paddingBottom: 60 },
-  titleBlock: { marginBottom: 16 },
-  recordingsLabel: { fontFamily: 'ChillaxMedium', fontSize: 11, color: '#929090', marginBottom: 2 },
-  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
-  recordingName: { fontFamily: 'Avenelle', fontSize: 26, color: '#425252', lineHeight: 30, letterSpacing: -1, flex: 1 },
-  amount: { fontFamily: 'RobotoMono_400Regular', fontSize: 20, flexShrink: 0 },
-  actionRow: { flexDirection: 'row', gap: 10, marginBottom: 24 },
-  actionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 999, borderWidth: 1, borderColor: '#e8e8e8', backgroundColor: '#fafafa' },
-  actionBtnDanger: { borderColor: '#fde8e8', backgroundColor: '#fff8f8' },
-  actionBtnText: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#425252' },
-  sectionHeader: { fontFamily: 'ChillaxMedium', fontSize: 15, color: '#0ccfcf', letterSpacing: -0.5, marginBottom: 10, marginTop: 4 },
-  infoBlock: { backgroundColor: '#fafafa', borderRadius: 14, paddingHorizontal: 14, paddingVertical: 6, marginBottom: 24 },
-  splitBtnGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 24 },
-  splitBtn: { width: '47%', flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1, borderColor: '#e8e8e8', backgroundColor: '#fafafa' },
-  splitBtnDisabled: { opacity: 0.4 },
-  splitBtnText: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#425252' },
-  peopleHeader: { fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#929090', textAlign: 'center', marginBottom: 10 },
-  peopleContainer: { borderWidth: 1, borderColor: '#929090', borderStyle: 'dashed', borderRadius: 14, padding: 14, marginBottom: 24, minHeight: 56, justifyContent: 'center' },
-  peoplePlaceholder: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#c0c0c0', textAlign: 'center' },
-  peopleChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  personChip: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#f0f0f0', borderRadius: 999, paddingVertical: 5, paddingLeft: 12, paddingRight: 8 },
-  personChipText: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#425252' },
-  personChipDelete: { padding: 2 },
-  itemsList: { gap: 10, marginBottom: 24 },
-  itemCard: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#ffffff', borderRadius: 999, paddingVertical: 10, paddingHorizontal: 14, borderWidth: 1, borderStyle: 'dashed', borderColor: '#929090' },
-  itemNumber: { fontFamily: 'RobotoMono_700Bold', fontSize: 12, color: '#0ccfcf', width: 18, flexShrink: 0 },
-  itemMiddle: { flex: 1, gap: 2 },
-  itemName: { fontFamily: 'RobotoMono_700Bold', fontSize: 12, color: '#425252' },
-  itemCost: { fontFamily: 'RobotoMono_400Regular', fontSize: 16, color: '#929090' },
-  itemRight: { alignItems: 'flex-end', gap: 4, flexShrink: 0 },
-  itemPeopleRow: { flexDirection: 'row', gap: 3 },
-  personCircle: { width: 22, height: 22, borderRadius: 11, backgroundColor: '#0ccfcf', justifyContent: 'center', alignItems: 'center' },
-  personCircleExtra: { width: 22, height: 22, borderRadius: 11, backgroundColor: '#c0c0c0', justifyContent: 'center', alignItems: 'center' },
-  personCircleLetter: { fontFamily: 'RobotoMono_700Bold', fontSize: 9, color: '#fff' },
-  itemSplit: { fontFamily: 'RobotoMono_400Regular', fontSize: 9, color: '#929090' },
-  itemDelete: { padding: 4, flexShrink: 0 },
-  itemsTotalRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 14, marginTop: 4 },
-  itemsTotalLabel: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#929090', flexShrink: 0 },
-  itemsTotalDots: { flex: 1, borderBottomWidth: 1, borderStyle: 'dotted', borderColor: '#c0c0c0', marginHorizontal: 8 },
-  itemsTotalValue: { fontFamily: 'RobotoMono_700Bold', fontSize: 10, color: '#425252', flexShrink: 0 },
-  allocatedNote: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#2ab671', textAlign: 'center', marginTop: 4, marginBottom: 8 },
-  addSubitemBtn: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999, borderWidth: 1, borderColor: '#0ccfcf', flexShrink: 0 },
-  addSubitemBtnText: { fontFamily: 'RobotoMono_400Regular', fontSize: 9, color: '#0ccfcf' },
-  subitemCard: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#ffffff', borderRadius: 10, padding: 10, borderWidth: 1, borderColor: '#f0f0f0', marginTop: 4, marginLeft: 28 },
-  subitemArrow: { fontSize: 12, color: '#c0c0c0', flexShrink: 0 },
-  subitemName: { fontFamily: 'RobotoMono_700Bold', fontSize: 10, color: '#425252' },
-  subitemCostText: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#425252' },
-  cookingBox: { borderRadius: 14, borderWidth: 1, borderColor: '#e8e8e8', backgroundColor: '#fafafa', padding: 20, alignItems: 'center', marginBottom: 24 },
-  cookingText: { fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#929090', textAlign: 'center' },
-  tooltip: { position: 'absolute', top: '50%', alignSelf: 'center', backgroundColor: '#425252', borderRadius: 8, paddingVertical: 6, paddingHorizontal: 12 },
-  tooltipText: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#fff' },
-
+  // screen-specific only — everything else uses shared style files
   personRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
-  personInput: { flex: 1, backgroundColor: '#f5f5f5', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, fontFamily: 'RobotoMono_400Regular', fontSize: 16, color: '#425252', borderWidth: 1, borderColor: '#e8e8e8' },
   removeBtn: { padding: 4 },
   addMoreBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start' },
-  addMoreText: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#0ccfcf' },
-  deleteWarning: { fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#929090', textAlign: 'center', lineHeight: 18 },
-  suggestionBox: { backgroundColor: '#ffffff', borderRadius: 8, borderWidth: 1, borderColor: '#f0f0f0', marginTop: -4, marginBottom: 6, overflow: 'hidden' },
-  suggestionItem: { paddingHorizontal: 12, paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
-  suggestionText: { fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#425252' },
-  itemFormSection: { marginBottom: 12 },
-  itemFormSectionDivider: { height: 1, backgroundColor: '#f0f0f0', marginVertical: 10 },
+  addMoreText: { fontFamily: Fonts.mono, fontSize: 11, color: Colors.cyan },
+  deleteWarning: { fontFamily: Fonts.mono, fontSize: 12, color: Colors.muted, textAlign: 'center', lineHeight: 18 },
+  suggestionBox: { backgroundColor: Colors.white, borderRadius: 8, borderWidth: 1, borderColor: Colors.border, marginTop: -4, marginBottom: 6, overflow: 'hidden' },
+  suggestionItem: { paddingHorizontal: 12, paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  suggestionText: { fontFamily: Fonts.mono, fontSize: 12, color: Colors.text },
   subitemFormRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 8, marginLeft: 4 },
   subitemFormInputRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  subitemFormInput: { flex: 1, backgroundColor: '#f5f5f5', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, fontFamily: 'RobotoMono_400Regular', fontSize: 16, color: '#425252', borderWidth: 1, borderColor: '#f0f0f0' },
-  subitemAutoHint: { fontFamily: 'RobotoMono_700Bold', fontSize: 10, color: '#0ccfcf', flexShrink: 0 },
-  itemFormRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
-  itemFormBlock: { width: '100%', backgroundColor: '#fafafa', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 4, borderWidth: 1, borderColor: '#f0f0f0' },
-  itemFormInput: { paddingVertical: 10, fontFamily: 'RobotoMono_400Regular', fontSize: 16, color: '#425252' },
-  itemFormDivider: { height: 1, backgroundColor: '#f0f0f0' },
-  itemFormLabel: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#929090', textTransform: 'uppercase', letterSpacing: 0.5, alignSelf: 'flex-start' },
-  itemPeopleSelect: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, width: '100%' },
-  personSelectChip: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 999, borderWidth: 1, borderColor: '#e8e8e8', backgroundColor: '#fafafa' },
-  personSelectChipActive: { backgroundColor: '#0ccfcf', borderColor: '#0ccfcf' },
-  personSelectText: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#929090' },
-  personSelectTextActive: { color: '#fff', fontFamily: 'RobotoMono_700Bold' },
-  subitemRemaining: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#929090', alignSelf: 'flex-start' },
-  receiptStrip: { backgroundColor: '#fafafa', borderRadius: 14, padding: 12, borderWidth: 1, borderColor: '#f0f0f0', marginBottom: 16 },
-  receiptStripHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  receiptStripLabel: { fontFamily: 'ChillaxMedium', fontSize: 13, color: '#0ccfcf' },
-  receiptUnlink: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#ed6a6a' },
-  receiptThumbImg: { width: 64, height: 64, borderRadius: 8, marginRight: 8 },
-  toast: { position: 'absolute', bottom: 48, alignSelf: 'center', backgroundColor: '#425252', borderRadius: 999, paddingVertical: 10, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  toastText: { fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#fff' },
-  shareOptionsRow: { flexDirection: 'row', gap: 10, width: '100%', marginBottom: 4 },
-  shareOptionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: '#f0f0f0', backgroundColor: '#fafafa' },
-  shareOptionText: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#0ccfcf' },
-  accountOption: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: '#f0f0f0', marginBottom: 6, backgroundColor: '#fafafa' },
-  accountOptionActive: { backgroundColor: '#425252', borderColor: '#425252' },
-  accountOptionName: { fontFamily: 'ChillaxMedium', fontSize: 13, color: '#425252' },
-  accountOptionBank: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#929090' },
-  subitemError: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#ed6a6a', alignSelf: 'flex-start' },
-  linkedPayableBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 999, borderWidth: 1, borderColor: '#e8e8e8', backgroundColor: '#fafafa', marginBottom: 16 },
-  linkedPayableBtnText: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#929090' },
-  sheetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
-  sheetActions: { flexDirection: 'row', gap: 10, paddingVertical: 16 },
-  cancelBtn: { flex: 1, backgroundColor: '#f5f5f5', borderRadius: 999, paddingVertical: 13, alignItems: 'center' },
-  cancelBtnText: { fontFamily: 'RobotoMono_700Bold', fontSize: 13, color: '#8a8a8a' },
-  splitPreview: { fontFamily: 'RobotoMono_700Bold', fontSize: 12, color: '#0ccfcf', alignSelf: 'flex-start' },
-  photoButtons: { flexDirection: 'row', gap: 12, marginVertical: 16 },
-  photoBtn: { flex: 1, borderRadius: 14, borderWidth: 1.5, borderColor: '#f0f0f0', borderStyle: 'dashed', paddingVertical: 28, alignItems: 'center', gap: 8, backgroundColor: '#fafafa' },
-  photoBtnText: { fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#0ccfcf' },
 });
+
 
 
 

@@ -15,4 +15,7 @@ export { default as FormActions } from './FormActions';
 export { default as MonthPicker } from './MonthPicker';
 export { default as InfoRow } from './InfoRow';
 export { default as formStyles } from './formStyles';
+export { default as pageStyles } from './pageStyles';
+export { default as itemStyles } from './itemStyles';
+export { default as accountStyles } from './accountStyles';
 export * from './theme';
