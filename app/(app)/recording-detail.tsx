@@ -1205,13 +1205,13 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
         <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}>
           <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => { setPeople(savedPeople); setAddPersonModal(false); setSuggestions([]); }} />
           <View style={styles.sheet}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+            <View style={styles.sheetHeader}>
               <View>
                 <Text style={styles.sheetSub}>split bill</Text>
                 <Text style={styles.sheetTitle}>people</Text>
               </View>
-              <TouchableOpacity onPress={() => { setPeople(savedPeople); setAddPersonModal(false); setSuggestions([]); }}>
-                <Ionicons name="close" size={22} color="#929090" />
+              <TouchableOpacity onPress={() => { setPeople(savedPeople); setAddPersonModal(false); setSuggestions([]); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Ionicons name="close" size={20} color="#929090" />
               </TouchableOpacity>
             </View>
             <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 16 }}>
@@ -1248,9 +1248,9 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
               <Ionicons name="add" size={13} color="#0ccfcf" />
               <Text style={styles.addMoreText}>add more</Text>
             </TouchableOpacity>
-            <View style={[styles.modalBtns, { marginTop: 16 }]}>
-              <TouchableOpacity style={[styles.modalBtn, { backgroundColor: '#f5f5f5' }]} onPress={() => { setPeople(savedPeople); setAddPersonModal(false); setSuggestions([]); }}>
-                <Text style={[styles.modalBtnText, { color: '#8a8a8a' }]}>cancel</Text>
+            <View style={styles.sheetActions}>
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => { setPeople(savedPeople); setAddPersonModal(false); setSuggestions([]); }}>
+                <Text style={styles.cancelBtnText}>cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.modalBtn, savingPeople && { opacity: 0.6 }]} onPress={savePeopleAndClose} disabled={savingPeople}>
                 <Text style={styles.modalBtnText}>{savingPeople ? 'saving...' : 'done'}</Text>
@@ -1291,13 +1291,13 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
               const equalCost = totalSubs > 0 ? item.cost / totalSubs : item.cost;
               return (
                 <>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+                  <View style={styles.sheetHeader}>
                     <View>
                       <Text style={styles.sheetSub}>split bill</Text>
                       <Text style={styles.sheetTitle}>add subitems</Text>
                     </View>
-                    <TouchableOpacity onPress={() => setEditSubitemsItemId(null)}>
-                      <Ionicons name="close" size={22} color="#929090" />
+                    <TouchableOpacity onPress={() => setEditSubitemsItemId(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                      <Ionicons name="close" size={20} color="#929090" />
                     </TouchableOpacity>
                   </View>
                   <Text style={styles.subitemRemaining}>{item.name} · {item.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
@@ -1336,9 +1336,9 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                     <Ionicons name="add" size={11} color="#0ccfcf" />
                     <Text style={styles.addMoreText}>add more</Text>
                   </TouchableOpacity>
-                  <View style={[styles.modalBtns, { marginTop: 16 }]}>
-                    <TouchableOpacity style={[styles.modalBtn, { backgroundColor: '#f5f5f5' }]} onPress={() => setEditSubitemsItemId(null)}>
-                      <Text style={[styles.modalBtnText, { color: '#8a8a8a' }]}>cancel</Text>
+                  <View style={styles.sheetActions}>
+                    <TouchableOpacity style={styles.cancelBtn} onPress={() => setEditSubitemsItemId(null)}>
+                      <Text style={styles.cancelBtnText}>cancel</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={[styles.modalBtn, editSubitemForms.every(s => !s.name.trim()) && { opacity: 0.4 }]} onPress={saveEditSubitems} disabled={editSubitemForms.every(s => !s.name.trim())}>
                       <Text style={styles.modalBtnText}>save</Text>
@@ -1441,8 +1441,9 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                 <Text style={styles.sheetSub}>receipt</Text>
                 <Text style={styles.sheetTitle}>link a receipt</Text>
               </View>
-              <TouchableOpacity onPress={() => setLinkReceiptModal(false)}><Ionicons name="close" size={22} color="#929090" /></TouchableOpacity>
+              <TouchableOpacity onPress={() => setLinkReceiptModal(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}><Ionicons name="close" size={20} color="#929090" /></TouchableOpacity>
             </View>
+            <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 8 }}>
                 {linkReceiptEntries.length === 0 ? (
                   <Text style={{ fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#929090', textAlign: 'center', paddingVertical: 16 }}>no unlinked receipts found</Text>
                 ) : (
@@ -1463,9 +1464,12 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                     ))}
                   </ScrollView>
                 )}
-                <TouchableOpacity style={[styles.pickerBtn, { flex: undefined, backgroundColor: '#f5f5f5' }]} onPress={() => setLinkReceiptModal(false)}>
-                  <Text style={[styles.pickerBtnText, { color: '#8a8a8a' }]}>cancel</Text>
-                </TouchableOpacity>
+            </ScrollView>
+            <View style={styles.sheetActions}>
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => setLinkReceiptModal(false)}>
+                <Text style={styles.cancelBtnText}>cancel</Text>
+              </TouchableOpacity>
+            </View>
               </View>
         </BlurView>
       </Modal>
@@ -1477,8 +1481,9 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
           <View style={styles.sheet}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
               <View><Text style={styles.sheetSub}>payable</Text><Text style={styles.sheetTitle}>pay bill</Text></View>
-              <TouchableOpacity onPress={() => setPayModal(false)}><Ionicons name="close" size={22} color="#929090" /></TouchableOpacity>
+              <TouchableOpacity onPress={() => setPayModal(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}><Ionicons name="close" size={20} color="#929090" /></TouchableOpacity>
             </View>
+            <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 8 }}>>
                 <Text style={styles.subitemRemaining}>
                   {(recording?.name ?? '').toLowerCase()} · {Number(recording?.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                 </Text>
@@ -1594,6 +1599,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                     <Text style={styles.modalBtnText}>{payLoading ? 'saving...' : 'confirm'}</Text>
                   </TouchableOpacity>
                 </View>
+            </ScrollView>
           </View>
         </BlurView>
       </Modal>
@@ -1682,8 +1688,9 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
           <View style={styles.sheet}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
               <View><Text style={styles.sheetSub}>receivable</Text><Text style={styles.sheetTitle}>collect payment</Text></View>
-              <TouchableOpacity onPress={() => setCollectModal(false)}><Ionicons name="close" size={22} color="#929090" /></TouchableOpacity>
+              <TouchableOpacity onPress={() => setCollectModal(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}><Ionicons name="close" size={20} color="#929090" /></TouchableOpacity>
             </View>
+            <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 8 }}>     </View>
                 <Text style={styles.subitemRemaining}>
                   {(recording?.name ?? '').toLowerCase()} · {Number(recording?.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                 </Text>
@@ -1748,6 +1755,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                     <Text style={styles.modalBtnText}>{collectLoading ? 'saving...' : 'confirm'}</Text>
                   </TouchableOpacity>
                 </View>
+            </ScrollView>
           </View>
         </BlurView>
       </Modal>
@@ -1913,6 +1921,10 @@ const styles = StyleSheet.create({
   subitemError: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#ed6a6a', alignSelf: 'flex-start' },
   linkedPayableBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 999, borderWidth: 1, borderColor: '#e8e8e8', backgroundColor: '#fafafa', marginBottom: 16 },
   linkedPayableBtnText: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#929090' },
+  sheetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
+  sheetActions: { flexDirection: 'row', gap: 10, paddingVertical: 16 },
+  cancelBtn: { flex: 1, backgroundColor: '#f5f5f5', borderRadius: 999, paddingVertical: 13, alignItems: 'center' },
+  cancelBtnText: { fontFamily: 'RobotoMono_700Bold', fontSize: 13, color: '#8a8a8a' },
   splitPreview: { fontFamily: 'RobotoMono_700Bold', fontSize: 12, color: '#0ccfcf', alignSelf: 'flex-start' },
 });
 
