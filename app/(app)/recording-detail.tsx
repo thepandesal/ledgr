@@ -59,6 +59,7 @@ export default function RecordingDetailScreen() {
   const [showAllPeopleModal, setShowAllPeopleModal] = useState(false);
   const [savedPeople, setSavedPeople] = useState<string[]>([]); // tracks last saved state for cancel
   const [payModal, setPayModal] = useState(false);
+  const [payStep, setPayStep] = useState<'account' | 'mode'>('account');
   const [payMode, setPayMode] = useState<'full' | 'manual' | 'split'>('full');
   const [payManualAmount, setPayManualAmount] = useState('');
   const [paySelectedPeople, setPaySelectedPeople] = useState<string[]>([]);
@@ -71,6 +72,7 @@ export default function RecordingDetailScreen() {
   const [linkedPayable, setLinkedPayable] = useState<any>(null);
   const [payablePerPerson, setPayablePerPerson] = useState<{ map: Record<string, number>; paidFor: string[] }>({ map: {}, paidFor: [] });
   const [collectModal, setCollectModal] = useState(false);
+  const [collectStep, setCollectStep] = useState<'account' | 'mode'>('account');
   const [collectMode, setCollectMode] = useState<'full' | 'manual' | 'split'>('full');
   const [collectManualAmount, setCollectManualAmount] = useState('');
   const [collectSelectedPeople, setCollectSelectedPeople] = useState<string[]>([]);
@@ -194,6 +196,7 @@ export default function RecordingDetailScreen() {
     if (accs) setCollectAccounts(accs);
     const defaultAcc = accs?.find((a: any) => a.id === recording?.receive_to_account_id) ?? accs?.find((a: any) => a.id === recording?.account_id) ?? accs?.[0] ?? null;
     setCollectAccount(defaultAcc);
+    setCollectStep('account');
     setCollectMode('full');
     setCollectManualAmount('');
     setCollectSelectedPeople([]);
@@ -231,7 +234,21 @@ export default function RecordingDetailScreen() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      await supabase.from('recordings').insert({
+
+      // Build per-person split breakdown if split mode
+      const perPersonMap: Record<string, number> = {};
+      if (collectMode === 'split') {
+        items.forEach(item => {
+          const calc = (people: string[], cost: number) => {
+            const pp = people.length > 0 ? cost / people.length : 0;
+            people.forEach(p => { perPersonMap[p] = (perPersonMap[p] || 0) + pp; });
+          };
+          if (item.subitems.length === 0) calc(item.people, item.cost);
+          else item.subitems.forEach((s: any) => calc(s.people, s.cost));
+        });
+      }
+
+      const { data: newRec } = await supabase.from('recordings').insert({
         space_id: recording.space_id,
         user_id: user.id,
         name: recording.name,
@@ -244,7 +261,20 @@ export default function RecordingDetailScreen() {
         linked_recording_id: recordingId,
         category_id: recording.category_id ?? null,
         payment_to: collectMode === 'split' && collectSelectedPeople.length > 0 ? collectSelectedPeople.join(', ') : null,
-      });
+      }).select('id').single();
+
+      // Insert breakdowns for split mode
+      if (newRec?.id && collectMode === 'split' && collectSelectedPeople.length > 0) {
+        await supabase.from('recording_breakdowns').insert(
+          collectSelectedPeople.map(person => ({
+            recording_id: newRec.id,
+            person,
+            amount: perPersonMap[person] ?? 0,
+            account_id: collectAccount?.id ?? null,
+          }))
+        );
+      }
+
       const prevPaid = Number(recording.paid_amount ?? 0);
       const newPaid = prevPaid + amount;
       await supabase.from('recordings').update({
@@ -265,6 +295,7 @@ export default function RecordingDetailScreen() {
     if (accs) setPayAccounts(accs);
     const defaultAcc = accs?.find((a: any) => a.id === recording?.account_id) ?? accs?.[0] ?? null;
     setPayAccount(defaultAcc);
+    setPayStep('account');
     setPayMode('full');
     setPayManualAmount('');
     setPaySelectedPeople([]);
@@ -302,7 +333,20 @@ export default function RecordingDetailScreen() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      await supabase.from('recordings').insert({
+
+      const perPersonMap: Record<string, number> = {};
+      if (payMode === 'split') {
+        items.forEach(item => {
+          const calc = (people: string[], cost: number) => {
+            const pp = people.length > 0 ? cost / people.length : 0;
+            people.forEach(p => { perPersonMap[p] = (perPersonMap[p] || 0) + pp; });
+          };
+          if (item.subitems.length === 0) calc(item.people, item.cost);
+          else item.subitems.forEach((s: any) => calc(s.people, s.cost));
+        });
+      }
+
+      const { data: newRec } = await supabase.from('recordings').insert({
         space_id: recording.space_id,
         user_id: user.id,
         name: recording.name,
@@ -315,7 +359,19 @@ export default function RecordingDetailScreen() {
         linked_recording_id: recordingId,
         category_id: recording.category_id ?? null,
         payment_to: payMode === 'split' && paySelectedPeople.length > 0 ? paySelectedPeople.join(', ') : null,
-      });
+      }).select('id').single();
+
+      if (newRec?.id && payMode === 'split' && paySelectedPeople.length > 0) {
+        await supabase.from('recording_breakdowns').insert(
+          paySelectedPeople.map(person => ({
+            recording_id: newRec.id,
+            person,
+            amount: perPersonMap[person] ?? 0,
+            account_id: payAccount?.id ?? null,
+          }))
+        );
+      }
+
       const prevPaid = Number(recording.paid_amount ?? 0);
       const newPaid = prevPaid + amount;
       await supabase.from('recordings').update({
@@ -1443,37 +1499,11 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
       </BottomSheet>
 
       {/* Pay modal */}
-      <BottomSheet visible={payModal} onClose={() => setPayModal(false)} sub="payable" title="pay bill">
-        <View style={{ gap: 12, width: '100%' }}>
-          <Text style={formStyles.hintMuted}>{(recording?.name ?? '').toLowerCase()} · {Number(recording?.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
-          <View style={{ flexDirection: 'row', gap: 6 }}>
-            {(['full', 'manual', ...(filledPeople.length > 0 && items.length > 0 ? ['split'] : [])] as const).map(mode => (
-              <TouchableOpacity key={mode} style={[itemStyles.personSelectChip, { flex: 1, justifyContent: 'center' }, payMode === mode && itemStyles.personSelectChipActive]} onPress={() => setPayMode(mode as any)}>
-                <Text style={[itemStyles.personSelectText, payMode === mode && itemStyles.personSelectTextActive]}>{mode}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          {payMode === 'full' && <Text style={{ fontFamily: Fonts.monoBold, fontSize: 22, color: Colors.cyan }}>{Number(recording?.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>}
-          {payMode === 'manual' && <TextInput style={[formStyles.input, { width: '100%' }]} placeholder="0.00" placeholderTextColor={Colors.faint} value={payManualAmount} onChangeText={setPayManualAmount} keyboardType="decimal-pad" autoFocus />}
-          {payMode === 'split' && (
-            <View style={{ gap: 8 }}>
-              <Text style={formStyles.hintMuted}>select who is paying</Text>
-              <View style={itemStyles.personSelectRow}>
-                {filledPeople.map((p, i) => {
-                  const sel = paySelectedPeople.includes(p);
-                  return (
-                    <TouchableOpacity key={i} style={[itemStyles.personSelectChip, sel && itemStyles.personSelectChipActive]} onPress={() => setPaySelectedPeople(prev => sel ? prev.filter(x => x !== p) : [...prev, p])}>
-                      <Text style={[itemStyles.personSelectText, sel && itemStyles.personSelectTextActive]}>{p}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-              {paySelectedPeople.length > 0 && <Text style={{ fontFamily: Fonts.monoBold, fontSize: 18, color: Colors.cyan }}>{getPayAmount().toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>}
-            </View>
-          )}
-          <View style={{ gap: 6 }}>
-            <Text style={formStyles.hintMuted}>payment account</Text>
-            <ScrollView style={{ maxHeight: 130 }} showsVerticalScrollIndicator={false}>
+      <BottomSheet visible={payModal} onClose={() => setPayModal(false)} sub="payable" title={payStep === 'account' ? 'paying from' : 'pay bill'}>
+        {payStep === 'account' ? (
+          <>
+            <Text style={formStyles.hintMuted}>which account are you paying from?</Text>
+            <ScrollView style={{ width: '100%', maxHeight: 200 }} showsVerticalScrollIndicator={false}>
               {payAccounts.map((acc: any) => (
                 <TouchableOpacity key={acc.id} style={[accountStyles.option, payAccount?.id === acc.id && accountStyles.optionActive]} onPress={() => setPayAccount(acc)}>
                   <View style={{ flex: 1 }}>
@@ -1484,30 +1514,84 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                 </TouchableOpacity>
               ))}
             </ScrollView>
-          </View>
-          <View style={{ gap: 6 }}>
-            <Text style={formStyles.hintMuted}>payment date</Text>
-            <TextInput style={[formStyles.input, { width: '100%' }]} placeholder="YYYY-MM-DD" placeholderTextColor={Colors.faint} value={payDate} onChangeText={setPayDate} />
-          </View>
-          <View style={{ gap: 6 }}>
-            <Text style={formStyles.hintMuted}>complete payment?</Text>
-            <View style={{ flexDirection: 'row', gap: 8 }}>
-              {([true, false] as const).map(val => (
-                <TouchableOpacity key={String(val)} style={[itemStyles.personSelectChip, { flex: 1, justifyContent: 'center' }, payComplete === val && itemStyles.personSelectChipActive]} onPress={() => setPayComplete(val)}>
-                  <Text style={[itemStyles.personSelectText, payComplete === val && itemStyles.personSelectTextActive]}>{val ? 'yes, complete' : 'no, partial'}</Text>
+            <View style={formStyles.actions}>
+              <TouchableOpacity style={formStyles.cancelBtn} onPress={() => setPayModal(false)}>
+                <Text style={formStyles.cancelBtnText}>cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[formStyles.primaryBtn, !payAccount && { opacity: 0.4 }]} onPress={() => setPayStep('mode')} disabled={!payAccount}>
+                <Text style={formStyles.primaryBtnText}>next</Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        ) : (
+          <View style={{ gap: 12, width: '100%' }}>
+            <Text style={formStyles.hintMuted}>{(recording?.name ?? '').toLowerCase()} · {Number(recording?.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+            <Text style={[formStyles.hintMuted, { color: Colors.cyan }]}>{payAccount?.account_name} · {payAccount?.bank}</Text>
+            <View style={{ flexDirection: 'row', gap: 6 }}>
+              {(['full', 'manual', ...(filledPeople.length > 0 && items.length > 0 ? ['split'] : [])] as const).map(mode => (
+                <TouchableOpacity key={mode} style={[itemStyles.personSelectChip, { flex: 1, justifyContent: 'center' }, payMode === mode && itemStyles.personSelectChipActive]} onPress={() => setPayMode(mode as any)}>
+                  <Text style={[itemStyles.personSelectText, payMode === mode && itemStyles.personSelectTextActive]}>{mode}</Text>
                 </TouchableOpacity>
               ))}
             </View>
+            {payMode === 'full' && <Text style={{ fontFamily: Fonts.monoBold, fontSize: 22, color: Colors.cyan }}>{Number(recording?.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>}
+            {payMode === 'manual' && <TextInput style={[formStyles.input, { width: '100%' }]} placeholder="0.00" placeholderTextColor={Colors.faint} value={payManualAmount} onChangeText={setPayManualAmount} keyboardType="decimal-pad" autoFocus />}
+            {payMode === 'split' && (
+              <View style={{ gap: 8 }}>
+                <Text style={formStyles.hintMuted}>select who you are paying for</Text>
+                {filledPeople.map((p, i) => {
+                  const sel = paySelectedPeople.includes(p);
+                  const personAmount = (() => {
+                    const map: Record<string, number> = {};
+                    items.forEach(item => {
+                      const calc = (people: string[], cost: number) => {
+                        const pp = people.length > 0 ? cost / people.length : 0;
+                        people.forEach(person => { map[person] = (map[person] || 0) + pp; });
+                      };
+                      if (item.subitems.length === 0) calc(item.people, item.cost);
+                      else item.subitems.forEach((s: any) => calc(s.people, s.cost));
+                    });
+                    return map[p] ?? 0;
+                  })();
+                  return (
+                    <TouchableOpacity key={i}
+                      style={[accountStyles.option, sel && accountStyles.optionActive]}
+                      onPress={() => setPaySelectedPeople(prev => sel ? prev.filter(x => x !== p) : [...prev, p])}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[accountStyles.optionName, sel && accountStyles.optionNameActive]}>{p}</Text>
+                        <Text style={[accountStyles.optionBank, sel && accountStyles.optionBankActive]}>{personAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+                      </View>
+                      <Ionicons name={sel ? 'checkbox' : 'square-outline'} size={18} color={sel ? Colors.white : Colors.faint} />
+                    </TouchableOpacity>
+                  );
+                })}
+                {paySelectedPeople.length > 0 && <Text style={{ fontFamily: Fonts.monoBold, fontSize: 18, color: Colors.cyan }}>{getPayAmount().toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>}
+              </View>
+            )}
+            <View style={{ gap: 6 }}>
+              <Text style={formStyles.hintMuted}>payment date</Text>
+              <TextInput style={[formStyles.input, { width: '100%' }]} placeholder="YYYY-MM-DD" placeholderTextColor={Colors.faint} value={payDate} onChangeText={setPayDate} />
+            </View>
+            <View style={{ gap: 6 }}>
+              <Text style={formStyles.hintMuted}>complete payment?</Text>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                {([true, false] as const).map(val => (
+                  <TouchableOpacity key={String(val)} style={[itemStyles.personSelectChip, { flex: 1, justifyContent: 'center' }, payComplete === val && itemStyles.personSelectChipActive]} onPress={() => setPayComplete(val)}>
+                    <Text style={[itemStyles.personSelectText, payComplete === val && itemStyles.personSelectTextActive]}>{val ? 'yes, complete' : 'no, partial'}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+            <View style={formStyles.actions}>
+              <TouchableOpacity style={formStyles.cancelBtn} onPress={() => setPayStep('account')}>
+                <Text style={formStyles.cancelBtnText}>back</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[formStyles.primaryBtn, (payComplete === null || getPayAmount() <= 0 || payLoading) && { opacity: 0.4 }]} onPress={confirmPayment} disabled={payComplete === null || getPayAmount() <= 0 || payLoading}>
+                <Text style={formStyles.primaryBtnText}>{payLoading ? 'saving...' : 'confirm'}</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
-        <View style={formStyles.actions}>
-          <TouchableOpacity style={formStyles.cancelBtn} onPress={() => setPayModal(false)}>
-            <Text style={formStyles.cancelBtnText}>cancel</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[formStyles.primaryBtn, (payComplete === null || getPayAmount() <= 0 || payLoading) && { opacity: 0.4 }]} onPress={confirmPayment} disabled={payComplete === null || getPayAmount() <= 0 || payLoading}>
-            <Text style={formStyles.primaryBtnText}>{payLoading ? 'saving...' : 'confirm'}</Text>
-          </TouchableOpacity>
-        </View>
+        )}
       </BottomSheet>
 
       {/* Delete confirm modal */}
@@ -1546,63 +1630,103 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
       </ConfirmModal>
 
       {/* Collect modal */}
-      <BottomSheet visible={collectModal} onClose={() => setCollectModal(false)} sub="receivable" title="collect payment">
-        <Text style={formStyles.hintMuted}>{(recording?.name ?? '').toLowerCase()} · {Number(recording?.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
-        <View style={{ flexDirection: 'row', gap: 6, width: '100%' }}>
-          {(['full', 'manual', ...(filledPeople.length > 0 && items.length > 0 ? ['split'] : [])] as const).map(mode => (
-            <TouchableOpacity key={mode} style={[itemStyles.personSelectChip, { flex: 1, justifyContent: 'center' }, collectMode === mode && itemStyles.personSelectChipActive]} onPress={() => setCollectMode(mode as any)}>
-              <Text style={[itemStyles.personSelectText, collectMode === mode && itemStyles.personSelectTextActive]}>{mode}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-        {collectMode === 'full' && <Text style={[formStyles.hintMuted, { color: Colors.income, fontSize: 15 }]}>{Number(recording?.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>}
-        {collectMode === 'manual' && <TextInput style={[formStyles.input, { width: '100%' }]} placeholder="0.00" placeholderTextColor={Colors.faint} value={collectManualAmount} onChangeText={setCollectManualAmount} keyboardType="decimal-pad" autoFocus />}
-        {collectMode === 'split' && (
-          <View style={{ width: '100%', gap: 6 }}>
-            <Text style={formStyles.hintMuted}>select who paid</Text>
-            <View style={itemStyles.personSelectRow}>
-              {filledPeople.map((p, i) => {
-                const sel = collectSelectedPeople.includes(p);
-                return (
-                  <TouchableOpacity key={i} style={[itemStyles.personSelectChip, sel && itemStyles.personSelectChipActive]} onPress={() => setCollectSelectedPeople(prev => sel ? prev.filter(x => x !== p) : [...prev, p])}>
-                    <Text style={[itemStyles.personSelectText, sel && itemStyles.personSelectTextActive]}>{p}</Text>
-                  </TouchableOpacity>
-                );
-              })}
+      <BottomSheet visible={collectModal} onClose={() => setCollectModal(false)} sub="receivable" title={collectStep === 'account' ? 'receive into' : 'collect payment'}>
+        {collectStep === 'account' ? (
+          <>
+            <Text style={formStyles.hintMuted}>which account are you receiving into?</Text>
+            <ScrollView style={{ width: '100%', maxHeight: 200 }} showsVerticalScrollIndicator={false}>
+              {collectAccounts.map((acc: any) => (
+                <TouchableOpacity key={acc.id} style={[accountStyles.option, collectAccount?.id === acc.id && accountStyles.optionActive]} onPress={() => setCollectAccount(acc)}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[accountStyles.optionName, collectAccount?.id === acc.id && accountStyles.optionNameActive]}>{acc.account_name}</Text>
+                    <Text style={[accountStyles.optionBank, collectAccount?.id === acc.id && accountStyles.optionBankActive]}>{acc.bank} · {acc.account_number}</Text>
+                  </View>
+                  {collectAccount?.id === acc.id && <Ionicons name="checkmark" size={14} color={Colors.white} />}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <View style={formStyles.actions}>
+              <TouchableOpacity style={formStyles.cancelBtn} onPress={() => setCollectModal(false)}>
+                <Text style={formStyles.cancelBtnText}>cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[formStyles.primaryBtn, !collectAccount && { opacity: 0.4 }]} onPress={() => setCollectStep('mode')} disabled={!collectAccount}>
+                <Text style={formStyles.primaryBtnText}>next</Text>
+              </TouchableOpacity>
             </View>
-            {collectSelectedPeople.length > 0 && <Text style={[formStyles.hintMuted, { color: Colors.income }]}>total: {getCollectAmount().toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>}
-          </View>
-        )}
-        <Text style={[formStyles.hintMuted, { marginTop: 4 }]}>receiving into</Text>
-        <ScrollView style={{ width: '100%', maxHeight: 130 }} showsVerticalScrollIndicator={false}>
-          {collectAccounts.map((acc: any) => (
-            <TouchableOpacity key={acc.id} style={[accountStyles.option, collectAccount?.id === acc.id && accountStyles.optionActive]} onPress={() => setCollectAccount(acc)}>
-              <View style={{ flex: 1 }}>
-                <Text style={[accountStyles.optionName, collectAccount?.id === acc.id && accountStyles.optionNameActive]}>{acc.account_name}</Text>
-                <Text style={[accountStyles.optionBank, collectAccount?.id === acc.id && accountStyles.optionBankActive]}>{acc.bank} · {acc.account_number}</Text>
+          </>
+        ) : (
+          <>
+            <Text style={formStyles.hintMuted}>{(recording?.name ?? '').toLowerCase()} · {Number(recording?.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+            <Text style={[formStyles.hintMuted, { color: Colors.cyan }]}>{collectAccount?.account_name} · {collectAccount?.bank}</Text>
+            <View style={{ flexDirection: 'row', gap: 6, width: '100%' }}>
+              {(['full', 'manual', ...(filledPeople.length > 0 && items.length > 0 ? ['split'] : [])] as const).map(mode => (
+                <TouchableOpacity key={mode} style={[itemStyles.personSelectChip, { flex: 1, justifyContent: 'center' }, collectMode === mode && itemStyles.personSelectChipActive]} onPress={() => setCollectMode(mode as any)}>
+                  <Text style={[itemStyles.personSelectText, collectMode === mode && itemStyles.personSelectTextActive]}>{mode}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            {collectMode === 'full' && <Text style={[formStyles.hintMuted, { color: Colors.income, fontSize: 15 }]}>{Number(recording?.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>}
+            {collectMode === 'manual' && <TextInput style={[formStyles.input, { width: '100%' }]} placeholder="0.00" placeholderTextColor={Colors.faint} value={collectManualAmount} onChangeText={setCollectManualAmount} keyboardType="decimal-pad" autoFocus />}
+            {collectMode === 'split' && (
+              <View style={{ width: '100%', gap: 8 }}>
+                <Text style={formStyles.hintMuted}>select who paid this session</Text>
+                {filledPeople.map((p, i) => {
+                  const sel = collectSelectedPeople.includes(p);
+                  const personAmount = (() => {
+                    const map: Record<string, number> = {};
+                    items.forEach(item => {
+                      const calc = (people: string[], cost: number) => {
+                        const pp = people.length > 0 ? cost / people.length : 0;
+                        people.forEach(person => { map[person] = (map[person] || 0) + pp; });
+                      };
+                      if (item.subitems.length === 0) calc(item.people, item.cost);
+                      else item.subitems.forEach((s: any) => calc(s.people, s.cost));
+                    });
+                    return map[p] ?? 0;
+                  })();
+                  return (
+                    <TouchableOpacity key={i}
+                      style={[accountStyles.option, sel && accountStyles.optionActive]}
+                      onPress={() => setCollectSelectedPeople(prev => sel ? prev.filter(x => x !== p) : [...prev, p])}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[accountStyles.optionName, sel && accountStyles.optionNameActive]}>{p}</Text>
+                        <Text style={[accountStyles.optionBank, sel && accountStyles.optionBankActive]}>{personAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+                      </View>
+                      <Ionicons name={sel ? 'checkbox' : 'square-outline'} size={18} color={sel ? Colors.white : Colors.faint} />
+                    </TouchableOpacity>
+                  );
+                })}
+                {collectSelectedPeople.length > 0 && (
+                  <Text style={{ fontFamily: Fonts.monoBold, fontSize: 18, color: Colors.income }}>
+                    {getCollectAmount().toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                  </Text>
+                )}
               </View>
-              {collectAccount?.id === acc.id && <Ionicons name="checkmark" size={14} color={Colors.white} />}
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-        <Text style={[formStyles.hintMuted, { marginTop: 4 }]}>collection date</Text>
-        <TextInput style={[formStyles.input, { width: '100%' }]} placeholder="YYYY-MM-DD" placeholderTextColor={Colors.faint} value={collectDate} onChangeText={setCollectDate} />
-        <Text style={[formStyles.hintMuted, { marginTop: 4 }]}>complete collection?</Text>
-        <View style={{ flexDirection: 'row', gap: 8, width: '100%' }}>
-          {([true, false] as const).map(val => (
-            <TouchableOpacity key={String(val)} style={[itemStyles.personSelectChip, { flex: 1, justifyContent: 'center' }, collectComplete === val && itemStyles.personSelectChipActive]} onPress={() => setCollectComplete(val)}>
-              <Text style={[itemStyles.personSelectText, collectComplete === val && itemStyles.personSelectTextActive]}>{val ? 'yes, complete' : 'no, partial'}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-        <View style={formStyles.actions}>
-          <TouchableOpacity style={formStyles.cancelBtn} onPress={() => setCollectModal(false)}>
-            <Text style={formStyles.cancelBtnText}>cancel</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[formStyles.primaryBtn, (collectComplete === null || getCollectAmount() <= 0 || collectLoading) && { opacity: 0.4 }]} onPress={confirmCollect} disabled={collectComplete === null || getCollectAmount() <= 0 || collectLoading}>
-            <Text style={formStyles.primaryBtnText}>{collectLoading ? 'saving...' : 'confirm'}</Text>
-          </TouchableOpacity>
-        </View>
+            )}
+            <View style={{ gap: 6, width: '100%' }}>
+              <Text style={formStyles.hintMuted}>collection date</Text>
+              <TextInput style={[formStyles.input, { width: '100%' }]} placeholder="YYYY-MM-DD" placeholderTextColor={Colors.faint} value={collectDate} onChangeText={setCollectDate} />
+            </View>
+            <View style={{ gap: 6, width: '100%' }}>
+              <Text style={formStyles.hintMuted}>complete collection?</Text>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                {([true, false] as const).map(val => (
+                  <TouchableOpacity key={String(val)} style={[itemStyles.personSelectChip, { flex: 1, justifyContent: 'center' }, collectComplete === val && itemStyles.personSelectChipActive]} onPress={() => setCollectComplete(val)}>
+                    <Text style={[itemStyles.personSelectText, collectComplete === val && itemStyles.personSelectTextActive]}>{val ? 'yes, complete' : 'no, partial'}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+            <View style={formStyles.actions}>
+              <TouchableOpacity style={formStyles.cancelBtn} onPress={() => setCollectStep('account')}>
+                <Text style={formStyles.cancelBtnText}>back</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[formStyles.primaryBtn, (collectComplete === null || getCollectAmount() <= 0 || collectLoading) && { opacity: 0.4 }]} onPress={confirmCollect} disabled={collectComplete === null || getCollectAmount() <= 0 || collectLoading}>
+                <Text style={formStyles.primaryBtnText}>{collectLoading ? 'saving...' : 'confirm'}</Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
       </BottomSheet>
 
       {/* Cooking modal */}
