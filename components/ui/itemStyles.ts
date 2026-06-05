@@ -23,6 +23,9 @@ const itemStyles = StyleSheet.create({
     borderColor: Colors.muted,
   },
   itemNumber: { fontFamily: Fonts.monoBold, fontSize: 12, color: Colors.cyan, width: 18, flexShrink: 0 },
+  // number badge (circle) used in AddItemModal
+  itemCardNum: { width: 24, height: 24, borderRadius: 12, backgroundColor: Colors.cyan, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
+  itemCardNumText: { fontFamily: Fonts.monoBold, fontSize: 11, color: Colors.white },
   itemMiddle: { flex: 1, gap: 2 },
   itemName: { fontFamily: Fonts.monoBold, fontSize: 12, color: Colors.text },
   itemCost: { fontFamily: Fonts.mono, fontSize: 16, color: Colors.muted },
