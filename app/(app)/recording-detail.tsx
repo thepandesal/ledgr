@@ -1690,7 +1690,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
               <View><Text style={styles.sheetSub}>receivable</Text><Text style={styles.sheetTitle}>collect payment</Text></View>
               <TouchableOpacity onPress={() => setCollectModal(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}><Ionicons name="close" size={20} color="#929090" /></TouchableOpacity>
             </View>
-            <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 8 }}>     </View>
+            <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 8 }}>
                 <Text style={styles.subitemRemaining}>
                   {(recording?.name ?? '').toLowerCase()} · {Number(recording?.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                 </Text>
