@@ -578,23 +578,31 @@ export default function RecordingDetailScreen() {
       if (!sid) throw new Error('failed to create share');
       const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://ledgr-six.vercel.app';
       const shareUrl = `${baseUrl}/split/${sid}`;
+      setSaveImageModal(false);
 
       if (Platform.OS !== 'web') {
-        // Native iOS/Android — use system share sheet directly, no delay
-        setSaveImageModal(false);
         await Share.share({ message: shareUrl, url: shareUrl });
-      } else if (typeof navigator !== 'undefined' && navigator.share) {
-        // Web with Web Share API (Safari on iOS via web)
-        setSaveImageModal(false);
-        await navigator.share({ title: recording.name, url: shareUrl });
-      } else if (typeof navigator !== 'undefined' && navigator.clipboard) {
-        await navigator.clipboard.writeText(shareUrl);
-        setSaveImageModal(false);
-        setCopiedToast(true);
-        setTimeout(() => setCopiedToast(false), 2500);
-      } else if (typeof window !== 'undefined') {
-        setSaveImageModal(false);
-        window.prompt('Copy the link:', shareUrl);
+      } else {
+        // Web (including Safari mobile) — use clipboard, show toast
+        let copied = false;
+        try {
+          if (typeof navigator !== 'undefined' && navigator.clipboard) {
+            await navigator.clipboard.writeText(shareUrl);
+            copied = true;
+          }
+        } catch (_) {}
+        if (!copied) {
+          // Safari fallback: open share sheet via window.open or prompt
+          if (typeof navigator !== 'undefined' && navigator.share) {
+            try { await navigator.share({ title: recording.name, url: shareUrl }); copied = true; } catch (_) {}
+          }
+        }
+        if (!copied && typeof window !== 'undefined') {
+          window.prompt('Copy this link:', shareUrl);
+        } else if (copied) {
+          setCopiedToast(true);
+          setTimeout(() => setCopiedToast(false), 2500);
+        }
       }
     } catch (e: any) { console.log(e); } finally { setShareLoading(false); }
   };
@@ -1071,7 +1079,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                 if (filledPeople.length > 0 && !(Math.abs(total - recAmt) < 0.01 && recAmt > 0)) setAddItemModal(true);
               }, disabled: isSplitLocked || filledPeople.length === 0 || (Math.abs(items.reduce((s, i) => s + i.cost, 0) - (recording ? Number(recording.amount) : 0)) < 0.01 && items.length > 0) },
               { icon: 'people-outline', label: 'add people', onPress: () => openPeopleModal(), disabled: isSplitLocked },
-              { icon: 'share-outline', label: 'share', onPress: () => openSaveImage(), disabled: filledPeople.length === 0 || items.length === 0 || items.every(i => i.subitems.length === 0) },
+              { icon: 'share-outline', label: 'share', onPress: () => openSaveImage(), disabled: filledPeople.length === 0 || items.length === 0 },
               { icon: 'person-add-outline', label: 'save person', onPress: () => setCookingModal(true), disabled: false },
             ].map(b => (
               <TouchableOpacity
@@ -1395,13 +1403,22 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
         <View style={accountStyles.shareRow}>
           <TouchableOpacity style={accountStyles.shareBtn} onPress={generateShare} disabled={shareLoading}>
             <Ionicons name="link-outline" size={18} color={Colors.cyan} />
-            <Text style={accountStyles.shareBtnText}>{shareLoading ? 'sharing...' : 'share link'}</Text>
+            <Text style={accountStyles.shareBtnText}>{shareLoading ? 'generating...' : shareRowId ? 'copy / share link' : 'share link'}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={accountStyles.shareBtn} onPress={saveAsImage} disabled={shareLoading}>
             <Ionicons name="image-outline" size={18} color={Colors.text} />
             <Text style={[accountStyles.shareBtnText, { color: Colors.text }]}>{shareLoading ? 'saving...' : 'save as pdf'}</Text>
           </TouchableOpacity>
         </View>
+        {shareRowId && (
+          <TextInput
+            style={[formStyles.input, { width: '100%', fontSize: 11, color: Colors.muted }]}
+            value={`https://ledgr-six.vercel.app/split/${shareRowId}`}
+            editable
+            selectTextOnFocus
+            caretHidden={false}
+          />
+        )}
       </ConfirmModal>
 
       {/* Link receipt modal */}
