@@ -382,11 +382,16 @@ export default function SpaceDetailScreen() {
                           </View>
                           <View style={{ alignItems: 'flex-end', gap: 3, flexShrink: 0 }}>
                             <Text style={[s.recordingAmount, { color: amountColor }]}>
-                              {Number(showPartial ? item.paid_amount : item.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                              {Number(item.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                             </Text>
                             {showPartial && (
                               <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: Colors.faint }}>
                                 / {Number(item.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                              </Text>
+                            )}
+                            {(item.type === 'payable' && item.status === 'paid' || item.type === 'receivable' && item.status === 'received') && item.paid_amount && (
+                              <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: amountColor }}>
+                                ({Number(item.paid_amount).toLocaleString('en-US', { minimumFractionDigits: 2 })} paid)
                               </Text>
                             )}
                           </View>
