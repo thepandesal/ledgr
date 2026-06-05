@@ -3,9 +3,8 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
 import * as ImagePicker from 'expo-image-picker';
-import * as ImageManipulator from 'expo-image-manipulator';
-import * as FileSystem from 'expo-file-system/legacy';
 import { supabase } from '../../src/lib/supabase';
+import { compressImage, uploadReceiptPhoto } from '../../src/lib/receiptUpload';
 
 const { width } = Dimensions.get('window');
 
@@ -26,21 +25,12 @@ export default function CaptureReceiptScreen() {
     Animated.timing(slideAnim, { toValue: width, duration: 250, useNativeDriver: false }).start(() => router.back());
   };
 
-  const compress = async (uri: string) => {
-    const result = await ImageManipulator.manipulateAsync(
-      uri,
-      [{ resize: { width: 1200 } }],
-      { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
-    );
-    return result.uri;
-  };
-
   const pickFromCamera = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') { Alert.alert('Permission needed', 'Camera access required.'); return; }
     const result = await ImagePicker.launchCameraAsync({ quality: 1, allowsEditing: false });
     if (!result.canceled && result.assets[0]) {
-      const compressed = await compress(result.assets[0].uri);
+      const compressed = await compressImage(result.assets[0].uri);
       setPhotos(prev => [...prev, compressed]);
     }
   };
@@ -48,13 +38,9 @@ export default function CaptureReceiptScreen() {
   const pickFromGallery = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') { Alert.alert('Permission needed', 'Photo library access required.'); return; }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsMultipleSelection: true,
-      quality: 1,
-    });
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsMultipleSelection: true, quality: 1 });
     if (!result.canceled) {
-      const compressed = await Promise.all(result.assets.map(a => compress(a.uri)));
+      const compressed = await Promise.all(result.assets.map(a => compressImage(a.uri)));
       setPhotos(prev => [...prev, ...compressed]);
     }
   };
@@ -85,27 +71,9 @@ export default function CaptureReceiptScreen() {
         rId = rec.id;
       }
 
-      // Upload each photo to Supabase Storage bucket 'receipts'
       for (const uri of photos) {
-        const fileName = `${user.id}/${rId}/${Date.now()}_${Math.random().toString(36).slice(2)}.jpg`;
-        let uploadData: Uint8Array | Blob;
-        if (typeof window !== 'undefined' && uri.startsWith('data:')) {
-          // Web data URI: convert to blob
-          const response = await fetch(uri);
-          uploadData = await response.blob();
-        } else if (typeof window !== 'undefined' && uri.startsWith('blob:')) {
-          const response = await fetch(uri);
-          uploadData = await response.blob();
-        } else {
-          // Native: read as base64 and decode
-          const base64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
-          uploadData = decode(base64);
-        }
-        const { error: uploadError } = await supabase.storage
-          .from('receipts')
-          .upload(fileName, uploadData, { contentType: 'image/jpeg', upsert: false });
-        if (uploadError) { Alert.alert('Upload Error', uploadError.message); setSaving(false); return; }
-        await supabase.from('receipt_photos').insert({ entry_id: rId, storage_path: fileName });
+        const uploaded = await uploadReceiptPhoto(uri, rId!);
+        if (!uploaded) { Alert.alert('Upload Error', 'Failed to upload photo'); setSaving(false); return; }
       }
 
       router.replace({ pathname: '/(app)/(tabs)/receipts' } as any);
@@ -115,27 +83,6 @@ export default function CaptureReceiptScreen() {
     }
   };
 
-  // decode base64 to Uint8Array for Supabase upload
-  const decode = (base64: string): Uint8Array => {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-    const lookup = new Uint8Array(256);
-    for (let i = 0; i < chars.length; i++) lookup[chars.charCodeAt(i)] = i;
-    const bytes = Math.floor(base64.length * 0.75);
-    const result = new Uint8Array(bytes);
-    let j = 0;
-    for (let i = 0; i < base64.length; i += 4) {
-      const a = lookup[base64.charCodeAt(i)];
-      const b = lookup[base64.charCodeAt(i + 1)];
-      const c = lookup[base64.charCodeAt(i + 2)];
-      const d = lookup[base64.charCodeAt(i + 3)];
-      result[j++] = (a << 2) | (b >> 4);
-      result[j++] = ((b & 15) << 4) | (c >> 2);
-      result[j++] = ((c & 3) << 6) | d;
-    }
-    return result;
-  };
-
-  return (
     <Animated.View style={[styles.container, { transform: [{ translateX: slideAnim }] }]}>
       <SafeAreaView style={styles.inner}>
         <View style={styles.header}>

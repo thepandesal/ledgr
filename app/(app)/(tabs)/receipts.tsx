@@ -3,8 +3,10 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useState } from 'react';
 import { supabase } from '../../../src/lib/supabase';
+import * as ImagePicker from 'expo-image-picker';
 import BottomSheet from '@/components/ui/BottomSheet';
 import formStyles from '@/components/ui/formStyles';
+import { compressImage, uploadReceiptPhoto } from '../../../src/lib/receiptUpload';
 
 interface Entry {
   id: string;
@@ -21,8 +23,10 @@ export default function ReceiptsScreen() {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(true);
   const [addModal, setAddModal] = useState(false);
+  const [addStep, setAddStep] = useState<'name' | 'photos'>('name');
   const [folderName, setFolderName] = useState('');
   const [creating, setCreating] = useState(false);
+  const [activeEntryId, setActiveEntryId] = useState<string | null>(null);
 
   useFocusEffect(useCallback(() => { loadEntries(); }, []));
 
@@ -75,10 +79,39 @@ export default function ReceiptsScreen() {
     const note = folderName.trim() || timeStr;
     const { data: entry, error } = await supabase.from('receipt_entries').insert({ user_id: user.id, note }).select().single();
     setCreating(false);
-    setAddModal(false);
-    setFolderName('');
     if (!error && entry) {
-      router.push({ pathname: '/(app)/receipt-detail', params: { receiptId: entry.id } } as any);
+      setActiveEntryId(entry.id);
+      setAddStep('photos');
+    }
+  };
+
+  const closeAddModal = () => {
+    setAddModal(false);
+    setAddStep('name');
+    setFolderName('');
+    setActiveEntryId(null);
+    loadEntries();
+  };
+
+  const addFromCamera = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') { Alert.alert('Permission needed', 'Camera access required.'); return; }
+    const result = await ImagePicker.launchCameraAsync({ quality: 1 });
+    if (!result.canceled && result.assets[0] && activeEntryId) {
+      const compressed = await compressImage(result.assets[0].uri);
+      await uploadReceiptPhoto(compressed, activeEntryId);
+    }
+  };
+
+  const addFromGallery = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') { Alert.alert('Permission needed', 'Photo library access required.'); return; }
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsMultipleSelection: true, quality: 1 });
+    if (!result.canceled && activeEntryId) {
+      for (const asset of result.assets) {
+        const compressed = await compressImage(asset.uri);
+        await uploadReceiptPhoto(compressed, activeEntryId);
+      }
     }
   };
 
@@ -150,26 +183,48 @@ export default function ReceiptsScreen() {
         </ScrollView>
       )}
 
-      <BottomSheet visible={addModal} onClose={() => { setAddModal(false); setFolderName(''); }} sub="receipts" title="new receipt">
-        <TextInput
-          style={formStyles.input}
-          placeholder="folder name (optional)"
-          placeholderTextColor="#c0c0c0"
-          value={folderName}
-          onChangeText={setFolderName}
-          autoFocus
-          returnKeyType="done"
-          onSubmitEditing={createEntry}
-        />
-        <Text style={formStyles.hintMuted}>leave empty to use current time</Text>
-        <View style={formStyles.actions}>
-          <TouchableOpacity style={formStyles.cancelBtn} onPress={() => { setAddModal(false); setFolderName(''); }}>
-            <Text style={formStyles.cancelBtnText}>cancel</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[formStyles.primaryBtn, creating && { opacity: 0.6 }]} onPress={createEntry} disabled={creating}>
-            <Text style={formStyles.primaryBtnText}>{creating ? 'creating...' : 'create'}</Text>
-          </TouchableOpacity>
-        </View>
+      <BottomSheet visible={addModal} onClose={closeAddModal} sub="receipts" title={addStep === 'name' ? 'new receipt' : 'add photos'}>
+        {addStep === 'name' ? (
+          <>
+            <TextInput
+              style={formStyles.input}
+              placeholder="folder name (optional)"
+              placeholderTextColor="#c0c0c0"
+              value={folderName}
+              onChangeText={setFolderName}
+              autoFocus
+              returnKeyType="done"
+              onSubmitEditing={createEntry}
+            />
+            <Text style={formStyles.hintMuted}>leave empty to use current time</Text>
+            <View style={formStyles.actions}>
+              <TouchableOpacity style={formStyles.cancelBtn} onPress={closeAddModal}>
+                <Text style={formStyles.cancelBtnText}>cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[formStyles.primaryBtn, creating && { opacity: 0.6 }]} onPress={createEntry} disabled={creating}>
+                <Text style={formStyles.primaryBtnText}>{creating ? 'creating...' : 'create'}</Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        ) : (
+          <>
+            <View style={s.photoButtons}>
+              <TouchableOpacity style={s.photoBtn} onPress={addFromCamera}>
+                <Ionicons name="camera-outline" size={28} color="#0ccfcf" />
+                <Text style={s.photoBtnText}>camera</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.photoBtn} onPress={addFromGallery}>
+                <Ionicons name="images-outline" size={28} color="#425252" />
+                <Text style={[s.photoBtnText, { color: '#425252' }]}>gallery</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={formStyles.actions}>
+              <TouchableOpacity style={formStyles.primaryBtn} onPress={closeAddModal}>
+                <Text style={formStyles.primaryBtnText}>done</Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
       </BottomSheet>
     </SafeAreaView>
   );
@@ -198,6 +253,9 @@ const s = StyleSheet.create({
   linkedDot: { width: 6, height: 6, borderRadius: 3 },
   linkedText: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#425252', maxWidth: 140 },
   unlinkedText: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#c0c0c0', marginTop: 2 },
+  photoButtons: { flexDirection: 'row', gap: 12, marginVertical: 16 },
+  photoBtn: { flex: 1, borderRadius: 14, borderWidth: 1.5, borderColor: '#f0f0f0', borderStyle: 'dashed', paddingVertical: 28, alignItems: 'center', gap: 8, backgroundColor: '#fafafa' },
+  photoBtnText: { fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#0ccfcf' },
   modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   modalBox: { backgroundColor: '#ffffff', borderRadius: 20, padding: 20, width: 300, gap: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 20, elevation: 10 },
 });
