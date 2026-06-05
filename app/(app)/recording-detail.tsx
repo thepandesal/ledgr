@@ -41,6 +41,7 @@ export default function RecordingDetailScreen() {
   const [shareSelectedAccount, setShareSelectedAccount] = useState<any>(null);
   const [shareLoading, setShareLoading] = useState(false);
   const [shareRowId, setShareRowId] = useState<string | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
   const [addReceiptModal, setAddReceiptModal] = useState(false);
   const [linkedReceipt, setLinkedReceipt] = useState<any>(null);
   const [receiptPhotos, setReceiptPhotos] = useState<{ id: string; url: string }[]>([]);
@@ -470,6 +471,7 @@ export default function RecordingDetailScreen() {
 
   const openSaveImage = async () => {
     setSaveImageModal(true);
+    // Pre-fetch accounts
     if (shareAccounts.length === 0) {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -477,6 +479,16 @@ export default function RecordingDetailScreen() {
       if (accs) setShareAccounts(accs);
       const recAccount = accs?.find((a: any) => a.id === recording?.account_id) ?? accs?.[0] ?? null;
       setShareSelectedAccount(recAccount);
+    }
+    // Pre-build share URL so tapping share link requires no async
+    if (!shareRowId) {
+      const { data: existing } = await supabase.from('split_shares').select('id').eq('recording_id', recordingId).single();
+      if (existing?.id) {
+        setShareRowId(existing.id);
+      } else {
+        const { data: inserted } = await supabase.from('split_shares').insert({ recording_id: recordingId }).select('id').single();
+        if (inserted?.id) setShareRowId(inserted.id);
+      }
     }
   };
 
@@ -560,51 +572,24 @@ export default function RecordingDetailScreen() {
     </body></html>`;
   };
 
-  const generateShare = async () => {
-    if (!recording) return;
-    setShareLoading(true);
-    try {
-      let sid = shareRowId;
-      if (!sid) {
-        const { data: existing } = await supabase.from('split_shares').select('id').eq('recording_id', recordingId).single();
-        sid = existing?.id ?? null;
-        if (!sid) {
-          const { data: inserted, error } = await supabase.from('split_shares').insert({ recording_id: recordingId }).select('id').single();
-          if (error) throw error;
-          sid = inserted?.id ?? null;
-        }
-        if (sid) setShareRowId(sid);
-      }
-      if (!sid) throw new Error('failed to create share');
-      const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://ledgr-six.vercel.app';
-      const shareUrl = `${baseUrl}/split/${sid}`;
+  const generateShare = () => {
+    if (!shareRowId) return;
+    const shareUrl = `https://ledgr-six.vercel.app/split/${shareRowId}`;
+    if (Platform.OS !== 'web') {
+      Share.share({ message: shareUrl, url: shareUrl });
       setSaveImageModal(false);
-
-      if (Platform.OS !== 'web') {
-        await Share.share({ message: shareUrl, url: shareUrl });
-      } else {
-        // Web (including Safari mobile) — use clipboard, show toast
-        let copied = false;
-        try {
-          if (typeof navigator !== 'undefined' && navigator.clipboard) {
-            await navigator.clipboard.writeText(shareUrl);
-            copied = true;
-          }
-        } catch (_) {}
-        if (!copied) {
-          // Safari fallback: open share sheet via window.open or prompt
-          if (typeof navigator !== 'undefined' && navigator.share) {
-            try { await navigator.share({ title: recording.name, url: shareUrl }); copied = true; } catch (_) {}
-          }
-        }
-        if (!copied && typeof window !== 'undefined') {
-          window.prompt('Copy this link:', shareUrl);
-        } else if (copied) {
-          setCopiedToast(true);
-          setTimeout(() => setCopiedToast(false), 2500);
-        }
-      }
-    } catch (e: any) { console.log(e); } finally { setShareLoading(false); }
+    } else if (typeof navigator !== 'undefined' && navigator.share) {
+      navigator.share({ title: recording?.name ?? 'split bill', url: shareUrl }).catch(() => {});
+    } else if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(shareUrl).then(() => {
+        setLinkCopied(true);
+        setTimeout(() => setLinkCopied(false), 3000);
+      }).catch(() => {
+        if (typeof window !== 'undefined') window.prompt('Copy this link:', shareUrl);
+      });
+    } else if (typeof window !== 'undefined') {
+      window.prompt('Copy this link:', shareUrl);
+    }
   };
 
   const saveAsImage = async () => {
@@ -1385,7 +1370,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
         visible={saveImageModal}
         onClose={() => setSaveImageModal(false)}
         title="share split"
-        actions={[{ label: 'cancel', onPress: () => setSaveImageModal(false), muted: true }]}
+        actions={[{ label: 'cancel', onPress: () => { setSaveImageModal(false); setLinkCopied(false); }, muted: true }]}
       >
         <Text style={formStyles.hintMuted}>choose payment account</Text>
         <ScrollView style={{ width: '100%', maxHeight: 180 }} showsVerticalScrollIndicator={false}>
@@ -1401,11 +1386,11 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
           {shareAccounts.length === 0 && <Text style={[formStyles.hintMuted, { textAlign: 'center', marginVertical: 8 }]}>no accounts saved</Text>}
         </ScrollView>
         <View style={accountStyles.shareRow}>
-          <TouchableOpacity style={accountStyles.shareBtn} onPress={generateShare} disabled={shareLoading}>
-            <Ionicons name="link-outline" size={18} color={Colors.cyan} />
-            <Text style={accountStyles.shareBtnText}>{shareLoading ? 'generating...' : shareRowId ? 'copy / share link' : 'share link'}</Text>
+          <TouchableOpacity style={[accountStyles.shareBtn, !shareRowId && { opacity: 0.4 }, linkCopied && { borderColor: Colors.income, backgroundColor: Colors.successBg }]} onPress={generateShare} disabled={!shareRowId}>
+            <Ionicons name={linkCopied ? 'checkmark' : 'link-outline'} size={18} color={linkCopied ? Colors.income : Colors.cyan} />
+            <Text style={[accountStyles.shareBtnText, linkCopied && { color: Colors.income }]}>{!shareRowId ? 'preparing...' : linkCopied ? 'link copied!' : 'share link'}</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={accountStyles.shareBtn} onPress={saveAsImage} disabled={shareLoading}>
+          <TouchableOpacity style={[accountStyles.shareBtn, shareLoading && { opacity: 0.4 }]} onPress={saveAsImage} disabled={shareLoading}>
             <Ionicons name="image-outline" size={18} color={Colors.text} />
             <Text style={[accountStyles.shareBtnText, { color: Colors.text }]}>{shareLoading ? 'saving...' : 'save as pdf'}</Text>
           </TouchableOpacity>
