@@ -1280,9 +1280,9 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                                       </TouchableOpacity>
                                     ))}
                                     {(item.people?.length ?? 0) > 3 && (
-                                      <View style={itemStyles.personCircleExtra}>
+                                      <TouchableOpacity style={itemStyles.personCircleExtra} onPress={() => setShowAllPeopleModal(true)}>
                                         <Text style={itemStyles.personCircleLetter}>+{item.people.length - 3}</Text>
-                                      </View>
+                                      </TouchableOpacity>
                                     )}
                                   </View>
                                   <Text style={itemStyles.itemSplit}>
@@ -1322,9 +1322,9 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                                           </TouchableOpacity>
                                         ))}
                                         {(sub.people?.length ?? 0) > 3 && (
-                                          <View style={itemStyles.personCircleExtra}>
+                                          <TouchableOpacity style={itemStyles.personCircleExtra} onPress={() => setShowAllPeopleModal(true)}>
                                             <Text style={itemStyles.personCircleLetter}>+{(sub.people?.length ?? 0) - 3}</Text>
-                                          </View>
+                                          </TouchableOpacity>
                                         )}
                                       </View>
                                       <Text style={itemStyles.itemSplit}>
