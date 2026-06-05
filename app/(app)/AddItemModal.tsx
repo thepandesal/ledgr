@@ -208,7 +208,7 @@ export default function AddItemModal({
 }
 
 const s = StyleSheet.create({
-  sheet: { backgroundColor: '#ffffff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 0, maxHeight: '85%', flex: 1 },
+  sheet: { backgroundColor: '#ffffff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 0, maxHeight: '92%', flex: 1 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
   headerSub: { fontFamily: 'ChillaxMedium', fontSize: 11, color: '#929090' },
   headerTitle: { fontFamily: 'Avenelle', fontSize: 26, color: '#425252', letterSpacing: -0.5, lineHeight: 30 },
