@@ -1594,7 +1594,6 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                     <Text style={styles.modalBtnText}>{payLoading ? 'saving...' : 'confirm'}</Text>
                   </TouchableOpacity>
                 </View>
-              </View>
           </View>
         </BlurView>
       </Modal>
@@ -1749,7 +1748,6 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                     <Text style={styles.modalBtnText}>{collectLoading ? 'saving...' : 'confirm'}</Text>
                   </TouchableOpacity>
                 </View>
-              </View>
           </View>
         </BlurView>
       </Modal>
