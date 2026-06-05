@@ -1057,7 +1057,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                     const wasPaid = payablePerPerson.paidFor.includes(name);
                     return (
                       <View key={name}>
-                        <View style={infoStyles.row}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 6 }}>
                           <Text style={[{ fontFamily: Fonts.mono, fontSize: 11, color: Colors.muted, flexShrink: 0 }, wasPaid && { color: Colors.income }]}>{name}</Text>
                           <View style={{ flex: 1, borderBottomWidth: 1, borderStyle: 'dotted', borderColor: Colors.faint, marginHorizontal: 8 }} />
                           <Text style={[{ fontFamily: Fonts.monoBold, fontSize: 11, color: Colors.text, flexShrink: 0, maxWidth: 130 }, wasPaid && { color: Colors.income }]}>{total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
