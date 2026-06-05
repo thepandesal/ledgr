@@ -2,6 +2,7 @@ import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView, Ima
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useState } from 'react';
+import { supabase } from '../../../src/lib/supabase';
 import BottomSheet from '@/components/ui/BottomSheet';
 import formStyles from '@/components/ui/formStyles';
 
