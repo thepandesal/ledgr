@@ -574,7 +574,7 @@ export default function RecordingDetailScreen() {
 
   const generateShare = () => {
     if (!shareRowId) return;
-    const shareUrl = `https://ledgr-six.vercel.app/split/${shareRowId}`;
+    const shareUrl = `https://ledgr.thepandesal.com/split/${shareRowId}`;
     if (Platform.OS !== 'web') {
       Share.share({ message: shareUrl, url: shareUrl });
       setSaveImageModal(false);
@@ -1398,7 +1398,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
         {shareRowId && (
           <TextInput
             style={[formStyles.input, { width: '100%', fontSize: 11, color: Colors.muted }]}
-            value={`https://ledgr-six.vercel.app/split/${shareRowId}`}
+            value={`https://ledgr.thepandesal.com/split/${shareRowId}`}
             editable
             selectTextOnFocus
             caretHidden={false}

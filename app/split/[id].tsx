@@ -20,7 +20,7 @@ export default function SplitSharePage() {
   const [qrModal, setQrModal] = useState(false);
   const [showUrlBar, setShowUrlBar] = useState(false);
 
-  const shareUrl = typeof window !== 'undefined' ? window.location.href : `https://ledgr-six.vercel.app/split/${id}`;
+  const shareUrl = typeof window !== 'undefined' ? window.location.href : `https://ledgr.thepandesal.com/split/${id}`;
 
   const handleShare = async () => {
     if (typeof navigator !== 'undefined' && navigator.share) {
