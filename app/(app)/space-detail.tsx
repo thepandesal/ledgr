@@ -48,7 +48,7 @@ function getDailyMonthLabel(selectedDate: Date) {
 
 function recordingColor(type: string, status: string): string {
   if (type === 'expense') return Colors.expense;
-  if (type === 'payable') return Colors.text;
+  if (type === 'payable') return status === 'paid' ? Colors.success : Colors.text;
   if (type === 'receivable') {
     if (status === 'received') return Colors.income;
     if (status === 'partial') return Colors.cyan;
@@ -542,8 +542,8 @@ const s = StyleSheet.create({
   addRecordingRow: { paddingHorizontal: Spacing.page, alignItems: 'flex-end', marginBottom: 10, marginTop: 20 },
 
   // Recording list
-  list: { paddingHorizontal: Spacing.page, paddingBottom: 100, gap: 48, paddingTop: 16 },
-  dateGroupLabel: { fontFamily: Fonts.heading, fontSize: 13, color: Colors.cyan, marginBottom: 8, marginTop: 32 },
+  list: { paddingHorizontal: Spacing.page, paddingBottom: 100, gap: 16, paddingTop: 16 },
+  dateGroupLabel: { fontFamily: Fonts.heading, fontSize: 13, color: Colors.cyan, marginBottom: 8, marginTop: 16 },
   recordingCard: { flexDirection: 'row', alignItems: 'center', borderRadius: Radius.pill, paddingVertical: 10, paddingHorizontal: 14, gap: 10, backgroundColor: Colors.white, borderWidth: 1, borderStyle: 'dashed' },
   recordingMiddle: { flex: 1, gap: 2, overflow: 'hidden' },
   recordingName: { fontFamily: Fonts.monoBold, fontSize: 12, color: Colors.text },
