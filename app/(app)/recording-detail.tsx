@@ -1374,17 +1374,17 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
       {/* Add people modal */}
       <BottomSheet visible={addPersonModal} onClose={() => { setPeople(savedPeople); setAddPersonModal(false); setSuggestions([]); }} sub="split bill" title="people">
         {/* Tag input */}
-        <View style={s.tagInputWrap}>
+        <View style={styles.tagInputWrap}>
           {people.filter(p => p.trim()).map((p, i) => (
-            <View key={i} style={s.tagChip}>
-              <Text style={s.tagChipText}>{p}</Text>
+            <View key={i} style={styles.tagChip}>
+              <Text style={styles.tagChipText}>{p}</Text>
               <TouchableOpacity onPress={() => requestDeletePerson(people.indexOf(p))} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
                 <Ionicons name="close" size={11} color={Colors.white} />
               </TouchableOpacity>
             </View>
           ))}
           <TextInput
-            style={s.tagInput}
+            style={styles.tagInput}
             placeholder={people.filter(p => p.trim()).length === 0 ? 'type a name and press enter...' : ''}
             placeholderTextColor={Colors.faint}
             value={tagInputVal}
@@ -1412,11 +1412,11 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
             return (
               <TouchableOpacity
                 key={i}
-                style={[s.contactRow, added && { opacity: 0.35 }]}
+                style={[styles.contactRow, added && { opacity: 0.35 }]}
                 onPress={() => { if (!added) { setPeople(prev => [...prev, c]); setTagInputVal(''); setSuggestions([]); } }}
                 disabled={added}
               >
-                <Text style={s.contactName}>{c}</Text>
+                <Text style={styles.contactName}>{c}</Text>
                 {added
                   ? <Ionicons name="checkmark" size={14} color={Colors.faint} />
                   : <Ionicons name="add" size={14} color={Colors.cyan} />}
