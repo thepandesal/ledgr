@@ -10,6 +10,8 @@ import { BlurView } from 'expo-blur';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as FileSystem from 'expo-file-system/legacy';
+import BottomSheet from '@/components/ui/BottomSheet';
+import formStyles from '@/components/ui/formStyles';
 
 const { width: SW, height: SH } = Dimensions.get('window');
 const COLS = 5;
@@ -333,72 +335,59 @@ export default function ReceiptDetailScreen() {
       </Modal>
 
       {/* Link modal */}
-      <Modal visible={linkModal} transparent animationType="slide" onRequestClose={() => setLinkModal(false)}>
-        <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}>
-          <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={() => setLinkModal(false)}>
-            <TouchableOpacity activeOpacity={1} onPress={e => e.stopPropagation()}>
-              <View style={[s.modalBox, { width: 340 }]}>
-                <Text style={s.modalTitle}>link to recording</Text>
-                <View style={s.modalInputBlock}>
-                  <TextInput style={s.modalInput} placeholder="search by name..." placeholderTextColor="#c0c0c0" value={linkSearch} onChangeText={setLinkSearch} />
-                </View>
-                <View style={s.linkDateRow}>
-                  <TouchableOpacity onPress={() => changeDate(-1)} style={s.carouselBtn}>
-                    <Ionicons name="chevron-back" size={18} color="#929090" />
-                  </TouchableOpacity>
-                  <Text style={s.linkDateText}>{new Date(linkDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</Text>
-                  <TouchableOpacity onPress={() => changeDate(1)} style={s.carouselBtn}>
-                    <Ionicons name="chevron-forward" size={18} color="#929090" />
-                  </TouchableOpacity>
-                </View>
-                <ScrollView style={{ maxHeight: 220, width: '100%' }} showsVerticalScrollIndicator={false}>
-                  {filteredRecordings.length === 0 ? (
-                    <Text style={s.linkEmpty}>no recordings on this date</Text>
-                  ) : (
-                    filteredRecordings.map((rec: any) => (
-                      <TouchableOpacity key={rec.id} style={s.linkRecItem} onPress={() => linkToRecording(rec)}>
-                        <View style={[s.linkTypeDot, { backgroundColor: typeColor(rec.type) }]} />
-                        <View style={{ flex: 1 }}>
-                          <Text style={s.linkRecName} numberOfLines={1}>{rec.name.toLowerCase()}</Text>
-                          <Text style={s.linkRecMeta}>{rec.type} · {Number(rec.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
-                        </View>
-                        <Ionicons name="link-outline" size={14} color="#0ccfcf" />
-                      </TouchableOpacity>
-                    ))
-                  )}
-                </ScrollView>
-                <TouchableOpacity style={s.modalCancelBtn} onPress={() => setLinkModal(false)}>
-                  <Text style={s.modalCancelText}>cancel</Text>
-                </TouchableOpacity>
-              </View>
-            </TouchableOpacity>
+      <BottomSheet visible={linkModal} onClose={() => setLinkModal(false)} sub="receipt" title="link to recording">
+        <TextInput style={formStyles.searchInput} placeholder="search by name..." placeholderTextColor="#c0c0c0" value={linkSearch} onChangeText={setLinkSearch} />
+        <View style={s.linkDateRow}>
+          <TouchableOpacity onPress={() => changeDate(-1)} style={s.carouselBtn}>
+            <Ionicons name="chevron-back" size={18} color="#929090" />
           </TouchableOpacity>
-        </BlurView>
-      </Modal>
+          <Text style={s.linkDateText}>{new Date(linkDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</Text>
+          <TouchableOpacity onPress={() => changeDate(1)} style={s.carouselBtn}>
+            <Ionicons name="chevron-forward" size={18} color="#929090" />
+          </TouchableOpacity>
+        </View>
+        {filteredRecordings.length === 0 ? (
+          <Text style={formStyles.listEmpty}>no recordings on this date</Text>
+        ) : (
+          filteredRecordings.map((rec: any) => (
+            <TouchableOpacity key={rec.id} style={s.linkRecItem} onPress={() => linkToRecording(rec)}>
+              <View style={[s.linkTypeDot, { backgroundColor: typeColor(rec.type) }]} />
+              <View style={{ flex: 1 }}>
+                <Text style={s.linkRecName} numberOfLines={1}>{rec.name.toLowerCase()}</Text>
+                <Text style={s.linkRecMeta}>{rec.type} · {Number(rec.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+              </View>
+              <Ionicons name="link-outline" size={14} color="#0ccfcf" />
+            </TouchableOpacity>
+          ))
+        )}
+        <View style={formStyles.actions}>
+          <TouchableOpacity style={formStyles.cancelBtn} onPress={() => setLinkModal(false)}>
+            <Text style={formStyles.cancelBtnText}>cancel</Text>
+          </TouchableOpacity>
+        </View>
+      </BottomSheet>
 
       {/* Rename modal */}
-      <Modal visible={renameModal} transparent animationType="slide" onRequestClose={() => setRenameModal(false)}>
-        <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}>
-          <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={() => setRenameModal(false)}>
-            <TouchableOpacity activeOpacity={1} onPress={e => e.stopPropagation()}>
-              <View style={s.modalBox}>
-                <Text style={s.modalTitle}>rename folder</Text>
-                <View style={s.modalInputBlock}>
-                  <TextInput style={s.modalInput} placeholder="folder name" placeholderTextColor="#c0c0c0" value={renameVal} onChangeText={setRenameVal} autoFocus returnKeyType="done" onSubmitEditing={rename} />
-                </View>
-                <View style={s.modalBtns}>
-                  <TouchableOpacity style={s.modalCancelBtn} onPress={() => setRenameModal(false)}>
-                    <Text style={s.modalCancelText}>cancel</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={s.modalSaveBtn} onPress={rename}>
-                    <Text style={s.modalSaveText}>save</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </TouchableOpacity>
+      <BottomSheet visible={renameModal} onClose={() => setRenameModal(false)} sub="receipt" title="rename folder">
+        <TextInput
+          style={formStyles.input}
+          placeholder="folder name"
+          placeholderTextColor="#c0c0c0"
+          value={renameVal}
+          onChangeText={setRenameVal}
+          autoFocus
+          returnKeyType="done"
+          onSubmitEditing={rename}
+        />
+        <View style={formStyles.actions}>
+          <TouchableOpacity style={formStyles.cancelBtn} onPress={() => setRenameModal(false)}>
+            <Text style={formStyles.cancelBtnText}>cancel</Text>
           </TouchableOpacity>
-        </BlurView>
-      </Modal>
+          <TouchableOpacity style={formStyles.primaryBtn} onPress={rename}>
+            <Text style={formStyles.primaryBtnText}>save</Text>
+          </TouchableOpacity>
+        </View>
+      </BottomSheet>
     </Animated.View>
   );
 }
@@ -448,18 +437,4 @@ const s = StyleSheet.create({
   linkTypeDot: { width: 8, height: 8, borderRadius: 4, flexShrink: 0 },
   linkRecName: { fontFamily: 'RobotoMono_700Bold', fontSize: 12, color: '#425252' },
   linkRecMeta: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#929090', marginTop: 2 },
-  linkEmpty: { fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#c0c0c0', textAlign: 'center', paddingVertical: 16 },
-  modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  modalBox: { backgroundColor: '#ffffff', borderRadius: 20, padding: 20, width: 300, gap: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 20, elevation: 10 },
-  modalTitle: { fontFamily: 'ChillaxMedium', fontSize: 16, color: '#425252' },
-  sheet: { backgroundColor: '#ffffff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 48, maxHeight: '85%' },
-  sheetTitle: { fontFamily: 'Avenelle', fontSize: 26, color: '#425252', letterSpacing: -0.5, lineHeight: 30, marginBottom: 4 },
-  sheetSub: { fontFamily: 'ChillaxMedium', fontSize: 11, color: '#929090' },
-  modalInputBlock: { backgroundColor: '#fafafa', borderRadius: 12, paddingHorizontal: 14, borderWidth: 1, borderColor: '#f0f0f0' },
-  modalInput: { fontFamily: 'RobotoMono_400Regular', fontSize: 16, color: '#425252', paddingVertical: 12 },
-  modalBtns: { flexDirection: 'row', gap: 10 },
-  modalCancelBtn: { flex: 1, backgroundColor: '#f5f5f5', borderRadius: 999, paddingVertical: 11, alignItems: 'center' },
-  modalCancelText: { fontFamily: 'RobotoMono_700Bold', fontSize: 13, color: '#8a8a8a' },
-  modalSaveBtn: { flex: 1, backgroundColor: '#425252', borderRadius: 999, paddingVertical: 11, alignItems: 'center' },
-  modalSaveText: { fontFamily: 'RobotoMono_700Bold', fontSize: 13, color: '#fff' },
 });

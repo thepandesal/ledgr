@@ -1,9 +1,9 @@
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView, Image, ActivityIndicator, Modal, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView, Image, ActivityIndicator, TextInput, Alert } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useState } from 'react';
-import { supabase } from '../../../src/lib/supabase';
-import { BlurView } from 'expo-blur';
+import BottomSheet from '@/components/ui/BottomSheet';
+import formStyles from '@/components/ui/formStyles';
 
 interface Entry {
   id: string;
@@ -149,44 +149,27 @@ export default function ReceiptsScreen() {
         </ScrollView>
       )}
 
-      {/* Add folder modal */}
-      <Modal visible={addModal} transparent animationType="slide" onRequestClose={() => { setAddModal(false); setFolderName(''); }}>
-        <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}>
-          <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => { setAddModal(false); setFolderName(''); }} />
-          <View style={s.sheet}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
-              <View>
-                <Text style={s.sheetSub}>receipts</Text>
-                <Text style={s.sheetTitle}>new receipt</Text>
-              </View>
-              <TouchableOpacity onPress={() => { setAddModal(false); setFolderName(''); }}>
-                <Ionicons name="close" size={22} color="#929090" />
-              </TouchableOpacity>
-            </View>
-            <View style={s.modalInputBlock}>
-              <TextInput
-                style={s.modalInput}
-                placeholder="folder name (optional)"
-                placeholderTextColor="#c0c0c0"
-                value={folderName}
-                onChangeText={setFolderName}
-                autoFocus
-                returnKeyType="done"
-                onSubmitEditing={createEntry}
-              />
-            </View>
-            <Text style={s.modalHint}>leave empty to use current time</Text>
-            <View style={[s.modalBtns, { marginTop: 16 }]}>
-              <TouchableOpacity style={s.modalCancelBtn} onPress={() => { setAddModal(false); setFolderName(''); }}>
-                <Text style={s.modalCancelText}>cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[s.modalSaveBtn, creating && { opacity: 0.6 }]} onPress={createEntry} disabled={creating}>
-                <Text style={s.modalSaveText}>{creating ? 'creating...' : 'create'}</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </BlurView>
-      </Modal>
+      <BottomSheet visible={addModal} onClose={() => { setAddModal(false); setFolderName(''); }} sub="receipts" title="new receipt">
+        <TextInput
+          style={formStyles.input}
+          placeholder="folder name (optional)"
+          placeholderTextColor="#c0c0c0"
+          value={folderName}
+          onChangeText={setFolderName}
+          autoFocus
+          returnKeyType="done"
+          onSubmitEditing={createEntry}
+        />
+        <Text style={formStyles.hintMuted}>leave empty to use current time</Text>
+        <View style={formStyles.actions}>
+          <TouchableOpacity style={formStyles.cancelBtn} onPress={() => { setAddModal(false); setFolderName(''); }}>
+            <Text style={formStyles.cancelBtnText}>cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[formStyles.primaryBtn, creating && { opacity: 0.6 }]} onPress={createEntry} disabled={creating}>
+            <Text style={formStyles.primaryBtnText}>{creating ? 'creating...' : 'create'}</Text>
+          </TouchableOpacity>
+        </View>
+      </BottomSheet>
     </SafeAreaView>
   );
 }
@@ -216,16 +199,4 @@ const s = StyleSheet.create({
   unlinkedText: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#c0c0c0', marginTop: 2 },
   modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   modalBox: { backgroundColor: '#ffffff', borderRadius: 20, padding: 20, width: 300, gap: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 20, elevation: 10 },
-  sheet: { backgroundColor: '#ffffff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 48 },
-  sheetTitle: { fontFamily: 'Avenelle', fontSize: 26, color: '#425252', letterSpacing: -0.5, lineHeight: 30, marginBottom: 4 },
-  sheetSub: { fontFamily: 'ChillaxMedium', fontSize: 11, color: '#929090' },
-  modalTitle: { fontFamily: 'ChillaxMedium', fontSize: 16, color: '#425252' },
-  modalInputBlock: { backgroundColor: '#fafafa', borderRadius: 12, paddingHorizontal: 14, borderWidth: 1, borderColor: '#f0f0f0' },
-  modalInput: { fontFamily: 'RobotoMono_400Regular', fontSize: 16, color: '#425252', paddingVertical: 12 },
-  modalHint: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#c0c0c0' },
-  modalBtns: { flexDirection: 'row', gap: 10 },
-  modalCancelBtn: { flex: 1, backgroundColor: '#f5f5f5', borderRadius: 999, paddingVertical: 11, alignItems: 'center' },
-  modalCancelText: { fontFamily: 'RobotoMono_700Bold', fontSize: 13, color: '#8a8a8a' },
-  modalSaveBtn: { flex: 1, backgroundColor: '#425252', borderRadius: 999, paddingVertical: 11, alignItems: 'center' },
-  modalSaveText: { fontFamily: 'RobotoMono_700Bold', fontSize: 13, color: '#fff' },
 });
