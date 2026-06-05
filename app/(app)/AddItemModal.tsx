@@ -41,9 +41,9 @@ export default function AddItemModal({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={{ flex: 1 }}>
+      <View style={{ flex: 1, justifyContent: 'flex-end' }}>
         <BlurView intensity={40} tint="light" style={{ ...StyleSheet.absoluteFillObject }} />
-        <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={onClose} />
+        <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
         <View style={s.sheet}>
 
           {/* Header */}
@@ -208,7 +208,7 @@ export default function AddItemModal({
 }
 
 const s = StyleSheet.create({
-  sheet: { backgroundColor: '#ffffff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 0, maxHeight: '92%', flex: 1 },
+  sheet: { backgroundColor: '#ffffff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 0, height: '90%' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
   headerSub: { fontFamily: 'ChillaxMedium', fontSize: 11, color: '#929090' },
   headerTitle: { fontFamily: 'Avenelle', fontSize: 26, color: '#425252', letterSpacing: -0.5, lineHeight: 30 },
