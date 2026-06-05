@@ -1,6 +1,6 @@
 import AddItemModal from './AddItemModal';
 import { setPendingFocusDate } from './space-detail';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Animated, Dimensions, ScrollView, TextInput, Modal, Platform, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Animated, Dimensions, ScrollView, TextInput, Modal, Platform, Image, Share } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -579,38 +579,19 @@ export default function RecordingDetailScreen() {
       const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://ledgr-six.vercel.app';
       const shareUrl = `${baseUrl}/split/${sid}`;
       setSaveImageModal(false);
-      // Small delay so modal closes before share sheet opens
       await new Promise(r => setTimeout(r, 150));
-      if (typeof navigator !== 'undefined' && navigator.share) {
+
+      if (Platform.OS !== 'web') {
+        // Native: use the system share sheet
+        await Share.share({ message: shareUrl, url: shareUrl });
+      } else if (typeof navigator !== 'undefined' && navigator.share) {
         try { await navigator.share({ title: recording.name, url: shareUrl }); } catch (_) {}
-      } else {
-        // Try clipboard API, fall back to prompt
-        let copied = false;
-        if (typeof navigator !== 'undefined' && navigator.clipboard) {
-          try { await navigator.clipboard.writeText(shareUrl); copied = true; } catch (_) {}
-        }
-        if (!copied) {
-          // textarea hack
-          try {
-            const el = document.createElement('textarea');
-            el.value = shareUrl;
-            el.setAttribute('readonly', '');
-            el.style.cssText = 'position:fixed;top:0;left:0;opacity:0;';
-            document.body.appendChild(el);
-            el.focus();
-            el.select();
-            el.setSelectionRange(0, 99999);
-            copied = document.execCommand('copy');
-            document.body.removeChild(el);
-          } catch (_) {}
-        }
-        if (!copied) {
-          // Last resort: prompt so user can copy manually
-          if (typeof window !== 'undefined') window.prompt('Copy the link:', shareUrl);
-        } else {
-          setCopiedToast(true);
-          setTimeout(() => setCopiedToast(false), 2500);
-        }
+      } else if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        await navigator.clipboard.writeText(shareUrl);
+        setCopiedToast(true);
+        setTimeout(() => setCopiedToast(false), 2500);
+      } else if (typeof window !== 'undefined') {
+        window.prompt('Copy the link:', shareUrl);
       }
     } catch (e: any) { console.log(e); } finally { setShareLoading(false); }
   };

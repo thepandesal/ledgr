@@ -15,7 +15,7 @@ const itemStyles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     backgroundColor: Colors.white,
-    borderRadius: Radius.pill,
+    borderRadius: Radius.lg,
     paddingVertical: 10,
     paddingHorizontal: 14,
     borderWidth: 1,
