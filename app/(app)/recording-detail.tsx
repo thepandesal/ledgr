@@ -578,19 +578,22 @@ export default function RecordingDetailScreen() {
       if (!sid) throw new Error('failed to create share');
       const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://ledgr-six.vercel.app';
       const shareUrl = `${baseUrl}/split/${sid}`;
-      setSaveImageModal(false);
-      await new Promise(r => setTimeout(r, 150));
 
       if (Platform.OS !== 'web') {
-        // Native: use the system share sheet
+        // Native iOS/Android — use system share sheet directly, no delay
+        setSaveImageModal(false);
         await Share.share({ message: shareUrl, url: shareUrl });
       } else if (typeof navigator !== 'undefined' && navigator.share) {
-        try { await navigator.share({ title: recording.name, url: shareUrl }); } catch (_) {}
+        // Web with Web Share API (Safari on iOS via web)
+        setSaveImageModal(false);
+        await navigator.share({ title: recording.name, url: shareUrl });
       } else if (typeof navigator !== 'undefined' && navigator.clipboard) {
         await navigator.clipboard.writeText(shareUrl);
+        setSaveImageModal(false);
         setCopiedToast(true);
         setTimeout(() => setCopiedToast(false), 2500);
       } else if (typeof window !== 'undefined') {
+        setSaveImageModal(false);
         window.prompt('Copy the link:', shareUrl);
       }
     } catch (e: any) { console.log(e); } finally { setShareLoading(false); }
