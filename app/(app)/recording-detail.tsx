@@ -486,7 +486,7 @@ export default function RecordingDetailScreen() {
       if (existing?.id) {
         setShareRowId(existing.id);
       } else {
-        const { data: inserted } = await supabase.from('split_shares').insert({ recording_id: recordingId }).select('id').single();
+        const { data: inserted } = await supabase.from('split_shares').insert({ recording_id: recordingId, data: {} }).select('id').single();
         if (inserted?.id) setShareRowId(inserted.id);
       }
     }
