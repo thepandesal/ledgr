@@ -83,6 +83,7 @@ export default function CaptureReceiptScreen() {
     }
   };
 
+  return (
     <Animated.View style={[styles.container, { transform: [{ translateX: slideAnim }] }]}>
       <SafeAreaView style={styles.inner}>
         <View style={styles.header}>
