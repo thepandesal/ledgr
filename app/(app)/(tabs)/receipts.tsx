@@ -6,6 +6,9 @@ import { supabase } from '../../../src/lib/supabase';
 import * as ImagePicker from 'expo-image-picker';
 import BottomSheet from '@/components/ui/BottomSheet';
 import formStyles from '@/components/ui/formStyles';
+import accountStyles from '@/components/ui/accountStyles';
+import pageStyles from '@/components/ui/pageStyles';
+import { Colors, Fonts, Radius, Spacing } from '@/components/ui/theme';
 import { compressImage, uploadReceiptPhoto } from '../../../src/lib/receiptUpload';
 
 interface Entry {
@@ -117,27 +120,27 @@ export default function ReceiptsScreen() {
 
   const formatDate = (d: string) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
-  const typeColor = (type: string) => type === 'expense' ? '#ed6a6a' : type === 'income' ? '#2ab671' : '#425252';
+  const typeColor = (type: string) => type === 'expense' ? Colors.expense : type === 'income' ? Colors.income : Colors.text;
 
   return (
-    <SafeAreaView style={s.container}>
+    <SafeAreaView style={pageStyles.container}>
       <View style={s.header}>
         <View>
-          <Text style={s.headerSub}>your</Text>
-          <Text style={s.headerTitle}>receipts</Text>
+          <Text style={pageStyles.pageLabel}>your</Text>
+          <Text style={[pageStyles.pageName, { fontSize: 32, lineHeight: 36, letterSpacing: -1 }]}>receipts</Text>
         </View>
-        <TouchableOpacity style={s.addBtn} onPress={() => setAddModal(true)} activeOpacity={0.85}>
-          <Ionicons name="add" size={14} color="#425252" />
-          <Text style={s.addBtnText}>add receipt</Text>
+        <TouchableOpacity style={pageStyles.actionBtn} onPress={() => setAddModal(true)} activeOpacity={0.85}>
+          <Ionicons name="add" size={14} color={Colors.text} />
+          <Text style={pageStyles.actionBtnText}>add receipt</Text>
         </TouchableOpacity>
       </View>
 
       {loading ? (
-        <View style={s.center}><ActivityIndicator color="#0ccfcf" /></View>
+        <View style={s.center}><ActivityIndicator color={Colors.cyan} /></View>
       ) : entries.length === 0 ? (
         <View style={s.center}>
-          <Ionicons name="receipt-outline" size={40} color="#e8e8e8" />
-          <Text style={s.emptyText}>no receipts yet</Text>
+          <Ionicons name="receipt-outline" size={40} color={Colors.borderMid} />
+          <Text style={pageStyles.emptyText}>no receipts yet</Text>
           <TouchableOpacity style={s.emptyBtn} onPress={() => setAddModal(true)}>
             <Text style={s.emptyBtnText}>add your first receipt</Text>
           </TouchableOpacity>
@@ -145,27 +148,18 @@ export default function ReceiptsScreen() {
       ) : (
         <ScrollView contentContainerStyle={s.list} showsVerticalScrollIndicator={false}>
           {entries.map(entry => (
-            <TouchableOpacity
-              key={entry.id}
-              style={s.folderCard}
-              activeOpacity={0.85}
-              onPress={() => router.push({ pathname: '/(app)/receipt-detail', params: { receiptId: entry.id } } as any)}
-            >
-              {/* Folder thumbnail */}
+            <TouchableOpacity key={entry.id} style={s.folderCard} activeOpacity={0.85}
+              onPress={() => router.push({ pathname: '/(app)/receipt-detail', params: { receiptId: entry.id } } as any)}>
               {entry.firstPhoto ? (
                 <Image source={{ uri: entry.firstPhoto }} style={s.folderThumb} resizeMode="cover" />
               ) : (
                 <View style={s.folderThumbEmpty}>
-                  <Ionicons name="image-outline" size={22} color="#c0c0c0" />
+                  <Ionicons name="image-outline" size={22} color={Colors.faint} />
                 </View>
               )}
-
-              {/* Info */}
               <View style={s.folderInfo}>
                 <Text style={s.folderDate}>{formatDate(entry.created_at)}</Text>
-                <Text style={s.folderName} numberOfLines={1}>
-                  {entry.note ?? formatDate(entry.created_at)}
-                </Text>
+                <Text style={s.folderName} numberOfLines={1}>{entry.note ?? formatDate(entry.created_at)}</Text>
                 <Text style={s.folderCount}>{entry.photoCount} photo{entry.photoCount !== 1 ? 's' : ''}</Text>
                 {entry.recording ? (
                   <View style={s.linkedBadge}>
@@ -176,8 +170,7 @@ export default function ReceiptsScreen() {
                   <Text style={s.unlinkedText}>no recording linked</Text>
                 )}
               </View>
-
-              <Ionicons name="chevron-forward" size={16} color="#c0c0c0" />
+              <Ionicons name="chevron-forward" size={16} color={Colors.faint} />
             </TouchableOpacity>
           ))}
         </ScrollView>
@@ -186,16 +179,7 @@ export default function ReceiptsScreen() {
       <BottomSheet visible={addModal} onClose={closeAddModal} sub="receipts" title={addStep === 'name' ? 'new receipt' : 'add photos'}>
         {addStep === 'name' ? (
           <>
-            <TextInput
-              style={formStyles.input}
-              placeholder="folder name (optional)"
-              placeholderTextColor="#c0c0c0"
-              value={folderName}
-              onChangeText={setFolderName}
-              autoFocus
-              returnKeyType="done"
-              onSubmitEditing={createEntry}
-            />
+            <TextInput style={formStyles.input} placeholder="folder name (optional)" placeholderTextColor={Colors.faint} value={folderName} onChangeText={setFolderName} autoFocus returnKeyType="done" onSubmitEditing={createEntry} />
             <Text style={formStyles.hintMuted}>leave empty to use current time</Text>
             <View style={formStyles.actions}>
               <TouchableOpacity style={formStyles.cancelBtn} onPress={closeAddModal}>
@@ -208,14 +192,14 @@ export default function ReceiptsScreen() {
           </>
         ) : (
           <>
-            <View style={s.photoButtons}>
-              <TouchableOpacity style={s.photoBtn} onPress={addFromCamera}>
-                <Ionicons name="camera-outline" size={28} color="#0ccfcf" />
-                <Text style={s.photoBtnText}>camera</Text>
+            <View style={accountStyles.photoButtons}>
+              <TouchableOpacity style={accountStyles.photoBtn} onPress={addFromCamera}>
+                <Ionicons name="camera-outline" size={28} color={Colors.cyan} />
+                <Text style={accountStyles.photoBtnText}>camera</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={s.photoBtn} onPress={addFromGallery}>
-                <Ionicons name="images-outline" size={28} color="#425252" />
-                <Text style={[s.photoBtnText, { color: '#425252' }]}>gallery</Text>
+              <TouchableOpacity style={accountStyles.photoBtn} onPress={addFromGallery}>
+                <Ionicons name="images-outline" size={28} color={Colors.text} />
+                <Text style={[accountStyles.photoBtnText, { color: Colors.text }]}>gallery</Text>
               </TouchableOpacity>
             </View>
             <View style={formStyles.actions}>
@@ -231,31 +215,22 @@ export default function ReceiptsScreen() {
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#ffffff' },
-  header: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', paddingHorizontal: 32, paddingTop: 52, paddingBottom: 16 },
-  headerSub: { fontFamily: 'ChillaxMedium', fontSize: 11, color: '#929090' },
-  headerTitle: { fontFamily: 'Avenelle', fontSize: 32, color: '#425252', lineHeight: 36, letterSpacing: -1 },
-  addBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#fafafa', borderRadius: 999, paddingVertical: 8, paddingHorizontal: 14, borderWidth: 1, borderColor: '#e8e8e8' },
-  addBtnText: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#425252' },
+  header: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', paddingHorizontal: Spacing.page, paddingTop: 52, paddingBottom: 16 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
-  emptyText: { fontFamily: 'RobotoMono_400Regular', fontSize: 13, color: '#929090' },
-  emptyBtn: { backgroundColor: '#425252', borderRadius: 999, paddingVertical: 10, paddingHorizontal: 20, marginTop: 8 },
-  emptyBtnText: { fontFamily: 'RobotoMono_700Bold', fontSize: 12, color: '#fff' },
-  list: { paddingHorizontal: 32, paddingBottom: 60, gap: 12 },
-  folderCard: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: '#fafafa', borderRadius: 14, padding: 12, borderWidth: 1, borderColor: '#f0f0f0' },
-  folderThumb: { width: 60, height: 60, borderRadius: 10, flexShrink: 0 },
-  folderThumbEmpty: { width: 60, height: 60, borderRadius: 10, backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
+  emptyBtn: { backgroundColor: Colors.text, borderRadius: Radius.pill, paddingVertical: 10, paddingHorizontal: 20, marginTop: 8 },
+  emptyBtnText: { fontFamily: Fonts.monoBold, fontSize: 12, color: Colors.white },
+  list: { paddingHorizontal: Spacing.page, paddingBottom: 60, gap: 12 },
+  folderCard: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: 12, borderWidth: 1, borderColor: Colors.border },
+  folderThumb: { width: 60, height: 60, borderRadius: Radius.md, flexShrink: 0 },
+  folderThumbEmpty: { width: 60, height: 60, borderRadius: Radius.md, backgroundColor: Colors.border, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
   folderInfo: { flex: 1, gap: 2 },
-  folderDate: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#929090' },
-  folderName: { fontFamily: 'ChillaxMedium', fontSize: 14, color: '#425252' },
-  folderCount: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#c0c0c0' },
+  folderDate: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted },
+  folderName: { fontFamily: Fonts.heading, fontSize: 14, color: Colors.text },
+  folderCount: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.faint },
   linkedBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
   linkedDot: { width: 6, height: 6, borderRadius: 3 },
-  linkedText: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#425252', maxWidth: 140 },
-  unlinkedText: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#c0c0c0', marginTop: 2 },
-  photoButtons: { flexDirection: 'row', gap: 12, marginVertical: 16 },
-  photoBtn: { flex: 1, borderRadius: 14, borderWidth: 1.5, borderColor: '#f0f0f0', borderStyle: 'dashed', paddingVertical: 28, alignItems: 'center', gap: 8, backgroundColor: '#fafafa' },
-  photoBtnText: { fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#0ccfcf' },
+  linkedText: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.text, maxWidth: 140 },
+  unlinkedText: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.faint, marginTop: 2 },
   modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  modalBox: { backgroundColor: '#ffffff', borderRadius: 20, padding: 20, width: 300, gap: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 20, elevation: 10 },
+  modalBox: { backgroundColor: Colors.white, borderRadius: Radius.xl, padding: 20, width: 300, gap: 10 },
 });

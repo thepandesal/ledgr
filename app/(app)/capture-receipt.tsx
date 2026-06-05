@@ -4,6 +4,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '../../src/lib/supabase';
+import pageStyles from '@/components/ui/pageStyles';
+import { Colors, Fonts, Radius } from '@/components/ui/theme';
 import { compressImage, uploadReceiptPhoto } from '../../src/lib/receiptUpload';
 
 const { width } = Dimensions.get('window');
@@ -84,15 +86,15 @@ export default function CaptureReceiptScreen() {
   };
 
   return (
-    <Animated.View style={[styles.container, { transform: [{ translateX: slideAnim }] }]}>
-      <SafeAreaView style={styles.inner}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={handleBack} style={styles.backBtn}>
-            <Ionicons name="arrow-back" size={22} color="#8a8a8a" />
+    <Animated.View style={[pageStyles.container, { transform: [{ translateX: slideAnim }] }]}>
+      <SafeAreaView style={pageStyles.inner}>
+        <View style={s.header}>
+          <TouchableOpacity onPress={handleBack} style={pageStyles.backBtn}>
+            <Ionicons name="arrow-back" size={22} color={Colors.muted} />
           </TouchableOpacity>
           <View>
-            <Text style={styles.headerSub}>receipts</Text>
-            <Text style={styles.headerTitle}>add photos</Text>
+            <Text style={pageStyles.pageLabel}>receipts</Text>
+            <Text style={[pageStyles.pageName, { fontSize: 22, lineHeight: 26 }]}>add photos</Text>
           </View>
         </View>
 
@@ -101,40 +103,35 @@ export default function CaptureReceiptScreen() {
           data={[...photos, 'add']}
           keyExtractor={(_, i) => String(i)}
           numColumns={3}
-          contentContainerStyle={styles.grid}
+          contentContainerStyle={s.grid}
           renderItem={({ item, index }) => {
             if (item === 'add') return (
-              <View style={styles.addPhotoCell}>
-                <TouchableOpacity style={styles.addPhotoBtn} onPress={pickFromCamera}>
-                  <Ionicons name="camera-outline" size={22} color="#0ccfcf" />
-                  <Text style={styles.addPhotoBtnText}>camera</Text>
+              <View style={s.addPhotoCell}>
+                <TouchableOpacity style={s.addPhotoBtn} onPress={pickFromCamera}>
+                  <Ionicons name="camera-outline" size={22} color={Colors.cyan} />
+                  <Text style={s.addPhotoBtnText}>camera</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.addPhotoBtn} onPress={pickFromGallery}>
-                  <Ionicons name="images-outline" size={22} color="#425252" />
-                  <Text style={[styles.addPhotoBtnText, { color: '#425252' }]}>gallery</Text>
+                <TouchableOpacity style={s.addPhotoBtn} onPress={pickFromGallery}>
+                  <Ionicons name="images-outline" size={22} color={Colors.text} />
+                  <Text style={[s.addPhotoBtnText, { color: Colors.text }]}>gallery</Text>
                 </TouchableOpacity>
               </View>
             );
             return (
-              <View style={styles.photoCell}>
-                <Image source={{ uri: item }} style={styles.photoThumb} resizeMode="cover" />
-                <TouchableOpacity style={styles.photoRemove} onPress={() => removePhoto(index)}>
-                  <Ionicons name="close-circle" size={20} color="#ed6a6a" />
+              <View style={s.photoCell}>
+                <Image source={{ uri: item }} style={s.photoThumb} resizeMode="cover" />
+                <TouchableOpacity style={s.photoRemove} onPress={() => removePhoto(index)}>
+                  <Ionicons name="close-circle" size={20} color={Colors.danger} />
                 </TouchableOpacity>
               </View>
             );
           }}
         />
-
         {photos.length > 0 && (
-          <View style={styles.footer}>
-            <Text style={styles.footerCount}>{photos.length} photo{photos.length > 1 ? 's' : ''}</Text>
-            <TouchableOpacity
-              style={[styles.saveBtn, saving && { opacity: 0.6 }]}
-              onPress={save}
-              disabled={saving}
-            >
-              <Text style={styles.saveBtnText}>{saving ? 'saving...' : 'save receipt'}</Text>
+          <View style={s.footer}>
+            <Text style={s.footerCount}>{photos.length} photo{photos.length > 1 ? 's' : ''}</Text>
+            <TouchableOpacity style={[s.saveBtn, saving && { opacity: 0.6 }]} onPress={save} disabled={saving}>
+              <Text style={s.saveBtnText}>{saving ? 'saving...' : 'save receipt'}</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -145,24 +142,19 @@ export default function CaptureReceiptScreen() {
 
 const CELL = (width - 48) / 3;
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#ffffff', position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
-  inner: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 28, paddingTop: 14, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
-  backBtn: { padding: 2 },
-  headerSub: { fontFamily: 'ChillaxMedium', fontSize: 10, color: '#929090' },
-  headerTitle: { fontFamily: 'Avenelle', fontSize: 22, color: '#425252', letterSpacing: -0.5, lineHeight: 26 },
+const s = StyleSheet.create({
+  header: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 28, paddingTop: 14, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: Colors.border },
   grid: { padding: 16, gap: 8 },
-  photoCell: { width: CELL, height: CELL, marginRight: 8, marginBottom: 8, borderRadius: 12, overflow: 'hidden' },
+  photoCell: { width: CELL, height: CELL, marginRight: 8, marginBottom: 8, borderRadius: Radius.lg, overflow: 'hidden' },
   photoThumb: { width: '100%', height: '100%' },
   photoRemove: { position: 'absolute', top: 4, right: 4 },
   addPhotoCell: { width: CELL * 2 + 8, height: CELL, marginBottom: 8, flexDirection: 'row', gap: 8 },
-  addPhotoBtn: { flex: 1, height: '100%', borderRadius: 12, borderWidth: 1.5, borderColor: '#f0f0f0', borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center', gap: 6, backgroundColor: '#fafafa' },
-  addPhotoBtnText: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#0ccfcf' },
-  footer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 28, paddingVertical: 16, borderTopWidth: 1, borderTopColor: '#f0f0f0' },
-  footerCount: { fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#929090' },
-  saveBtn: { backgroundColor: '#425252', borderRadius: 999, paddingVertical: 12, paddingHorizontal: 24 },
-  saveBtnText: { fontFamily: 'RobotoMono_700Bold', fontSize: 13, color: '#fff' },
+  addPhotoBtn: { flex: 1, height: '100%', borderRadius: Radius.lg, borderWidth: 1.5, borderColor: Colors.border, borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center', gap: 6, backgroundColor: Colors.surface },
+  addPhotoBtnText: { fontFamily: Fonts.mono, fontSize: 11, color: Colors.cyan },
+  footer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 28, paddingVertical: 16, borderTopWidth: 1, borderTopColor: Colors.border },
+  footerCount: { fontFamily: Fonts.mono, fontSize: 12, color: Colors.muted },
+  saveBtn: { backgroundColor: Colors.text, borderRadius: Radius.pill, paddingVertical: 12, paddingHorizontal: 24 },
+  saveBtnText: { fontFamily: Fonts.monoBold, fontSize: 13, color: Colors.white },
 });
 
 

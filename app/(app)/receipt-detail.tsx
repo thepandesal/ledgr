@@ -10,6 +10,9 @@ import { BlurView } from 'expo-blur';
 import * as ImagePicker from 'expo-image-picker';
 import BottomSheet from '@/components/ui/BottomSheet';
 import formStyles from '@/components/ui/formStyles';
+import pageStyles from '@/components/ui/pageStyles';
+import accountStyles from '@/components/ui/accountStyles';
+import { Colors, Fonts, Radius, Spacing } from '@/components/ui/theme';
 import { compressImage, uploadReceiptPhoto } from '../../src/lib/receiptUpload';
 
 const { width: SW, height: SH } = Dimensions.get('window');
@@ -156,53 +159,53 @@ export default function ReceiptDetailScreen() {
     : linkRecordings;
 
   const formatDate = (d: string) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  const typeColor = (type: string) => type === 'expense' ? '#ed6a6a' : type === 'income' ? '#2ab671' : '#425252';
+  const typeColor = (type: string) => type === 'expense' ? Colors.expense : type === 'income' ? Colors.income : Colors.text;
 
   if (loading) return (
-    <Animated.View style={[s.container, { transform: [{ translateX: slideAnim }] }]}>
+    <Animated.View style={[pageStyles.container, { transform: [{ translateX: slideAnim }] }]}>
       <SafeAreaView style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator color="#0ccfcf" />
+        <ActivityIndicator color={Colors.cyan} />
       </SafeAreaView>
     </Animated.View>
   );
 
   return (
-    <Animated.View style={[s.container, { transform: [{ translateX: slideAnim }] }]}>
-      <SafeAreaView style={s.inner}>
+    <Animated.View style={[pageStyles.container, { transform: [{ translateX: slideAnim }] }]}>
+      <SafeAreaView style={pageStyles.inner}>
 
-        <TouchableOpacity onPress={handleBack} style={s.backBtn}>
-          <Ionicons name="arrow-back" size={22} color="#8a8a8a" />
+        <TouchableOpacity onPress={handleBack} style={pageStyles.backBtn}>
+          <Ionicons name="arrow-back" size={22} color={Colors.muted} />
         </TouchableOpacity>
 
-        <View style={s.titleBlock}>
-          <Text style={s.pageLabel}>receipts</Text>
+        <View style={[pageStyles.titleBlock, { paddingHorizontal: Spacing.page }]}>
+          <Text style={pageStyles.pageLabel}>receipts</Text>
           <View style={s.titleRow}>
             <TouchableOpacity style={s.titleNameBtn} onPress={() => { setRenameVal(entry?.note ?? ''); setRenameModal(true); }}>
-              <Text style={s.pageName} numberOfLines={1}>{(entry?.note ?? 'untitled').toLowerCase()}</Text>
-              <Ionicons name="pencil-outline" size={12} color="#c0c0c0" />
+              <Text style={pageStyles.pageName} numberOfLines={1}>{(entry?.note ?? 'untitled').toLowerCase()}</Text>
+              <Ionicons name="pencil-outline" size={12} color={Colors.faint} />
             </TouchableOpacity>
             <Text style={s.pageDate}>{formatDate(entry?.created_at ?? '')}</Text>
           </View>
         </View>
 
-        <View style={s.actionRow}>
-          <TouchableOpacity style={s.actionBtn} onPress={addFromCamera}>
-            <Ionicons name="camera-outline" size={15} color="#425252" />
-            <Text style={s.actionBtnText}>camera</Text>
+        <View style={[pageStyles.actionRow, { marginHorizontal: Spacing.page }]}>
+          <TouchableOpacity style={pageStyles.actionBtn} onPress={addFromCamera}>
+            <Ionicons name="camera-outline" size={15} color={Colors.text} />
+            <Text style={pageStyles.actionBtnText}>camera</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={s.actionBtn} onPress={addFromGallery}>
-            <Ionicons name="images-outline" size={15} color="#425252" />
-            <Text style={s.actionBtnText}>photos</Text>
+          <TouchableOpacity style={pageStyles.actionBtn} onPress={addFromGallery}>
+            <Ionicons name="images-outline" size={15} color={Colors.text} />
+            <Text style={pageStyles.actionBtnText}>photos</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[s.actionBtn, s.actionBtnDanger]} onPress={deleteEntry}>
-            <Ionicons name="trash-outline" size={15} color="#ed6a6a" />
-            <Text style={[s.actionBtnText, { color: '#ed6a6a' }]}>delete</Text>
+          <TouchableOpacity style={[pageStyles.actionBtn, pageStyles.actionBtnDanger]} onPress={deleteEntry}>
+            <Ionicons name="trash-outline" size={15} color={Colors.danger} />
+            <Text style={[pageStyles.actionBtnText, { color: Colors.danger }]}>delete</Text>
           </TouchableOpacity>
         </View>
 
-        <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={pageStyles.scroll} showsVerticalScrollIndicator={false}>
 
-          <Text style={s.sectionHeader}>photos</Text>
+          <Text style={pageStyles.sectionHeader}>photos</Text>
 
           {photos.length > 0 ? (
             <View style={s.grid}>
@@ -210,19 +213,19 @@ export default function ReceiptDetailScreen() {
                 <TouchableOpacity key={p.id} onPress={() => setCarouselIdx(i)} activeOpacity={0.85} style={s.cell}>
                   <Image source={{ uri: p.url }} style={s.cellImg} resizeMode="cover" />
                   <TouchableOpacity style={s.cellDelete} onPress={() => deletePhoto(p)}>
-                    <Ionicons name="close-circle" size={18} color="#ed6a6a" />
+                    <Ionicons name="close-circle" size={18} color={Colors.danger} />
                   </TouchableOpacity>
                 </TouchableOpacity>
               ))}
             </View>
           ) : (
-            <View style={s.emptyGrid}>
-              <Ionicons name="images-outline" size={32} color="#e8e8e8" />
-              <Text style={s.emptyText}>no photos yet</Text>
+            <View style={[pageStyles.emptyBox, { borderWidth: 0, backgroundColor: 'transparent', marginBottom: 24 }]}>
+              <Ionicons name="images-outline" size={32} color={Colors.borderMid} />
+              <Text style={pageStyles.emptyText}>no photos yet</Text>
             </View>
           )}
 
-          <Text style={s.sectionHeader}>recording</Text>
+          <Text style={pageStyles.sectionHeader}>recording</Text>
 
           {entry?.recording_id ? (
             <View style={s.linkedCard}>
@@ -233,17 +236,17 @@ export default function ReceiptDetailScreen() {
                 </TouchableOpacity>
               </View>
               <TouchableOpacity onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: entry.recording_id } } as any)}>
-                <Ionicons name="arrow-forward" size={16} color="#c0c0c0" />
+                <Ionicons name="arrow-forward" size={16} color={Colors.faint} />
               </TouchableOpacity>
             </View>
           ) : (
             <View style={s.recordingActions}>
               <TouchableOpacity style={s.makeRecordingBtn} onPress={() => router.push({ pathname: '/(app)/add-recording', params: { from: 'receipt', receiptId, defaultDate: new Date().toISOString().split('T')[0] } } as any)} activeOpacity={0.85}>
-                <Ionicons name="add-circle-outline" size={16} color="#fff" />
+                <Ionicons name="add-circle-outline" size={16} color={Colors.white} />
                 <Text style={s.makeRecordingText}>make a recording</Text>
               </TouchableOpacity>
               <TouchableOpacity style={s.linkBtn} onPress={openLinkModal} activeOpacity={0.85}>
-                <Ionicons name="link-outline" size={16} color="#425252" />
+                <Ionicons name="link-outline" size={16} color={Colors.text} />
                 <Text style={s.linkBtnText}>link existing recording</Text>
               </TouchableOpacity>
             </View>
@@ -258,27 +261,23 @@ export default function ReceiptDetailScreen() {
           <SafeAreaView style={{ flex: 1 }}>
             <View style={s.carouselHeader}>
               <TouchableOpacity onPress={() => setCarouselIdx(null)} style={s.carouselBtn}>
-                <Ionicons name="close" size={22} color="#425252" />
+                <Ionicons name="close" size={22} color={Colors.text} />
               </TouchableOpacity>
               <Text style={s.carouselCount}>{(carouselIdx ?? 0) + 1} / {photos.length}</Text>
               <TouchableOpacity onPress={() => deletePhoto(photos[carouselIdx ?? 0])} style={s.carouselBtn}>
-                <Ionicons name="trash-outline" size={18} color="#ed6a6a" />
+                <Ionicons name="trash-outline" size={18} color={Colors.danger} />
               </TouchableOpacity>
             </View>
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-              <Image
-                source={{ uri: photos[carouselIdx ?? 0]?.url ?? '' }}
-                style={{ width: SW - 32, height: SH * 0.55, borderRadius: 16 }}
-                resizeMode="contain"
-              />
+              <Image source={{ uri: photos[carouselIdx ?? 0]?.url ?? '' }} style={{ width: SW - 32, height: SH * 0.55, borderRadius: 16 }} resizeMode="contain" />
               {(carouselIdx ?? 0) > 0 && (
                 <TouchableOpacity style={s.arrowLeft} onPress={() => setCarouselIdx(prev => (prev ?? 1) - 1)}>
-                  <Ionicons name="chevron-back" size={28} color="#425252" />
+                  <Ionicons name="chevron-back" size={28} color={Colors.text} />
                 </TouchableOpacity>
               )}
               {(carouselIdx ?? 0) < photos.length - 1 && (
                 <TouchableOpacity style={s.arrowRight} onPress={() => setCarouselIdx(prev => (prev ?? 0) + 1)}>
-                  <Ionicons name="chevron-forward" size={28} color="#425252" />
+                  <Ionicons name="chevron-forward" size={28} color={Colors.text} />
                 </TouchableOpacity>
               )}
             </View>
@@ -297,27 +296,27 @@ export default function ReceiptDetailScreen() {
 
       {/* Link modal */}
       <BottomSheet visible={linkModal} onClose={() => setLinkModal(false)} sub="receipt" title="link to recording">
-        <TextInput style={formStyles.searchInput} placeholder="search by name..." placeholderTextColor="#c0c0c0" value={linkSearch} onChangeText={setLinkSearch} />
+        <TextInput style={formStyles.searchInput} placeholder="search by name..." placeholderTextColor={Colors.faint} value={linkSearch} onChangeText={setLinkSearch} />
         <View style={s.linkDateRow}>
           <TouchableOpacity onPress={() => changeDate(-1)} style={s.carouselBtn}>
-            <Ionicons name="chevron-back" size={18} color="#929090" />
+            <Ionicons name="chevron-back" size={18} color={Colors.muted} />
           </TouchableOpacity>
           <Text style={s.linkDateText}>{new Date(linkDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</Text>
           <TouchableOpacity onPress={() => changeDate(1)} style={s.carouselBtn}>
-            <Ionicons name="chevron-forward" size={18} color="#929090" />
+            <Ionicons name="chevron-forward" size={18} color={Colors.muted} />
           </TouchableOpacity>
         </View>
         {filteredRecordings.length === 0 ? (
           <Text style={formStyles.listEmpty}>no recordings on this date</Text>
         ) : (
           filteredRecordings.map((rec: any) => (
-            <TouchableOpacity key={rec.id} style={s.linkRecItem} onPress={() => linkToRecording(rec)}>
+            <TouchableOpacity key={rec.id} style={formStyles.listItem} onPress={() => linkToRecording(rec)}>
               <View style={[s.linkTypeDot, { backgroundColor: typeColor(rec.type) }]} />
               <View style={{ flex: 1 }}>
-                <Text style={s.linkRecName} numberOfLines={1}>{rec.name.toLowerCase()}</Text>
-                <Text style={s.linkRecMeta}>{rec.type} · {Number(rec.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+                <Text style={formStyles.listItemText} numberOfLines={1}>{rec.name.toLowerCase()}</Text>
+                <Text style={formStyles.listItemSub}>{rec.type} · {Number(rec.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
               </View>
-              <Ionicons name="link-outline" size={14} color="#0ccfcf" />
+              <Ionicons name="link-outline" size={14} color={Colors.cyan} />
             </TouchableOpacity>
           ))
         )}
@@ -354,48 +353,36 @@ export default function ReceiptDetailScreen() {
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#ffffff', position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
-  inner: { flex: 1 },
-  backBtn: { paddingHorizontal: 28, paddingTop: 14, paddingBottom: 4 },
-  titleBlock: { paddingHorizontal: 32, marginBottom: 16 },
-  pageLabel: { fontFamily: 'ChillaxMedium', fontSize: 11, color: '#929090', marginBottom: 2 },
+  // Title row
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   titleNameBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 },
-  pageName: { fontFamily: 'Avenelle', fontSize: 26, color: '#425252', letterSpacing: -0.5, lineHeight: 30, flex: 1 },
-  pageDate: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#929090' },
-  actionRow: { flexDirection: 'row', gap: 8, marginHorizontal: 32, marginBottom: 20 },
-  actionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 10, borderRadius: 999, borderWidth: 1, borderColor: '#e8e8e8', backgroundColor: '#fafafa' },
-  actionBtnDanger: { borderColor: '#fde8e8', backgroundColor: '#fff8f8' },
-  actionBtnText: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#425252' },
-  scroll: { paddingHorizontal: 32, paddingBottom: 60 },
-  sectionHeader: { fontFamily: 'ChillaxMedium', fontSize: 14, color: '#0ccfcf', letterSpacing: -0.3, marginBottom: 12, marginTop: 4 },
+  pageDate: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted },
+  // Photo grid
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GAP, marginBottom: 24 },
-  cell: { width: CELL, height: CELL, borderRadius: 8, overflow: 'hidden', backgroundColor: '#f5f5f5' },
+  cell: { width: CELL, height: CELL, borderRadius: Radius.sm, overflow: 'hidden', backgroundColor: Colors.input },
   cellImg: { width: '100%', height: '100%' },
   cellDelete: { position: 'absolute', top: 3, right: 3 },
-  emptyGrid: { alignItems: 'center', paddingVertical: 32, gap: 8, marginBottom: 24 },
-  emptyText: { fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#c0c0c0' },
-  linkedCard: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#fafafa', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: '#f0f0f0', marginBottom: 16 },
-  linkedName: { fontFamily: 'Avenelle', fontSize: 16, color: '#425252', letterSpacing: -0.5 },
-  unlinkText: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#ed6a6a', marginTop: 3 },
+  // Linked recording card
+  linkedCard: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: Colors.surface, borderRadius: Radius.md, padding: 14, borderWidth: 1, borderColor: Colors.border, marginBottom: 16 },
+  linkedName: { fontFamily: Fonts.display, fontSize: 16, color: Colors.text, letterSpacing: -0.5 },
+  unlinkText: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.danger, marginTop: 3 },
   recordingActions: { gap: 10, marginBottom: 16 },
-  makeRecordingBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#425252', borderRadius: 999, paddingVertical: 13 },
-  makeRecordingText: { fontFamily: 'RobotoMono_700Bold', fontSize: 13, color: '#fff' },
-  linkBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#fafafa', borderRadius: 999, paddingVertical: 13, borderWidth: 1, borderColor: '#e8e8e8' },
-  linkBtnText: { fontFamily: 'RobotoMono_700Bold', fontSize: 13, color: '#425252' },
+  makeRecordingBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: Colors.text, borderRadius: Radius.pill, paddingVertical: 13 },
+  makeRecordingText: { fontFamily: Fonts.monoBold, fontSize: 13, color: Colors.white },
+  linkBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: Colors.surface, borderRadius: Radius.pill, paddingVertical: 13, borderWidth: 1, borderColor: Colors.borderMid },
+  linkBtnText: { fontFamily: Fonts.monoBold, fontSize: 13, color: Colors.text },
+  // Carousel
   carouselHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 12 },
   carouselBtn: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
-  carouselCount: { fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#425252' },
-  arrowLeft: { position: 'absolute', left: 8, backgroundColor: 'rgba(255,255,255,0.85)', borderRadius: 999, width: 44, height: 44, justifyContent: 'center', alignItems: 'center' },
-  arrowRight: { position: 'absolute', right: 8, backgroundColor: 'rgba(255,255,255,0.85)', borderRadius: 999, width: 44, height: 44, justifyContent: 'center', alignItems: 'center' },
+  carouselCount: { fontFamily: Fonts.mono, fontSize: 12, color: Colors.text },
+  arrowLeft: { position: 'absolute', left: 8, backgroundColor: 'rgba(255,255,255,0.85)', borderRadius: Radius.pill, width: 44, height: 44, justifyContent: 'center', alignItems: 'center' },
+  arrowRight: { position: 'absolute', right: 8, backgroundColor: 'rgba(255,255,255,0.85)', borderRadius: Radius.pill, width: 44, height: 44, justifyContent: 'center', alignItems: 'center' },
   thumbStrip: { paddingHorizontal: 16, paddingVertical: 12, gap: 8, alignItems: 'center' },
-  thumbItem: { width: 56, height: 56, borderRadius: 8, overflow: 'hidden', borderWidth: 2, borderColor: 'transparent' },
-  thumbItemActive: { borderColor: '#0ccfcf' },
+  thumbItem: { width: 56, height: 56, borderRadius: Radius.sm, overflow: 'hidden', borderWidth: 2, borderColor: 'transparent' },
+  thumbItemActive: { borderColor: Colors.cyan },
   thumbImg: { width: '100%', height: '100%' },
+  // Link modal
   linkDateRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', paddingVertical: 4 },
-  linkDateText: { fontFamily: 'Avenelle', fontSize: 15, color: '#425252' },
-  linkRecItem: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
+  linkDateText: { fontFamily: Fonts.display, fontSize: 15, color: Colors.text },
   linkTypeDot: { width: 8, height: 8, borderRadius: 4, flexShrink: 0 },
-  linkRecName: { fontFamily: 'RobotoMono_700Bold', fontSize: 12, color: '#425252' },
-  linkRecMeta: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#929090', marginTop: 2 },
 });
