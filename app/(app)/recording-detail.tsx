@@ -1473,10 +1473,12 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
       {/* Pay modal */}
       <Modal visible={payModal} transparent animationType="slide" onRequestClose={() => setPayModal(false)}>
         <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}>
-          <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setPayModal(false)}>
-            <TouchableOpacity activeOpacity={1} onPress={e => e.stopPropagation()}>
-              <View style={[styles.modalBox, { width: 320 }]}>
-                <Text style={styles.modalTitle}>pay bill</Text>
+          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setPayModal(false)} />
+          <View style={styles.sheet}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+              <View><Text style={styles.sheetSub}>payable</Text><Text style={styles.sheetTitle}>pay bill</Text></View>
+              <TouchableOpacity onPress={() => setPayModal(false)}><Ionicons name="close" size={22} color="#929090" /></TouchableOpacity>
+            </View>
                 <Text style={styles.subitemRemaining}>
                   {(recording?.name ?? '').toLowerCase()} · {Number(recording?.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                 </Text>
@@ -1593,8 +1595,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                   </TouchableOpacity>
                 </View>
               </View>
-            </TouchableOpacity>
-          </TouchableOpacity>
+          </View>
         </BlurView>
       </Modal>
 
@@ -1678,10 +1679,12 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
       {/* Collect modal */}
       <Modal visible={collectModal} transparent animationType="slide" onRequestClose={() => setCollectModal(false)}>
         <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}>
-          <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setCollectModal(false)}>
-            <TouchableOpacity activeOpacity={1} onPress={e => e.stopPropagation()}>
-              <View style={[styles.modalBox, { width: 320 }]}>
-                <Text style={styles.modalTitle}>collect payment</Text>
+          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setCollectModal(false)} />
+          <View style={styles.sheet}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+              <View><Text style={styles.sheetSub}>receivable</Text><Text style={styles.sheetTitle}>collect payment</Text></View>
+              <TouchableOpacity onPress={() => setCollectModal(false)}><Ionicons name="close" size={22} color="#929090" /></TouchableOpacity>
+            </View>
                 <Text style={styles.subitemRemaining}>
                   {(recording?.name ?? '').toLowerCase()} · {Number(recording?.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                 </Text>
@@ -1747,8 +1750,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                   </TouchableOpacity>
                 </View>
               </View>
-            </TouchableOpacity>
-          </TouchableOpacity>
+          </View>
         </BlurView>
       </Modal>
 
