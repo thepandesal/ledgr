@@ -1214,7 +1214,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                 <Ionicons name="close" size={22} color="#929090" />
               </TouchableOpacity>
             </View>
-            <ScrollView style={{ width: '100%', maxHeight: 260 }} showsVerticalScrollIndicator={false}>
+            <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 16 }}>
               {people.map((p, i) => (
                 <View key={i}>
                   <View style={styles.personRow}>
@@ -1863,7 +1863,7 @@ const styles = StyleSheet.create({
   tooltipText: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#fff' },
   modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   modalBox: { backgroundColor: '#ffffff', borderRadius: 20, padding: 20, width: 300, gap: 12, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 20, elevation: 10 },
-  sheet: { backgroundColor: '#ffffff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 48, maxHeight: '85%' },
+  sheet: { backgroundColor: '#ffffff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 0, height: '90%' },
   sheetTitle: { fontFamily: 'Avenelle', fontSize: 26, color: '#425252', letterSpacing: -0.5, lineHeight: 30, marginBottom: 4 },
   sheetSub: { fontFamily: 'ChillaxMedium', fontSize: 11, color: '#929090', marginBottom: 0 },
   modalTitle: { fontFamily: 'ChillaxMedium', fontSize: 16, color: '#425252', alignSelf: 'flex-start' },

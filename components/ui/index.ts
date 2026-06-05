@@ -13,4 +13,5 @@ export { default as SearchableList } from './SearchableList';
 export { default as FormActions } from './FormActions';
 export { default as MonthPicker } from './MonthPicker';
 export { default as InfoRow } from './InfoRow';
+export { default as formStyles } from './formStyles';
 export * from './theme';
