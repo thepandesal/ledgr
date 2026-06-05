@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Image, TouchableOpacity, Modal, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Image, TouchableOpacity, Modal, Platform, TextInput } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../src/lib/supabase';
@@ -18,20 +18,19 @@ export default function SplitSharePage() {
   const [receiptModal, setReceiptModal] = useState(false);
   const [receiptLoading, setReceiptLoading] = useState(false);
   const [qrModal, setQrModal] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [showUrlBar, setShowUrlBar] = useState(false);
 
   const shareUrl = typeof window !== 'undefined' ? window.location.href : `https://ledgr-six.vercel.app/split/${id}`;
 
   const handleShare = async () => {
     if (typeof navigator !== 'undefined' && navigator.share) {
-      try { await navigator.share({ title: 'split bill', url: shareUrl }); } catch (_) {}
-    } else if (typeof navigator !== 'undefined' && navigator.clipboard) {
-      await navigator.clipboard.writeText(shareUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2500);
-    } else if (typeof window !== 'undefined') {
-      window.prompt('Copy the link:', shareUrl);
+      try {
+        await navigator.share({ title: 'split bill', url: shareUrl });
+        return;
+      } catch (_) {}
     }
+    // Fallback: show the URL in a selectable input so user can copy via native menu
+    setShowUrlBar(true);
   };
 
   useEffect(() => {
@@ -133,10 +132,26 @@ export default function SplitSharePage() {
         <Text style={s.recDate}>{formattedDate}</Text>
 
         {/* Share button */}
-        <TouchableOpacity style={s.shareBtn} onPress={handleShare} activeOpacity={0.8}>
-          <Ionicons name={copied ? 'checkmark' : 'share-outline'} size={15} color="#0ccfcf" />
-          <Text style={s.shareBtnText}>{copied ? 'link copied!' : 'share this bill'}</Text>
-        </TouchableOpacity>
+        {showUrlBar ? (
+          <View style={s.urlBar}>
+            <TextInput
+              style={s.urlInput}
+              value={shareUrl}
+              editable
+              selectTextOnFocus
+              autoFocus
+              caretHidden={false}
+            />
+            <TouchableOpacity onPress={() => setShowUrlBar(false)} style={{ padding: 6 }}>
+              <Ionicons name="close" size={16} color="#929090" />
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <TouchableOpacity style={s.shareBtn} onPress={handleShare} activeOpacity={0.8}>
+            <Ionicons name="share-outline" size={15} color="#0ccfcf" />
+            <Text style={s.shareBtnText}>share this bill</Text>
+          </TouchableOpacity>
+        )}
 
         {/* Per Person Pay */}
         {perPerson.length > 0 && <>
@@ -328,4 +343,6 @@ const s = StyleSheet.create({
   footer: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#c0c0c0', textAlign: 'center', marginTop: 24 },
   shareBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 999, paddingVertical: 10, paddingHorizontal: 20, borderWidth: 1, borderColor: '#0ccfcf', backgroundColor: '#f0fffe', marginBottom: 28 },
   shareBtnText: { fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#0ccfcf' },
+  urlBar: { flexDirection: 'row', alignItems: 'center', borderRadius: 10, borderWidth: 1, borderColor: '#0ccfcf', backgroundColor: '#f0fffe', paddingHorizontal: 12, marginBottom: 28, gap: 8 },
+  urlInput: { flex: 1, fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#425252', paddingVertical: 10 },
 });
