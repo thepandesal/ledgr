@@ -567,17 +567,14 @@ export default function RecordingDetailScreen() {
       const { data: accs } = await supabase.from('accounts').select().eq('user_id', user.id).order('account_name');
       if (accs) setShareAccounts(accs);
     }
-    // Pre-build share row and load previously selected accounts
-    if (!shareRowId) {
-      const { data: existing } = await supabase.from('split_shares').select('id, data').eq('recording_id', recordingId).maybeSingle();
-      if (existing?.id) {
-        setShareRowId(existing.id);
-        const savedIds: string[] = existing.data?.account_ids ?? [];
-        setShareSelectedAccountIds(savedIds);
-      } else {
-        const { data: inserted } = await supabase.from('split_shares').insert({ recording_id: recordingId, data: {} }).select('id').single();
-        if (inserted?.id) setShareRowId(inserted.id);
-      }
+    // Always load the share row and previously selected accounts
+    const { data: existing } = await supabase.from('split_shares').select('id, data').eq('recording_id', recordingId).maybeSingle();
+    if (existing?.id) {
+      setShareRowId(existing.id);
+      setShareSelectedAccountIds(existing.data?.account_ids ?? []);
+    } else {
+      const { data: inserted } = await supabase.from('split_shares').insert({ recording_id: recordingId, data: {} }).select('id').single();
+      if (inserted?.id) { setShareRowId(inserted.id); setShareSelectedAccountIds([]); }
     }
   };
 
@@ -1252,51 +1249,53 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                           <View style={itemStyles.itemCard}>
                             <Text style={itemStyles.itemNumber}>{idx + 1}</Text>
                             <View style={itemStyles.itemMiddle}>
-                              <Text style={itemStyles.itemName} numberOfLines={1}>{truncate(item.name, MAX_ITEM_NAME)}</Text>
-                              {editingItemCost?.id === item.id ? (
-                                <TextInput
-                                  style={[itemStyles.itemCost, { borderBottomWidth: 1, borderBottomColor: Colors.cyan, minWidth: 60 }]}
-                                  value={editingItemCost.value}
-                                  onChangeText={v => setEditingItemCost({ id: item.id, value: v })}
-                                  keyboardType="decimal-pad"
-                                  autoFocus
-                                  onBlur={() => updateItemCost(item.id, parseFloat(editingItemCost.value))}
-                                  onSubmitEditing={() => updateItemCost(item.id, parseFloat(editingItemCost.value))}
-                                />
-                              ) : (
-                                <TouchableOpacity onPress={() => setEditingItemCost({ id: item.id, value: String(item.cost) })}>
-                                  <Text style={[itemStyles.itemCost, { textDecorationLine: 'underline', textDecorationStyle: 'dotted', textDecorationColor: Colors.faint }]}>
-                                    {item.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                                  </Text>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                <Text style={[itemStyles.itemName, { flex: 1 }]} numberOfLines={1}>{truncate(item.name, MAX_ITEM_NAME)}</Text>
+                                {editingItemCost?.id === item.id ? (
+                                  <TextInput
+                                    style={[itemStyles.itemCost, { borderBottomWidth: 1, borderBottomColor: Colors.cyan, minWidth: 60, flexShrink: 0 }]}
+                                    value={editingItemCost.value}
+                                    onChangeText={v => setEditingItemCost({ id: item.id, value: v })}
+                                    keyboardType="decimal-pad"
+                                    autoFocus
+                                    onBlur={() => updateItemCost(item.id, parseFloat(editingItemCost.value))}
+                                    onSubmitEditing={() => updateItemCost(item.id, parseFloat(editingItemCost.value))}
+                                  />
+                                ) : (
+                                  <TouchableOpacity onPress={() => setEditingItemCost({ id: item.id, value: String(item.cost) })}>
+                                    <Text style={[itemStyles.itemCost, { textDecorationLine: 'underline', textDecorationStyle: 'dotted', textDecorationColor: Colors.faint }]}>
+                                      {item.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                    </Text>
+                                  </TouchableOpacity>
+                                )}
+                                <TouchableOpacity style={[itemStyles.addSubitemBtn, isSplitLocked && { opacity: 0.3 }]} onPress={() => !isSplitLocked && openEditSubitems(item)}>
+                                  <Ionicons name="add" size={13} color={Colors.cyan} />
+                                  <Text style={itemStyles.addSubitemBtnText}>subitem</Text>
                                 </TouchableOpacity>
+                                <TouchableOpacity onPress={() => deleteItem(item.id)} style={itemStyles.itemDelete}>
+                                  <Ionicons name="close" size={14} color={Colors.faint} />
+                                </TouchableOpacity>
+                              </View>
+                              {item.subitems.length === 0 && item.people.length > 0 && (
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                                  <View style={itemStyles.peopleRow}>
+                                    {(item.people ?? []).slice(0, 3).map((p, pi) => (
+                                      <TouchableOpacity key={pi} style={itemStyles.personCircle} onPress={() => setTooltip(tooltip?.name === p ? null : { name: p })}>
+                                        <Text style={itemStyles.personCircleLetter}>{p[0]?.toUpperCase()}</Text>
+                                      </TouchableOpacity>
+                                    ))}
+                                    {(item.people?.length ?? 0) > 3 && (
+                                      <View style={itemStyles.personCircleExtra}>
+                                        <Text style={itemStyles.personCircleLetter}>+{item.people.length - 3}</Text>
+                                      </View>
+                                    )}
+                                  </View>
+                                  <Text style={itemStyles.itemSplit}>
+                                    {item.people.length} {item.people.length === 1 ? 'person' : 'people'}, {(item.cost / item.people.length).toLocaleString('en-US', { minimumFractionDigits: 2 })} each
+                                  </Text>
+                                </View>
                               )}
                             </View>
-                            {item.subitems.length === 0 && item.people.length > 0 && (
-                              <View style={itemStyles.itemRight}>
-                                <View style={itemStyles.peopleRow}>
-                                  {(item.people ?? []).slice(0, 3).map((p, pi) => (
-                                    <TouchableOpacity key={pi} style={itemStyles.personCircle} onPress={() => setTooltip(tooltip?.name === p ? null : { name: p })}>
-                                      <Text style={itemStyles.personCircleLetter}>{p[0]?.toUpperCase()}</Text>
-                                    </TouchableOpacity>
-                                  ))}
-                                  {(item.people?.length ?? 0) > 3 && (
-                                    <View style={itemStyles.personCircleExtra}>
-                                      <Text style={itemStyles.personCircleLetter}>+{item.people.length - 3}</Text>
-                                    </View>
-                                  )}
-                                </View>
-                                <Text style={itemStyles.itemSplit}>
-                                  {item.people.length} {item.people.length === 1 ? 'person' : 'people'}, {(item.cost / item.people.length).toLocaleString('en-US', { minimumFractionDigits: 2 })} each
-                                </Text>
-                              </View>
-                            )}
-                            <TouchableOpacity style={[itemStyles.addSubitemBtn, isSplitLocked && { opacity: 0.3 }]} onPress={() => !isSplitLocked && openEditSubitems(item)}>
-                              <Ionicons name="add" size={13} color={Colors.cyan} />
-                              <Text style={itemStyles.addSubitemBtnText}>subitem</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity onPress={() => deleteItem(item.id)} style={itemStyles.itemDelete}>
-                              <Ionicons name="close" size={14} color={Colors.faint} />
-                            </TouchableOpacity>
                           </View>
                           {item.subitems.map(sub => {
                             const perPerson = sub.people.length > 0 ? sub.cost / sub.people.length : 0;
@@ -1304,29 +1303,33 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                               <View key={sub.id} style={itemStyles.subitemCard}>
                                 <Text style={itemStyles.subitemArrow}>↳</Text>
                                 <View style={itemStyles.itemMiddle}>
-                                  <Text style={itemStyles.subitemName} numberOfLines={1}>{truncate(sub.name, MAX_ITEM_NAME)}</Text>
-                                  <Text style={itemStyles.subitemCost}>{sub.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
-                                </View>
-                                <View style={itemStyles.itemRight}>
-                                  <View style={itemStyles.peopleRow}>
-                                    {(sub.people ?? []).slice(0, 3).map((p, pi) => (
-                                      <TouchableOpacity key={pi} style={itemStyles.personCircle} onPress={() => setTooltip(tooltip?.name === p ? null : { name: p })}>
-                                        <Text style={itemStyles.personCircleLetter}>{p[0]?.toUpperCase()}</Text>
-                                      </TouchableOpacity>
-                                    ))}
-                                    {(sub.people?.length ?? 0) > 3 && (
-                                      <View style={itemStyles.personCircleExtra}>
-                                        <Text style={itemStyles.personCircleLetter}>+{(sub.people?.length ?? 0) - 3}</Text>
-                                      </View>
-                                    )}
+                                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                    <Text style={[itemStyles.subitemName, { flex: 1 }]} numberOfLines={1}>{truncate(sub.name, MAX_ITEM_NAME)}</Text>
+                                    <Text style={[itemStyles.subitemCost, { flexShrink: 0 }]}>{sub.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+                                    <TouchableOpacity onPress={() => deleteSubitem(item.id, sub.id)} style={itemStyles.itemDelete}>
+                                      <Ionicons name="close" size={12} color={Colors.faint} />
+                                    </TouchableOpacity>
                                   </View>
-                                  <Text style={itemStyles.itemSplit}>
-                                    {sub.people.length} {sub.people.length === 1 ? 'person' : 'people'}, {perPerson.toLocaleString('en-US', { minimumFractionDigits: 2 })} each
-                                  </Text>
+                                  {sub.people.length > 0 && (
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                                      <View style={itemStyles.peopleRow}>
+                                        {(sub.people ?? []).slice(0, 3).map((p, pi) => (
+                                          <TouchableOpacity key={pi} style={itemStyles.personCircle} onPress={() => setTooltip(tooltip?.name === p ? null : { name: p })}>
+                                            <Text style={itemStyles.personCircleLetter}>{p[0]?.toUpperCase()}</Text>
+                                          </TouchableOpacity>
+                                        ))}
+                                        {(sub.people?.length ?? 0) > 3 && (
+                                          <View style={itemStyles.personCircleExtra}>
+                                            <Text style={itemStyles.personCircleLetter}>+{(sub.people?.length ?? 0) - 3}</Text>
+                                          </View>
+                                        )}
+                                      </View>
+                                      <Text style={itemStyles.itemSplit}>
+                                        {sub.people.length} {sub.people.length === 1 ? 'person' : 'people'}, {perPerson.toLocaleString('en-US', { minimumFractionDigits: 2 })} each
+                                      </Text>
+                                    </View>
+                                  )}
                                 </View>
-                                <TouchableOpacity onPress={() => deleteSubitem(item.id, sub.id)} style={itemStyles.itemDelete}>
-                                  <Ionicons name="close" size={12} color={Colors.faint} />
-                                </TouchableOpacity>
                               </View>
                             );
                           })}
