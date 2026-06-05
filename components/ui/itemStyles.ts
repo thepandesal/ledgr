@@ -28,7 +28,7 @@ const itemStyles = StyleSheet.create({
   itemCardNumText: { fontFamily: Fonts.monoBold, fontSize: 11, color: Colors.white },
   itemMiddle: { flex: 1, gap: 2, minWidth: 0 },
   itemName: { fontFamily: Fonts.monoBold, fontSize: 12, color: Colors.text },
-  itemCost: { fontFamily: Fonts.mono, fontSize: 16, color: Colors.muted },
+  itemCost: { fontFamily: Fonts.mono, fontSize: 11, color: Colors.muted },
   itemRight: { alignItems: 'flex-end', gap: 4, flexShrink: 0 },
   itemDelete: { padding: 4, flexShrink: 0 },
   itemSplit: { fontFamily: Fonts.mono, fontSize: 9, color: Colors.muted },

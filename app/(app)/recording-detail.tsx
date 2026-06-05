@@ -1248,36 +1248,31 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                         <View key={item.id}>
                           <View style={itemStyles.itemCard}>
                             <Text style={itemStyles.itemNumber}>{idx + 1}</Text>
-                            <View style={itemStyles.itemMiddle}>
-                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                <Text style={[itemStyles.itemName, { flex: 1 }]} numberOfLines={1}>{truncate(item.name, MAX_ITEM_NAME)}</Text>
-                                {editingItemCost?.id === item.id ? (
-                                  <TextInput
-                                    style={[itemStyles.itemCost, { borderBottomWidth: 1, borderBottomColor: Colors.cyan, minWidth: 60, flexShrink: 0 }]}
-                                    value={editingItemCost.value}
-                                    onChangeText={v => setEditingItemCost({ id: item.id, value: v })}
-                                    keyboardType="decimal-pad"
-                                    autoFocus
-                                    onBlur={() => updateItemCost(item.id, parseFloat(editingItemCost.value))}
-                                    onSubmitEditing={() => updateItemCost(item.id, parseFloat(editingItemCost.value))}
-                                  />
-                                ) : (
-                                  <TouchableOpacity onPress={() => setEditingItemCost({ id: item.id, value: String(item.cost) })}>
-                                    <Text style={[itemStyles.itemCost, { textDecorationLine: 'underline', textDecorationStyle: 'dotted', textDecorationColor: Colors.faint }]}>
-                                      {item.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                                    </Text>
-                                  </TouchableOpacity>
-                                )}
-                                <TouchableOpacity style={[itemStyles.addSubitemBtn, isSplitLocked && { opacity: 0.3 }]} onPress={() => !isSplitLocked && openEditSubitems(item)}>
-                                  <Ionicons name="add" size={13} color={Colors.cyan} />
-                                  <Text style={itemStyles.addSubitemBtnText}>subitem</Text>
+                            {/* Left: name + cost */}
+                            <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                              <Text style={itemStyles.itemName} numberOfLines={1} ellipsizeMode="tail">{truncate(item.name, MAX_ITEM_NAME)}</Text>
+                              {editingItemCost?.id === item.id ? (
+                                <TextInput
+                                  style={[itemStyles.itemCost, { borderBottomWidth: 1, borderBottomColor: Colors.cyan }]}
+                                  value={editingItemCost.value}
+                                  onChangeText={v => setEditingItemCost({ id: item.id, value: v })}
+                                  keyboardType="decimal-pad"
+                                  autoFocus
+                                  onBlur={() => updateItemCost(item.id, parseFloat(editingItemCost.value))}
+                                  onSubmitEditing={() => updateItemCost(item.id, parseFloat(editingItemCost.value))}
+                                />
+                              ) : (
+                                <TouchableOpacity onPress={() => setEditingItemCost({ id: item.id, value: String(item.cost) })}>
+                                  <Text style={[itemStyles.itemCost, { textDecorationLine: 'underline', textDecorationStyle: 'dotted', textDecorationColor: Colors.faint }]}>
+                                    {item.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                  </Text>
                                 </TouchableOpacity>
-                                <TouchableOpacity onPress={() => deleteItem(item.id)} style={itemStyles.itemDelete}>
-                                  <Ionicons name="close" size={14} color={Colors.faint} />
-                                </TouchableOpacity>
-                              </View>
+                              )}
+                            </View>
+                            {/* Right: people + each amount + subitem btn + delete */}
+                            <View style={{ alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
                               {item.subitems.length === 0 && item.people.length > 0 && (
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                                <>
                                   <View style={itemStyles.peopleRow}>
                                     {(item.people ?? []).slice(0, 3).map((p, pi) => (
                                       <TouchableOpacity key={pi} style={itemStyles.personCircle} onPress={() => setTooltip(tooltip?.name === p ? null : { name: p })}>
@@ -1291,10 +1286,19 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                                     )}
                                   </View>
                                   <Text style={itemStyles.itemSplit}>
-                                    {item.people.length} {item.people.length === 1 ? 'person' : 'people'}, {(item.cost / item.people.length).toLocaleString('en-US', { minimumFractionDigits: 2 })} each
+                                    {(item.cost / item.people.length).toLocaleString('en-US', { minimumFractionDigits: 2 })} each
                                   </Text>
-                                </View>
+                                </>
                               )}
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <TouchableOpacity style={[itemStyles.addSubitemBtn, isSplitLocked && { opacity: 0.3 }]} onPress={() => !isSplitLocked && openEditSubitems(item)}>
+                                  <Ionicons name="add" size={13} color={Colors.cyan} />
+                                  <Text style={itemStyles.addSubitemBtnText}>subitem</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity onPress={() => deleteItem(item.id)} style={itemStyles.itemDelete}>
+                                  <Ionicons name="close" size={14} color={Colors.faint} />
+                                </TouchableOpacity>
+                              </View>
                             </View>
                           </View>
                           {item.subitems.map(sub => {
@@ -1302,16 +1306,15 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                             return (
                               <View key={sub.id} style={itemStyles.subitemCard}>
                                 <Text style={itemStyles.subitemArrow}>↳</Text>
-                                <View style={itemStyles.itemMiddle}>
-                                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                    <Text style={[itemStyles.subitemName, { flex: 1 }]} numberOfLines={1}>{truncate(sub.name, MAX_ITEM_NAME)}</Text>
-                                    <Text style={[itemStyles.subitemCost, { flexShrink: 0 }]}>{sub.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
-                                    <TouchableOpacity onPress={() => deleteSubitem(item.id, sub.id)} style={itemStyles.itemDelete}>
-                                      <Ionicons name="close" size={12} color={Colors.faint} />
-                                    </TouchableOpacity>
-                                  </View>
+                                {/* Left: name + cost */}
+                                <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                                  <Text style={itemStyles.subitemName} numberOfLines={1} ellipsizeMode="tail">{truncate(sub.name, MAX_ITEM_NAME)}</Text>
+                                  <Text style={itemStyles.subitemCost}>{sub.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+                                </View>
+                                {/* Right: people + each + delete */}
+                                <View style={{ alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
                                   {sub.people.length > 0 && (
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                                    <>
                                       <View style={itemStyles.peopleRow}>
                                         {(sub.people ?? []).slice(0, 3).map((p, pi) => (
                                           <TouchableOpacity key={pi} style={itemStyles.personCircle} onPress={() => setTooltip(tooltip?.name === p ? null : { name: p })}>
@@ -1325,10 +1328,13 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                                         )}
                                       </View>
                                       <Text style={itemStyles.itemSplit}>
-                                        {sub.people.length} {sub.people.length === 1 ? 'person' : 'people'}, {perPerson.toLocaleString('en-US', { minimumFractionDigits: 2 })} each
+                                        {perPerson.toLocaleString('en-US', { minimumFractionDigits: 2 })} each
                                       </Text>
-                                    </View>
+                                    </>
                                   )}
+                                  <TouchableOpacity onPress={() => deleteSubitem(item.id, sub.id)} style={itemStyles.itemDelete}>
+                                    <Ionicons name="close" size={12} color={Colors.faint} />
+                                  </TouchableOpacity>
                                 </View>
                               </View>
                             );
