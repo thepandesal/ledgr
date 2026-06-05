@@ -1,15 +1,17 @@
 import AddItemModal from './AddItemModal';
 import { setPendingFocusDate } from './space-detail';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Animated, Dimensions, ScrollView, TextInput, Modal, Share, Linking, Platform, Clipboard, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Animated, Dimensions, ScrollView, TextInput, Modal, Platform, Image } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../../src/lib/supabase';
-import { BlurView } from 'expo-blur';
 import * as ImagePicker from 'expo-image-picker';
 import { compressImage, uploadReceiptPhoto } from '../../src/lib/receiptUpload';
 import BottomSheet from '@/components/ui/BottomSheet';
+import ConfirmModal from '@/components/ui/ConfirmModal';
+import { InfoRow } from '@/components/ui';
 import formStyles from '@/components/ui/formStyles';
+import { Colors, Fonts } from '@/components/ui/theme';
 
 const { width } = Dimensions.get('window');
 const MAX_NAME_CHARS = 18;
@@ -1053,9 +1055,9 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                     return (
                       <View key={name}>
                         <View style={infoStyles.row}>
-                          <Text style={[infoStyles.label, wasPaid && { color: '#2ab671' }]}>{name}</Text>
-                          <View style={infoStyles.dots} />
-                          <Text style={[infoStyles.value, wasPaid && { color: '#2ab671' }]}>{total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+                          <Text style={[{ fontFamily: Fonts.mono, fontSize: 11, color: Colors.muted, flexShrink: 0 }, wasPaid && { color: Colors.income }]}>{name}</Text>
+                          <View style={{ flex: 1, borderBottomWidth: 1, borderStyle: 'dotted', borderColor: Colors.faint, marginHorizontal: 8 }} />
+                          <Text style={[{ fontFamily: Fonts.monoBold, fontSize: 11, color: Colors.text, flexShrink: 0, maxWidth: 130 }, wasPaid && { color: Colors.income }]}>{total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
                           {wasPaid
                             ? <Ionicons name="checkmark-circle" size={13} color="#2ab671" style={{ marginLeft: 6 }} />
                             : <Ionicons name="ellipse-outline" size={13} color="#c0c0c0" style={{ marginLeft: 6 }} />}
@@ -1377,84 +1379,58 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
           </BottomSheet>
 
       {/* Delete person confirm */}
-      <Modal visible={!!deletePersonConfirm} transparent animationType="fade" onRequestClose={() => setDeletePersonConfirm(null)}>
-        <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}>
-          <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setDeletePersonConfirm(null)}>
-            <TouchableOpacity activeOpacity={1} onPress={e => e.stopPropagation()}>
-              <View style={styles.modalBox}>
-                <Text style={styles.modalTitle}>remove person</Text>
-                <Text style={styles.deleteWarning}>
-                  <Text style={{ fontFamily: 'RobotoMono_700Bold' }}>{deletePersonConfirm?.name}</Text>
-                  {` is included in ${deletePersonConfirm?.affectedItems} item${deletePersonConfirm?.affectedItems === 1 ? '' : 's'}. removing them will update those splits.`}
-                </Text>
-                <View style={styles.modalBtns}>
-                  <TouchableOpacity style={[styles.modalBtn, { backgroundColor: '#f5f5f5' }]} onPress={() => setDeletePersonConfirm(null)}>
-                    <Text style={[styles.modalBtnText, { color: '#8a8a8a' }]}>cancel</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={[styles.modalBtn, { backgroundColor: '#ed6a6a' }]} onPress={confirmDeletePerson}>
-                    <Text style={styles.modalBtnText}>remove</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </TouchableOpacity>
-          </TouchableOpacity>
-        </BlurView>
-      </Modal>
+      <ConfirmModal
+        visible={!!deletePersonConfirm}
+        onClose={() => setDeletePersonConfirm(null)}
+        title="remove person"
+        actions={[
+          { label: 'cancel', onPress: () => setDeletePersonConfirm(null), muted: true },
+          { label: 'remove', onPress: confirmDeletePerson, destructive: true },
+        ]}
+      >
+        <Text style={styles.deleteWarning}>
+          <Text style={{ fontFamily: Fonts.monoBold }}>{deletePersonConfirm?.name}</Text>
+          {` is included in ${deletePersonConfirm?.affectedItems} item${deletePersonConfirm?.affectedItems === 1 ? '' : 's'}. removing them will update those splits.`}
+        </Text>
+      </ConfirmModal>
 
       {/* Save image modal */}
-      <Modal visible={saveImageModal} transparent animationType="fade" onRequestClose={() => setSaveImageModal(false)}>
-        <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}>
-          <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setSaveImageModal(false)}>
-            <TouchableOpacity activeOpacity={1} onPress={e => e.stopPropagation()}>
-              <View style={styles.modalBox}>
-                <Text style={styles.modalTitle}>share split</Text>
-                <Text style={styles.subitemRemaining}>choose payment account</Text>
-                <ScrollView style={{ width: '100%', maxHeight: 180 }} showsVerticalScrollIndicator={false}>
-                  {shareAccounts.map((acc: any) => (
-                    <TouchableOpacity
-                      key={acc.id}
-                      style={[styles.accountOption, shareSelectedAccount?.id === acc.id && styles.accountOptionActive]}
-                      onPress={() => setShareSelectedAccount(acc)}
-                    >
-                      <View style={{ flex: 1 }}>
-                        <Text style={[styles.accountOptionName, shareSelectedAccount?.id === acc.id && { color: '#fff' }]}>{acc.account_name}</Text>
-                        <Text style={[styles.accountOptionBank, shareSelectedAccount?.id === acc.id && { color: 'rgba(255,255,255,0.7)' }]}>{acc.bank} · {acc.account_number}</Text>
-                      </View>
-                      {shareSelectedAccount?.id === acc.id && <Ionicons name="checkmark" size={14} color="#fff" />}
-                    </TouchableOpacity>
-                  ))}
-                  {shareAccounts.length === 0 && (
-                    <Text style={[styles.subitemRemaining, { textAlign: 'center', marginVertical: 8 }]}>no accounts saved</Text>
-                  )}
-                </ScrollView>
-
-                <View style={styles.shareOptionsRow}>
-                  <TouchableOpacity
-                    style={styles.shareOptionBtn}
-                    onPress={generateShare}
-                    disabled={shareLoading}
-                  >
-                    <Ionicons name="link-outline" size={18} color="#0ccfcf" />
-                    <Text style={styles.shareOptionText}>{shareLoading ? 'sharing...' : 'share link'}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.shareOptionBtn}
-                    onPress={saveAsImage}
-                    disabled={shareLoading}
-                  >
-                    <Ionicons name="image-outline" size={18} color="#425252" />
-                    <Text style={[styles.shareOptionText, { color: '#425252' }]}>{shareLoading ? 'saving...' : 'save as pdf'}</Text>
-                  </TouchableOpacity>
-                </View>
-
-                <TouchableOpacity style={[styles.modalBtn, { width: '100%', backgroundColor: '#f5f5f5' }]} onPress={() => setSaveImageModal(false)}>
-                  <Text style={[styles.modalBtnText, { color: '#8a8a8a' }]}>cancel</Text>
-                </TouchableOpacity>
+      <ConfirmModal
+        visible={saveImageModal}
+        onClose={() => setSaveImageModal(false)}
+        title="share split"
+        actions={[{ label: 'cancel', onPress: () => setSaveImageModal(false), muted: true }]}
+      >
+        <Text style={styles.subitemRemaining}>choose payment account</Text>
+        <ScrollView style={{ width: '100%', maxHeight: 180 }} showsVerticalScrollIndicator={false}>
+          {shareAccounts.map((acc: any) => (
+            <TouchableOpacity
+              key={acc.id}
+              style={[styles.accountOption, shareSelectedAccount?.id === acc.id && styles.accountOptionActive]}
+              onPress={() => setShareSelectedAccount(acc)}
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.accountOptionName, shareSelectedAccount?.id === acc.id && { color: Colors.white }]}>{acc.account_name}</Text>
+                <Text style={[styles.accountOptionBank, shareSelectedAccount?.id === acc.id && { color: 'rgba(255,255,255,0.7)' }]}>{acc.bank} · {acc.account_number}</Text>
               </View>
+              {shareSelectedAccount?.id === acc.id && <Ionicons name="checkmark" size={14} color={Colors.white} />}
             </TouchableOpacity>
+          ))}
+          {shareAccounts.length === 0 && (
+            <Text style={[styles.subitemRemaining, { textAlign: 'center', marginVertical: 8 }]}>no accounts saved</Text>
+          )}
+        </ScrollView>
+        <View style={styles.shareOptionsRow}>
+          <TouchableOpacity style={styles.shareOptionBtn} onPress={generateShare} disabled={shareLoading}>
+            <Ionicons name="link-outline" size={18} color={Colors.cyan} />
+            <Text style={styles.shareOptionText}>{shareLoading ? 'sharing...' : 'share link'}</Text>
           </TouchableOpacity>
-        </BlurView>
-      </Modal>
+          <TouchableOpacity style={styles.shareOptionBtn} onPress={saveAsImage} disabled={shareLoading}>
+            <Ionicons name="image-outline" size={18} color={Colors.text} />
+            <Text style={[styles.shareOptionText, { color: Colors.text }]}>{shareLoading ? 'saving...' : 'save as pdf'}</Text>
+          </TouchableOpacity>
+        </View>
+      </ConfirmModal>
 
       {/* Link receipt modal */}
       <BottomSheet visible={linkReceiptModal} onClose={() => setLinkReceiptModal(false)} sub="receipt" title="link a receipt">
@@ -1607,81 +1583,39 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
       </BottomSheet>
 
       {/* Delete confirm modal */}
-      <Modal visible={deleteConfirm} transparent animationType="fade" onRequestClose={() => setDeleteConfirm(false)}>
-        <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}>
-          <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setDeleteConfirm(false)}>
-            <TouchableOpacity activeOpacity={1} onPress={e => e.stopPropagation()}>
-              <View style={styles.modalBox}>
-                <Text style={styles.modalTitle}>delete recording</Text>
-                {linkedPayable ? (
-                  <>
-                    <Text style={styles.deleteWarning}>
-                      this expense is linked to the payable{' '}
-                      <Text style={{ fontFamily: 'RobotoMono_700Bold', color: '#425252' }}>{linkedPayable.name}</Text>.
-                      {' '}what do you want to do with the linked payable?
-                    </Text>
-                    <View style={styles.modalBtns}>
-                      <TouchableOpacity style={[styles.modalBtn, { backgroundColor: '#f5f5f5' }]} onPress={() => setDeleteConfirm(false)}>
-                        <Text style={[styles.modalBtnText, { color: '#8a8a8a' }]}>cancel</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity style={[styles.modalBtn, { backgroundColor: '#425252' }]} onPress={() => confirmDelete(false, false, false)} disabled={deleteLoading}>
-                        <Text style={styles.modalBtnText}>expense only</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity style={[styles.modalBtn, { backgroundColor: '#ed6a6a' }]} onPress={() => confirmDelete(true, false, true)} disabled={deleteLoading}>
-                        <Text style={styles.modalBtnText}>{deleteLoading ? '...' : 'delete both'}</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </>
-                ) : (
-                  <>
-                    <Text style={styles.deleteWarning}>
-                      {linkedReceipt
-                        ? 'do you also want to delete the linked receipt and its photos?'
-                        : 'this cannot be undone.'}
-                    </Text>
-                    <View style={styles.modalBtns}>
-                      <TouchableOpacity style={[styles.modalBtn, { backgroundColor: '#f5f5f5' }]} onPress={() => setDeleteConfirm(false)}>
-                        <Text style={[styles.modalBtnText, { color: '#8a8a8a' }]}>cancel</Text>
-                      </TouchableOpacity>
-                      {linkedReceipt && (
-                        <TouchableOpacity style={[styles.modalBtn, { backgroundColor: '#425252' }]} onPress={() => confirmDelete(true, false)} disabled={deleteLoading}>
-                          <Text style={styles.modalBtnText}>keep receipt</Text>
-                        </TouchableOpacity>
-                      )}
-                      <TouchableOpacity style={[styles.modalBtn, { backgroundColor: '#ed6a6a' }]} onPress={() => confirmDelete(true, !!linkedReceipt)} disabled={deleteLoading}>
-                        <Text style={styles.modalBtnText}>{deleteLoading ? '...' : linkedReceipt ? 'delete both' : 'delete'}</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </>
-                )}
-              </View>
-            </TouchableOpacity>
-          </TouchableOpacity>
-        </BlurView>
-      </Modal>
+      <ConfirmModal
+        visible={deleteConfirm}
+        onClose={() => setDeleteConfirm(false)}
+        title="delete recording"
+        message={linkedPayable
+          ? `this expense is linked to the payable "${linkedPayable.name}". what do you want to do?`
+          : linkedReceipt ? 'do you also want to delete the linked receipt and its photos?' : 'this cannot be undone.'}
+        actions={linkedPayable ? [
+          { label: 'cancel', onPress: () => setDeleteConfirm(false), muted: true },
+          { label: 'expense only', onPress: () => confirmDelete(false, false, false), disabled: deleteLoading },
+          { label: deleteLoading ? '...' : 'delete both', onPress: () => confirmDelete(true, false, true), destructive: true, disabled: deleteLoading },
+        ] : [
+          { label: 'cancel', onPress: () => setDeleteConfirm(false), muted: true },
+          ...(linkedReceipt ? [{ label: 'keep receipt', onPress: () => confirmDelete(true, false), disabled: deleteLoading }] : []),
+          { label: deleteLoading ? '...' : linkedReceipt ? 'delete both' : 'delete', onPress: () => confirmDelete(true, !!linkedReceipt), destructive: true, disabled: deleteLoading },
+        ]}
+      />
 
       {/* All people preview modal */}
-      <Modal visible={showAllPeopleModal} transparent animationType="fade" onRequestClose={() => setShowAllPeopleModal(false)}>
-        <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}>
-          <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowAllPeopleModal(false)}>
-            <TouchableOpacity activeOpacity={1} onPress={e => e.stopPropagation()}>
-              <View style={styles.modalBox}>
-                <Text style={styles.modalTitle}>people</Text>
-                <View style={[styles.itemPeopleSelect, { paddingBottom: 4 }]}>
-                  {filledPeople.map((p, i) => (
-                    <View key={i} style={styles.personChip}>
-                      <Text style={styles.personChipText}>{p}</Text>
-                    </View>
-                  ))}
-                </View>
-                <TouchableOpacity style={[styles.modalBtn, { width: '100%', backgroundColor: '#f5f5f5' }]} onPress={() => setShowAllPeopleModal(false)}>
-                  <Text style={[styles.modalBtnText, { color: '#8a8a8a' }]}>close</Text>
-                </TouchableOpacity>
-              </View>
-            </TouchableOpacity>
-          </TouchableOpacity>
-        </BlurView>
-      </Modal>
+      <ConfirmModal
+        visible={showAllPeopleModal}
+        onClose={() => setShowAllPeopleModal(false)}
+        title="people"
+        actions={[{ label: 'close', onPress: () => setShowAllPeopleModal(false), muted: true }]}
+      >
+        <View style={[styles.itemPeopleSelect, { paddingBottom: 4 }]}>
+          {filledPeople.map((p, i) => (
+            <View key={i} style={styles.personChip}>
+              <Text style={styles.personChipText}>{p}</Text>
+            </View>
+          ))}
+        </View>
+      </ConfirmModal>
 
       {/* Collect modal */}
       <BottomSheet visible={collectModal} onClose={() => setCollectModal(false)} sub="receivable" title="collect payment">
@@ -1752,16 +1686,15 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
       </BottomSheet>
 
       {/* Cooking modal */}
-      <Modal visible={cookingModal} transparent animationType="fade" onRequestClose={() => setCookingModal(false)}>
-        <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}>
-          <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setCookingModal(false)}>
-            <View style={styles.modalBox}>
-              <Text style={{ fontSize: 36 }}>🍳</Text>
-              <Text style={styles.cookingText}>we're cooking something</Text>
-            </View>
-          </TouchableOpacity>
-        </BlurView>
-      </Modal>
+      <ConfirmModal
+        visible={cookingModal}
+        onClose={() => setCookingModal(false)}
+        title="coming soon"
+        actions={[{ label: 'close', onPress: () => setCookingModal(false), muted: true }]}
+      >
+        <Text style={{ fontSize: 36 }}>🍳</Text>
+        <Text style={styles.cookingText}>we're cooking something</Text>
+      </ConfirmModal>
       {/* Copied toast */}
       {copiedToast && (
         <View style={styles.toast} pointerEvents="none">
@@ -1806,23 +1739,6 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
     </Animated.View>
   );
 }
-
-function InfoRow({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={infoStyles.row}>
-      <Text style={infoStyles.label}>{label}</Text>
-      <View style={infoStyles.dots} />
-      <Text style={infoStyles.value} numberOfLines={1}>{value}</Text>
-    </View>
-  );
-}
-
-const infoStyles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6 },
-  label: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#929090', flexShrink: 0 },
-  dots: { flex: 1, borderBottomWidth: 1, borderStyle: 'dotted', borderColor: '#c0c0c0', marginHorizontal: 8 },
-  value: { fontFamily: 'RobotoMono_700Bold', fontSize: 11, color: '#425252', flexShrink: 0, maxWidth: 130 },
-});
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#ffffff', position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
@@ -1879,15 +1795,7 @@ const styles = StyleSheet.create({
   cookingText: { fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#929090', textAlign: 'center' },
   tooltip: { position: 'absolute', top: '50%', alignSelf: 'center', backgroundColor: '#425252', borderRadius: 8, paddingVertical: 6, paddingHorizontal: 12 },
   tooltipText: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#fff' },
-  modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  modalBox: { backgroundColor: '#ffffff', borderRadius: 20, padding: 20, width: 300, gap: 12, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 20, elevation: 10 },
-  sheet: { backgroundColor: '#ffffff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 0, height: '90%' },
-  sheetTitle: { fontFamily: 'Avenelle', fontSize: 26, color: '#425252', letterSpacing: -0.5, lineHeight: 30, marginBottom: 4 },
-  sheetSub: { fontFamily: 'ChillaxMedium', fontSize: 11, color: '#929090', marginBottom: 0 },
-  modalTitle: { fontFamily: 'ChillaxMedium', fontSize: 16, color: '#425252', alignSelf: 'flex-start' },
-  modalBtns: { flexDirection: 'row', gap: 10, width: '100%' },
-  modalBtn: { flex: 1, backgroundColor: '#425252', borderRadius: 999, paddingVertical: 11, alignItems: 'center' },
-  modalBtnText: { fontFamily: 'RobotoMono_700Bold', fontSize: 13, color: '#fff' },
+
   personRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
   personInput: { flex: 1, backgroundColor: '#f5f5f5', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, fontFamily: 'RobotoMono_400Regular', fontSize: 16, color: '#425252', borderWidth: 1, borderColor: '#e8e8e8' },
   removeBtn: { padding: 4 },

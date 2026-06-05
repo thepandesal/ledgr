@@ -5,6 +5,7 @@
  */
 
 export { default as BottomSheet } from './BottomSheet';
+export { default as ConfirmModal } from './ConfirmModal';
 export { default as FormLabel } from './FormLabel';
 export { default as FormInput } from './FormInput';
 export { FormBlock, FormRow } from './FormBlock';
