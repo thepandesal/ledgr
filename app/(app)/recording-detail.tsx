@@ -1447,53 +1447,61 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
 
       {/* Pay modal */}
       <BottomSheet visible={payModal} onClose={() => setPayModal(false)} sub="payable" title="pay bill">
-        <Text style={formStyles.hintMuted}>{(recording?.name ?? '').toLowerCase()} · {Number(recording?.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
-        <View style={{ flexDirection: 'row', gap: 6, width: '100%' }}>
-          {(['full', 'manual', ...(filledPeople.length > 0 && items.length > 0 ? ['split'] : [])] as const).map(mode => (
-            <TouchableOpacity key={mode} style={[itemStyles.personSelectChip, { flex: 1, justifyContent: 'center' }, payMode === mode && itemStyles.personSelectChipActive]} onPress={() => setPayMode(mode as any)}>
-              <Text style={[itemStyles.personSelectText, payMode === mode && itemStyles.personSelectTextActive]}>{mode}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-        {payMode === 'full' && <Text style={[formStyles.hintMuted, { color: Colors.cyan, fontSize: 15 }]}>{Number(recording?.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>}
-        {payMode === 'manual' && <TextInput style={[formStyles.input, { width: '100%' }]} placeholder="0.00" placeholderTextColor={Colors.faint} value={payManualAmount} onChangeText={setPayManualAmount} keyboardType="decimal-pad" autoFocus />}
-        {payMode === 'split' && (
-          <View style={{ width: '100%', gap: 6 }}>
-            <Text style={formStyles.hintMuted}>select who is paying</Text>
-            <View style={itemStyles.personSelectRow}>
-              {filledPeople.map((p, i) => {
-                const sel = paySelectedPeople.includes(p);
-                return (
-                  <TouchableOpacity key={i} style={[itemStyles.personSelectChip, sel && itemStyles.personSelectChipActive]} onPress={() => setPaySelectedPeople(prev => sel ? prev.filter(x => x !== p) : [...prev, p])}>
-                    <Text style={[itemStyles.personSelectText, sel && itemStyles.personSelectTextActive]}>{p}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-            {paySelectedPeople.length > 0 && <Text style={[formStyles.hintMuted, { color: Colors.cyan }]}>total: {getPayAmount().toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>}
+        <View style={{ gap: 12, width: '100%' }}>
+          <Text style={formStyles.hintMuted}>{(recording?.name ?? '').toLowerCase()} · {Number(recording?.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+          <View style={{ flexDirection: 'row', gap: 6 }}>
+            {(['full', 'manual', ...(filledPeople.length > 0 && items.length > 0 ? ['split'] : [])] as const).map(mode => (
+              <TouchableOpacity key={mode} style={[itemStyles.personSelectChip, { flex: 1, justifyContent: 'center' }, payMode === mode && itemStyles.personSelectChipActive]} onPress={() => setPayMode(mode as any)}>
+                <Text style={[itemStyles.personSelectText, payMode === mode && itemStyles.personSelectTextActive]}>{mode}</Text>
+              </TouchableOpacity>
+            ))}
           </View>
-        )}
-        <Text style={[formStyles.hintMuted, { marginTop: 4 }]}>payment account</Text>
-        <ScrollView style={{ width: '100%', maxHeight: 130 }} showsVerticalScrollIndicator={false}>
-          {payAccounts.map((acc: any) => (
-            <TouchableOpacity key={acc.id} style={[accountStyles.option, payAccount?.id === acc.id && accountStyles.optionActive]} onPress={() => setPayAccount(acc)}>
-              <View style={{ flex: 1 }}>
-                <Text style={[accountStyles.optionName, payAccount?.id === acc.id && accountStyles.optionNameActive]}>{acc.account_name}</Text>
-                <Text style={[accountStyles.optionBank, payAccount?.id === acc.id && accountStyles.optionBankActive]}>{acc.bank} · {acc.account_number}</Text>
+          {payMode === 'full' && <Text style={{ fontFamily: Fonts.monoBold, fontSize: 22, color: Colors.cyan }}>{Number(recording?.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>}
+          {payMode === 'manual' && <TextInput style={[formStyles.input, { width: '100%' }]} placeholder="0.00" placeholderTextColor={Colors.faint} value={payManualAmount} onChangeText={setPayManualAmount} keyboardType="decimal-pad" autoFocus />}
+          {payMode === 'split' && (
+            <View style={{ gap: 8 }}>
+              <Text style={formStyles.hintMuted}>select who is paying</Text>
+              <View style={itemStyles.personSelectRow}>
+                {filledPeople.map((p, i) => {
+                  const sel = paySelectedPeople.includes(p);
+                  return (
+                    <TouchableOpacity key={i} style={[itemStyles.personSelectChip, sel && itemStyles.personSelectChipActive]} onPress={() => setPaySelectedPeople(prev => sel ? prev.filter(x => x !== p) : [...prev, p])}>
+                      <Text style={[itemStyles.personSelectText, sel && itemStyles.personSelectTextActive]}>{p}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
-              {payAccount?.id === acc.id && <Ionicons name="checkmark" size={14} color={Colors.white} />}
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-        <Text style={[formStyles.hintMuted, { marginTop: 4 }]}>payment date</Text>
-        <TextInput style={[formStyles.input, { width: '100%' }]} placeholder="YYYY-MM-DD" placeholderTextColor={Colors.faint} value={payDate} onChangeText={setPayDate} />
-        <Text style={[formStyles.hintMuted, { marginTop: 4 }]}>complete payment?</Text>
-        <View style={{ flexDirection: 'row', gap: 8, width: '100%' }}>
-          {([true, false] as const).map(val => (
-            <TouchableOpacity key={String(val)} style={[itemStyles.personSelectChip, { flex: 1, justifyContent: 'center' }, payComplete === val && itemStyles.personSelectChipActive]} onPress={() => setPayComplete(val)}>
-              <Text style={[itemStyles.personSelectText, payComplete === val && itemStyles.personSelectTextActive]}>{val ? 'yes, complete' : 'no, partial'}</Text>
-            </TouchableOpacity>
-          ))}
+              {paySelectedPeople.length > 0 && <Text style={{ fontFamily: Fonts.monoBold, fontSize: 18, color: Colors.cyan }}>{getPayAmount().toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>}
+            </View>
+          )}
+          <View style={{ gap: 6 }}>
+            <Text style={formStyles.hintMuted}>payment account</Text>
+            <ScrollView style={{ maxHeight: 130 }} showsVerticalScrollIndicator={false}>
+              {payAccounts.map((acc: any) => (
+                <TouchableOpacity key={acc.id} style={[accountStyles.option, payAccount?.id === acc.id && accountStyles.optionActive]} onPress={() => setPayAccount(acc)}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[accountStyles.optionName, payAccount?.id === acc.id && accountStyles.optionNameActive]}>{acc.account_name}</Text>
+                    <Text style={[accountStyles.optionBank, payAccount?.id === acc.id && accountStyles.optionBankActive]}>{acc.bank} · {acc.account_number}</Text>
+                  </View>
+                  {payAccount?.id === acc.id && <Ionicons name="checkmark" size={14} color={Colors.white} />}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+          <View style={{ gap: 6 }}>
+            <Text style={formStyles.hintMuted}>payment date</Text>
+            <TextInput style={[formStyles.input, { width: '100%' }]} placeholder="YYYY-MM-DD" placeholderTextColor={Colors.faint} value={payDate} onChangeText={setPayDate} />
+          </View>
+          <View style={{ gap: 6 }}>
+            <Text style={formStyles.hintMuted}>complete payment?</Text>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              {([true, false] as const).map(val => (
+                <TouchableOpacity key={String(val)} style={[itemStyles.personSelectChip, { flex: 1, justifyContent: 'center' }, payComplete === val && itemStyles.personSelectChipActive]} onPress={() => setPayComplete(val)}>
+                  <Text style={[itemStyles.personSelectText, payComplete === val && itemStyles.personSelectTextActive]}>{val ? 'yes, complete' : 'no, partial'}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
         </View>
         <View style={formStyles.actions}>
           <TouchableOpacity style={formStyles.cancelBtn} onPress={() => setPayModal(false)}>
