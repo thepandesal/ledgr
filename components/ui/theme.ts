@@ -30,6 +30,8 @@ export const Colors = {
   dangerBorder: '#fde8e8',
   success: '#2ab671',
   successBg: '#f0fff8',
+  warningBg: '#fff8f0',
+  warningBorder: '#f0e0c0',
 
   // Overlays
   overlay: 'rgba(0,0,0,0.3)',

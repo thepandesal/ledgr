@@ -859,10 +859,10 @@ export default function RecordingDetailScreen() {
 const truncate = (str: string, max: number) => str && str.length > max ? str.slice(0, max) + '...' : str;
 
   const amountColor = () => {
-    if (!recording) return '#929090';
-    if (recording.type === 'expense') return '#ed6a6a';
-    if (recording.type === 'income' || recording.type === 'savings' || recording.type === 'return') return '#2ab671';
-    return '#425252';
+    if (!recording) return Colors.muted;
+    if (recording.type === 'expense') return Colors.expense;
+    if (recording.type === 'income' || recording.type === 'savings' || recording.type === 'return') return Colors.income;
+    return Colors.text;
   };
 
   const formatDate = (d: string) => {
@@ -1062,10 +1062,10 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                           <View style={{ flex: 1, borderBottomWidth: 1, borderStyle: 'dotted', borderColor: Colors.faint, marginHorizontal: 8 }} />
                           <Text style={[{ fontFamily: Fonts.monoBold, fontSize: 11, color: Colors.text, flexShrink: 0, maxWidth: 130 }, wasPaid && { color: Colors.income }]}>{total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
                           {wasPaid
-                            ? <Ionicons name="checkmark-circle" size={13} color="#2ab671" style={{ marginLeft: 6 }} />
-                            : <Ionicons name="ellipse-outline" size={13} color="#c0c0c0" style={{ marginLeft: 6 }} />}
+                            ? <Ionicons name="checkmark-circle" size={13} color={Colors.income} style={{ marginLeft: 6 }} />
+                            : <Ionicons name="ellipse-outline" size={13} color={Colors.faint} style={{ marginLeft: 6 }} />}
                         </View>
-                        {i < arr.length - 1 && <View style={{ height: 1, backgroundColor: '#f0f0f0' }} />}
+                        {i < arr.length - 1 && <View style={{ height: 1, backgroundColor: Colors.border }} />}
                       </View>
                     );
                   })}
@@ -1074,7 +1074,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
             </>
           ) : (<>
           {isSplitLocked && (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#fff8f0', borderRadius: 10, padding: 12, marginBottom: 16, borderWidth: 1, borderColor: '#f0e0c0' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: Colors.warningBg, borderRadius: 10, padding: 12, marginBottom: 16, borderWidth: 1, borderColor: Colors.warningBorder }}>
               <Ionicons name="lock-closed-outline" size={14} color={Colors.muted} />
               <Text style={{ fontFamily: Fonts.mono, fontSize: 11, color: Colors.muted, flex: 1 }}>split bill is locked while payments are in progress</Text>
             </View>
