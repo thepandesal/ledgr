@@ -39,7 +39,7 @@ export default function BottomSheet({ visible, onClose, sub, title, children }: 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <KeyboardAvoidingView
-        style={s.flex}
+        style={[s.flex, s.justify]}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill} />
@@ -80,5 +80,6 @@ export default function BottomSheet({ visible, onClose, sub, title, children }: 
 
 const s = StyleSheet.create({
   flex: { flex: 1 },
+  justify: { justifyContent: 'flex-end' },
   content: { paddingBottom: 16 },
 });

@@ -6,6 +6,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../../src/lib/supabase';
 import { BlurView } from 'expo-blur';
+import BottomSheet from '@/components/ui/BottomSheet';
+import formStyles from '@/components/ui/formStyles';
 
 const { width } = Dimensions.get('window');
 const MAX_NAME_CHARS = 18;
@@ -1201,19 +1203,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
       )}
 
       {/* Add people modal */}
-      <Modal visible={addPersonModal} transparent animationType="slide" onRequestClose={() => { setPeople(savedPeople); setAddPersonModal(false); setSuggestions([]); }}>
-        <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}>
-          <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => { setPeople(savedPeople); setAddPersonModal(false); setSuggestions([]); }} />
-          <View style={styles.sheet}>
-            <View style={styles.sheetHeader}>
-              <View>
-                <Text style={styles.sheetSub}>split bill</Text>
-                <Text style={styles.sheetTitle}>people</Text>
-              </View>
-              <TouchableOpacity onPress={() => { setPeople(savedPeople); setAddPersonModal(false); setSuggestions([]); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Ionicons name="close" size={20} color="#929090" />
-              </TouchableOpacity>
-            </View>
+      <BottomSheet visible={addPersonModal} onClose={() => { setPeople(savedPeople); setAddPersonModal(false); setSuggestions([]); }} sub="split bill" title="people">
             <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 16 }}>
               {people.map((p, i) => (
                 <View key={i}>
@@ -1256,9 +1246,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                 <Text style={styles.modalBtnText}>{savingPeople ? 'saving...' : 'done'}</Text>
               </TouchableOpacity>
             </View>
-          </View>
-        </BlurView>
-      </Modal>
+      </BottomSheet>
       {/* Add item modal */}
       <AddItemModal
         visible={addItemModal}
@@ -1280,26 +1268,14 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
       />
 
       {/* Edit subitems modal */}
-      <Modal visible={!!editSubitemsItemId} transparent animationType="slide" onRequestClose={() => setEditSubitemsItemId(null)}>
-        <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}>
-          <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setEditSubitemsItemId(null)} />
-          <View style={styles.sheet}>
-            {(() => {
+      <BottomSheet visible={!!editSubitemsItemId} onClose={() => setEditSubitemsItemId(null)} sub="split bill" title="add subitems">
+          {(() => {
               const item = items.find(i => i.id === editSubitemsItemId);
               if (!item) return null;
               const totalSubs = item.subitems.length + editSubitemForms.filter(s => s.name.trim()).length;
               const equalCost = totalSubs > 0 ? item.cost / totalSubs : item.cost;
               return (
                 <>
-                  <View style={styles.sheetHeader}>
-                    <View>
-                      <Text style={styles.sheetSub}>split bill</Text>
-                      <Text style={styles.sheetTitle}>add subitems</Text>
-                    </View>
-                    <TouchableOpacity onPress={() => setEditSubitemsItemId(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                      <Ionicons name="close" size={20} color="#929090" />
-                    </TouchableOpacity>
-                  </View>
                   <Text style={styles.subitemRemaining}>{item.name} · {item.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
                   {item.subitems.length > 0 && (
                     <Text style={styles.subitemRemaining}>{item.subitems.length} existing · will become {equalCost.toLocaleString('en-US', { minimumFractionDigits: 2 })} each</Text>
@@ -1347,9 +1323,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                 </>
               );
             })()}
-          </View>
-        </BlurView>
-      </Modal>
+          </BottomSheet>
 
       {/* Delete person confirm */}
       <Modal visible={!!deletePersonConfirm} transparent animationType="fade" onRequestClose={() => setDeletePersonConfirm(null)}>
@@ -1432,17 +1406,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
       </Modal>
 
       {/* Link receipt modal */}
-      <Modal visible={linkReceiptModal} transparent animationType="slide" onRequestClose={() => setLinkReceiptModal(false)}>
-        <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}>
-          <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setLinkReceiptModal(false)} />
-          <View style={styles.sheet}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
-              <View>
-                <Text style={styles.sheetSub}>receipt</Text>
-                <Text style={styles.sheetTitle}>link a receipt</Text>
-              </View>
-              <TouchableOpacity onPress={() => setLinkReceiptModal(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}><Ionicons name="close" size={20} color="#929090" /></TouchableOpacity>
-            </View>
+      <BottomSheet visible={linkReceiptModal} onClose={() => setLinkReceiptModal(false)} sub="receipt" title="link a receipt">
             <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 8 }}>
                 {linkReceiptEntries.length === 0 ? (
                   <Text style={{ fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#929090', textAlign: 'center', paddingVertical: 16 }}>no unlinked receipts found</Text>
@@ -1471,19 +1435,10 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
               </TouchableOpacity>
             </View>
               </View>
-        </BlurView>
-      </Modal>
+      </BottomSheet>
 
       {/* Pay modal */}
-      <Modal visible={payModal} transparent animationType="slide" onRequestClose={() => setPayModal(false)}>
-        <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}>
-          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setPayModal(false)} />
-          <View style={styles.sheet}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
-              <View><Text style={styles.sheetSub}>payable</Text><Text style={styles.sheetTitle}>pay bill</Text></View>
-              <TouchableOpacity onPress={() => setPayModal(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}><Ionicons name="close" size={20} color="#929090" /></TouchableOpacity>
-            </View>
-            <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 8 }}>>
+      <BottomSheet visible={payModal} onClose={() => setPayModal(false)} sub="payable" title="pay bill">>
                 <Text style={styles.subitemRemaining}>
                   {(recording?.name ?? '').toLowerCase()} · {Number(recording?.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                 </Text>
@@ -1599,10 +1554,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                     <Text style={styles.modalBtnText}>{payLoading ? 'saving...' : 'confirm'}</Text>
                   </TouchableOpacity>
                 </View>
-            </ScrollView>
-          </View>
-        </BlurView>
-      </Modal>
+      </BottomSheet>
 
       {/* Delete confirm modal */}
       <Modal visible={deleteConfirm} transparent animationType="fade" onRequestClose={() => setDeleteConfirm(false)}>
@@ -1682,15 +1634,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
       </Modal>
 
       {/* Collect modal */}
-      <Modal visible={collectModal} transparent animationType="slide" onRequestClose={() => setCollectModal(false)}>
-        <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}>
-          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setCollectModal(false)} />
-          <View style={styles.sheet}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
-              <View><Text style={styles.sheetSub}>receivable</Text><Text style={styles.sheetTitle}>collect payment</Text></View>
-              <TouchableOpacity onPress={() => setCollectModal(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}><Ionicons name="close" size={20} color="#929090" /></TouchableOpacity>
-            </View>
-            <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 8 }}>
+      <BottomSheet visible={collectModal} onClose={() => setCollectModal(false)} sub="receivable" title="collect payment">
                 <Text style={styles.subitemRemaining}>
                   {(recording?.name ?? '').toLowerCase()} · {Number(recording?.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                 </Text>
@@ -1755,10 +1699,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                     <Text style={styles.modalBtnText}>{collectLoading ? 'saving...' : 'confirm'}</Text>
                   </TouchableOpacity>
                 </View>
-            </ScrollView>
-          </View>
-        </BlurView>
-      </Modal>
+      </BottomSheet>
 
       {/* Cooking modal */}
       <Modal visible={cookingModal} transparent animationType="fade" onRequestClose={() => setCookingModal(false)}>
