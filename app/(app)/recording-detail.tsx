@@ -1434,11 +1434,10 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                 <Text style={styles.cancelBtnText}>cancel</Text>
               </TouchableOpacity>
             </View>
-              </View>
       </BottomSheet>
 
       {/* Pay modal */}
-      <BottomSheet visible={payModal} onClose={() => setPayModal(false)} sub="payable" title="pay bill">>
+      <BottomSheet visible={payModal} onClose={() => setPayModal(false)} sub="payable" title="pay bill">
                 <Text style={styles.subitemRemaining}>
                   {(recording?.name ?? '').toLowerCase()} · {Number(recording?.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                 </Text>
