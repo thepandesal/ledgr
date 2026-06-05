@@ -14,7 +14,7 @@ import formStyles from '@/components/ui/formStyles';
 import pageStyles from '@/components/ui/pageStyles';
 import itemStyles from '@/components/ui/itemStyles';
 import accountStyles from '@/components/ui/accountStyles';
-import { Colors, Fonts } from '@/components/ui/theme';
+import { Colors, Fonts, Radius } from '@/components/ui/theme';
 
 const { width } = Dimensions.get('window');
 const MAX_NAME_CHARS = 18;
@@ -57,7 +57,8 @@ export default function RecordingDetailScreen() {
   const [deletePersonConfirm, setDeletePersonConfirm] = useState<{ idx: number; name: string; affectedItems: number } | null>(null);
   const [savingPeople, setSavingPeople] = useState(false);
   const [showAllPeopleModal, setShowAllPeopleModal] = useState(false);
-  const [savedPeople, setSavedPeople] = useState<string[]>([]); // tracks last saved state for cancel
+  const [savedPeople, setSavedPeople] = useState<string[]>([]);
+  const [tagInputVal, setTagInputVal] = useState('');
   const [payModal, setPayModal] = useState(false);
   const [payStep, setPayStep] = useState<'account' | 'mode'>('account');
   const [payMode, setPayMode] = useState<'full' | 'manual' | 'split'>('full');
@@ -733,8 +734,9 @@ export default function RecordingDetailScreen() {
   };
 
   const openPeopleModal = () => {
-    if (people.length === 0) setPeople(['', '', '']);
     setSavedPeople([...people]);
+    setTagInputVal('');
+    setSuggestions([]);
     setAddPersonModal(true);
   };
   const addPerson = () => setPeople(prev => [...prev, '']);
@@ -772,11 +774,9 @@ export default function RecordingDetailScreen() {
   const savePeopleAndClose = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user || !recordingId) return;
-    // Deduplicate: keep unique non-empty names (case-insensitive)
-    const seen = new Set<string>();
-    const filled = people
-      .map(p => p.trim())
-      .filter(p => { if (!p) return false; const k = p.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; });
+    // Add any pending tag input value
+    const pending = tagInputVal.trim();
+    const filled = [...new Set([...people.filter(p => p.trim()), ...(pending ? [pending] : [])])];
     setSavingPeople(true);
     await supabase.from('bill_splits').delete().eq('recording_id', recordingId);
     if (filled.length > 0) {
@@ -787,10 +787,10 @@ export default function RecordingDetailScreen() {
     for (const p of filled) await saveContact(p);
     setPeople(filled);
     setSavedPeople(filled);
+    setTagInputVal('');
     setSavingPeople(false);
     setAddPersonModal(false);
     setSuggestions([]);
-    setActiveSuggestionIdx(null);
     checkStale(filled, items);
   };
 
@@ -1373,35 +1373,60 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
 
       {/* Add people modal */}
       <BottomSheet visible={addPersonModal} onClose={() => { setPeople(savedPeople); setAddPersonModal(false); setSuggestions([]); }} sub="split bill" title="people">
-        <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 16 }}>
-          {people.map((p, i) => (
-            <View key={i}>
-              <View style={styles.personRow}>
-                <TextInput style={formStyles.input} placeholder={`person ${i + 1}`} placeholderTextColor={Colors.faint} value={p} onChangeText={v => updatePerson(i, v)} returnKeyType="next" />
-                {people.length > 1 && (
-                  <TouchableOpacity onPress={() => requestDeletePerson(i)} style={styles.removeBtn}>
-                    <Ionicons name="close" size={14} color={Colors.muted} />
-                  </TouchableOpacity>
-                )}
-              </View>
-              {activeSuggestionIdx === i && suggestions.length > 0 && (
-                <View style={styles.suggestionBox}>
-                  {suggestions.map((s, si) => (
-                    <TouchableOpacity key={si} style={styles.suggestionItem} onPress={() => pickSuggestion(i, s)}>
-                      <Text style={styles.suggestionText}>{s}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
+        {/* Tag input */}
+        <View style={s.tagInputWrap}>
+          {people.filter(p => p.trim()).map((p, i) => (
+            <View key={i} style={s.tagChip}>
+              <Text style={s.tagChipText}>{p}</Text>
+              <TouchableOpacity onPress={() => requestDeletePerson(people.indexOf(p))} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+                <Ionicons name="close" size={11} color={Colors.white} />
+              </TouchableOpacity>
             </View>
           ))}
+          <TextInput
+            style={s.tagInput}
+            placeholder={people.filter(p => p.trim()).length === 0 ? 'type a name and press enter...' : ''}
+            placeholderTextColor={Colors.faint}
+            value={tagInputVal}
+            onChangeText={v => {
+              setSuggestions(v.trim() ? contacts.filter(c => c.toLowerCase().startsWith(v.toLowerCase()) && !people.includes(c)) : []);
+              setTagInputVal(v);
+            }}
+            returnKeyType="done"
+            onSubmitEditing={() => {
+              const name = tagInputVal.trim();
+              if (name && !people.includes(name)) setPeople(prev => [...prev, name]);
+              setTagInputVal('');
+              setSuggestions([]);
+            }}
+            blurOnSubmit={false}
+          />
+        </View>
+
+        {/* Contacts list */}
+        <Text style={[formStyles.hintMuted, { marginTop: 8, marginBottom: 4 }]}>your contacts</Text>
+        <ScrollView style={{ maxHeight: 200 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          {contacts.length === 0 && <Text style={formStyles.listEmpty}>no contacts saved yet</Text>}
+          {contacts.map((c, i) => {
+            const added = people.includes(c);
+            return (
+              <TouchableOpacity
+                key={i}
+                style={[s.contactRow, added && { opacity: 0.35 }]}
+                onPress={() => { if (!added) { setPeople(prev => [...prev, c]); setTagInputVal(''); setSuggestions([]); } }}
+                disabled={added}
+              >
+                <Text style={s.contactName}>{c}</Text>
+                {added
+                  ? <Ionicons name="checkmark" size={14} color={Colors.faint} />
+                  : <Ionicons name="add" size={14} color={Colors.cyan} />}
+              </TouchableOpacity>
+            );
+          })}
         </ScrollView>
-        <TouchableOpacity style={styles.addMoreBtn} onPress={addPerson}>
-          <Ionicons name="add" size={13} color={Colors.cyan} />
-          <Text style={styles.addMoreText}>add more</Text>
-        </TouchableOpacity>
+
         <View style={formStyles.actions}>
-          <TouchableOpacity style={formStyles.cancelBtn} onPress={() => { setPeople(savedPeople); setAddPersonModal(false); setSuggestions([]); }}>
+          <TouchableOpacity style={formStyles.cancelBtn} onPress={() => { setPeople(savedPeople); setAddPersonModal(false); setSuggestions([]); setTagInputVal(''); }}>
             <Text style={formStyles.cancelBtnText}>cancel</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[formStyles.primaryBtn, savingPeople && { opacity: 0.6 }]} onPress={savePeopleAndClose} disabled={savingPeople}>
@@ -1874,6 +1899,14 @@ const styles = StyleSheet.create({
   suggestionText: { fontFamily: Fonts.mono, fontSize: 12, color: Colors.text },
   subitemFormRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 8, marginLeft: 4 },
   subitemFormInputRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  // Tag input
+  tagInputWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, borderWidth: 1, borderColor: Colors.borderMid, borderRadius: Radius.md, padding: 8, minHeight: 44, marginBottom: 4 },
+  tagChip: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: Colors.cyan, borderRadius: Radius.pill, paddingVertical: 4, paddingLeft: 10, paddingRight: 6 },
+  tagChipText: { fontFamily: Fonts.monoBold, fontSize: 11, color: Colors.white },
+  tagInput: { fontFamily: Fonts.mono, fontSize: 14, color: Colors.text, minWidth: 120, flex: 1, padding: 2 },
+  // Contacts list
+  contactRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  contactName: { fontFamily: Fonts.mono, fontSize: 13, color: Colors.text },
 });
 
 
