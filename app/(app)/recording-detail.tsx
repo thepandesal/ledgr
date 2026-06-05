@@ -6,6 +6,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../../src/lib/supabase';
 import { BlurView } from 'expo-blur';
+import * as ImagePicker from 'expo-image-picker';
+import { compressImage, uploadReceiptPhoto } from '../../src/lib/receiptUpload';
 import BottomSheet from '@/components/ui/BottomSheet';
 import formStyles from '@/components/ui/formStyles';
 
@@ -34,6 +36,7 @@ export default function RecordingDetailScreen() {
   const [shareSelectedAccount, setShareSelectedAccount] = useState<any>(null);
   const [shareLoading, setShareLoading] = useState(false);
   const [shareRowId, setShareRowId] = useState<string | null>(null);
+  const [addReceiptModal, setAddReceiptModal] = useState(false);
   const [linkedReceipt, setLinkedReceipt] = useState<any>(null);
   const [receiptPhotos, setReceiptPhotos] = useState<{ id: string; url: string }[]>([]);
   const [linkReceiptModal, setLinkReceiptModal] = useState(false);
@@ -322,6 +325,54 @@ export default function RecordingDetailScreen() {
 
   const loadExistingShare = async () => {
     // no-op: share data is now fetched live on the share page
+  };
+
+  const addReceiptFromCamera = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') return;
+    const result = await ImagePicker.launchCameraAsync({ quality: 1 });
+    if (!result.canceled && result.assets[0]) {
+      let entryId = linkedReceipt?.id;
+      if (!entryId) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        const note = recording?.transaction_date && recording?.name
+          ? `${new Date(recording.transaction_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}: ${recording.name}`
+          : recording?.name ?? '';
+        const { data: entry } = await supabase.from('receipt_entries').insert({ user_id: user.id, note, recording_id: recordingId }).select().single();
+        entryId = entry?.id;
+      }
+      if (!entryId) return;
+      const compressed = await compressImage(result.assets[0].uri);
+      await uploadReceiptPhoto(compressed, entryId);
+      setAddReceiptModal(false);
+      loadLinkedReceipt();
+    }
+  };
+
+  const addReceiptFromGallery = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') return;
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsMultipleSelection: true, quality: 1 });
+    if (!result.canceled) {
+      let entryId = linkedReceipt?.id;
+      if (!entryId) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        const note = recording?.transaction_date && recording?.name
+          ? `${new Date(recording.transaction_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}: ${recording.name}`
+          : recording?.name ?? '';
+        const { data: entry } = await supabase.from('receipt_entries').insert({ user_id: user.id, note, recording_id: recordingId }).select().single();
+        entryId = entry?.id;
+      }
+      if (!entryId) return;
+      for (const asset of result.assets) {
+        const compressed = await compressImage(asset.uri);
+        await uploadReceiptPhoto(compressed, entryId);
+      }
+      setAddReceiptModal(false);
+      loadLinkedReceipt();
+    }
   };
 
   const loadLinkedReceipt = async () => {
@@ -859,7 +910,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                 if (linkedReceipt) {
                   router.push({ pathname: '/(app)/receipt-detail', params: { receiptId: linkedReceipt.id } } as any);
                 } else {
-                  router.push({ pathname: '/(app)/capture-receipt', params: { recordingId, recordingName: recording?.name, recordingDate: recording?.transaction_date } } as any);
+                  setAddReceiptModal(true);
                 }
               }}
             >
@@ -1719,6 +1770,25 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
         </View>
       )}
 
+      {/* Add receipt modal */}
+      <BottomSheet visible={addReceiptModal} onClose={() => setAddReceiptModal(false)} sub="recording" title="add receipt">
+        <View style={styles.photoButtons}>
+          <TouchableOpacity style={styles.photoBtn} onPress={addReceiptFromCamera}>
+            <Ionicons name="camera-outline" size={28} color="#0ccfcf" />
+            <Text style={styles.photoBtnText}>camera</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.photoBtn} onPress={addReceiptFromGallery}>
+            <Ionicons name="images-outline" size={28} color="#425252" />
+            <Text style={[styles.photoBtnText, { color: '#425252' }]}>gallery</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={formStyles.actions}>
+          <TouchableOpacity style={formStyles.cancelBtn} onPress={() => setAddReceiptModal(false)}>
+            <Text style={formStyles.cancelBtnText}>cancel</Text>
+          </TouchableOpacity>
+        </View>
+      </BottomSheet>
+
       {/* Hidden WebView for image capture - native only */}
       {captureHtml && Platform.OS !== 'web' && (() => {
         const { WebView } = require('react-native-webview');
@@ -1866,6 +1936,9 @@ const styles = StyleSheet.create({
   cancelBtn: { flex: 1, backgroundColor: '#f5f5f5', borderRadius: 999, paddingVertical: 13, alignItems: 'center' },
   cancelBtnText: { fontFamily: 'RobotoMono_700Bold', fontSize: 13, color: '#8a8a8a' },
   splitPreview: { fontFamily: 'RobotoMono_700Bold', fontSize: 12, color: '#0ccfcf', alignSelf: 'flex-start' },
+  photoButtons: { flexDirection: 'row', gap: 12, marginVertical: 16 },
+  photoBtn: { flex: 1, borderRadius: 14, borderWidth: 1.5, borderColor: '#f0f0f0', borderStyle: 'dashed', paddingVertical: 28, alignItems: 'center', gap: 8, backgroundColor: '#fafafa' },
+  photoBtnText: { fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#0ccfcf' },
 });
 
 
