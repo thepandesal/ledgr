@@ -12,12 +12,13 @@ export default function SplitSharePage() {
   const [recording, setRecording] = useState<any>(null);
   const [perPerson, setPerPerson] = useState<{ name: string; total: number }[]>([]);
   const [items, setItems] = useState<any[]>([]);
-  const [payment, setPayment] = useState<any>(null);
+  const [payments, setPayments] = useState<any[]>([]);
   const [receiptId, setReceiptId] = useState<string | null>(null);
   const [receiptPhotos, setReceiptPhotos] = useState<string[]>([]);
   const [receiptModal, setReceiptModal] = useState(false);
   const [receiptLoading, setReceiptLoading] = useState(false);
   const [qrModal, setQrModal] = useState(false);
+  const [qrModalAcc, setQrModalAcc] = useState<any>(null);
   const [showUrlBar, setShowUrlBar] = useState(false);
 
   const shareUrl = typeof window !== 'undefined' ? window.location.href : `https://ledgr.thepandesal.com/split/${id}`;
@@ -39,43 +40,31 @@ export default function SplitSharePage() {
   }, [id]);
 
   const loadAll = async () => {
-    // Get recording_id from split_shares
-    const { data: share, error } = await supabase.from('split_shares').select('recording_id').eq('id', id).single();
+    const { data: share, error } = await supabase.from('split_shares').select('recording_id, data').eq('id', id).single();
     if (error || !share) { setNotFound(true); setLoading(false); return; }
     const rid = share.recording_id;
+    const accountIds: string[] = share.data?.account_ids ?? [];
 
-    // Fetch everything in parallel
     const [recRes, splitsRes, itemsRes, receiptRes] = await Promise.all([
-      supabase.from('recordings').select('*, account:account_id(account_name, bank, account_number, qr_code)').eq('id', rid).single(),
+      supabase.from('recordings').select('*').eq('id', rid).single(),
       supabase.from('bill_splits').select('person_name').eq('recording_id', rid).order('created_at'),
       supabase.from('split_items').select('*, split_subitems(*)').eq('recording_id', rid).order('created_at'),
-      supabase.from('receipt_entries').select('id').eq('recording_id', rid).single(),
+      supabase.from('receipt_entries').select('id').eq('recording_id', rid).maybeSingle(),
     ]);
 
     if (!recRes.data) { setNotFound(true); setLoading(false); return; }
     setRecording(recRes.data);
-
-    // Payment account
-    if (recRes.data.account) {
-      setPayment({
-        accountName: recRes.data.account.account_name,
-        bank: recRes.data.account.bank,
-        accountNumber: recRes.data.account.account_number,
-        qrCode: recRes.data.account.qr_code ?? null,
-      });
-    }
-
-    // Receipt
     if (receiptRes.data) setReceiptId(receiptRes.data.id);
 
-    // Items
-    const loadedItems = (itemsRes.data ?? []).map((item: any) => ({
-      ...item,
-      subitems: item.split_subitems ?? [],
-    }));
+    // Load selected payment accounts
+    if (accountIds.length > 0) {
+      const { data: accs } = await supabase.from('accounts').select('account_name, bank, account_number, qr_code').in('id', accountIds);
+      if (accs) setPayments(accs);
+    }
+
+    const loadedItems = (itemsRes.data ?? []).map((item: any) => ({ ...item, subitems: item.split_subitems ?? [] }));
     setItems(loadedItems);
 
-    // Per person calculation
     const people = (splitsRes.data ?? []).map((r: any) => r.person_name);
     const perPersonMap: Record<string, number> = {};
     people.forEach(p => { perPersonMap[p] = 0; });
@@ -240,24 +229,26 @@ export default function SplitSharePage() {
         )}
 
         {/* Payment Information */}
-        {payment && (
+        {payments.length > 0 && (
           <>
             <Text style={s.sectionHeader}>payment information</Text>
-            <View style={s.card}>
-              <View style={s.payRow}>
-                <View style={{ gap: 3, flex: 1 }}>
-                  <Text style={s.payName}>{payment.accountName ?? ''}</Text>
-                  <Text style={s.payBank}>{payment.bank ?? ''}</Text>
-                  <Text style={s.payNumber}>{payment.accountNumber ?? ''}</Text>
+            {payments.map((acc: any, i: number) => (
+              <View key={i} style={[s.card, { marginBottom: 10 }]}>
+                <View style={s.payRow}>
+                  <View style={{ gap: 3, flex: 1 }}>
+                    <Text style={s.payName}>{acc.account_name ?? ''}</Text>
+                    <Text style={s.payBank}>{acc.bank ?? ''}</Text>
+                    <Text style={s.payNumber}>{acc.account_number ?? ''}</Text>
+                  </View>
+                  {acc.qr_code
+                    ? <TouchableOpacity onPress={() => { setQrModalAcc(acc); setQrModal(true); }}>
+                        <Image source={{ uri: acc.qr_code }} style={s.qr} resizeMode="contain" />
+                      </TouchableOpacity>
+                    : null}
                 </View>
-                {payment.qrCode
-                  ? <TouchableOpacity onPress={() => setQrModal(true)}>
-                      <Image source={{ uri: payment.qrCode }} style={s.qr} resizeMode="contain" />
-                    </TouchableOpacity>
-                  : null}
+                {acc.qr_code && <Text style={s.qrHint}>tap the QR code to expand</Text>}
               </View>
-              {payment.qrCode && <Text style={s.qrHint}>tap the QR code to expand</Text>}
-            </View>
+            ))}
           </>
         )}
 
@@ -287,8 +278,8 @@ export default function SplitSharePage() {
       {/* QR Modal */}
       <Modal visible={qrModal} transparent animationType="fade" onRequestClose={() => setQrModal(false)}>
         <BlurView intensity={60} tint="dark" style={s.qrOverlay}>
-          <TouchableOpacity style={s.qrOverlay} activeOpacity={1} onPress={() => setQrModal(false)}>
-            <Image source={{ uri: payment?.qrCode ?? '' }} style={s.qrLarge} resizeMode="contain" />
+          <TouchableOpacity style={s.qrOverlay} activeOpacity={1} onPress={() => { setQrModal(false); setQrModalAcc(null); }}>
+            <Image source={{ uri: qrModalAcc?.qr_code ?? '' }} style={s.qrLarge} resizeMode="contain" />
             <Text style={s.qrTap}>tap anywhere to close</Text>
           </TouchableOpacity>
         </BlurView>

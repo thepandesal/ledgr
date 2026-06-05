@@ -38,7 +38,7 @@ export default function RecordingDetailScreen() {
   const [cookingModal, setCookingModal] = useState(false);
   const [saveImageModal, setSaveImageModal] = useState(false);
   const [shareAccounts, setShareAccounts] = useState<any[]>([]);
-  const [shareSelectedAccount, setShareSelectedAccount] = useState<any>(null);
+  const [shareSelectedAccountIds, setShareSelectedAccountIds] = useState<string[]>([]);
   const [shareLoading, setShareLoading] = useState(false);
   const [shareRowId, setShareRowId] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
@@ -477,14 +477,14 @@ export default function RecordingDetailScreen() {
       if (!user) return;
       const { data: accs } = await supabase.from('accounts').select().eq('user_id', user.id).order('account_name');
       if (accs) setShareAccounts(accs);
-      const recAccount = accs?.find((a: any) => a.id === recording?.account_id) ?? accs?.[0] ?? null;
-      setShareSelectedAccount(recAccount);
     }
-    // Pre-build share URL so tapping share link requires no async
+    // Pre-build share row and load previously selected accounts
     if (!shareRowId) {
-      const { data: existing } = await supabase.from('split_shares').select('id').eq('recording_id', recordingId).maybeSingle();
+      const { data: existing } = await supabase.from('split_shares').select('id, data').eq('recording_id', recordingId).maybeSingle();
       if (existing?.id) {
         setShareRowId(existing.id);
+        const savedIds: string[] = existing.data?.account_ids ?? [];
+        setShareSelectedAccountIds(savedIds);
       } else {
         const { data: inserted } = await supabase.from('split_shares').insert({ recording_id: recordingId, data: {} }).select('id').single();
         if (inserted?.id) setShareRowId(inserted.id);
@@ -572,8 +572,10 @@ export default function RecordingDetailScreen() {
     </body></html>`;
   };
 
-  const generateShare = () => {
+  const generateShare = async () => {
     if (!shareRowId) return;
+    // Upsert selected accounts into split_shares.data
+    await supabase.from('split_shares').update({ data: { account_ids: shareSelectedAccountIds } }).eq('id', shareRowId);
     const shareUrl = `https://ledgr.thepandesal.com/split/${shareRowId}`;
     if (Platform.OS !== 'web') {
       Share.share({ message: shareUrl, url: shareUrl });
@@ -1372,17 +1374,26 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
         title="share split"
         actions={[{ label: 'cancel', onPress: () => { setSaveImageModal(false); setLinkCopied(false); }, muted: true }]}
       >
-        <Text style={formStyles.hintMuted}>choose payment account</Text>
-        <ScrollView style={{ width: '100%', maxHeight: 180 }} showsVerticalScrollIndicator={false}>
-          {shareAccounts.map((acc: any) => (
-            <TouchableOpacity key={acc.id} style={[accountStyles.option, shareSelectedAccount?.id === acc.id && accountStyles.optionActive]} onPress={() => setShareSelectedAccount(acc)}>
-              <View style={{ flex: 1 }}>
-                <Text style={[accountStyles.optionName, shareSelectedAccount?.id === acc.id && accountStyles.optionNameActive]}>{acc.account_name}</Text>
-                <Text style={[accountStyles.optionBank, shareSelectedAccount?.id === acc.id && accountStyles.optionBankActive]}>{acc.bank} · {acc.account_number}</Text>
-              </View>
-              {shareSelectedAccount?.id === acc.id && <Ionicons name="checkmark" size={14} color={Colors.white} />}
-            </TouchableOpacity>
-          ))}
+        <Text style={formStyles.hintMuted}>choose payment account(s)</Text>
+        <ScrollView style={{ width: '100%', maxHeight: 200 }} showsVerticalScrollIndicator={false}>
+          {shareAccounts.map((acc: any) => {
+            const selected = shareSelectedAccountIds.includes(acc.id);
+            return (
+              <TouchableOpacity
+                key={acc.id}
+                style={[accountStyles.option, selected && accountStyles.optionActive]}
+                onPress={() => setShareSelectedAccountIds(prev =>
+                  selected ? prev.filter(id => id !== acc.id) : [...prev, acc.id]
+                )}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={[accountStyles.optionName, selected && accountStyles.optionNameActive]}>{acc.account_name}</Text>
+                  <Text style={[accountStyles.optionBank, selected && accountStyles.optionBankActive]}>{acc.bank} · {acc.account_number}</Text>
+                </View>
+                <Ionicons name={selected ? 'checkbox' : 'square-outline'} size={18} color={selected ? Colors.white : Colors.faint} />
+              </TouchableOpacity>
+            );
+          })}
           {shareAccounts.length === 0 && <Text style={[formStyles.hintMuted, { textAlign: 'center', marginVertical: 8 }]}>no accounts saved</Text>}
         </ScrollView>
         <View style={accountStyles.shareRow}>
