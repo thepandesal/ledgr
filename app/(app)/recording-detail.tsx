@@ -139,7 +139,7 @@ export default function RecordingDetailScreen() {
     loadLinkedReceipt();
     loadPaymentData();
     // Pre-fetch share row ID so share button is instant
-    supabase.from('split_shares').select('id').eq('recording_id', recordingId).single()
+    supabase.from('split_shares').select('id').eq('recording_id', recordingId).maybeSingle()
       .then(({ data }) => { if (data) setShareRowId(data.id); });
   }, []);
 
@@ -482,7 +482,7 @@ export default function RecordingDetailScreen() {
     }
     // Pre-build share URL so tapping share link requires no async
     if (!shareRowId) {
-      const { data: existing } = await supabase.from('split_shares').select('id').eq('recording_id', recordingId).single();
+      const { data: existing } = await supabase.from('split_shares').select('id').eq('recording_id', recordingId).maybeSingle();
       if (existing?.id) {
         setShareRowId(existing.id);
       } else {
