@@ -566,7 +566,7 @@ const s = StyleSheet.create({
   // Stats
   statsRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 8 },
   statCard: { flex: 1, alignItems: 'center', gap: 4 },
-  statIcon: { width: 40, height: 40 },
+  statIcon: { width: 28, height: 28 },
   statValue: { fontFamily: Fonts.monoBold, fontSize: 13 },
   statLabel: { fontFamily: Fonts.mono, fontSize: 9, color: Colors.muted, textAlign: 'center' },
 
