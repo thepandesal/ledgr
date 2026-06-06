@@ -22,7 +22,7 @@ export default function LoginScreen() {
   };
 
   return (
-    <SafeAreaView style={s.container} edges={['bottom']}>
+    <SafeAreaView style={s.container} edges={['bottom', 'top']}>
 
       {/* Hero — full width, correct aspect ratio, no cropping */}
       <Image
