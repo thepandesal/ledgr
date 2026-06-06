@@ -9,6 +9,7 @@ import { supabase } from '../../src/lib/supabase';
 import { BlurView } from 'expo-blur';
 import * as ImagePicker from 'expo-image-picker';
 import BottomSheet from '@/components/ui/BottomSheet';
+import ConfirmModal from '@/components/ui/ConfirmModal';
 import formStyles from '@/components/ui/formStyles';
 import pageStyles from '@/components/ui/pageStyles';
 import accountStyles from '@/components/ui/accountStyles';
@@ -34,6 +35,8 @@ export default function ReceiptDetailScreen() {
   const [carouselIdx, setCarouselIdx] = useState<number | null>(null);
   const [renameModal, setRenameModal] = useState(false);
   const [renameVal, setRenameVal] = useState('');
+  const [deleteEntryConfirm, setDeleteEntryConfirm] = useState(false);
+  const [deletePhotoConfirm, setDeletePhotoConfirm] = useState<Photo | null>(null);
   const [linkModal, setLinkModal] = useState(false);
   const [linkDate, setLinkDate] = useState(new Date().toISOString().split('T')[0]);
   const [linkRecordings, setLinkRecordings] = useState<any[]>([]);
@@ -76,15 +79,11 @@ export default function ReceiptDetailScreen() {
     setRenameModal(false);
   };
 
-  const deleteEntry = () => {
-    Alert.alert('Delete Folder', 'This will delete all photos. Cannot be undone.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: async () => {
-        for (const p of photos) await supabase.storage.from('receipts').remove([p.path]);
-        await supabase.from('receipt_entries').delete().eq('id', receiptId);
-        handleBack();
-      }},
-    ]);
+  const deleteEntry = async () => {
+    for (const p of photos) await supabase.storage.from('receipts').remove([p.path]);
+    await supabase.from('receipt_photos').delete().eq('entry_id', receiptId);
+    await supabase.from('receipt_entries').delete().eq('id', receiptId);
+    handleBack();
   };
 
   const deletePhoto = async (photo: Photo) => {
@@ -92,6 +91,7 @@ export default function ReceiptDetailScreen() {
     await supabase.from('receipt_photos').delete().eq('id', photo.id);
     setPhotos(prev => prev.filter(p => p.id !== photo.id));
     setCarouselIdx(null);
+    setDeletePhotoConfirm(null);
   };
 
   const addFromGallery = async () => {
@@ -197,7 +197,7 @@ export default function ReceiptDetailScreen() {
             <Ionicons name="images-outline" size={15} color={Colors.text} />
             <Text style={pageStyles.actionBtnText}>photos</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[pageStyles.actionBtn, pageStyles.actionBtnDanger]} onPress={deleteEntry}>
+          <TouchableOpacity style={[pageStyles.actionBtn, pageStyles.actionBtnDanger]} onPress={() => setDeleteEntryConfirm(true)}>
             <Ionicons name="trash-outline" size={15} color={Colors.danger} />
             <Text style={[pageStyles.actionBtnText, { color: Colors.danger }]}>delete</Text>
           </TouchableOpacity>
@@ -214,7 +214,7 @@ export default function ReceiptDetailScreen() {
                   <TouchableOpacity onPress={() => setCarouselIdx(i)} activeOpacity={0.85} style={{ flex: 1 }}>
                     <Image source={{ uri: p.url }} style={s.cellImg} resizeMode="cover" />
                   </TouchableOpacity>
-                  <TouchableOpacity style={s.cellDelete} onPress={() => deletePhoto(p)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <TouchableOpacity style={s.cellDelete} onPress={() => setDeletePhotoConfirm(p)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                     <Ionicons name="close-circle" size={20} color={Colors.danger} />
                   </TouchableOpacity>
                 </View>
@@ -328,6 +328,30 @@ export default function ReceiptDetailScreen() {
           </TouchableOpacity>
         </View>
       </BottomSheet>
+
+      {/* Delete entry confirm */}
+      <ConfirmModal
+        visible={deleteEntryConfirm}
+        onClose={() => setDeleteEntryConfirm(false)}
+        title="delete folder"
+        message="this will delete all photos. cannot be undone."
+        actions={[
+          { label: 'cancel', onPress: () => setDeleteEntryConfirm(false), muted: true },
+          { label: 'delete', onPress: deleteEntry, destructive: true },
+        ]}
+      />
+
+      {/* Delete photo confirm */}
+      <ConfirmModal
+        visible={!!deletePhotoConfirm}
+        onClose={() => setDeletePhotoConfirm(null)}
+        title="delete photo"
+        message="this photo will be permanently deleted."
+        actions={[
+          { label: 'cancel', onPress: () => setDeletePhotoConfirm(null), muted: true },
+          { label: 'delete', onPress: () => deletePhoto(deletePhotoConfirm!), destructive: true },
+        ]}
+      />
 
       {/* Rename modal */}
       <BottomSheet visible={renameModal} onClose={() => setRenameModal(false)} sub="receipt" title="rename folder">
