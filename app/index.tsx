@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../src/lib/supabase';
 import { useState } from 'react';
@@ -18,39 +18,50 @@ export default function LoginScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
-      <View style={styles.inner}>
-        <Text style={styles.tagline}>track your money the right way with</Text>
-        <Text style={styles.brand}>ledgr</Text>
-        <View style={styles.buttons}>
-          <TouchableOpacity style={styles.button} activeOpacity={0.8} onPress={() => signIn('google')} disabled={loading !== null}>
-            {loading === 'google' ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>continue with google</Text>}
+    <SafeAreaView style={s.container} edges={['bottom']}>
+      <View style={s.inner}>
+
+        {/* Hero image */}
+        <Image source={require('../assets/login-vector.png')} style={s.hero} resizeMode="contain" />
+
+        {/* Brand */}
+        <Text style={s.brand}>LEDGR</Text>
+        <Text style={s.tagline}>track your numbers.</Text>
+
+        {/* Buttons */}
+        <View style={s.buttons}>
+          <TouchableOpacity style={s.button} activeOpacity={0.8} onPress={() => signIn('google')} disabled={loading !== null}>
+            {loading === 'google'
+              ? <ActivityIndicator color="#545454" />
+              : <Text style={s.buttonText}>continue with google</Text>}
           </TouchableOpacity>
-          <TouchableOpacity style={styles.button} activeOpacity={0.8} onPress={() => signIn('apple')} disabled={loading !== null}>
-            {loading === 'apple' ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>continue with apple</Text>}
+          <TouchableOpacity style={s.button} activeOpacity={0.8} onPress={() => signIn('apple')} disabled={loading !== null}>
+            {loading === 'apple'
+              ? <ActivityIndicator color="#545454" />
+              : <Text style={s.buttonText}>continue with apple</Text>}
           </TouchableOpacity>
         </View>
+
       </View>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f5f5' },
-  inner: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
-  tagline: { fontFamily: 'RobotoMono_400Regular', fontSize: 14, color: '#1c1d1d', textAlign: 'center', marginBottom: 16 },
-  brand: { fontFamily: 'Avenelle', fontSize: 120, color: '#0ccfcf', textAlign: 'center', marginBottom: 16, lineHeight: 130 },
-  buttons: { width: '70%', gap: 12 },
+const s = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#ffffff' },
+  inner: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 0 },
+  hero: { width: 220, height: 220, marginBottom: 24 },
+  brand: { fontFamily: 'MuseoModerno_Black', fontSize: 52, color: '#7fd8cd', letterSpacing: -1, marginBottom: 6 },
+  tagline: { fontFamily: 'ChillaxMedium', fontSize: 13, color: '#545454', marginBottom: 40 },
+  buttons: { width: '100%', gap: 12 },
   button: {
-    backgroundColor: '#425252',
     borderRadius: 999,
-    paddingVertical: 15,
+    paddingVertical: 14,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 6,
+    borderWidth: 1,
+    borderStyle: 'dotted',
+    borderColor: '#929090',
+    backgroundColor: '#ffffff',
   },
-  buttonText: { fontFamily: 'DMSans_600SemiBold', fontSize: 15, color: '#ffffff' },
+  buttonText: { fontFamily: 'CalSans', fontSize: 15, color: '#545454' },
 });
