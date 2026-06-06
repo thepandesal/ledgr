@@ -242,9 +242,21 @@ export default function SpaceDetailScreen() {
         {/* Recordings header */}
         <View style={s.recordingsHeader}>
           <Text style={[pageStyles.sectionHeader, { marginBottom: 0, marginTop: 0 }]}>recordings</Text>
-          <TouchableOpacity style={{ padding: 6 }} onPress={() => setShowFilter(true)}>
-            <Ionicons name="options-outline" size={18} color={activeFilter.length > 0 ? Colors.cyan : Colors.muted} />
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            {spaceId !== 'all' && (
+              <TouchableOpacity
+                style={pageStyles.actionBtn}
+                onPress={() => router.push({ pathname: '/(app)/add-recording', params: { spaceId, spaceName: name, defaultDate: selectedDate.toISOString().split('T')[0] } } as any)}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="add" size={14} color={Colors.text} />
+                <Text style={pageStyles.actionBtnText}>add recording</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity style={{ padding: 6 }} onPress={() => setShowFilter(true)}>
+              <Ionicons name="options-outline" size={18} color={activeFilter.length > 0 ? Colors.cyan : Colors.muted} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Nav row */}
@@ -329,20 +341,7 @@ export default function SpaceDetailScreen() {
             </View>
           )}
 
-          {/* Add recording — hidden in all spaces view */}
-          {spaceId !== 'all' && (
-            <View style={s.addRecordingRow}>
-              <TouchableOpacity
-                style={[pageStyles.actionBtn, { alignSelf: 'flex-end' }]}
-                onPress={() => router.push({ pathname: '/(app)/add-recording', params: { spaceId, spaceName: name, defaultDate: selectedDate.toISOString().split('T')[0] } } as any)}
-                activeOpacity={0.85}
-              >
-                <Ionicons name="add" size={14} color={Colors.text} />
-                <Text style={pageStyles.actionBtnText}>add recording</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
+          
           {loading ? (
             <ActivityIndicator color={Colors.income} style={{ marginTop: 40 }} />
           ) : grouped.length === 0 ? (
@@ -562,8 +561,6 @@ const s = StyleSheet.create({
   dot: { width: 4, height: 4, borderRadius: 2, backgroundColor: Colors.cyan, marginTop: 3 },
   dotSelected: { backgroundColor: Colors.white },
 
-  // Add recording
-  addRecordingRow: { paddingHorizontal: Spacing.page, alignItems: 'flex-end', marginBottom: 10, marginTop: 20 },
 
   // Recording list
   list: { paddingHorizontal: Spacing.page, paddingBottom: 100, gap: 16, paddingTop: 16 },
