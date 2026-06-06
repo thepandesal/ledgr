@@ -1362,13 +1362,17 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                                 </>
                               )}
                               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                <TouchableOpacity style={[itemStyles.addSubitemBtn, isSplitLocked && { opacity: 0.3 }]} onPress={() => !isSplitLocked && openEditSubitems(item)}>
-                                  <Ionicons name="add" size={13} color={Colors.cyan} />
-                                  <Text style={itemStyles.addSubitemBtnText}>subitem</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity onPress={() => deleteItem(item.id)} style={itemStyles.itemDelete}>
-                                  <Ionicons name="close" size={14} color={Colors.faint} />
-                                </TouchableOpacity>
+                                {!isSplitLocked && (
+                                  <TouchableOpacity style={itemStyles.addSubitemBtn} onPress={() => openEditSubitems(item)}>
+                                    <Ionicons name="add" size={13} color={Colors.cyan} />
+                                    <Text style={itemStyles.addSubitemBtnText}>subitem</Text>
+                                  </TouchableOpacity>
+                                )}
+                                {!isSplitLocked && (
+                                  <TouchableOpacity onPress={() => deleteItem(item.id)} style={itemStyles.itemDelete}>
+                                    <Ionicons name="close" size={14} color={Colors.faint} />
+                                  </TouchableOpacity>
+                                )}
                               </View>
                             </View>
                           </View>
@@ -1403,9 +1407,11 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                                       </Text>
                                     </>
                                   )}
-                                  <TouchableOpacity onPress={() => deleteSubitem(item.id, sub.id)} style={itemStyles.itemDelete}>
-                                    <Ionicons name="close" size={12} color={Colors.faint} />
-                                  </TouchableOpacity>
+                                  {!isSplitLocked && (
+                                    <TouchableOpacity onPress={() => deleteSubitem(item.id, sub.id)} style={itemStyles.itemDelete}>
+                                      <Ionicons name="close" size={12} color={Colors.faint} />
+                                    </TouchableOpacity>
+                                  )}
                                 </View>
                               </View>
                             );
