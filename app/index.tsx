@@ -3,7 +3,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../src/lib/supabase';
 import { useState } from 'react';
 
-const { width, height } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
+const IMG_ASPECT = 1830 / 1320;
+const heroHeight = width * IMG_ASPECT;
 
 export default function LoginScreen() {
   const [loading, setLoading] = useState<'google' | 'apple' | null>(null);
@@ -22,14 +24,14 @@ export default function LoginScreen() {
   return (
     <SafeAreaView style={s.container} edges={['bottom']}>
 
-      {/* Hero — fills top half edge to edge */}
+      {/* Hero — full width, correct aspect ratio, no cropping */}
       <Image
         source={require('../assets/login-vector.png')}
-        style={s.hero}
-        resizeMode="cover"
+        style={{ width, height: heroHeight }}
+        resizeMode="contain"
       />
 
-      {/* Content — bottom half */}
+      {/* Content */}
       <View style={s.content}>
         <Text style={s.brand}>LEDGR</Text>
         <Text style={s.tagline}>track your numbers.</Text>
@@ -53,25 +55,21 @@ export default function LoginScreen() {
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#ffffff' },
-  hero: { width, height: height * 0.5 },
   content: {
-    flex: 1,
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 32,
-    gap: 0,
+    paddingHorizontal: 48,
+    marginTop: -16,
   },
-  brand: { fontFamily: 'MuseoModerno_Black', fontSize: 104, color: '#7fd8cd', letterSpacing: -1, marginBottom: 4 },
-  tagline: { fontFamily: 'ChillaxMedium', fontSize: 13, color: '#545454', marginBottom: 32 },
+  brand: { fontFamily: 'MuseoModerno_Black', fontSize: 72, color: '#7fd8cd', letterSpacing: -1, marginBottom: 4 },
+  tagline: { fontFamily: 'ChillaxMedium', fontSize: 18, color: '#545454', marginBottom: 32 },
   buttons: { width: '100%', gap: 12 },
   button: {
     borderRadius: 999,
     paddingVertical: 14,
     alignItems: 'center',
-    borderWidth: 2,
-    borderStyle: 'dashed',
+    borderWidth: 1,
     borderColor: '#929090',
     backgroundColor: '#ffffff',
   },
-  buttonText: { fontFamily: 'CalSans', fontSize: 15, color: '#545454' },
+  buttonText: { fontFamily: 'CalSans', fontSize: 15, color: '#545454', letterSpacing: 1.5 },
 });
