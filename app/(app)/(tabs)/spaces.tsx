@@ -1,11 +1,15 @@
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  SafeAreaView, Modal, TextInput, ActivityIndicator, Alert, Animated,
+  SafeAreaView, TextInput, ActivityIndicator, Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../../src/lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
+import BottomSheet from '@/components/ui/BottomSheet';
+import ConfirmModal from '@/components/ui/ConfirmModal';
+import formStyles from '@/components/ui/formStyles';
+import { Colors, Fonts, Radius, Spacing } from '@/components/ui/theme';
 
 const PASTEL_COLORS = [
   '#FFB3B3', '#FFD9B3', '#FFFAB3', '#B3FFB3', '#B3FFE0',
@@ -39,7 +43,6 @@ export default function SpacesScreen() {
   const [error, setError] = useState('');
   const [menuModal, setMenuModal] = useState(false);
   const [selectedSpace, setSelectedSpace] = useState<Space | null>(null);
-  const menuFade = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -79,235 +82,210 @@ export default function SpacesScreen() {
     setSpaces(prev => [...prev, data]); setLoading(false); setCreateModal(false);
   };
 
-  const openMenu = (space: Space) => {
-    setSelectedSpace(space); setMenuModal(true);
-    Animated.timing(menuFade, { toValue: 1, duration: 200, useNativeDriver: false }).start();
-  };
-
-  const closeMenu = (cb?: () => void) => {
-    Animated.timing(menuFade, { toValue: 0, duration: 150, useNativeDriver: false }).start(() => { setMenuModal(false); cb?.(); });
-  };
+  const openMenu = (space: Space) => { setSelectedSpace(space); setMenuModal(true); };
+  const closeMenu = () => setMenuModal(false);
 
   const handleDeleteSpace = () => {
-    closeMenu(() => {
-      Alert.alert('Delete Space', `Delete "${selectedSpace?.name}"? This cannot be undone.`, [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: async () => {
-          await supabase.from('spaces').delete().eq('id', selectedSpace!.id);
-          setSpaces(prev => prev.filter(s => s.id !== selectedSpace!.id));
-        }},
-      ]);
-    });
+    closeMenu();
+    Alert.alert('Delete Space', `Delete "${selectedSpace?.name}"? This cannot be undone.`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: async () => {
+        await supabase.from('spaces').delete().eq('id', selectedSpace!.id);
+        setSpaces(prev => prev.filter(s => s.id !== selectedSpace!.id));
+      }},
+    ]);
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <View style={styles.avatarFallback}>
-            <Ionicons name="person" size={16} color="#b0b0b0" />
+    <SafeAreaView style={s.container}>
+      <View style={s.header}>
+        <View style={s.headerLeft}>
+          <View style={s.avatarFallback}>
+            <Ionicons name="person" size={16} color={Colors.faint} />
           </View>
-          <Text style={styles.greeting}>Hey, <Text style={styles.greetingName}>{userName}!</Text></Text>
+          <Text style={s.greeting}>Hey, <Text style={s.greetingName}>{userName}!</Text></Text>
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <Text style={styles.sectionTitle}>spaces</Text>
-        <View style={styles.grid}>
-          {/* All spaces button */}
+      <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+        <Text style={s.sectionTitle}>spaces</Text>
+        <View style={s.grid}>
           <TouchableOpacity
-            style={[styles.spaceCard, { backgroundColor: '#425252', width: '100%' }]}
+            style={[s.spaceCard, { backgroundColor: Colors.text, width: '100%' }]}
             activeOpacity={0.8}
             onPress={() => router.push({ pathname: '/(app)/space-detail', params: { spaceId: 'all', name: 'all spaces' } })}>
-            <Ionicons name="layers-outline" size={16} color="#fff" />
-            <Text style={[styles.spaceCardText, { fontFamily: 'DMSans_600SemiBold' }]}>all spaces</Text>
+            <Ionicons name="layers-outline" size={16} color={Colors.white} />
+            <Text style={s.spaceCardText}>all spaces</Text>
           </TouchableOpacity>
           {spaces.map(space => (
-            <View key={space.id} style={styles.spaceCard}>
-              <TouchableOpacity style={styles.spaceCardMain} activeOpacity={0.8}
+            <View key={space.id} style={s.spaceCard}>
+              <TouchableOpacity style={s.spaceCardMain} activeOpacity={0.8}
                 onPress={() => router.push({ pathname: '/(app)/space-detail', params: { spaceId: space.id, name: space.name, color: space.color } })}>
-                <Ionicons name={space.icon as any} size={16} color="#fff" />
-                <Text style={styles.spaceCardText} numberOfLines={1}>{space.name.toLowerCase()}</Text>
+                <Ionicons name={space.icon as any} size={16} color={Colors.white} />
+                <Text style={s.spaceCardText} numberOfLines={1}>{space.name.toLowerCase()}</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => openMenu(space)} style={styles.spaceMenuBtn}>
-                <Ionicons name="ellipsis-vertical" size={14} color="#fff" />
+              <TouchableOpacity onPress={() => openMenu(space)} style={s.spaceMenuBtn}>
+                <Ionicons name="ellipsis-vertical" size={14} color={Colors.white} />
               </TouchableOpacity>
             </View>
           ))}
-          <TouchableOpacity style={styles.addCard} activeOpacity={0.8} onPress={openCreate}>
-            <Ionicons name="add" size={24} color="#fff" />
-            <Text style={styles.addCardText}>add a space</Text>
+          <TouchableOpacity style={s.addCard} activeOpacity={0.8} onPress={openCreate}>
+            <Ionicons name="add" size={24} color={Colors.white} />
+            <Text style={s.addCardText}>add a space</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
 
-      <Modal visible={createModal} transparent animationType="slide" onRequestClose={() => setCreateModal(false)}>
-        <View style={styles.modalOverlay}>
-          <ScrollView contentContainerStyle={styles.modalScroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>new space</Text>
-                <TouchableOpacity onPress={() => setCreateModal(false)}>
-                  <Ionicons name="close" size={22} color="#b0b0b0" />
-                </TouchableOpacity>
-              </View>
+      {/* Create space sheet */}
+      <BottomSheet visible={createModal} onClose={() => setCreateModal(false)} sub="spaces" title="new space">
+        {error ? <Text style={formStyles.errorText}>{error}</Text> : null}
+        <Text style={formStyles.sectionLabel}>name</Text>
+        <TextInput
+          style={[formStyles.input, error ? { borderColor: Colors.danger } : null]}
+          placeholder="e.g. Household"
+          placeholderTextColor={Colors.faint}
+          value={spaceName}
+          onChangeText={v => { setSpaceName(v.slice(0, 15)); setError(''); }}
+          maxLength={15}
+          autoFocus
+        />
+        <Text style={[formStyles.hintMuted, { alignSelf: 'flex-end' }]}>{spaceName.length}/15</Text>
 
-              <Text style={styles.label}>name</Text>
-              <TextInput style={[styles.input, error ? styles.inputError : null]} placeholder="e.g. Household"
-                placeholderTextColor="#b0b0b0" value={spaceName}
-                onChangeText={v => { setSpaceName(v.slice(0, 15)); setError(''); }} maxLength={15} autoFocus />
-              <Text style={styles.charCount}>{spaceName.length}/15</Text>
-              {error ? <Text style={styles.error}>{error}</Text> : null}
-
-              <Text style={styles.label}>color</Text>
-              <View style={styles.colorRow}>
-                {PASTEL_COLORS.map(c => (
-                  <TouchableOpacity key={c} style={[styles.colorDot, { backgroundColor: c }, selectedColor === c && styles.colorDotSelected]} onPress={() => setSelectedColor(c)} />
-                ))}
-              </View>
-
-              <Text style={styles.label}>icon</Text>
-              <View style={styles.iconRow}>
-                {ICONS.map(i => (
-                  <TouchableOpacity key={i} style={[styles.iconBtn, selectedIcon === i && styles.iconBtnSelected]} onPress={() => setSelectedIcon(i)}>
-                    <Ionicons name={i as any} size={20} color={selectedIcon === i ? '#ffffff' : '#8a8a8a'} />
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              <Text style={styles.label}>preview</Text>
-              <View style={[styles.preview, { backgroundColor: selectedColor }]}>
-                <Ionicons name={selectedIcon as any} size={16} color="#1c1d1d" />
-                <Text style={styles.previewText}>{spaceName || 'my space'}</Text>
-              </View>
-
-              <Text style={styles.label}>default category</Text>
-              <View style={styles.toggleRow}>
-                <Text style={styles.toggleLabel}>use a default category?</Text>
-                <TouchableOpacity style={[styles.toggleBtn, useDefaultCategory && styles.toggleBtnActive]}
-                  onPress={() => { setUseDefaultCategory(!useDefaultCategory); setSelectedCategory(null); setCategoryInput(''); }}>
-                  <Text style={[styles.toggleBtnText, useDefaultCategory && styles.toggleBtnTextActive]}>
-                    {useDefaultCategory ? 'yes' : 'no'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              {useDefaultCategory && (
-                selectedCategory ? (
-                  <View style={styles.badgeRow}>
-                    <View style={[styles.badge, { backgroundColor: selectedCategory.color }]}>
-                      <Ionicons name={selectedCategory.icon as any} size={14} color="#1c1d1d" />
-                      <Text style={styles.badgeText}>{selectedCategory.name}</Text>
-                      <TouchableOpacity onPress={() => setSelectedCategory(null)}>
-                        <Ionicons name="close" size={14} color="#1c1d1d" />
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                ) : (
-                  <>
-                    <TextInput style={[styles.input, { marginTop: 8 }]} placeholder="search categories..."
-                      placeholderTextColor="#b0b0b0" value={categoryInput} onChangeText={handleCategoryInput} />
-                    {categorySuggestions.length > 0 && (
-                      <View style={styles.suggestions}>
-                        {categorySuggestions.map(c => (
-                          <TouchableOpacity key={c.id} style={styles.suggestion} onPress={() => { setSelectedCategory(c); setCategoryInput(''); setCategorySuggestions([]); }}>
-                            <View style={[styles.catDot, { backgroundColor: c.color }]}>
-                              <Ionicons name={c.icon as any} size={12} color="#1c1d1d" />
-                            </View>
-                            <Text style={styles.suggestionText}>{c.name}</Text>
-                          </TouchableOpacity>
-                        ))}
-                      </View>
-                    )}
-                    {categoryInput.trim() !== '' && categorySuggestions.length === 0 && (
-                      <Text style={styles.noResults}>no categories found</Text>
-                    )}
-                  </>
-                )
-              )}
-
-              <TouchableOpacity style={[styles.createBtn, !spaceName.trim() && styles.createBtnDisabled]}
-                onPress={handleCreate} disabled={loading || !spaceName.trim()} activeOpacity={0.8}>
-                {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.createBtnText}>create space</Text>}
-              </TouchableOpacity>
-            </View>
-          </ScrollView>
+        <Text style={formStyles.sectionLabel}>color</Text>
+        <View style={s.colorRow}>
+          {PASTEL_COLORS.map(c => (
+            <TouchableOpacity key={c} style={[s.colorDot, { backgroundColor: c }, selectedColor === c && s.colorDotSelected]} onPress={() => setSelectedColor(c)} />
+          ))}
         </View>
-      </Modal>
 
-      <Modal visible={menuModal} transparent animationType="none" onRequestClose={() => closeMenu()}>
-        <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => closeMenu()}>
-          <Animated.View style={[styles.menuContent, { opacity: menuFade }]}>
-            <TouchableOpacity style={styles.menuItem} onPress={() => closeMenu()}>
-              <Ionicons name="pencil-outline" size={18} color="#1c1d1d" />
-              <Text style={styles.menuItemText}>edit</Text>
+        <Text style={formStyles.sectionLabel}>icon</Text>
+        <View style={s.iconRow}>
+          {ICONS.map(i => (
+            <TouchableOpacity key={i} style={[s.iconBtn, selectedIcon === i && s.iconBtnSelected]} onPress={() => setSelectedIcon(i)}>
+              <Ionicons name={i as any} size={20} color={selectedIcon === i ? Colors.white : Colors.muted} />
             </TouchableOpacity>
-            <View style={styles.menuDivider} />
-            <TouchableOpacity style={styles.menuItem} onPress={handleDeleteSpace}>
-              <Ionicons name="trash-outline" size={18} color="#e74c3c" />
-              <Text style={[styles.menuItemText, { color: '#e74c3c' }]}>delete</Text>
-            </TouchableOpacity>
-          </Animated.View>
-        </TouchableOpacity>
-      </Modal>
+          ))}
+        </View>
+
+        <Text style={formStyles.sectionLabel}>preview</Text>
+        <View style={[s.preview, { backgroundColor: selectedColor }]}>
+          <Ionicons name={selectedIcon as any} size={16} color={Colors.text} />
+          <Text style={s.previewText}>{spaceName || 'my space'}</Text>
+        </View>
+
+        <Text style={formStyles.sectionLabel}>default category</Text>
+        <View style={s.toggleRow}>
+          <Text style={s.toggleLabel}>use a default category?</Text>
+          <TouchableOpacity
+            style={[s.toggleBtn, useDefaultCategory && s.toggleBtnActive]}
+            onPress={() => { setUseDefaultCategory(!useDefaultCategory); setSelectedCategory(null); setCategoryInput(''); }}>
+            <Text style={[s.toggleBtnText, useDefaultCategory && s.toggleBtnTextActive]}>
+              {useDefaultCategory ? 'yes' : 'no'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {useDefaultCategory && (
+          selectedCategory ? (
+            <View style={s.badgeRow}>
+              <View style={[s.badge, { backgroundColor: selectedCategory.color }]}>
+                <Ionicons name={selectedCategory.icon as any} size={14} color={Colors.text} />
+                <Text style={s.badgeText}>{selectedCategory.name}</Text>
+                <TouchableOpacity onPress={() => setSelectedCategory(null)}>
+                  <Ionicons name="close" size={14} color={Colors.text} />
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : (
+            <>
+              <TextInput
+                style={[formStyles.input, { marginTop: 8 }]}
+                placeholder="search categories..."
+                placeholderTextColor={Colors.faint}
+                value={categoryInput}
+                onChangeText={handleCategoryInput}
+              />
+              {categorySuggestions.length > 0 && (
+                <View style={s.suggestions}>
+                  {categorySuggestions.map(c => (
+                    <TouchableOpacity key={c.id} style={formStyles.listItem} onPress={() => { setSelectedCategory(c); setCategoryInput(''); setCategorySuggestions([]); }}>
+                      <View style={[s.catDot, { backgroundColor: c.color }]}>
+                        <Ionicons name={c.icon as any} size={12} color={Colors.text} />
+                      </View>
+                      <Text style={formStyles.listItemText}>{c.name}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+              {categoryInput.trim() !== '' && categorySuggestions.length === 0 && (
+                <Text style={formStyles.listEmpty}>no categories found</Text>
+              )}
+            </>
+          )
+        )}
+
+        <View style={formStyles.actions}>
+          <TouchableOpacity style={formStyles.cancelBtn} onPress={() => setCreateModal(false)}>
+            <Text style={formStyles.cancelBtnText}>cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[formStyles.primaryBtn, (!spaceName.trim() || loading) && { opacity: 0.4 }]}
+            onPress={handleCreate}
+            disabled={loading || !spaceName.trim()}
+            activeOpacity={0.8}
+          >
+            {loading ? <ActivityIndicator color={Colors.white} /> : <Text style={formStyles.primaryBtnText}>create space</Text>}
+          </TouchableOpacity>
+        </View>
+      </BottomSheet>
+
+      {/* Space menu */}
+      <ConfirmModal
+        visible={menuModal}
+        onClose={() => closeMenu()}
+        title={selectedSpace?.name?.toLowerCase() ?? 'space'}
+        actions={[
+          { label: 'cancel', onPress: () => closeMenu(), muted: true },
+          { label: 'delete', onPress: handleDeleteSpace, destructive: true },
+        ]}
+      />
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f5f5' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24, paddingTop: 52, paddingBottom: 16 },
+const s = StyleSheet.create({
+  container: { flex: 1, backgroundColor: Colors.input },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.xxl, paddingTop: 52, paddingBottom: 16 },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  avatarFallback: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#e8e8e8', justifyContent: 'center', alignItems: 'center' },
-  greeting: { fontFamily: 'DMSans_400Regular', fontSize: 16, color: '#8a8a8a' },
-  greetingName: { fontFamily: 'DMSans_700Bold', color: '#1c1d1d' },
-  scroll: { paddingHorizontal: 24, paddingBottom: 40, paddingTop: 12 },
-  sectionTitle: { fontFamily: 'Avenelle', fontSize: 36, color: '#1c1d1d', marginBottom: 20 },
+  avatarFallback: { width: 34, height: 34, borderRadius: 17, backgroundColor: Colors.borderMid, justifyContent: 'center', alignItems: 'center' },
+  greeting: { fontFamily: Fonts.sans, fontSize: 16, color: Colors.muted },
+  greetingName: { fontFamily: Fonts.sansBold, color: Colors.text },
+  scroll: { paddingHorizontal: Spacing.xxl, paddingBottom: 40, paddingTop: 12 },
+  sectionTitle: { fontFamily: Fonts.display, fontSize: 36, color: Colors.text, marginBottom: 20 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  spaceCard: { width: '47%', borderRadius: 999, paddingVertical: 10, paddingLeft: 16, paddingRight: 8, flexDirection: 'row', alignItems: 'center', backgroundColor: '#0ccfcf' },
+  spaceCard: { width: '47%', borderRadius: Radius.pill, paddingVertical: 10, paddingLeft: 16, paddingRight: 8, flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.cyan },
   spaceCardMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  spaceCardText: { fontFamily: 'DMSans_600SemiBold', fontSize: 15, color: '#fff', flex: 1 },
+  spaceCardText: { fontFamily: Fonts.sansSemiBold, fontSize: 15, color: Colors.white, flex: 1 },
   spaceMenuBtn: { padding: 6 },
-  addCard: { width: '47%', borderRadius: 999, paddingVertical: 14, paddingHorizontal: 16, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', backgroundColor: '#545454', gap: 6 },
-  addCardText: { fontFamily: 'DMSans_400Regular', fontSize: 13, color: '#fff' },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'flex-end' },
-  modalScroll: { justifyContent: 'flex-end', flexGrow: 1 },
-  modalContent: { backgroundColor: '#ffffff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  modalTitle: { fontFamily: 'DMSans_700Bold', fontSize: 18, color: '#1c1d1d' },
-  label: { fontFamily: 'DMSans_600SemiBold', fontSize: 11, color: '#8a8a8a', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 16 },
-  input: { backgroundColor: '#f5f5f5', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 13, fontFamily: 'DMSans_400Regular', fontSize: 15, color: '#1c1d1d', borderWidth: 1, borderColor: '#e8e8e8' },
-  inputError: { borderColor: '#e74c3c' },
-  charCount: { fontFamily: 'DMSans_400Regular', fontSize: 11, color: '#b0b0b0', textAlign: 'right', marginTop: 4 },
-  error: { fontFamily: 'DMSans_400Regular', fontSize: 13, color: '#e74c3c', marginTop: 4 },
+  addCard: { width: '47%', borderRadius: Radius.pill, paddingVertical: 14, paddingHorizontal: 16, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', backgroundColor: '#545454', gap: 6 },
+  addCardText: { fontFamily: Fonts.sans, fontSize: 13, color: Colors.white },
   colorRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   colorDot: { width: 30, height: 30, borderRadius: 15 },
-  colorDotSelected: { borderWidth: 3, borderColor: '#1c1d1d' },
+  colorDotSelected: { borderWidth: 3, borderColor: Colors.text },
   iconRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  iconBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#f5f5f5', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#e8e8e8' },
-  iconBtnSelected: { backgroundColor: '#1c1d1d', borderColor: '#1c1d1d' },
-  preview: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 999, paddingVertical: 14, paddingHorizontal: 16, marginTop: 4 },
-  previewText: { fontFamily: 'DMSans_700Bold', fontSize: 14, color: '#1c1d1d' },
-  createBtn: { backgroundColor: '#00bf63', borderRadius: 999, paddingVertical: 15, alignItems: 'center', marginTop: 20 },
-  createBtnDisabled: { opacity: 0.4 },
-  createBtnText: { fontFamily: 'DMSans_600SemiBold', fontSize: 15, color: '#ffffff' },
+  iconBtn: { width: 44, height: 44, borderRadius: Radius.md, backgroundColor: Colors.input, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: Colors.borderMid },
+  iconBtnSelected: { backgroundColor: Colors.text, borderColor: Colors.text },
+  preview: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: Radius.pill, paddingVertical: 14, paddingHorizontal: 16, marginTop: 4 },
+  previewText: { fontFamily: Fonts.sansBold, fontSize: 14, color: Colors.text },
   toggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },
-  toggleLabel: { fontFamily: 'DMSans_400Regular', fontSize: 14, color: '#8a8a8a' },
-  toggleBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999, borderWidth: 1, borderColor: '#e8e8e8', backgroundColor: '#f5f5f5' },
-  toggleBtnActive: { backgroundColor: '#00bf63', borderColor: '#00bf63' },
-  toggleBtnText: { fontFamily: 'DMSans_600SemiBold', fontSize: 13, color: '#b0b0b0' },
-  toggleBtnTextActive: { color: '#ffffff' },
+  toggleLabel: { fontFamily: Fonts.sans, fontSize: 14, color: Colors.muted },
+  toggleBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: Radius.pill, borderWidth: 1, borderColor: Colors.borderMid, backgroundColor: Colors.input },
+  toggleBtnActive: { backgroundColor: Colors.income, borderColor: Colors.income },
+  toggleBtnText: { fontFamily: Fonts.sansSemiBold, fontSize: 13, color: Colors.faint },
+  toggleBtnTextActive: { color: Colors.white },
   badgeRow: { flexDirection: 'row', marginTop: 8 },
-  badge: { flexDirection: 'row', alignItems: 'center', borderRadius: 999, paddingVertical: 8, paddingHorizontal: 14, gap: 6 },
-  badgeText: { fontFamily: 'DMSans_600SemiBold', fontSize: 14, color: '#1c1d1d' },
-  suggestions: { backgroundColor: '#f5f5f5', borderRadius: 12, marginTop: 4, overflow: 'hidden', borderWidth: 1, borderColor: '#e8e8e8' },
-  suggestion: { paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#e8e8e8', flexDirection: 'row', alignItems: 'center', gap: 10 },
-  suggestionText: { fontFamily: 'DMSans_400Regular', fontSize: 14, color: '#1c1d1d' },
+  badge: { flexDirection: 'row', alignItems: 'center', borderRadius: Radius.pill, paddingVertical: 8, paddingHorizontal: 14, gap: 6 },
+  badgeText: { fontFamily: Fonts.sansSemiBold, fontSize: 14, color: Colors.text },
+  suggestions: { backgroundColor: Colors.input, borderRadius: Radius.md, marginTop: 4, overflow: 'hidden', borderWidth: 1, borderColor: Colors.borderMid },
   catDot: { width: 24, height: 24, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-  noResults: { fontFamily: 'DMSans_400Regular', fontSize: 13, color: '#b0b0b0', marginTop: 8, textAlign: 'center' },
-  menuOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'center', alignItems: 'center' },
-  menuContent: { backgroundColor: '#ffffff', borderRadius: 16, overflow: 'hidden', minWidth: 160, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 8 },
-  menuItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingVertical: 16 },
-  menuItemText: { fontFamily: 'DMSans_400Regular', fontSize: 15, color: '#1c1d1d' },
-  menuDivider: { height: 1, backgroundColor: '#e8e8e8' },
 });

@@ -1,10 +1,13 @@
 import {
-  View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView,
-  Modal, TextInput, ActivityIndicator, Alert, Animated,
+  View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, TextInput, ActivityIndicator,
 } from 'react-native';
 import { supabase } from '../../../src/lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
+import BottomSheet from '@/components/ui/BottomSheet';
+import ConfirmModal from '@/components/ui/ConfirmModal';
+import formStyles from '@/components/ui/formStyles';
+import { Colors, Fonts, Radius, Spacing } from '@/components/ui/theme';
 
 const PASTEL_COLORS = ['#FFB3B3', '#FFD9B3', '#FFFAB3', '#B3FFB3', '#B3FFE0', '#B3F0FF', '#B3C6FF', '#D9B3FF', '#FFB3F0', '#FFB3C6'];
 const SUGGESTED_ICONS = ['fast-food-outline', 'car-outline', 'flash-outline', 'home-outline', 'musical-notes-outline', 'heart-outline', 'cart-outline', 'save-outline', 'airplane-outline', 'briefcase-outline', 'cafe-outline', 'fitness-outline', 'gift-outline', 'school-outline', 'phone-portrait-outline', 'ellipsis-horizontal-outline'];
@@ -22,7 +25,6 @@ export default function CategoriesScreen() {
   const [icon, setIcon] = useState(SUGGESTED_ICONS[0]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const menuFade = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -37,15 +39,6 @@ export default function CategoriesScreen() {
 
   const openAdd = () => { setName(''); setColor(PASTEL_COLORS[0]); setIcon(SUGGESTED_ICONS[0]); setError(''); setModal(true); };
 
-  const openMenu = (cat: Category) => {
-    setSelected(cat); setMenuModal(true);
-    Animated.timing(menuFade, { toValue: 1, duration: 200, useNativeDriver: false }).start();
-  };
-
-  const closeMenu = (cb?: () => void) => {
-    Animated.timing(menuFade, { toValue: 0, duration: 150, useNativeDriver: false }).start(() => { setMenuModal(false); cb?.(); });
-  };
-
   const handleSave = async () => {
     if (!name.trim()) { setError('Name is required.'); return; }
     setLoading(true);
@@ -54,119 +47,112 @@ export default function CategoriesScreen() {
     await load(userId); setLoading(false); setModal(false);
   };
 
-  const handleDelete = () => {
-    closeMenu(() => {
-      Alert.alert('Delete Category', 'This will also remove this category from any spaces using it as default. Are you sure?', [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: async () => { await supabase.from('categories').delete().eq('id', selected!.id); await load(userId); } },
-      ]);
-    });
+  const handleDelete = async () => {
+    setMenuModal(false);
+    await supabase.from('categories').delete().eq('id', selected!.id);
+    await load(userId);
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}><Text style={styles.title}>Categories</Text></View>
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <View style={styles.list}>
+    <SafeAreaView style={s.container}>
+      <View style={s.header}>
+        <Text style={s.title}>categories</Text>
+      </View>
+      <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+        <View style={s.list}>
           {categories.map(cat => (
-            <View key={cat.id} style={[styles.catBtn, { backgroundColor: cat.color }]}>
-              <Ionicons name={cat.icon as any} size={16} color="#1c1d1d" />
-              <Text style={styles.catName}>{cat.name}</Text>
-              {cat.is_default && <Text style={styles.defaultBadge}>default</Text>}
-              <TouchableOpacity onPress={() => openMenu(cat)} style={styles.menuBtn}>
-                <Ionicons name="ellipsis-vertical" size={15} color="#1c1d1d" />
+            <View key={cat.id} style={[s.catBtn, { backgroundColor: cat.color }]}>
+              <Ionicons name={cat.icon as any} size={16} color={Colors.text} />
+              <Text style={s.catName}>{cat.name}</Text>
+              {cat.is_default && <Text style={s.defaultBadge}>default</Text>}
+              <TouchableOpacity onPress={() => { setSelected(cat); setMenuModal(true); }} style={s.menuBtn}>
+                <Ionicons name="ellipsis-vertical" size={15} color={Colors.text} />
               </TouchableOpacity>
             </View>
           ))}
-          <TouchableOpacity style={styles.addBtn} onPress={openAdd} activeOpacity={0.8}>
-            <Ionicons name="add" size={16} color="#b0b0b0" />
-            <Text style={styles.addBtnText}>add a category</Text>
+          <TouchableOpacity style={s.addBtn} onPress={openAdd} activeOpacity={0.8}>
+            <Ionicons name="add" size={16} color={Colors.faint} />
+            <Text style={s.addBtnText}>add a category</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
 
-      <Modal visible={modal} transparent animationType="slide" onRequestClose={() => setModal(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>new category</Text>
-              <TouchableOpacity onPress={() => setModal(false)}><Ionicons name="close" size={22} color="#b0b0b0" /></TouchableOpacity>
-            </View>
-            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-              {error ? <Text style={styles.error}>{error}</Text> : null}
-              <Text style={styles.label}>category name</Text>
-              <TextInput style={styles.input} placeholder="e.g. Groceries" placeholderTextColor="#b0b0b0" value={name} onChangeText={v => { setName(v); setError(''); }} autoFocus />
-              <Text style={styles.label}>color</Text>
-              <View style={styles.colorRow}>
-                {PASTEL_COLORS.map(c => <TouchableOpacity key={c} style={[styles.colorDot, { backgroundColor: c }, color === c && styles.colorDotSelected]} onPress={() => setColor(c)} />)}
-              </View>
-              <Text style={styles.label}>icon</Text>
-              <View style={styles.iconRow}>
-                {SUGGESTED_ICONS.map(i => (
-                  <TouchableOpacity key={i} style={[styles.iconBtn, icon === i && styles.iconBtnSelected]} onPress={() => setIcon(i)}>
-                    <Ionicons name={i as any} size={20} color={icon === i ? '#ffffff' : '#8a8a8a'} />
-                  </TouchableOpacity>
-                ))}
-              </View>
-              <Text style={styles.label}>preview</Text>
-              <View style={[styles.preview, { backgroundColor: color }]}>
-                <Ionicons name={icon as any} size={16} color="#1c1d1d" />
-                <Text style={styles.previewText}>{name || 'my category'}</Text>
-              </View>
-              <TouchableOpacity style={[styles.saveBtn, !name.trim() && styles.saveBtnDisabled]} onPress={handleSave} disabled={loading || !name.trim()} activeOpacity={0.8}>
-                {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>add category</Text>}
-              </TouchableOpacity>
-            </ScrollView>
-          </View>
+      <BottomSheet visible={modal} onClose={() => setModal(false)} sub="categories" title="new category">
+        {error ? <Text style={formStyles.errorText}>{error}</Text> : null}
+        <Text style={formStyles.sectionLabel}>category name</Text>
+        <TextInput
+          style={formStyles.input}
+          placeholder="e.g. Groceries"
+          placeholderTextColor={Colors.faint}
+          value={name}
+          onChangeText={v => { setName(v); setError(''); }}
+          autoFocus
+        />
+        <Text style={formStyles.sectionLabel}>color</Text>
+        <View style={s.colorRow}>
+          {PASTEL_COLORS.map(c => (
+            <TouchableOpacity key={c} style={[s.colorDot, { backgroundColor: c }, color === c && s.colorDotSelected]} onPress={() => setColor(c)} />
+          ))}
         </View>
-      </Modal>
-
-      <Modal visible={menuModal} transparent animationType="none" onRequestClose={() => closeMenu()}>
-        <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => closeMenu()}>
-          <Animated.View style={[styles.menuContent, { opacity: menuFade }]}>
-            <TouchableOpacity style={styles.menuItem} onPress={handleDelete}>
-              <Ionicons name="trash-outline" size={18} color="#e74c3c" />
-              <Text style={[styles.menuItemText, { color: '#e74c3c' }]}>delete</Text>
+        <Text style={formStyles.sectionLabel}>icon</Text>
+        <View style={s.iconRow}>
+          {SUGGESTED_ICONS.map(i => (
+            <TouchableOpacity key={i} style={[s.iconBtn, icon === i && s.iconBtnSelected]} onPress={() => setIcon(i)}>
+              <Ionicons name={i as any} size={20} color={icon === i ? Colors.white : Colors.muted} />
             </TouchableOpacity>
-          </Animated.View>
-        </TouchableOpacity>
-      </Modal>
+          ))}
+        </View>
+        <Text style={formStyles.sectionLabel}>preview</Text>
+        <View style={[s.preview, { backgroundColor: color }]}>
+          <Ionicons name={icon as any} size={16} color={Colors.text} />
+          <Text style={s.previewText}>{name || 'my category'}</Text>
+        </View>
+        <View style={formStyles.actions}>
+          <TouchableOpacity style={formStyles.cancelBtn} onPress={() => setModal(false)}>
+            <Text style={formStyles.cancelBtnText}>cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[formStyles.primaryBtn, (!name.trim() || loading) && { opacity: 0.4 }]}
+            onPress={handleSave}
+            disabled={loading || !name.trim()}
+            activeOpacity={0.8}
+          >
+            {loading ? <ActivityIndicator color={Colors.white} /> : <Text style={formStyles.primaryBtnText}>add category</Text>}
+          </TouchableOpacity>
+        </View>
+      </BottomSheet>
+
+      <ConfirmModal
+        visible={menuModal}
+        onClose={() => setMenuModal(false)}
+        title={selected?.name?.toLowerCase() ?? 'category'}
+        actions={[
+          { label: 'cancel', onPress: () => setMenuModal(false), muted: true },
+          { label: 'delete', onPress: handleDelete, destructive: true },
+        ]}
+      />
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f5f5' },
-  header: { paddingHorizontal: 20, paddingVertical: 16 },
-  title: { fontFamily: 'DMSans_700Bold', fontSize: 22, color: '#1c1d1d' },
-  scroll: { paddingHorizontal: 20, paddingBottom: 40 },
+const s = StyleSheet.create({
+  container: { flex: 1, backgroundColor: Colors.input },
+  header: { paddingHorizontal: Spacing.xxl, paddingTop: 52, paddingBottom: 16 },
+  title: { fontFamily: Fonts.display, fontSize: 36, color: Colors.text },
+  scroll: { paddingHorizontal: Spacing.xxl, paddingBottom: 40 },
   list: { gap: 10 },
-  catBtn: { borderRadius: 999, paddingVertical: 14, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  catName: { fontFamily: 'DMSans_600SemiBold', fontSize: 14, color: '#1c1d1d', flex: 1 },
-  defaultBadge: { fontFamily: 'DMSans_400Regular', fontSize: 10, color: 'rgba(0,0,0,0.4)', backgroundColor: 'rgba(0,0,0,0.1)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 },
+  catBtn: { borderRadius: Radius.pill, paddingVertical: 14, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  catName: { fontFamily: Fonts.sansSemiBold, fontSize: 14, color: Colors.text, flex: 1 },
+  defaultBadge: { fontFamily: Fonts.sans, fontSize: 10, color: 'rgba(0,0,0,0.4)', backgroundColor: 'rgba(0,0,0,0.1)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: Radius.pill },
   menuBtn: { padding: 4 },
-  addBtn: { borderRadius: 999, paddingVertical: 14, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e8e8e8', gap: 6 },
-  addBtnText: { fontFamily: 'DMSans_400Regular', fontSize: 13, color: '#b0b0b0' },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: '#ffffff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40, maxHeight: '90%' },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  modalTitle: { fontFamily: 'DMSans_700Bold', fontSize: 18, color: '#1c1d1d' },
-  label: { fontFamily: 'DMSans_600SemiBold', fontSize: 11, color: '#8a8a8a', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 16 },
-  input: { backgroundColor: '#f5f5f5', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 13, fontFamily: 'DMSans_400Regular', fontSize: 15, color: '#1c1d1d', borderWidth: 1, borderColor: '#e8e8e8' },
-  error: { fontFamily: 'DMSans_400Regular', fontSize: 13, color: '#e74c3c', marginBottom: 4 },
+  addBtn: { borderRadius: Radius.pill, paddingVertical: 14, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.white, borderWidth: 1, borderColor: Colors.borderMid, gap: 6 },
+  addBtnText: { fontFamily: Fonts.sans, fontSize: 13, color: Colors.faint },
   colorRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   colorDot: { width: 30, height: 30, borderRadius: 15 },
-  colorDotSelected: { borderWidth: 3, borderColor: '#1c1d1d' },
+  colorDotSelected: { borderWidth: 3, borderColor: Colors.text },
   iconRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  iconBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#f5f5f5', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#e8e8e8' },
-  iconBtnSelected: { backgroundColor: '#1c1d1d', borderColor: '#1c1d1d' },
-  preview: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 999, paddingVertical: 14, paddingHorizontal: 16, marginTop: 4 },
-  previewText: { fontFamily: 'DMSans_700Bold', fontSize: 14, color: '#1c1d1d' },
-  saveBtn: { backgroundColor: '#00bf63', borderRadius: 999, paddingVertical: 15, alignItems: 'center', marginTop: 20, marginBottom: 10 },
-  saveBtnDisabled: { opacity: 0.4 },
-  saveBtnText: { fontFamily: 'DMSans_600SemiBold', fontSize: 15, color: '#ffffff' },
-  menuOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'center', alignItems: 'center' },
-  menuContent: { backgroundColor: '#ffffff', borderRadius: 16, overflow: 'hidden', minWidth: 160, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 8 },
-  menuItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingVertical: 16 },
-  menuItemText: { fontFamily: 'DMSans_400Regular', fontSize: 15, color: '#1c1d1d' },
+  iconBtn: { width: 44, height: 44, borderRadius: Radius.md, backgroundColor: Colors.input, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: Colors.borderMid },
+  iconBtnSelected: { backgroundColor: Colors.text, borderColor: Colors.text },
+  preview: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: Radius.pill, paddingVertical: 14, paddingHorizontal: 16, marginTop: 4 },
+  previewText: { fontFamily: Fonts.sansBold, fontSize: 14, color: Colors.text },
 });
