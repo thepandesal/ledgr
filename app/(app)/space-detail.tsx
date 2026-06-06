@@ -1,6 +1,6 @@
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  SafeAreaView, Animated, Dimensions, ScrollView, ActivityIndicator,
+  SafeAreaView, Animated, Dimensions, ScrollView, ActivityIndicator, Image,
 } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -215,28 +215,20 @@ export default function SpaceDetailScreen() {
           <Text style={[pageStyles.pageName, { color: Colors.cyan, fontSize: 26, letterSpacing: -1 }]}>{(name ?? '').toLowerCase()}</Text>
         </View>
 
-        {/* Stats row */}
-        <View style={[pageStyles.infoBlock, { marginHorizontal: Spacing.page, marginBottom: 16 }]}>
-          <View style={s.statsInfoRow}>
-            <Text style={s.statsLabel}>expenses</Text>
-            <View style={s.statsDots} />
-            <Text style={[s.statsValue, { color: Colors.expense }]}>{shortAmount(totalExpenses)}</Text>
-          </View>
-          <View style={s.statsInfoRow}>
-            <Text style={s.statsLabel}>income / savings</Text>
-            <View style={s.statsDots} />
-            <Text style={[s.statsValue, { color: Colors.income }]}>{shortAmount(totalIncomeSavings)}</Text>
-          </View>
-          <View style={s.statsInfoRow}>
-            <Text style={s.statsLabel}>payables</Text>
-            <View style={s.statsDots} />
-            <Text style={[s.statsValue, { color: Colors.muted }]}>{countPayables}</Text>
-          </View>
-          <View style={s.statsInfoRow}>
-            <Text style={s.statsLabel}>receivables</Text>
-            <View style={s.statsDots} />
-            <Text style={[s.statsValue, { color: Colors.muted }]}>{countReceivables}</Text>
-          </View>
+        {/* Stats row — 4 column */}
+        <View style={[s.statsRow, { marginHorizontal: Spacing.page, marginBottom: 16 }]}>
+          {[
+            { img: require('../../assets/stat-expense.png'), label: 'expenses', value: shortAmount(totalExpenses), color: Colors.expense },
+            { img: require('../../assets/stat-income.png'), label: 'income', value: shortAmount(totalIncomeSavings), color: Colors.income },
+            { img: require('../../assets/stat-payable.png'), label: 'payables', value: String(countPayables), color: Colors.muted },
+            { img: require('../../assets/stat-receivable.png'), label: 'receivables', value: String(countReceivables), color: Colors.muted },
+          ].map((stat, i) => (
+            <View key={i} style={s.statCard}>
+              <Image source={stat.img} style={s.statIcon} resizeMode="contain" />
+              <Text style={[s.statValue, { color: stat.color }]}>{stat.value}</Text>
+              <Text style={s.statLabel}>{stat.label}</Text>
+            </View>
+          ))}
         </View>
 
         {/* Recordings header */}
@@ -572,10 +564,11 @@ const s = StyleSheet.create({
   recordingAmount: { fontFamily: Fonts.mono, fontSize: 14 },
 
   // Stats
-  statsInfoRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6 },
-  statsLabel: { fontFamily: Fonts.mono, fontSize: 11, color: Colors.muted, flexShrink: 0 },
-  statsDots: { flex: 1, borderBottomWidth: 1, borderStyle: 'dotted', borderColor: Colors.faint, marginHorizontal: 8 },
-  statsValue: { fontFamily: Fonts.monoBold, fontSize: 11, flexShrink: 0 },
+  statsRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 8 },
+  statCard: { flex: 1, alignItems: 'center', gap: 4 },
+  statIcon: { width: 40, height: 40 },
+  statValue: { fontFamily: Fonts.monoBold, fontSize: 13 },
+  statLabel: { fontFamily: Fonts.mono, fontSize: 9, color: Colors.muted, textAlign: 'center' },
 
   // Filter
   filterOption: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, paddingHorizontal: 14, borderRadius: Radius.pill, borderWidth: 1, borderColor: Colors.borderMid },
