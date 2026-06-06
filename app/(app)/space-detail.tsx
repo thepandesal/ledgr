@@ -215,11 +215,11 @@ export default function SpaceDetailScreen() {
           <Text style={[pageStyles.pageName, { color: Colors.cyan, fontSize: 26, letterSpacing: -1 }]}>{(name ?? '').toLowerCase()}</Text>
         </View>
 
-        {/* Stats row — 2x2 grid */}
+        {/* Stats row — 4 columns 1 row */}
         <View style={[s.statsGrid, { marginHorizontal: Spacing.page, marginBottom: 16 }]}>
           {[
             { label: 'expenses', value: shortAmount(totalExpenses), color: Colors.expense },
-            { label: 'income / savings', value: shortAmount(totalIncomeSavings), color: Colors.income },
+            { label: 'income', value: shortAmount(totalIncomeSavings), color: Colors.income },
             { label: 'payables', value: String(countPayables), color: Colors.muted },
             { label: 'receivables', value: String(countReceivables), color: Colors.muted },
           ].map((stat, i) => (
@@ -241,7 +241,7 @@ export default function SpaceDetailScreen() {
                 activeOpacity={0.85}
               >
                 <Ionicons name="add" size={14} color={Colors.text} />
-                <Text style={pageStyles.actionBtnText}>add recording</Text>
+                <Text style={pageStyles.actionBtnText}>add record</Text>
               </TouchableOpacity>
             )}
             <TouchableOpacity style={{ padding: 6 }} onPress={() => setShowFilter(true)}>
@@ -563,18 +563,19 @@ const s = StyleSheet.create({
   recordingAmount: { fontFamily: Fonts.mono, fontSize: 14 },
 
   // Stats
-  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  statsGrid: { flexDirection: 'row', gap: 8 },
   statCard: {
-    width: '47%',
+    flex: 1,
     backgroundColor: Colors.surface,
     borderRadius: Radius.lg,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 10,
     borderWidth: 1,
     borderColor: Colors.border,
+    alignItems: 'center',
   },
-  statValue: { fontFamily: Fonts.monoBold, fontSize: 18, marginBottom: 2 },
-  statLabel: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted },
+  statValue: { fontFamily: Fonts.monoBold, fontSize: 13, marginBottom: 2 },
+  statLabel: { fontFamily: Fonts.mono, fontSize: 8, color: Colors.muted, textAlign: 'center' },
 
   // Filter
   filterOption: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, paddingHorizontal: 14, borderRadius: Radius.pill, borderWidth: 1, borderColor: Colors.borderMid },
