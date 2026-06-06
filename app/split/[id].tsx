@@ -142,29 +142,20 @@ export default function SplitSharePage() {
           </TouchableOpacity>
         )}
 
-        {/* Per Person Pay */}
-        {perPerson.length > 0 && <>
-          <Text style={s.sectionHeader}>per person pay</Text>
-          <View style={s.card}>
-            {perPerson.map((p, i) => (
-              <View key={i}>
-                <View style={s.infoRow}>
-                  <Text style={s.infoLabel}>{p.name}</Text>
-                  <View style={s.dots} />
-                  <Text style={s.infoValue}>{p.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
-                </View>
-                <View style={s.divider} />
-              </View>
-            ))}
-            <View style={s.infoRow}>
-              <Text style={[s.infoLabel, { color: '#425252', fontFamily: 'RobotoMono_700Bold' }]}>total</Text>
-              <View style={s.dots} />
-              <Text style={[s.infoValue, { color: '#0ccfcf' }]}>
-                {perPerson.reduce((sum, p) => sum + p.total, 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-              </Text>
-            </View>
+        {/* Receipt */}
+        <Text style={s.sectionHeader}>receipt</Text>
+        {receiptId ? (
+          <TouchableOpacity style={s.receiptBtn} onPress={openReceipt}>
+            <Ionicons name="receipt-outline" size={16} color="#0ccfcf" />
+            <Text style={s.receiptBtnText}>tap to view receipt photos</Text>
+            <Ionicons name="arrow-forward" size={14} color="#0ccfcf" />
+          </TouchableOpacity>
+        ) : (
+          <View style={s.receiptUnavailable}>
+            <Ionicons name="receipt-outline" size={16} color="#c0c0c0" />
+            <Text style={s.receiptUnavailableText}>receipt not available</Text>
           </View>
-        </>}
+        )}
 
         {/* Item Information */}
         {items.length > 0 && <>
@@ -213,20 +204,29 @@ export default function SplitSharePage() {
           })}
         </>}
 
-        {/* Receipt */}
-        <Text style={s.sectionHeader}>receipt</Text>
-        {receiptId ? (
-          <TouchableOpacity style={s.receiptBtn} onPress={openReceipt}>
-            <Ionicons name="receipt-outline" size={16} color="#0ccfcf" />
-            <Text style={s.receiptBtnText}>tap to view receipt photos</Text>
-            <Ionicons name="arrow-forward" size={14} color="#0ccfcf" />
-          </TouchableOpacity>
-        ) : (
-          <View style={s.receiptUnavailable}>
-            <Ionicons name="receipt-outline" size={16} color="#c0c0c0" />
-            <Text style={s.receiptUnavailableText}>receipt not available</Text>
+        {/* Per Person Pay */}
+        {perPerson.length > 0 && <>
+          <Text style={s.sectionHeader}>per person pay</Text>
+          <View style={s.card}>
+            {perPerson.map((p, i) => (
+              <View key={i}>
+                <View style={s.infoRow}>
+                  <Text style={s.infoLabel}>{p.name}</Text>
+                  <View style={s.dots} />
+                  <Text style={s.infoValue}>{p.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+                </View>
+                <View style={s.divider} />
+              </View>
+            ))}
+            <View style={s.infoRow}>
+              <Text style={[s.infoLabel, { color: '#425252', fontFamily: 'RobotoMono_700Bold' }]}>total</Text>
+              <View style={s.dots} />
+              <Text style={[s.infoValue, { color: '#0ccfcf' }]}>
+                {perPerson.reduce((sum, p) => sum + p.total, 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              </Text>
+            </View>
           </View>
-        )}
+        </>}
 
         {/* Payment Information */}
         {payments.length > 0 && (
