@@ -236,7 +236,7 @@ export default function SpaceDetailScreen() {
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             {spaceId !== 'all' && (
               <TouchableOpacity
-                style={pageStyles.actionBtn}
+                style={[pageStyles.actionBtn, { flex: 0, paddingHorizontal: 16 }]}
                 onPress={() => router.push({ pathname: '/(app)/add-recording', params: { spaceId, spaceName: name, defaultDate: selectedDate.toISOString().split('T')[0] } } as any)}
                 activeOpacity={0.85}
               >
