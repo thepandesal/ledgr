@@ -25,12 +25,14 @@ export default function LoginScreen() {
   return (
     <SafeAreaView style={s.container} edges={['bottom', 'top']}>
 
-      {/* Hero — full width, correct aspect ratio, no cropping */}
-      <Image
+      {/* Hero */}
+      <View style={{ paddingTop: 24 }}>
+        <Image
         source={require('../assets/login-vector.png')}
         style={{ width: heroWidth, height: heroHeight, alignSelf: 'center' }}
         resizeMode="contain"
       />
+      </View>
 
       {/* Content */}
       <View style={s.content}>
@@ -40,12 +42,12 @@ export default function LoginScreen() {
           <TouchableOpacity style={s.button} activeOpacity={0.8} onPress={() => signIn('google')} disabled={loading !== null}>
             {loading === 'google'
               ? <ActivityIndicator color="#545454" />
-              : <Text style={s.buttonText}>continue with google</Text>}
+              : <Text style={s.buttonText}>Continue with Google</Text>}
           </TouchableOpacity>
           <TouchableOpacity style={s.button} activeOpacity={0.8} onPress={() => signIn('apple')} disabled={loading !== null}>
             {loading === 'apple'
               ? <ActivityIndicator color="#545454" />
-              : <Text style={s.buttonText}>continue with apple</Text>}
+              : <Text style={s.buttonText}>Continue with Apple</Text>}
           </TouchableOpacity>
         </View>
       </View>
@@ -62,13 +64,14 @@ const s = StyleSheet.create({
     marginTop: 8,
   },
   brand: { fontFamily: 'MuseoModerno_Black', fontSize: 72, color: '#7fd8cd', letterSpacing: -1, marginBottom: 4 },
-  tagline: { fontFamily: 'ChillaxMedium', fontSize: 18, color: '#545454', marginBottom: 32 },
+  tagline: { fontFamily: 'ChillaxMedium', fontSize: 14, color: '#545454', marginBottom: 32 },
   buttons: { width: '100%', gap: 12 },
   button: {
     borderRadius: 999,
     paddingVertical: 14,
     alignItems: 'center',
-    borderWidth: 1,
+    borderWidth: 3,
+    borderStyle: 'dotted',
     borderColor: '#929090',
     backgroundColor: '#ffffff',
   },
