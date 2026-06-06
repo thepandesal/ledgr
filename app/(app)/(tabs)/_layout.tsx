@@ -6,6 +6,7 @@ import AccountsScreen from './accounts';
 import BillSplitScreen from './bill-split';
 import ReceiptsScreen from './receipts';
 import CategoriesScreen from './categories';
+import { Colors, Fonts } from '@/components/ui/theme';
 
 const { width } = Dimensions.get('window');
 
@@ -69,8 +70,7 @@ export default function TabsLayout() {
             const isActive = activeTab === tab.key;
             return (
               <TouchableOpacity key={tab.key} style={styles.navItem} onPress={() => switchTab(tab.key)} activeOpacity={0.7}>
-                <Ionicons name={tab.icon as any} size={22} color={isActive ? '#00bf63' : '#b0b0b0'} />
-                <Text style={[styles.navLabel, isActive && styles.navLabelActive]}>{tab.label}</Text>
+                <Ionicons name={tab.icon as any} size={22} color={isActive ? Colors.cyan : Colors.faint} />
               </TouchableOpacity>
             );
           })}
@@ -84,9 +84,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f5f5f5' },
   content: { flex: 1, position: 'relative' },
   screen: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#f5f5f5' },
-  navSafeArea: { backgroundColor: '#ffffff', borderTopWidth: 1, borderTopColor: '#e8e8e8' },
-  nav: { flexDirection: 'row', paddingVertical: 10, paddingBottom: 12 },
-  navItem: { flex: 1, alignItems: 'center', gap: 4 },
-  navLabel: { fontFamily: 'DMSans_400Regular', fontSize: 10, color: '#b0b0b0' },
-  navLabelActive: { color: '#00bf63', fontFamily: 'DMSans_600SemiBold' },
+  navSafeArea: { backgroundColor: Colors.white, borderTopWidth: 1, borderTopColor: Colors.muted, borderStyle: 'dashed' },
+  nav: { flexDirection: 'row', paddingVertical: 12 },
+  navItem: { flex: 1, alignItems: 'center' },
 });

@@ -114,6 +114,14 @@ export default function SpacesScreen() {
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <Text style={styles.sectionTitle}>spaces</Text>
         <View style={styles.grid}>
+          {/* All spaces button */}
+          <TouchableOpacity
+            style={[styles.spaceCard, { backgroundColor: '#425252', width: '100%' }]}
+            activeOpacity={0.8}
+            onPress={() => router.push({ pathname: '/(app)/space-detail', params: { spaceId: 'all', name: 'all spaces' } })}>
+            <Ionicons name="layers-outline" size={16} color="#fff" />
+            <Text style={[styles.spaceCardText, { fontFamily: 'DMSans_600SemiBold' }]}>all spaces</Text>
+          </TouchableOpacity>
           {spaces.map(space => (
             <View key={space.id} style={styles.spaceCard}>
               <TouchableOpacity style={styles.spaceCardMain} activeOpacity={0.8}
@@ -258,7 +266,7 @@ const styles = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   spaceCard: { width: '47%', borderRadius: 999, paddingVertical: 10, paddingLeft: 16, paddingRight: 8, flexDirection: 'row', alignItems: 'center', backgroundColor: '#0ccfcf' },
   spaceCardMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  spaceCardText: { fontFamily: 'Avenelle', fontSize: 15, color: '#fff', flex: 1 },
+  spaceCardText: { fontFamily: 'DMSans_600SemiBold', fontSize: 15, color: '#fff', flex: 1 },
   spaceMenuBtn: { padding: 6 },
   addCard: { width: '47%', borderRadius: 999, paddingVertical: 14, paddingHorizontal: 16, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', backgroundColor: '#545454', gap: 6 },
   addCardText: { fontFamily: 'DMSans_400Regular', fontSize: 13, color: '#fff' },

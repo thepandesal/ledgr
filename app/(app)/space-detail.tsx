@@ -129,11 +129,19 @@ export default function SpaceDetailScreen() {
 
   const loadRecordings = async () => {
     setLoading(true);
-    const { data } = await supabase.from('recordings')
-      .select('*, categories:category_id(name, color, icon), account:account_id(account_name, bank, color)')
-      .eq('space_id', spaceId)
-      .order('transaction_date', { ascending: false });
-    if (data) setRecordings(data);
+    const query = supabase.from('recordings')
+      .select('*, categories:category_id(name, color, icon), account:account_id(account_name, bank, color)');
+    if (spaceId === 'all') {
+      // load all recordings for this user across all spaces
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data } = await query.eq('user_id', user.id).order('transaction_date', { ascending: false });
+        if (data) setRecordings(data);
+      }
+    } else {
+      const { data } = await query.eq('space_id', spaceId).order('transaction_date', { ascending: false });
+      if (data) setRecordings(data);
+    }
     setLoading(false);
   };
 
@@ -321,17 +329,19 @@ export default function SpaceDetailScreen() {
             </View>
           )}
 
-          {/* Add recording */}
-          <View style={s.addRecordingRow}>
-            <TouchableOpacity
-              style={[pageStyles.actionBtn, { alignSelf: 'flex-end' }]}
-              onPress={() => router.push({ pathname: '/(app)/add-recording', params: { spaceId, spaceName: name, defaultDate: selectedDate.toISOString().split('T')[0] } } as any)}
-              activeOpacity={0.85}
-            >
-              <Ionicons name="add" size={14} color={Colors.text} />
-              <Text style={pageStyles.actionBtnText}>add recording</Text>
-            </TouchableOpacity>
-          </View>
+          {/* Add recording — hidden in all spaces view */}
+          {spaceId !== 'all' && (
+            <View style={s.addRecordingRow}>
+              <TouchableOpacity
+                style={[pageStyles.actionBtn, { alignSelf: 'flex-end' }]}
+                onPress={() => router.push({ pathname: '/(app)/add-recording', params: { spaceId, spaceName: name, defaultDate: selectedDate.toISOString().split('T')[0] } } as any)}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="add" size={14} color={Colors.text} />
+                <Text style={pageStyles.actionBtnText}>add recording</Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
           {loading ? (
             <ActivityIndicator color={Colors.income} style={{ marginTop: 40 }} />
