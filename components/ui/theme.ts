@@ -6,7 +6,7 @@
 
 export const Colors = {
   // Brand
-  cyan: '#0ccfcf',
+  cyan: '#7fd8cd',
 
   // Text
   text: '#425252',
