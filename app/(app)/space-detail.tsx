@@ -218,16 +218,19 @@ export default function SpaceDetailScreen() {
         {/* Stats row — 4 columns 1 row */}
         <View style={[s.statsGrid, { marginHorizontal: Spacing.page, marginBottom: 16 }]}>
           {[
-            { label: 'expenses', value: shortAmount(totalExpenses), color: Colors.expense },
-            { label: 'income', value: shortAmount(totalIncomeSavings), color: Colors.income },
-            { label: 'payables', value: String(countPayables), color: Colors.muted },
-            { label: 'receivables', value: String(countReceivables), color: Colors.muted },
-          ].map((stat, i) => (
-            <View key={i} style={s.statCard}>
+            { key: 'expense', label: 'expenses', value: shortAmount(totalExpenses), color: Colors.expense },
+            { key: 'income', label: 'income', value: shortAmount(totalIncomeSavings), color: Colors.income },
+            { key: 'payable', label: 'payables', value: String(countPayables), color: Colors.muted },
+            { key: 'receivable', label: 'receivables', value: String(countReceivables), color: Colors.muted },
+          ].map((stat, i) => {
+            const isActive = activeFilter.includes(stat.key);
+            return (
+              <TouchableOpacity key={i} style={s.statCard}>
               <Text style={[s.statValue, { color: stat.color }]}>{stat.value}</Text>
               <Text style={s.statLabel}>{stat.label}</Text>
-            </View>
-          ))}
+            </TouchableOpacity>
+            );
+          })}
         </View>
 
         {/* Recordings header */}
