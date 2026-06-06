@@ -1,7 +1,9 @@
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Image } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Image, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../src/lib/supabase';
 import { useState } from 'react';
+
+const { width, height } = Dimensions.get('window');
 
 export default function LoginScreen() {
   const [loading, setLoading] = useState<'google' | 'apple' | null>(null);
@@ -19,16 +21,18 @@ export default function LoginScreen() {
 
   return (
     <SafeAreaView style={s.container} edges={['bottom']}>
-      <View style={s.inner}>
 
-        {/* Hero image */}
-        <Image source={require('../assets/login-vector.png')} style={s.hero} resizeMode="contain" />
+      {/* Hero — fills top half edge to edge */}
+      <Image
+        source={require('../assets/login-vector.png')}
+        style={s.hero}
+        resizeMode="cover"
+      />
 
-        {/* Brand */}
+      {/* Content — bottom half */}
+      <View style={s.content}>
         <Text style={s.brand}>LEDGR</Text>
         <Text style={s.tagline}>track your numbers.</Text>
-
-        {/* Buttons */}
         <View style={s.buttons}>
           <TouchableOpacity style={s.button} activeOpacity={0.8} onPress={() => signIn('google')} disabled={loading !== null}>
             {loading === 'google'
@@ -41,18 +45,24 @@ export default function LoginScreen() {
               : <Text style={s.buttonText}>continue with apple</Text>}
           </TouchableOpacity>
         </View>
-
       </View>
+
     </SafeAreaView>
   );
 }
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#ffffff' },
-  inner: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 0 },
-  hero: { width: '100%', height: 320, marginBottom: 24 },
-  brand: { fontFamily: 'MuseoModerno_Black', fontSize: 104, color: '#7fd8cd', letterSpacing: -1, marginBottom: 6 },
-  tagline: { fontFamily: 'ChillaxMedium', fontSize: 13, color: '#545454', marginBottom: 40 },
+  hero: { width, height: height * 0.5 },
+  content: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+    gap: 0,
+  },
+  brand: { fontFamily: 'MuseoModerno_Black', fontSize: 104, color: '#7fd8cd', letterSpacing: -1, marginBottom: 4 },
+  tagline: { fontFamily: 'ChillaxMedium', fontSize: 13, color: '#545454', marginBottom: 32 },
   buttons: { width: '100%', gap: 12 },
   button: {
     borderRadius: 999,
