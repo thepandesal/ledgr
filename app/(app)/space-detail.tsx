@@ -241,21 +241,16 @@ export default function SpaceDetailScreen() {
         {/* Recordings header */}
         <View style={s.recordingsHeader}>
           <Text style={[pageStyles.sectionHeader, { marginBottom: 0, marginTop: 0 }]}>recordings</Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            {spaceId !== 'all' && (
-              <TouchableOpacity
-                style={pageStyles.actionBtn}
-                onPress={() => router.push({ pathname: '/(app)/add-recording', params: { spaceId, spaceName: name, defaultDate: selectedDate.toISOString().split('T')[0] } } as any)}
-                activeOpacity={0.85}
-              >
-                <Ionicons name="add" size={14} color={Colors.text} />
-                <Text style={pageStyles.actionBtnText}>add record</Text>
-              </TouchableOpacity>
-            )}
-            <TouchableOpacity style={{ padding: 6 }} onPress={() => setShowFilter(true)}>
-              <Ionicons name="options-outline" size={18} color={activeFilter.length > 0 ? Colors.cyan : Colors.muted} />
+          {spaceId !== 'all' && (
+            <TouchableOpacity
+              style={s.modeBtn}
+              onPress={() => router.push({ pathname: '/(app)/add-recording', params: { spaceId, spaceName: name, defaultDate: selectedDate.toISOString().split('T')[0] } } as any)}
+              activeOpacity={0.85}
+            >
+              <Text style={s.modeBtnText}>add record</Text>
             </TouchableOpacity>
-          </View>
+          )}
+        </View>
         </View>
 
         {/* Date nav */}

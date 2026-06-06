@@ -458,7 +458,7 @@ export default function RecordingDetailScreen() {
       if (!user) return;
       const personLabel = receivableMode === 'split' && receivableSelectedPeople.length > 0
         ? receivableSelectedPeople.join(', ') : null;
-      await supabase.from('recordings').insert({
+      const { data: newRec } = await supabase.from('recordings').insert({
         space_id: recording.space_id,
         user_id: user.id,
         name: recording.name,
@@ -469,12 +469,12 @@ export default function RecordingDetailScreen() {
         account_id: recording.account_id ?? null,
         category_id: recording.category_id ?? null,
         linked_recording_id: recordingId,
-        person_name: personLabel,
-      });
+      }).select('id').single();
       setReceivableModal(false);
       setReceivableMode('full');
       setReceivableManualAmount('');
       setReceivableSelectedPeople([]);
+      if (newRec?.id) router.push({ pathname: '/(app)/recording-detail', params: { recordingId: newRec.id } } as any);
     } catch (e) { console.log(e); }
     finally { setReceivableLoading(false); }
   };
