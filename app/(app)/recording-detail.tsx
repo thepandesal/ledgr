@@ -660,7 +660,7 @@ export default function RecordingDetailScreen() {
       date: recording?.transaction_date ? new Date(recording.transaction_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '',
       perPerson: Object.entries(perPersonMap).map(([name, total]) => ({ name, total })),
       items: items.map(item => ({ name: item.name, cost: item.cost, people: item.people ?? [], subitems: item.subitems.map(s => ({ name: s.name, cost: s.cost, people: s.people })) })),
-      payment: shareSelectedAccount ? { accountName: shareSelectedAccount.account_name, bank: shareSelectedAccount.bank, accountNumber: shareSelectedAccount.account_number, qrCode: shareSelectedAccount.qr_code ?? null } : null,
+      payment: shareAccounts.filter(a => shareSelectedAccountIds.includes(a.id)).map(a => ({ accountName: a.account_name, bank: a.bank, accountNumber: a.account_number, qrCode: a.qr_code ?? null })),
       receiptId: linkedReceipt?.id ?? null,
     };
   };

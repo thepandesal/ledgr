@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../src/lib/supabase';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
+import { Colors, Fonts, Radius, Spacing } from '@/components/ui/theme';
 
 export default function SplitSharePage() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -99,7 +100,7 @@ export default function SplitSharePage() {
     setReceiptLoading(false);
   };
 
-  if (loading) return <View style={s.center}><ActivityIndicator color="#0ccfcf" /></View>;
+  if (loading) return <View style={s.center}><ActivityIndicator color={Colors.cyan} /></View>;
   if (notFound || !recording) return (
     <View style={s.center}>
       <Text style={{ fontSize: 40 }}>🔍</Text>
@@ -107,7 +108,7 @@ export default function SplitSharePage() {
     </View>
   );
 
-  const amtColor = recording.type === 'expense' ? '#ed6a6a' : recording.type === 'income' ? '#2ab671' : '#425252';
+  const amtColor = recording.type === 'expense' ? Colors.expense : recording.type === 'income' ? Colors.income : Colors.text;
   const formattedDate = recording.transaction_date
     ? new Date(recording.transaction_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
     : '';
@@ -124,9 +125,9 @@ export default function SplitSharePage() {
         <Text style={s.sectionHeader}>receipt</Text>
         {receiptId ? (
           <TouchableOpacity style={s.receiptBtn} onPress={openReceipt}>
-            <Ionicons name="receipt-outline" size={16} color="#0ccfcf" />
+            <Ionicons name="receipt-outline" size={16} color={Colors.cyan} />
             <Text style={s.receiptBtnText}>tap to view receipt photos</Text>
-            <Ionicons name="arrow-forward" size={14} color="#0ccfcf" />
+            <Ionicons name="arrow-forward" size={14} color={Colors.cyan} />
           </TouchableOpacity>
         ) : (
           <View style={s.receiptUnavailable}>
@@ -197,9 +198,9 @@ export default function SplitSharePage() {
               </View>
             ))}
             <View style={s.infoRow}>
-              <Text style={[s.infoLabel, { color: '#425252', fontFamily: 'RobotoMono_700Bold' }]}>total</Text>
+              <Text style={[s.infoLabel, { color: Colors.text, fontFamily: Fonts.monoBold }]}>total</Text>
               <View style={s.dots} />
-              <Text style={[s.infoValue, { color: '#0ccfcf' }]}>
+              <Text style={[s.infoValue, { color: Colors.cyan }]}>
                 {perPerson.reduce((sum, p) => sum + p.total, 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
               </Text>
             </View>
@@ -242,12 +243,12 @@ export default function SplitSharePage() {
               caretHidden={false}
             />
             <TouchableOpacity onPress={() => setShowUrlBar(false)} style={{ padding: 6 }}>
-              <Ionicons name="close" size={16} color="#929090" />
+              <Ionicons name="close" size={16} color={Colors.muted} />
             </TouchableOpacity>
           </View>
         ) : (
           <TouchableOpacity style={s.shareBtn} onPress={handleShare} activeOpacity={0.8}>
-            <Ionicons name="share-outline" size={15} color="#0ccfcf" />
+            <Ionicons name="share-outline" size={15} color={Colors.cyan} />
             <Text style={s.shareBtnText}>share this bill</Text>
           </TouchableOpacity>
         )}
@@ -289,51 +290,51 @@ export default function SplitSharePage() {
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#ffffff' },
-  scroll: { paddingHorizontal: 28, paddingTop: 60, paddingBottom: 60 },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#ffffff', gap: 12 },
-  notFound: { fontFamily: 'RobotoMono_400Regular', fontSize: 13, color: '#929090' },
-  appLabel: { fontFamily: 'Avenelle', fontSize: 18, color: '#0ccfcf', marginBottom: 8 },
-  recName: { fontFamily: 'Avenelle', fontSize: 26, color: '#425252', letterSpacing: -0.5, lineHeight: 30, marginBottom: 4 },
-  recAmount: { fontFamily: 'RobotoMono_400Regular', fontSize: 20, marginBottom: 2 },
-  recDate: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#929090', marginBottom: 28 },
-  sectionHeader: { fontFamily: 'ChillaxMedium', fontSize: 14, color: '#0ccfcf', letterSpacing: -0.3, marginBottom: 10 },
-  card: { backgroundColor: '#fafafa', borderRadius: 14, paddingHorizontal: 16, paddingVertical: 4, borderWidth: 1, borderColor: '#f0f0f0', marginBottom: 24 },
+  container: { flex: 1, backgroundColor: Colors.white },
+  scroll: { paddingHorizontal: Spacing.xxl + 4, paddingTop: 60, paddingBottom: 60 },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.white, gap: 12 },
+  notFound: { fontFamily: Fonts.mono, fontSize: 13, color: Colors.muted },
+  appLabel: { fontFamily: Fonts.display, fontSize: 18, color: Colors.cyan, marginBottom: 8 },
+  recName: { fontFamily: Fonts.display, fontSize: 26, color: Colors.text, letterSpacing: -0.5, lineHeight: 30, marginBottom: 4 },
+  recAmount: { fontFamily: Fonts.mono, fontSize: 20, marginBottom: 2 },
+  recDate: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted, marginBottom: 28 },
+  sectionHeader: { fontFamily: Fonts.heading, fontSize: 14, color: Colors.cyan, letterSpacing: -0.3, marginBottom: 10 },
+  card: { backgroundColor: Colors.surface, borderRadius: Radius.lg, paddingHorizontal: 16, paddingVertical: 4, borderWidth: 1, borderColor: Colors.border, marginBottom: 24 },
   infoRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10 },
-  infoLabel: { fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#425252', flexShrink: 0 },
-  dots: { flex: 1, borderBottomWidth: 1, borderStyle: 'dotted', borderColor: '#d0d0d0', marginHorizontal: 8 },
-  infoValue: { fontFamily: 'RobotoMono_700Bold', fontSize: 12, color: '#425252', flexShrink: 0 },
-  divider: { height: 1, backgroundColor: '#f0f0f0' },
-  itemBlock: { backgroundColor: '#fafafa', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: '#f0f0f0', marginBottom: 10 },
+  infoLabel: { fontFamily: Fonts.mono, fontSize: 12, color: Colors.text, flexShrink: 0 },
+  dots: { flex: 1, borderBottomWidth: 1, borderStyle: 'dotted', borderColor: Colors.faint, marginHorizontal: 8 },
+  infoValue: { fontFamily: Fonts.monoBold, fontSize: 12, color: Colors.text, flexShrink: 0 },
+  divider: { height: 1, backgroundColor: Colors.border },
+  itemBlock: { backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: 14, borderWidth: 1, borderColor: Colors.border, marginBottom: 10 },
   itemHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
-  itemName: { fontFamily: 'RobotoMono_700Bold', fontSize: 13, color: '#425252' },
-  itemCost: { fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#929090' },
+  itemName: { fontFamily: Fonts.monoBold, fontSize: 13, color: Colors.text },
+  itemCost: { fontFamily: Fonts.mono, fontSize: 12, color: Colors.muted },
   itemPeopleRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, alignItems: 'center' },
   subRow: { flexDirection: 'row', gap: 8, marginBottom: 8 },
-  arrow: { fontSize: 11, color: '#c0c0c0', marginTop: 2 },
+  arrow: { fontSize: 11, color: Colors.faint, marginTop: 2 },
   subTop: { flexDirection: 'row', justifyContent: 'space-between' },
-  subName: { fontFamily: 'RobotoMono_700Bold', fontSize: 11, color: '#425252' },
-  subCost: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: '#929090' },
-  subSplit: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#929090' },
+  subName: { fontFamily: Fonts.monoBold, fontSize: 11, color: Colors.text },
+  subCost: { fontFamily: Fonts.mono, fontSize: 11, color: Colors.muted },
+  subSplit: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
-  chip: { backgroundColor: '#f0f0f0', borderRadius: 999, paddingVertical: 3, paddingHorizontal: 8 },
-  chipText: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#425252' },
-  receiptBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#f0fffe', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: '#0ccfcf', marginBottom: 24 },
-  receiptBtnText: { fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#0ccfcf', flex: 1 },
-  receiptUnavailable: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#fafafa', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: '#f0f0f0', marginBottom: 24 },
-  receiptUnavailableText: { fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#c0c0c0' },
-  qrHint: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#c0c0c0', textAlign: 'right', paddingBottom: 8 },
+  chip: { backgroundColor: Colors.border, borderRadius: Radius.pill, paddingVertical: 3, paddingHorizontal: 8 },
+  chipText: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.text },
+  receiptBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: Colors.successBg, borderRadius: Radius.md, padding: 14, borderWidth: 1, borderColor: Colors.cyan, marginBottom: 24 },
+  receiptBtnText: { fontFamily: Fonts.mono, fontSize: 12, color: Colors.cyan, flex: 1 },
+  receiptUnavailable: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: Colors.surface, borderRadius: Radius.md, padding: 14, borderWidth: 1, borderColor: Colors.border, marginBottom: 24 },
+  receiptUnavailableText: { fontFamily: Fonts.mono, fontSize: 12, color: Colors.faint },
+  qrHint: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.faint, textAlign: 'right', paddingBottom: 8 },
   payRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12 },
-  payName: { fontFamily: 'ChillaxMedium', fontSize: 14, color: '#425252' },
-  payBank: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#929090' },
-  payNumber: { fontFamily: 'RobotoMono_700Bold', fontSize: 13, color: '#425252' },
-  qr: { width: 80, height: 80, borderRadius: 8 },
+  payName: { fontFamily: Fonts.heading, fontSize: 14, color: Colors.text },
+  payBank: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted },
+  payNumber: { fontFamily: Fonts.monoBold, fontSize: 13, color: Colors.text },
+  qr: { width: 80, height: 80, borderRadius: Radius.sm },
   qrOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  qrLarge: { width: 260, height: 260, borderRadius: 16 },
-  qrTap: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 16 },
-  footer: { fontFamily: 'RobotoMono_400Regular', fontSize: 10, color: '#c0c0c0', textAlign: 'center', marginTop: 24 },
-  shareBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 999, paddingVertical: 10, paddingHorizontal: 20, borderWidth: 1, borderColor: '#0ccfcf', backgroundColor: '#f0fffe', marginBottom: 28 },
-  shareBtnText: { fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#0ccfcf' },
-  urlBar: { flexDirection: 'row', alignItems: 'center', borderRadius: 10, borderWidth: 1, borderColor: '#0ccfcf', backgroundColor: '#f0fffe', paddingHorizontal: 12, marginBottom: 28, gap: 8 },
-  urlInput: { flex: 1, fontFamily: 'RobotoMono_400Regular', fontSize: 12, color: '#425252', paddingVertical: 10 },
+  qrLarge: { width: 260, height: 260, borderRadius: Radius.lg },
+  qrTap: { fontFamily: Fonts.mono, fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 16 },
+  footer: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.faint, textAlign: 'center', marginTop: 24 },
+  shareBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: Radius.pill, paddingVertical: 10, paddingHorizontal: 20, borderWidth: 1, borderColor: Colors.cyan, backgroundColor: Colors.successBg, marginBottom: 28 },
+  shareBtnText: { fontFamily: Fonts.mono, fontSize: 12, color: Colors.cyan },
+  urlBar: { flexDirection: 'row', alignItems: 'center', borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.cyan, backgroundColor: Colors.successBg, paddingHorizontal: 12, marginBottom: 28, gap: 8 },
+  urlInput: { flex: 1, fontFamily: Fonts.mono, fontSize: 12, color: Colors.text, paddingVertical: 10 },
 });

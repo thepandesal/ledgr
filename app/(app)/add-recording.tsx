@@ -6,14 +6,13 @@
 
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView,
-  TextInput, ActivityIndicator, Switch, Animated, Dimensions, Modal,
+  TextInput, ActivityIndicator, Switch, Animated, Dimensions,
   FlatList, Image,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../../src/lib/supabase';
-import { BlurView } from 'expo-blur';
 import { setPendingFocusDate } from './space-detail';
 
 import {
@@ -364,7 +363,7 @@ export default function AddRecordingScreen() {
             {selectedCategory && (
               <View style={s.selectedItem}>
                 <View style={[s.catDot, { backgroundColor: selectedCategory.color }]}>
-                  <Ionicons name={selectedCategory.icon} size={11} color="#1c1d1d" />
+                  <Ionicons name={selectedCategory.icon} size={11} color={Colors.text} />
                 </View>
                 <Text style={s.selectedItemText}>{selectedCategory.name}</Text>
               </View>
@@ -570,7 +569,7 @@ export default function AddRecordingScreen() {
           labelExtractor={c => c.name}
           renderLeft={(c, sel) => (
             <View style={[s.catDot, { backgroundColor: c.color }]}>
-              <Ionicons name={c.icon} size={11} color="#1c1d1d" />
+              <Ionicons name={c.icon} size={11} color={Colors.text} />
             </View>
           )}
           emptyText="no categories found"
