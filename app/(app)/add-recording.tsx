@@ -81,8 +81,7 @@ export default function AddRecordingScreen() {
   const [showAccountModal, setShowAccountModal]   = useState(false);
 
   // ── Receipt photos ────────────────────────────────────────────────────────
-  const [receiptPhotos, setReceiptPhotos]   = useState<string[]>([]);
-  const [attachedEntryId, setAttachedEntryId] = useState<string | null>(null);
+  const [receiptPhotos, setReceiptPhotos] = useState<string[]>([]);
 
   // ── Receivable-specific ──────────────────────────────────────────────────
   const [decreasedFromAccount, setDecreasedFromAccount] = useState<any>(null);
@@ -150,26 +149,11 @@ export default function AddRecordingScreen() {
 
   // ─── Receipt capture ────────────────────────────────────────────────────
 
-  const ensureEntryId = async (): Promise<string | null> => {
-    if (attachedEntryId) return attachedEntryId;
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return null;
-    const { data: entry } = await supabase.from('receipt_entries')
-      .insert({ user_id: user.id, note: recName.trim() || 'new recording' })
-      .select().single();
-    if (entry?.id) { setAttachedEntryId(entry.id); return entry.id; }
-    return null;
-  };
-
   const addFromCamera = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') { Alert.alert('Permission needed', 'Camera access required.'); return; }
     const result = await ImagePicker.launchCameraAsync({ quality: 1 });
     if (!result.canceled && result.assets[0]) {
-      const entryId = await ensureEntryId();
-      if (!entryId) return;
-      const compressed = await compressImage(result.assets[0].uri);
-      await uploadReceiptPhoto(compressed, entryId);
       setReceiptPhotos(prev => [...prev, result.assets[0].uri]);
     }
   };
@@ -179,15 +163,12 @@ export default function AddRecordingScreen() {
     if (status !== 'granted') { Alert.alert('Permission needed', 'Photo library access required.'); return; }
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsMultipleSelection: true, quality: 1 });
     if (!result.canceled) {
-      const entryId = await ensureEntryId();
-      if (!entryId) return;
-      for (const asset of result.assets) {
-        const compressed = await compressImage(asset.uri);
-        await uploadReceiptPhoto(compressed, entryId);
-      }
       setReceiptPhotos(prev => [...prev, ...result.assets.map(a => a.uri)]);
     }
   };
+
+  const removePhoto = (index: number) =>
+    setReceiptPhotos(prev => prev.filter((_, i) => i !== index));
 
   // ─── Save ───────────────────────────────────────────────────────────────
 
@@ -245,9 +226,19 @@ export default function AddRecordingScreen() {
           });
         }
 
-        // Link receipt entry to the new recording
-        if (attachedEntryId && newRec?.id) {
-          await supabase.from('receipt_entries').update({ recording_id: newRec.id }).eq('id', attachedEntryId);
+        // Upload receipt photos after saving
+        if (receiptPhotos.length > 0 && newRec?.id) {
+          const { data: { user: u } } = await supabase.auth.getUser();
+          const note = recName.trim();
+          const { data: entry } = await supabase.from('receipt_entries')
+            .insert({ user_id: u!.id, note, recording_id: newRec.id })
+            .select().single();
+          if (entry?.id) {
+            for (const uri of receiptPhotos) {
+              const compressed = await compressImage(uri);
+              await uploadReceiptPhoto(compressed, entry.id);
+            }
+          }
         }
       }
 
@@ -486,7 +477,16 @@ export default function AddRecordingScreen() {
         </TouchableOpacity>
       </View>
       {receiptPhotos.length > 0 && (
-        <Text style={formStyles.hintMuted}>{receiptPhotos.length} photo{receiptPhotos.length !== 1 ? 's' : ''} attached</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 8 }}>
+          {receiptPhotos.map((uri, i) => (
+            <View key={i} style={s.photoThumbWrap}>
+              <Image source={{ uri }} style={s.receiptThumb} resizeMode="cover" />
+              <TouchableOpacity style={s.photoRemoveBtn} onPress={() => removePhoto(i)}>
+                <Ionicons name="close-circle" size={18} color={Colors.text} />
+              </TouchableOpacity>
+            </View>
+          ))}
+        </ScrollView>
       )}
 
       {/* ── Save button ── */}
@@ -561,6 +561,8 @@ export default function AddRecordingScreen() {
 // ─── Styles ──────────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
+  photoThumbWrap: { position: 'relative', marginRight: 8 },
+  photoRemoveBtn: { position: 'absolute', top: -6, right: -6, backgroundColor: Colors.white, borderRadius: 99 },
   receiptThumb: { width: 72, height: 72, borderRadius: Radius.md },
   typeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   typeBtn: {
