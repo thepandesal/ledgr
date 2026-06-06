@@ -1,6 +1,6 @@
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  SafeAreaView, Animated, Dimensions, ScrollView, ActivityIndicator, Image,
+  SafeAreaView, Animated, Dimensions, ScrollView, ActivityIndicator,
 } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -215,16 +215,15 @@ export default function SpaceDetailScreen() {
           <Text style={[pageStyles.pageName, { color: Colors.cyan, fontSize: 26, letterSpacing: -1 }]}>{(name ?? '').toLowerCase()}</Text>
         </View>
 
-        {/* Stats row — 4 column */}
-        <View style={[s.statsRow, { marginHorizontal: Spacing.page, marginBottom: 16 }]}>
+        {/* Stats row — 2x2 grid */}
+        <View style={[s.statsGrid, { marginHorizontal: Spacing.page, marginBottom: 16 }]}>
           {[
-            { img: require('../../assets/stat-expense.png'), label: 'expenses', value: shortAmount(totalExpenses), color: Colors.expense },
-            { img: require('../../assets/stat-income.png'), label: 'income', value: shortAmount(totalIncomeSavings), color: Colors.income },
-            { img: require('../../assets/stat-payable.png'), label: 'payables', value: String(countPayables), color: Colors.muted },
-            { img: require('../../assets/stat-receivable.png'), label: 'receivables', value: String(countReceivables), color: Colors.muted },
+            { label: 'expenses', value: shortAmount(totalExpenses), color: Colors.expense },
+            { label: 'income / savings', value: shortAmount(totalIncomeSavings), color: Colors.income },
+            { label: 'payables', value: String(countPayables), color: Colors.muted },
+            { label: 'receivables', value: String(countReceivables), color: Colors.muted },
           ].map((stat, i) => (
             <View key={i} style={s.statCard}>
-              <Image source={stat.img} style={s.statIcon} resizeMode="contain" />
               <Text style={[s.statValue, { color: stat.color }]}>{stat.value}</Text>
               <Text style={s.statLabel}>{stat.label}</Text>
             </View>
@@ -564,11 +563,18 @@ const s = StyleSheet.create({
   recordingAmount: { fontFamily: Fonts.mono, fontSize: 14 },
 
   // Stats
-  statsRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 8 },
-  statCard: { flex: 1, alignItems: 'center', gap: 4 },
-  statIcon: { width: 28, height: 28 },
-  statValue: { fontFamily: Fonts.monoBold, fontSize: 13 },
-  statLabel: { fontFamily: Fonts.mono, fontSize: 9, color: Colors.muted, textAlign: 'center' },
+  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  statCard: {
+    width: '47%',
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.lg,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  statValue: { fontFamily: Fonts.monoBold, fontSize: 18, marginBottom: 2 },
+  statLabel: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted },
 
   // Filter
   filterOption: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, paddingHorizontal: 14, borderRadius: Radius.pill, borderWidth: 1, borderColor: Colors.borderMid },
