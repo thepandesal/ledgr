@@ -210,12 +210,14 @@ export default function ReceiptDetailScreen() {
           {photos.length > 0 ? (
             <View style={s.grid}>
               {photos.map((p, i) => (
-                <TouchableOpacity key={p.id} onPress={() => setCarouselIdx(i)} activeOpacity={0.85} style={s.cell}>
-                  <Image source={{ uri: p.url }} style={s.cellImg} resizeMode="cover" />
-                  <TouchableOpacity style={s.cellDelete} onPress={() => deletePhoto(p)}>
-                    <Ionicons name="close-circle" size={18} color={Colors.danger} />
+                <View key={p.id} style={s.cell}>
+                  <TouchableOpacity onPress={() => setCarouselIdx(i)} activeOpacity={0.85} style={{ flex: 1 }}>
+                    <Image source={{ uri: p.url }} style={s.cellImg} resizeMode="cover" />
                   </TouchableOpacity>
-                </TouchableOpacity>
+                  <TouchableOpacity style={s.cellDelete} onPress={() => deletePhoto(p)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Ionicons name="close-circle" size={20} color={Colors.danger} />
+                  </TouchableOpacity>
+                </View>
               ))}
             </View>
           ) : (
@@ -359,7 +361,7 @@ const s = StyleSheet.create({
   pageDate: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted },
   // Photo grid
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GAP, marginBottom: 24 },
-  cell: { width: CELL, height: CELL, borderRadius: Radius.sm, overflow: 'hidden', backgroundColor: Colors.input },
+  cell: { width: CELL, height: CELL, borderRadius: Radius.sm, overflow: 'hidden', backgroundColor: Colors.input, position: 'relative' },
   cellImg: { width: '100%', height: '100%' },
   cellDelete: { position: 'absolute', top: 3, right: 3 },
   // Linked recording card
