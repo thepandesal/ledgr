@@ -84,6 +84,13 @@ export default function RecordingDetailScreen() {
   const [collectComplete, setCollectComplete] = useState<boolean | null>(null);
   const [collectLoading, setCollectLoading] = useState(false);
 
+  // Create receivable from expense
+  const [receivableModal, setReceivableModal] = useState(false);
+  const [receivableMode, setReceivableMode] = useState<'full' | 'manual' | 'split'>('full');
+  const [receivableManualAmount, setReceivableManualAmount] = useState('');
+  const [receivableSelectedPeople, setReceivableSelectedPeople] = useState<string[]>([]);
+  const [receivableLoading, setReceivableLoading] = useState(false);
+
   // Add item form state
   const [itemForms, setItemForms] = useState<{ name: string; cost: string; people: string[]; subitemForms: { name: string; people: string[] }[] }[]>([{ name: '', cost: '', people: [], subitemForms: [] }]);
   const addItemForm = () => setItemForms(prev => [...prev, { name: '', cost: '', people: [], subitemForms: [] }]);
@@ -417,6 +424,55 @@ export default function RecordingDetailScreen() {
       loadPaymentData();
     } catch (e) { console.log(e); }
     finally { setPayLoading(false); }
+  };
+
+  const getReceivableAmount = () => {
+    if (receivableMode === 'full') return Number(recording?.amount ?? 0);
+    if (receivableMode === 'manual') return parseFloat(receivableManualAmount || '0') || 0;
+    if (receivableMode === 'split') {
+      const map: Record<string, number> = {};
+      items.forEach(item => {
+        const calc = (people: string[], cost: number) => {
+          const pp = people.length > 0 ? cost / people.length : 0;
+          people.forEach(p => { map[p] = (map[p] || 0) + pp; });
+        };
+        if (item.subitems.length === 0) calc(item.people, item.cost);
+        else item.subitems.forEach(s => calc(s.people, s.cost));
+      });
+      return receivableSelectedPeople.reduce((s, p) => s + (map[p] ?? 0), 0);
+    }
+    return 0;
+  };
+
+  const confirmCreateReceivable = async () => {
+    if (!recording) return;
+    const amount = getReceivableAmount();
+    if (!amount || amount <= 0) return;
+    setReceivableLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const personLabel = receivableMode === 'split' && receivableSelectedPeople.length > 0
+        ? receivableSelectedPeople.join(', ') : null;
+      await supabase.from('recordings').insert({
+        space_id: recording.space_id,
+        user_id: user.id,
+        name: recording.name,
+        type: 'receivable',
+        amount,
+        transaction_date: recording.transaction_date,
+        status: 'pending',
+        account_id: recording.account_id ?? null,
+        category_id: recording.category_id ?? null,
+        linked_recording_id: recordingId,
+        person_name: personLabel,
+      });
+      setReceivableModal(false);
+      setReceivableMode('full');
+      setReceivableManualAmount('');
+      setReceivableSelectedPeople([]);
+    } catch (e) { console.log(e); }
+    finally { setReceivableLoading(false); }
   };
 
   const loadExistingShare = async () => {
@@ -995,6 +1051,17 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
             )}
           </View>
           <View style={pageStyles.actionRow}>
+            {recording?.type === 'expense' && (
+              <TouchableOpacity style={pageStyles.actionBtn} onPress={() => {
+                setReceivableMode('full');
+                setReceivableManualAmount('');
+                setReceivableSelectedPeople([]);
+                setReceivableModal(true);
+              }}>
+                <Ionicons name="arrow-undo-outline" size={15} color={Colors.text} />
+                <Text style={pageStyles.actionBtnText}>create receivable</Text>
+              </TouchableOpacity>
+            )}
             {recording?.type === 'payable' && recording?.status !== 'paid' && (
               <TouchableOpacity style={pageStyles.actionBtn} onPress={openPayModal}>
                 <Ionicons name="cash-outline" size={15} color={Colors.text} />
@@ -1830,6 +1897,74 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
             </View>
           </>
         )}
+      </BottomSheet>
+
+      {/* Create receivable modal */}
+      <BottomSheet visible={receivableModal} onClose={() => setReceivableModal(false)} sub="expense" title="create receivable">
+        <Text style={formStyles.hintMuted}>{(recording?.name ?? '').toLowerCase()} · {Number(recording?.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+        <View style={{ flexDirection: 'row', gap: 6, width: '100%', marginTop: 8 }}>
+          {(['full', 'manual', ...(filledPeople.length > 0 && items.length > 0 ? ['split'] : [])] as const).map(mode => (
+            <TouchableOpacity key={mode} style={[itemStyles.personSelectChip, { flex: 1, justifyContent: 'center' }, receivableMode === mode && itemStyles.personSelectChipActive]} onPress={() => setReceivableMode(mode as any)}>
+              <Text style={[itemStyles.personSelectText, receivableMode === mode && itemStyles.personSelectTextActive]}>{mode}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        {receivableMode === 'full' && (
+          <Text style={{ fontFamily: Fonts.monoBold, fontSize: 22, color: Colors.cyan, marginTop: 8 }}>
+            {Number(recording?.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+          </Text>
+        )}
+        {receivableMode === 'manual' && (
+          <TextInput style={[formStyles.input, { width: '100%', marginTop: 8 }]} placeholder="0.00" placeholderTextColor={Colors.faint} value={receivableManualAmount} onChangeText={setReceivableManualAmount} keyboardType="decimal-pad" autoFocus />
+        )}
+        {receivableMode === 'split' && (
+          <View style={{ width: '100%', gap: 8, marginTop: 8 }}>
+            <Text style={formStyles.hintMuted}>select who owes you</Text>
+            {filledPeople.map((p, i) => {
+              const sel = receivableSelectedPeople.includes(p);
+              const personAmount = (() => {
+                const map: Record<string, number> = {};
+                items.forEach(item => {
+                  const calc = (people: string[], cost: number) => {
+                    const pp = people.length > 0 ? cost / people.length : 0;
+                    people.forEach(person => { map[person] = (map[person] || 0) + pp; });
+                  };
+                  if (item.subitems.length === 0) calc(item.people, item.cost);
+                  else item.subitems.forEach((s: any) => calc(s.people, s.cost));
+                });
+                return map[p] ?? 0;
+              })();
+              return (
+                <TouchableOpacity key={i}
+                  style={[accountStyles.option, sel && accountStyles.optionActive]}
+                  onPress={() => setReceivableSelectedPeople(prev => sel ? prev.filter(x => x !== p) : [...prev, p])}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[accountStyles.optionName, sel && accountStyles.optionNameActive]}>{p}</Text>
+                    <Text style={[accountStyles.optionBank, sel && accountStyles.optionBankActive]}>{personAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+                  </View>
+                  <Ionicons name={sel ? 'checkbox' : 'square-outline'} size={18} color={sel ? Colors.white : Colors.faint} />
+                </TouchableOpacity>
+              );
+            })}
+            {receivableSelectedPeople.length > 0 && (
+              <Text style={{ fontFamily: Fonts.monoBold, fontSize: 18, color: Colors.cyan }}>
+                {getReceivableAmount().toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              </Text>
+            )}
+          </View>
+        )}
+        <View style={formStyles.actions}>
+          <TouchableOpacity style={formStyles.cancelBtn} onPress={() => setReceivableModal(false)}>
+            <Text style={formStyles.cancelBtnText}>cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[formStyles.primaryBtn, (getReceivableAmount() <= 0 || receivableLoading) && { opacity: 0.4 }]}
+            onPress={confirmCreateReceivable}
+            disabled={getReceivableAmount() <= 0 || receivableLoading}
+          >
+            <Text style={formStyles.primaryBtnText}>{receivableLoading ? 'creating...' : 'create'}</Text>
+          </TouchableOpacity>
+        </View>
       </BottomSheet>
 
       {/* Cooking modal */}
