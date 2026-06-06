@@ -23,7 +23,7 @@ const ICONS = [
   'car-outline', 'musical-notes-outline',
 ];
 
-const PAGE_PAD = 48;
+const PAGE_PAD = 32;
 
 interface Space { id: string; name: string; color: string; icon: string; default_category_id?: string; }
 interface Category { id: string; name: string; color: string; icon: string; }
@@ -141,9 +141,9 @@ export default function SpacesScreen() {
           ))}
 
           {/* Add a space */}
-          <TouchableOpacity style={[pageStyles.actionBtn, { alignSelf: 'flex-start', flex: 0 }]} activeOpacity={0.8} onPress={openCreate}>
+          <TouchableOpacity style={s.addCard} activeOpacity={0.8} onPress={openCreate}>
             <Ionicons name="add" size={14} color={Colors.text} />
-            <Text style={pageStyles.actionBtnText}>add a space</Text>
+            <Text style={s.addCardText}>add a space</Text>
           </TouchableOpacity>
 
         </View>
@@ -295,6 +295,21 @@ const s = StyleSheet.create({
   spaceCardMain: { flex: 1 },
   spaceCardText: { fontFamily: 'ChillaxMedium', fontSize: 15, color: Colors.white },
   spaceMenuBtn: { padding: 6 },
+
+  // Add a space button
+  addCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: Radius.pill,
+    borderWidth: 1,
+    borderColor: Colors.borderMid,
+    backgroundColor: Colors.surface,
+  },
+  addCardText: { fontFamily: Fonts.mono, fontSize: 11, color: Colors.text },
 
   // Form
   colorRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
