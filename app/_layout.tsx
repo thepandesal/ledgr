@@ -16,6 +16,8 @@ export default function RootLayout() {
     Avenelle: require('../assets/avenelle.ttf'),
     ChillaxMedium: require('../assets/Chillax-Medium.otf'),
     MuseoModerno_Black: require('../assets/MuseoModerno-Black.ttf'),
+    MuseoModerno_Medium: require('../assets/MuseoModerno-Medium.ttf'),
+    MuseoModerno_Regular: require('../assets/MuseoModerno-Regular.ttf'),
     CalSans: require('../assets/CalSans-Regular.ttf'),
   });
 

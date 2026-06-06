@@ -44,6 +44,14 @@ export const Fonts = {
   // Section headers — ChillaxMedium
   heading: 'ChillaxMedium',
 
+  // Museo Moderno
+  museoBlack: 'MuseoModerno_Black',
+  museoMedium: 'MuseoModerno_Medium',
+  museoRegular: 'MuseoModerno_Regular',
+
+  // CalSans
+  calSans: 'CalSans',
+
   // Body / data / labels
   mono: 'RobotoMono_400Regular',
   monoBold: 'RobotoMono_700Bold',

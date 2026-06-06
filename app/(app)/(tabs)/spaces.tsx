@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react';
 import BottomSheet from '@/components/ui/BottomSheet';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import formStyles from '@/components/ui/formStyles';
+import pageStyles from '@/components/ui/pageStyles';
 import { Colors, Fonts, Radius, Spacing } from '@/components/ui/theme';
 
 const PASTEL_COLORS = [
@@ -21,6 +22,8 @@ const ICONS = [
   'heart-outline', 'star-outline', 'leaf-outline', 'cafe-outline',
   'car-outline', 'musical-notes-outline',
 ];
+
+const PAGE_PAD = 48;
 
 interface Space { id: string; name: string; color: string; icon: string; default_category_id?: string; }
 interface Category { id: string; name: string; color: string; icon: string; }
@@ -98,30 +101,37 @@ export default function SpacesScreen() {
 
   return (
     <SafeAreaView style={s.container}>
+
+      {/* Header */}
       <View style={s.header}>
-        <View style={s.headerLeft}>
-          <View style={s.avatarFallback}>
-            <Ionicons name="person" size={16} color={Colors.faint} />
-          </View>
-          <Text style={s.greeting}>Hey, <Text style={s.greetingName}>{userName}!</Text></Text>
+        <View style={s.avatarFallback}>
+          <Ionicons name="person" size={16} color={Colors.faint} />
         </View>
+        <Text style={s.greeting}>
+          Hey, <Text style={s.greetingName}>{userName}!</Text>
+        </Text>
       </View>
 
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+
+        {/* Section title */}
         <Text style={s.sectionTitle}>spaces</Text>
+
         <View style={s.grid}>
+
+          {/* All spaces */}
           <TouchableOpacity
-            style={[s.spaceCard, { backgroundColor: Colors.text, width: '100%' }]}
+            style={s.allSpacesCard}
             activeOpacity={0.8}
             onPress={() => router.push({ pathname: '/(app)/space-detail', params: { spaceId: 'all', name: 'all spaces' } })}>
-            <Ionicons name="layers-outline" size={16} color={Colors.white} />
-            <Text style={s.spaceCardText}>all spaces</Text>
+            <Text style={s.allSpacesText}>all spaces</Text>
           </TouchableOpacity>
+
+          {/* Space cards */}
           {spaces.map(space => (
             <View key={space.id} style={s.spaceCard}>
               <TouchableOpacity style={s.spaceCardMain} activeOpacity={0.8}
                 onPress={() => router.push({ pathname: '/(app)/space-detail', params: { spaceId: space.id, name: space.name, color: space.color } })}>
-                <Ionicons name={space.icon as any} size={16} color={Colors.white} />
                 <Text style={s.spaceCardText} numberOfLines={1}>{space.name.toLowerCase()}</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={() => openMenu(space)} style={s.spaceMenuBtn}>
@@ -129,10 +139,13 @@ export default function SpacesScreen() {
               </TouchableOpacity>
             </View>
           ))}
-          <TouchableOpacity style={s.addCard} activeOpacity={0.8} onPress={openCreate}>
-            <Ionicons name="add" size={24} color={Colors.white} />
-            <Text style={s.addCardText}>add a space</Text>
+
+          {/* Add a space */}
+          <TouchableOpacity style={[pageStyles.actionBtn, { alignSelf: 'flex-start', flex: 0 }]} activeOpacity={0.8} onPress={openCreate}>
+            <Ionicons name="add" size={14} color={Colors.text} />
+            <Text style={pageStyles.actionBtnText}>add a space</Text>
           </TouchableOpacity>
+
         </View>
       </ScrollView>
 
@@ -254,21 +267,36 @@ export default function SpacesScreen() {
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.input },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.xxl, paddingTop: 52, paddingBottom: 16 },
-  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  container: { flex: 1, backgroundColor: Colors.white },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: PAGE_PAD, paddingTop: 32, paddingBottom: 16 },
   avatarFallback: { width: 34, height: 34, borderRadius: 17, backgroundColor: Colors.borderMid, justifyContent: 'center', alignItems: 'center' },
-  greeting: { fontFamily: Fonts.sans, fontSize: 16, color: Colors.muted },
-  greetingName: { fontFamily: Fonts.sansBold, color: Colors.text },
-  scroll: { paddingHorizontal: Spacing.xxl, paddingBottom: 40, paddingTop: 12 },
-  sectionTitle: { fontFamily: Fonts.display, fontSize: 36, color: Colors.text, marginBottom: 20 },
+  greeting: { fontFamily: 'MuseoModerno_Regular', fontSize: 16, color: Colors.muted },
+  greetingName: { fontFamily: 'MuseoModerno_Regular', color: Colors.text },
+  scroll: { paddingHorizontal: PAGE_PAD, paddingBottom: 40, paddingTop: 8 },
+  sectionTitle: { fontFamily: 'MuseoModerno_Medium', fontSize: 36, color: Colors.text, marginBottom: 20 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  spaceCard: { width: '47%', borderRadius: Radius.pill, paddingVertical: 10, paddingLeft: 16, paddingRight: 8, flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.cyan },
-  spaceCardMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  spaceCardText: { fontFamily: Fonts.sansSemiBold, fontSize: 15, color: Colors.white, flex: 1 },
+
+  // All spaces — dotted border, #ed6a6a text, no bg
+  allSpacesCard: {
+    width: '100%',
+    borderRadius: Radius.pill,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    borderWidth: 3,
+    borderStyle: 'dotted',
+    borderColor: Colors.expense,
+    backgroundColor: 'transparent',
+  },
+  allSpacesText: { fontFamily: 'ChillaxMedium', fontSize: 15, color: Colors.expense },
+
+  // Space cards — #7fd8cd bg, no icon
+  spaceCard: { width: '47%', borderRadius: Radius.pill, paddingVertical: 12, paddingLeft: 16, paddingRight: 8, flexDirection: 'row', alignItems: 'center', backgroundColor: '#7fd8cd' },
+  spaceCardMain: { flex: 1 },
+  spaceCardText: { fontFamily: 'ChillaxMedium', fontSize: 15, color: Colors.white },
   spaceMenuBtn: { padding: 6 },
-  addCard: { width: '47%', borderRadius: Radius.pill, paddingVertical: 14, paddingHorizontal: 16, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', backgroundColor: '#545454', gap: 6 },
-  addCardText: { fontFamily: Fonts.sans, fontSize: 13, color: Colors.white },
+
+  // Form
   colorRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   colorDot: { width: 30, height: 30, borderRadius: 15 },
   colorDotSelected: { borderWidth: 3, borderColor: Colors.text },
