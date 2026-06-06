@@ -225,10 +225,15 @@ export default function SpaceDetailScreen() {
           ].map((stat, i) => {
             const isActive = activeFilter.includes(stat.key);
             return (
-              <TouchableOpacity key={i} style={s.statCard}>
-              <Text style={[s.statValue, { color: stat.color }]}>{stat.value}</Text>
-              <Text style={s.statLabel}>{stat.label}</Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                key={i}
+                activeOpacity={0.7}
+                style={[s.statCard, isActive && { borderColor: Colors.cyan, backgroundColor: Colors.cyan + '22' }]}
+                onPress={() => setActiveFilter(prev => isActive ? prev.filter(k => k !== stat.key) : [...prev, stat.key])}
+              >
+                <Text style={[s.statValue, { color: isActive ? Colors.cyan : stat.color }]}>{stat.value}</Text>
+                <Text style={[s.statLabel, isActive && { color: Colors.cyan }]}>{stat.label}</Text>
+              </TouchableOpacity>
             );
           })}
         </View>
