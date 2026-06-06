@@ -258,50 +258,40 @@ export default function SpaceDetailScreen() {
           </View>
         </View>
 
-        {/* Nav row */}
-        <View style={s.topNavRow}>
-          <TouchableOpacity style={s.dateNavLeft} onPress={openPicker}>
-            <TouchableOpacity onPress={() => {
-              if (viewMode === 'daily') setSelectedDate(d => addDays(d, -1));
-              else if (viewMode === 'weekly') setSelectedDate(d => addDays(d, -7));
-              else setSelectedDate(d => { const n = new Date(d); n.setMonth(n.getMonth() - 1); return n; });
-            }}>
-              <Ionicons name="chevron-back" size={16} color={Colors.muted} />
+        {/* Date nav */}
+        <View style={s.modeRow}>
+          {MODES.map(mode => (
+            <TouchableOpacity
+              key={mode}
+              style={[s.modeBtn, viewMode === mode && s.modeBtnActive]}
+              onPress={() => switchMode(mode)}
+              activeOpacity={0.7}
+            >
+              <Text style={[s.modeBtnText, viewMode === mode && s.modeBtnTextActive]}>
+                {mode}
+              </Text>
             </TouchableOpacity>
-            <Text style={s.dateNavLabel}>{getNavLabel(viewMode, selectedDate).toLowerCase()}</Text>
-            <TouchableOpacity onPress={() => {
-              if (viewMode === 'daily') setSelectedDate(d => addDays(d, 1));
-              else if (viewMode === 'weekly') setSelectedDate(d => addDays(d, 7));
-              else setSelectedDate(d => { const n = new Date(d); n.setMonth(n.getMonth() + 1); return n; });
-            }}>
-              <Ionicons name="chevron-forward" size={16} color={Colors.muted} />
-            </TouchableOpacity>
+          ))}
+        </View>
+        <View style={s.dateNavRow}>
+          <TouchableOpacity onPress={() => {
+            if (viewMode === 'daily') setSelectedDate(d => addDays(d, -1));
+            else if (viewMode === 'weekly') setSelectedDate(d => addDays(d, -7));
+            else setSelectedDate(d => { const n = new Date(d); n.setMonth(n.getMonth() - 1); return n; });
+          }} style={s.dateNavArrow}>
+            <Ionicons name="chevron-back" size={18} color={Colors.muted} />
           </TouchableOpacity>
-          <View style={s.tabsInline}>
-            {MODES.map((mode, idx) => (
-              <TouchableOpacity
-                key={mode}
-                style={s.tabItemInline}
-                onPress={() => switchMode(mode)}
-                onLayout={e => {
-                  const { x, width: w } = e.nativeEvent.layout;
-                  setTabLayouts(prev => { const next = [...prev]; next[idx] = { x, width: w }; return next; });
-                }}
-              >
-                <Text style={[s.tabTextInline, viewMode === mode && s.tabTextInlineActive]}>
-                  {mode.charAt(0).toUpperCase() + mode.slice(1)}
-                </Text>
-              </TouchableOpacity>
-            ))}
-            {tabLayouts.filter(Boolean).length === 3 && (
-              <Animated.Image
-                source={require('../../assets/circle-doodle.png')}
-                style={[s.circleDoodle, { transform: [{ translateX: circleAnim }] }]}
-                resizeMode="contain"
-                pointerEvents="none"
-              />
-            )}
-          </View>
+          <TouchableOpacity onPress={openPicker} style={s.dateNavCenter}>
+            <Text style={s.dateNavLabel}>{getNavLabel(viewMode, selectedDate).toLowerCase()}</Text>
+            <Ionicons name="calendar-outline" size={12} color={Colors.faint} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => {
+            if (viewMode === 'daily') setSelectedDate(d => addDays(d, 1));
+            else if (viewMode === 'weekly') setSelectedDate(d => addDays(d, 7));
+            else setSelectedDate(d => { const n = new Date(d); n.setMonth(n.getMonth() + 1); return n; });
+          }} style={s.dateNavArrow}>
+            <Ionicons name="chevron-forward" size={18} color={Colors.muted} />
+          </TouchableOpacity>
         </View>
 
         <Animated.View style={[s.contentArea, { transform: [{ translateX: contentSlide }] }]}>
@@ -538,16 +528,17 @@ export default function SpaceDetailScreen() {
 }
 
 const s = StyleSheet.create({
-  // Nav
+  // Date nav
+  modeRow: { flexDirection: 'row', paddingHorizontal: Spacing.page, gap: 8, marginBottom: 10 },
+  modeBtn: { flex: 1, paddingVertical: 8, borderRadius: Radius.pill, borderWidth: 1, borderColor: Colors.borderMid, backgroundColor: Colors.surface, alignItems: 'center' },
+  modeBtnActive: { backgroundColor: Colors.cyan, borderColor: Colors.cyan },
+  modeBtnText: { fontFamily: Fonts.mono, fontSize: 11, color: Colors.muted },
+  modeBtnTextActive: { fontFamily: Fonts.monoBold, color: Colors.white },
+  dateNavRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.page, marginBottom: 8 },
+  dateNavArrow: { padding: 8 },
+  dateNavCenter: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  dateNavLabel: { fontFamily: Fonts.monoBold, fontSize: 12, color: Colors.text },
   recordingsHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.page, marginBottom: 8 },
-  topNavRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.page, marginBottom: 8 },
-  dateNavLeft: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  dateNavLabel: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted },
-  tabsInline: { flexDirection: 'row', gap: 10, paddingLeft: 8 },
-  tabItemInline: { paddingVertical: 2 },
-  tabTextInline: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted },
-  tabTextInlineActive: { fontFamily: Fonts.monoBold, color: Colors.text },
-  circleDoodle: { position: 'absolute', width: 70, height: 32, top: -8, left: 4, pointerEvents: 'none' },
   contentArea: { flex: 1 },
 
   // Date chips

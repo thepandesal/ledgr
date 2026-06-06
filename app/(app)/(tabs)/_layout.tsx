@@ -45,10 +45,20 @@ export default function TabsLayout() {
 
   const switchTab = (key: string) => {
     if (key === activeTabRef.current) return;
+    const prev = activeTabRef.current;
     activeTabRef.current = key;
+    // New tab starts off-screen right
     slideAnims[key].setValue(width);
-    Animated.timing(slideAnims[key], { toValue: 0, duration: 280, useNativeDriver: false }).start();
     setActiveTab(key);
+    Animated.parallel([
+      // Slide new tab in from right
+      Animated.timing(slideAnims[key], { toValue: 0, duration: 260, useNativeDriver: false }),
+      // Slide old tab out to left
+      Animated.timing(slideAnims[prev], { toValue: -width, duration: 260, useNativeDriver: false }),
+    ]).start(() => {
+      // Reset old tab position off-screen right (ready for next time)
+      slideAnims[prev].setValue(width);
+    });
   };
 
   return (
@@ -57,7 +67,10 @@ export default function TabsLayout() {
         {TABS.map(tab => (
           <Animated.View
             key={tab.key}
-            style={[styles.screen, { transform: [{ translateX: slideAnims[tab.key] }], zIndex: activeTab === tab.key ? 10 : 1 }]}
+            style={[
+              styles.screen,
+              { transform: [{ translateX: slideAnims[tab.key] }], zIndex: activeTab === tab.key ? 10 : 0 },
+            ]}
             pointerEvents={activeTab === tab.key ? 'auto' : 'none'}
           >
             {SCREENS[tab.key]}
