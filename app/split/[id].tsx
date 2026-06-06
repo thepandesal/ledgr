@@ -72,11 +72,11 @@ export default function SplitSharePage() {
       const subs = item.subitems ?? [];
       if (subs.length === 0) {
         const pp = (item.people ?? []).length > 0 ? Number(item.cost) / item.people.length : 0;
-        (item.people ?? []).forEach((p: string) => { if (perPersonMap[p] !== undefined) perPersonMap[p] += pp; });
+        (item.people ?? []).forEach((p: string) => { if (perPersonMap[p] !== undefined) perPersonMap[p] = Math.round((perPersonMap[p] + pp) * 100) / 100; });
       } else {
         subs.forEach((sub: any) => {
           const pp = (sub.people ?? []).length > 0 ? Number(sub.cost) / sub.people.length : 0;
-          (sub.people ?? []).forEach((p: string) => { if (perPersonMap[p] !== undefined) perPersonMap[p] += pp; });
+          (sub.people ?? []).forEach((p: string) => { if (perPersonMap[p] !== undefined) perPersonMap[p] = Math.round((perPersonMap[p] + pp) * 100) / 100; });
         });
       }
     });
