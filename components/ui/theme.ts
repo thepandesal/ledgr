@@ -32,6 +32,8 @@ export const Colors = {
   successBg: '#f0fff8',
   warningBg: '#fff8f0',
   warningBorder: '#f0e0c0',
+  pending: '#eed68b',
+  paid: '#80b0dd',
 
   // Overlays
   overlay: 'rgba(0,0,0,0.3)',

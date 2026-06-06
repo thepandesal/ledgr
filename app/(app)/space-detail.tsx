@@ -48,12 +48,14 @@ function getDailyMonthLabel(selectedDate: Date) {
 
 function recordingColor(type: string, status: string): string {
   if (type === 'expense') return Colors.expense;
-  if (type === 'payable') return status === 'paid' ? Colors.success : Colors.text;
+  if (type === 'income' || type === 'savings') return Colors.cyan;
+  if (type === 'payable') return status === 'paid' ? Colors.paid : Colors.pending;
   if (type === 'receivable') {
-    if (status === 'received') return Colors.income;
-    if (status === 'partial') return Colors.cyan;
-    return Colors.text;
+    if (status === 'received') return Colors.paid;
+    return Colors.pending;
   }
+  return Colors.cyan;
+}
   return Colors.income;
 }
 
