@@ -3,9 +3,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../src/lib/supabase';
 import { useState } from 'react';
 
-const { width } = Dimensions.get('window');
-const IMG_ASPECT = 1830 / 1320;
-const heroHeight = width * IMG_ASPECT;
+const { width, height } = Dimensions.get('window');
+const IMG_ASPECT = 1320 / 1830;
+const heroHeight = height * 0.45;
+const heroWidth = heroHeight * IMG_ASPECT;
 
 export default function LoginScreen() {
   const [loading, setLoading] = useState<'google' | 'apple' | null>(null);
@@ -27,7 +28,7 @@ export default function LoginScreen() {
       {/* Hero — full width, correct aspect ratio, no cropping */}
       <Image
         source={require('../assets/login-vector.png')}
-        style={{ width, height: heroHeight }}
+        style={{ width: heroWidth, height: heroHeight, alignSelf: 'center' }}
         resizeMode="contain"
       />
 
@@ -58,7 +59,7 @@ const s = StyleSheet.create({
   content: {
     alignItems: 'center',
     paddingHorizontal: 48,
-    marginTop: -16,
+    marginTop: 8,
   },
   brand: { fontFamily: 'MuseoModerno_Black', fontSize: 72, color: '#7fd8cd', letterSpacing: -1, marginBottom: 4 },
   tagline: { fontFamily: 'ChillaxMedium', fontSize: 18, color: '#545454', marginBottom: 32 },
