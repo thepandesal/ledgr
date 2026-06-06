@@ -74,7 +74,7 @@ export default function SpaceDetailScreen() {
   const [pendingDeleteName, setPendingDeleteName] = useState('');
   const [tabLayouts, setTabLayouts] = useState<{ x: number; width: number }[]>([]);
   const [showPicker, setShowPicker] = useState(false);
-  const [activeFilter, setActiveFilter] = useState<string | null>(null);
+  const [activeFilter, setActiveFilter] = useState<string[]>([]);
   const [showFilter, setShowFilter] = useState(false);
   const [pickerMonth, setPickerMonth] = useState(new Date().getMonth());
   const [pickerYear, setPickerYear] = useState(new Date().getFullYear());
@@ -160,7 +160,7 @@ export default function SpaceDetailScreen() {
   const filteredRecordings = recordings.filter(r => {
     const parts = r.transaction_date.split('-');
     const rDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-    if (activeFilter && r.type !== activeFilter) return false;
+    if (activeFilter.length > 0 && !activeFilter.includes(r.type)) return false;
     if (viewMode === 'daily') return isSameDay(rDate, selectedDate);
     if (viewMode === 'weekly') { const end = addDays(weekStart, 6); return rDate >= weekStart && rDate <= end; }
     return rDate.getMonth() === selectedDate.getMonth() && rDate.getFullYear() === selectedDate.getFullYear();
@@ -243,7 +243,7 @@ export default function SpaceDetailScreen() {
         <View style={s.recordingsHeader}>
           <Text style={[pageStyles.sectionHeader, { marginBottom: 0, marginTop: 0 }]}>recordings</Text>
           <TouchableOpacity style={{ padding: 6 }} onPress={() => setShowFilter(true)}>
-            <Ionicons name="options-outline" size={18} color={activeFilter ? Colors.cyan : Colors.muted} />
+            <Ionicons name="options-outline" size={18} color={activeFilter.length > 0 ? Colors.cyan : Colors.muted} />
           </TouchableOpacity>
         </View>
 
@@ -422,26 +422,35 @@ export default function SpaceDetailScreen() {
         visible={showFilter}
         onClose={() => setShowFilter(false)}
         title="filter by"
-        actions={[{ label: 'close', onPress: () => setShowFilter(false), muted: true }]}
+        actions={[
+          { label: 'clear', onPress: () => { setActiveFilter([]); setShowFilter(false); }, muted: true },
+          { label: 'done', onPress: () => setShowFilter(false) },
+        ]}
       >
         {[
-          { key: null, label: 'all', color: null },
           { key: 'expense', label: 'expense', color: Colors.expense },
           { key: 'income', label: 'income', color: Colors.income },
           { key: 'savings', label: 'savings', color: Colors.income },
           { key: 'payable', label: 'payable', color: Colors.muted },
           { key: 'receivable', label: 'receivable', color: Colors.muted },
         ].map(f => {
-          const isActive = activeFilter === f.key;
+          const isActive = activeFilter.includes(f.key);
           return (
             <TouchableOpacity
-              key={String(f.key)}
-              style={[s.filterOption, isActive && { borderColor: f.color ?? Colors.cyan, backgroundColor: (f.color ?? Colors.cyan) + '18' }]}
-              onPress={() => { setActiveFilter(f.key); setShowFilter(false); }}
+              key={f.key}
+              style={[s.filterOption, isActive && { borderColor: f.color, backgroundColor: f.color + '18' }]}
+              onPress={() => setActiveFilter(prev =>
+                isActive ? prev.filter(k => k !== f.key) : [...prev, f.key]
+              )}
             >
-              {f.color && <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: f.color }} />}
-              <Text style={[s.filterOptionText, isActive && { color: f.color ?? Colors.cyan, fontFamily: Fonts.monoBold }]}>{f.label}</Text>
-              {isActive && <Ionicons name="checkmark" size={14} color={f.color ?? Colors.cyan} style={{ marginLeft: 'auto' }} />}
+              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: f.color }} />
+              <Text style={[s.filterOptionText, isActive && { color: f.color, fontFamily: Fonts.monoBold }]}>{f.label}</Text>
+              <Ionicons
+                name={isActive ? 'checkbox' : 'square-outline'}
+                size={16}
+                color={isActive ? f.color : Colors.faint}
+                style={{ marginLeft: 'auto' }}
+              />
             </TouchableOpacity>
           );
         })}
