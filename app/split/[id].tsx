@@ -21,6 +21,7 @@ export default function SplitSharePage() {
   const [qrModal, setQrModal] = useState(false);
   const [qrModalAcc, setQrModalAcc] = useState<any>(null);
   const [showUrlBar, setShowUrlBar] = useState(false);
+  const [copiedAccIdx, setCopiedAccIdx] = useState<number | null>(null);
 
   const shareUrl = typeof window !== 'undefined' ? window.location.href : `https://ledgr.art/split/${id}`;
 
@@ -83,6 +84,20 @@ export default function SplitSharePage() {
     });
     setPerPerson(Object.entries(perPersonMap).map(([name, total]) => ({ name, total })));
     setLoading(false);
+  };
+
+  const copyAccountNumber = (accNumber: string, idx: number) => {
+    // Must be synchronous for Safari — no await before writeText
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(accNumber).then(() => {
+        setCopiedAccIdx(idx);
+        setTimeout(() => setCopiedAccIdx(null), 2000);
+      }).catch(() => {
+        if (typeof window !== 'undefined') window.prompt('Copy account number:', accNumber);
+      });
+    } else if (typeof window !== 'undefined') {
+      window.prompt('Copy account number:', accNumber);
+    }
   };
 
   const openReceipt = async () => {
@@ -217,7 +232,18 @@ export default function SplitSharePage() {
                   <View style={{ gap: 3, flex: 1 }}>
                     <Text style={s.payName}>{acc.account_name ?? ''}</Text>
                     <Text style={s.payBank}>{acc.bank ?? ''}</Text>
-                    <Text style={s.payNumber}>{acc.account_number ?? ''}</Text>
+                    <TouchableOpacity
+                      style={s.copyRow}
+                      onPress={() => copyAccountNumber(acc.account_number ?? '', i)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={s.payNumber}>{acc.account_number ?? ''}</Text>
+                      <Ionicons
+                        name={copiedAccIdx === i ? 'checkmark' : 'copy-outline'}
+                        size={13}
+                        color={copiedAccIdx === i ? Colors.income : Colors.muted}
+                      />
+                    </TouchableOpacity>
                   </View>
                   {acc.qr_code
                     ? <TouchableOpacity onPress={() => { setQrModalAcc(acc); setQrModal(true); }}>
@@ -328,6 +354,7 @@ const s = StyleSheet.create({
   payName: { fontFamily: Fonts.heading, fontSize: 14, color: Colors.text },
   payBank: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted },
   payNumber: { fontFamily: Fonts.monoBold, fontSize: 13, color: Colors.text },
+  copyRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   qr: { width: 80, height: 80, borderRadius: Radius.sm },
   qrOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   qrLarge: { width: 260, height: 260, borderRadius: Radius.lg },
