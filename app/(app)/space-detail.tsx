@@ -236,12 +236,12 @@ export default function SpaceDetailScreen() {
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             {spaceId !== 'all' && (
               <TouchableOpacity
-                style={s.addRecordBtn}
+                style={pageStyles.actionBtn}
                 onPress={() => router.push({ pathname: '/(app)/add-recording', params: { spaceId, spaceName: name, defaultDate: selectedDate.toISOString().split('T')[0] } } as any)}
                 activeOpacity={0.85}
               >
                 <Ionicons name="add" size={14} color={Colors.text} />
-                <Text style={s.addRecordBtnText}>add record</Text>
+                <Text style={pageStyles.actionBtnText}>add record</Text>
               </TouchableOpacity>
             )}
             <TouchableOpacity style={{ padding: 6 }} onPress={() => setShowFilter(true)}>
@@ -530,21 +530,6 @@ export default function SpaceDetailScreen() {
 }
 
 const s = StyleSheet.create({
-  // Add record button
-  addRecordBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingVertical: 7,
-    paddingHorizontal: 14,
-    borderRadius: Radius.pill,
-    borderWidth: 2,
-    borderStyle: 'dotted',
-    borderColor: Colors.muted,
-    backgroundColor: 'transparent',
-  },
-  addRecordBtnText: { fontFamily: 'ChillaxMedium', fontSize: 11, color: Colors.text },
-
   // Nav
   recordingsHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.page, marginBottom: 8 },
   topNavRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.page, marginBottom: 8 },
@@ -608,6 +593,7 @@ const s = StyleSheet.create({
   monthBtnActive: { backgroundColor: Colors.cyan, borderColor: Colors.cyan },
   monthBtnText: { fontFamily: Fonts.display, fontSize: 14, color: Colors.text },
 });
+
 
 
 
