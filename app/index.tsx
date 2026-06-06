@@ -5,7 +5,7 @@ import { useState } from 'react';
 
 const { width, height } = Dimensions.get('window');
 const IMG_ASPECT = 1320 / 1830;
-const heroHeight = height * 0.45;
+const heroHeight = height * 0.9 * 0.48;
 const heroWidth = heroHeight * IMG_ASPECT;
 
 export default function LoginScreen() {
@@ -24,40 +24,45 @@ export default function LoginScreen() {
 
   return (
     <SafeAreaView style={s.container} edges={['bottom', 'top']}>
+      <View style={s.wrapper}>
 
-      {/* Hero */}
-      <View style={{ paddingTop: 72 }}>
+        {/* Hero */}
         <Image
-        source={require('../assets/login-vector.png')}
-        style={{ width: heroWidth, height: heroHeight, alignSelf: 'center' }}
-        resizeMode="contain"
-      />
-      </View>
+          source={require('../assets/login-vector.png')}
+          style={{ width: heroWidth, height: heroHeight, alignSelf: 'center' }}
+          resizeMode="contain"
+        />
 
-      {/* Content */}
-      <View style={s.content}>
-        <Text style={s.brand}>LEDGR</Text>
-        <Text style={s.tagline}>track your numbers.</Text>
-        <View style={s.buttons}>
-          <TouchableOpacity style={s.button} activeOpacity={0.8} onPress={() => signIn('google')} disabled={loading !== null}>
-            {loading === 'google'
-              ? <ActivityIndicator color="#545454" />
-              : <Text style={s.buttonText}>Continue with Google</Text>}
-          </TouchableOpacity>
-          <TouchableOpacity style={s.button} activeOpacity={0.8} onPress={() => signIn('apple')} disabled={loading !== null}>
-            {loading === 'apple'
-              ? <ActivityIndicator color="#545454" />
-              : <Text style={s.buttonText}>Continue with Apple</Text>}
-          </TouchableOpacity>
+        {/* Content */}
+        <View style={s.content}>
+          <Text style={s.brand}>LEDGR</Text>
+          <Text style={s.tagline}>track your numbers.</Text>
+          <View style={s.buttons}>
+            <TouchableOpacity style={s.button} activeOpacity={0.8} onPress={() => signIn('google')} disabled={loading !== null}>
+              {loading === 'google'
+                ? <ActivityIndicator color="#545454" />
+                : <Text style={s.buttonText}>Continue with Google</Text>}
+            </TouchableOpacity>
+            <TouchableOpacity style={s.button} activeOpacity={0.8} onPress={() => signIn('apple')} disabled={loading !== null}>
+              {loading === 'apple'
+                ? <ActivityIndicator color="#545454" />
+                : <Text style={s.buttonText}>Continue with Apple</Text>}
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
 
+      </View>
     </SafeAreaView>
   );
 }
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#ffffff' },
+  wrapper: {
+    height: height * 0.9,
+    marginVertical: height * 0.05,
+    justifyContent: 'center',
+  },
   content: {
     alignItems: 'center',
     paddingHorizontal: 48,
