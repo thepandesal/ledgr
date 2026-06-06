@@ -21,7 +21,7 @@ export default function SplitSharePage() {
   const [qrModalAcc, setQrModalAcc] = useState<any>(null);
   const [showUrlBar, setShowUrlBar] = useState(false);
 
-  const shareUrl = typeof window !== 'undefined' ? window.location.href : `https://ledgr.thepandesal.com/split/${id}`;
+  const shareUrl = typeof window !== 'undefined' ? window.location.href : `https://ledgr.art/split/${id}`;
 
   const handleShare = async () => {
     if (typeof navigator !== 'undefined' && navigator.share) {

@@ -663,7 +663,7 @@ export default function RecordingDetailScreen() {
     if (!shareRowId) return;
     // Upsert selected accounts into split_shares.data
     await supabase.from('split_shares').update({ data: { account_ids: shareSelectedAccountIds } }).eq('id', shareRowId);
-    const shareUrl = `https://ledgr.thepandesal.com/split/${shareRowId}`;
+    const shareUrl = `https://ledgr.art/split/${shareRowId}`;
     if (Platform.OS !== 'web') {
       Share.share({ message: shareUrl, url: shareUrl });
       setSaveImageModal(false);
@@ -1568,7 +1568,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
         {shareRowId && (
           <TextInput
             style={[formStyles.input, { width: '100%', fontSize: 11, color: Colors.muted }]}
-            value={`https://ledgr.thepandesal.com/split/${shareRowId}`}
+            value={`https://ledgr.art/split/${shareRowId}`}
             editable
             selectTextOnFocus
             caretHidden={false}
