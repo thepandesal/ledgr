@@ -5,3 +5,4 @@ export default function SplitLayout() {
     <Stack screenOptions={{ headerShown: false }} />
   );
 }
+

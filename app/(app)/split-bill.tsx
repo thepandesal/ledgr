@@ -387,3 +387,4 @@ const styles = StyleSheet.create({
   doneBtn: { backgroundColor: '#00bf63', borderRadius: 999, paddingVertical: 12, alignItems: 'center', marginTop: 4 },
   doneBtnText: { fontFamily: 'DMSans_600SemiBold', fontSize: 14, color: '#ffffff' },
 });
+

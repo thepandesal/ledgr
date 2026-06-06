@@ -90,7 +90,7 @@ export default function SpaceDetailScreen() {
   };
 
   useEffect(() => {
-    Animated.timing(slideAnim, { toValue: 0, duration: 280, useNativeDriver: true }).start();
+    Animated.timing(slideAnim, { toValue: 0, duration: 280, useNativeDriver: false }).start();
   }, []);
 
   useEffect(() => { if (spaceId) loadRecordings(); }, [spaceId]);
@@ -113,17 +113,17 @@ export default function SpaceDetailScreen() {
     if (!layout) return;
     Animated.spring(circleAnim, {
       toValue: layout.x + layout.width / 2 - DOODLE_W / 2,
-      useNativeDriver: true, tension: 70, friction: 12,
+      useNativeDriver: false, tension: 70, friction: 12,
     }).start();
   }, [viewMode, tabLayouts]);
 
   const switchMode = (next: ViewMode) => {
     if (next === viewMode) return;
     const goLeft = MODES.indexOf(next) > MODES.indexOf(viewMode);
-    Animated.timing(contentSlide, { toValue: goLeft ? -width : width, duration: 220, useNativeDriver: true }).start(() => {
+    Animated.timing(contentSlide, { toValue: goLeft ? -width : width, duration: 220, useNativeDriver: false }).start(() => {
       setViewMode(next);
       contentSlide.setValue(goLeft ? width : -width);
-      Animated.timing(contentSlide, { toValue: 0, duration: 220, useNativeDriver: true }).start();
+      Animated.timing(contentSlide, { toValue: 0, duration: 220, useNativeDriver: false }).start();
     });
   };
 
@@ -146,7 +146,7 @@ export default function SpaceDetailScreen() {
   };
 
   const handleBack = () => {
-    Animated.timing(slideAnim, { toValue: width, duration: 250, useNativeDriver: true }).start(() => router.back());
+    Animated.timing(slideAnim, { toValue: width, duration: 250, useNativeDriver: false }).start(() => router.back());
   };
 
   const confirmDelete = async () => {
@@ -601,6 +601,8 @@ const s = StyleSheet.create({
   monthBtnActive: { backgroundColor: Colors.cyan, borderColor: Colors.cyan },
   monthBtnText: { fontFamily: Fonts.display, fontSize: 14, color: Colors.text },
 });
+
+
 
 
 

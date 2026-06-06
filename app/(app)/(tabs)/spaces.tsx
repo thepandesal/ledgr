@@ -332,3 +332,4 @@ const s = StyleSheet.create({
   suggestions: { backgroundColor: Colors.input, borderRadius: Radius.md, marginTop: 4, overflow: 'hidden', borderWidth: 1, borderColor: Colors.borderMid },
   catDot: { width: 24, height: 24, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
 });
+

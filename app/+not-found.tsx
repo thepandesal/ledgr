@@ -25,3 +25,4 @@ const s = StyleSheet.create({
   btn: { marginTop: 24, backgroundColor: '#425252', borderRadius: 999, paddingVertical: 12, paddingHorizontal: 32 },
   btnText: { fontFamily: 'RobotoMono_700Bold', fontSize: 13, color: '#fff' },
 });
+

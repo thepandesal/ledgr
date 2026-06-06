@@ -165,3 +165,4 @@ const styles = StyleSheet.create({
   headerBtn: { width: 44, height: 44, justifyContent: 'center', alignItems: 'center' },
   headerTitle: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: 'rgba(255,255,255,0.7)' },
 });
+

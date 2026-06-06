@@ -412,3 +412,4 @@ const s = StyleSheet.create({
   linkDateText: { fontFamily: Fonts.display, fontSize: 15, color: Colors.text },
   linkTypeDot: { width: 8, height: 8, borderRadius: 4, flexShrink: 0 },
 });
+

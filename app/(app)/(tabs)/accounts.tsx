@@ -330,3 +330,4 @@ const s = StyleSheet.create({
   qrUploadBtn: { borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface, overflow: 'hidden', marginBottom: 8 },
   qrPreview: { width: 160, height: 160, borderRadius: Radius.md },
 });
+

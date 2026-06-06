@@ -17,3 +17,4 @@ const styles = StyleSheet.create({
   emoji: { fontSize: 48 },
   text: { fontFamily: 'DMSans_400Regular', fontSize: 18, color: '#8a8a8a' },
 });
+

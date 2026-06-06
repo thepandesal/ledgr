@@ -88,3 +88,4 @@ const styles = StyleSheet.create({
   nav: { flexDirection: 'row', paddingVertical: 12 },
   navItem: { flex: 1, alignItems: 'center' },
 });
+

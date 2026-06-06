@@ -82,3 +82,4 @@ const s = StyleSheet.create({
   },
   buttonText: { fontFamily: 'CalSans', fontSize: 15, color: '#545454', letterSpacing: 1.5 },
 });
+

@@ -138,7 +138,7 @@ export default function RecordingDetailScreen() {
         }).eq('id', linkedPayable.id);
       }
       if (recordingDate) setPendingFocusDate(recordingDate);
-      Animated.timing(slideAnim, { toValue: width, duration: 250, useNativeDriver: true }).start(() => {
+      Animated.timing(slideAnim, { toValue: width, duration: 250, useNativeDriver: false }).start(() => {
         router.back();
       });
     } catch (e) { console.log(e); }
@@ -146,7 +146,7 @@ export default function RecordingDetailScreen() {
   };
 
   useEffect(() => {
-    Animated.timing(slideAnim, { toValue: 0, duration: 280, useNativeDriver: true }).start();
+    Animated.timing(slideAnim, { toValue: 0, duration: 280, useNativeDriver: false }).start();
     loadRecording();
     loadContacts();
     loadPeople();
@@ -790,7 +790,7 @@ export default function RecordingDetailScreen() {
   };
 
   const handleBack = () => {
-    Animated.timing(slideAnim, { toValue: width, duration: 250, useNativeDriver: true }).start(() => router.back());
+    Animated.timing(slideAnim, { toValue: width, duration: 250, useNativeDriver: false }).start(() => router.back());
   };
 
   const openPeopleModal = () => {
@@ -1821,6 +1821,8 @@ const styles = StyleSheet.create({
   contactRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.border },
   contactName: { fontFamily: Fonts.mono, fontSize: 13, color: Colors.text },
 });
+
+
 
 
 

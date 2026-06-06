@@ -234,3 +234,4 @@ const s = StyleSheet.create({
   modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   modalBox: { backgroundColor: Colors.white, borderRadius: Radius.xl, padding: 20, width: 300, gap: 10 },
 });
+
