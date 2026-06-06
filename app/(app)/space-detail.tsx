@@ -56,8 +56,6 @@ function recordingColor(type: string, status: string): string {
   }
   return Colors.cyan;
 }
-  return Colors.income;
-}
 
 export default function SpaceDetailScreen() {
   const { spaceId, name } = useLocalSearchParams<{ spaceId: string; name: string; color: string }>();
