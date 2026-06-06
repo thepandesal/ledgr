@@ -26,7 +26,7 @@ export default function LoginScreen() {
     <SafeAreaView style={s.container} edges={['bottom', 'top']}>
 
       {/* Hero */}
-      <View style={{ paddingTop: 24 }}>
+      <View style={{ paddingTop: 72 }}>
         <Image
         source={require('../assets/login-vector.png')}
         style={{ width: heroWidth, height: heroHeight, alignSelf: 'center' }}
