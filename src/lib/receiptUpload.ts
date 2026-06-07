@@ -2,6 +2,12 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import * as FileSystem from 'expo-file-system/legacy';
 import { supabase } from './supabase';
 
+const R2_ENDPOINT = process.env.EXPO_PUBLIC_R2_ENDPOINT!;
+const R2_ACCESS_KEY = process.env.EXPO_PUBLIC_R2_ACCESS_KEY!;
+const R2_SECRET_KEY = process.env.EXPO_PUBLIC_R2_SECRET_KEY!;
+const R2_BUCKET = process.env.EXPO_PUBLIC_R2_BUCKET!;
+const R2_PUBLIC_URL = process.env.EXPO_PUBLIC_R2_PUBLIC_URL!;
+
 export const compressImage = async (uri: string): Promise<string> => {
   const r = await ImageManipulator.manipulateAsync(
     uri,
@@ -11,24 +17,65 @@ export const compressImage = async (uri: string): Promise<string> => {
   return r.uri;
 };
 
-const decode = (base64: string): Uint8Array => {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-  const lookup = new Uint8Array(256);
-  for (let i = 0; i < chars.length; i++) lookup[chars.charCodeAt(i)] = i;
-  const bytes = Math.floor(base64.length * 0.75);
-  const result = new Uint8Array(bytes);
-  let j = 0;
-  for (let i = 0; i < base64.length; i += 4) {
-    const a = lookup[base64.charCodeAt(i)], b = lookup[base64.charCodeAt(i + 1)];
-    const c = lookup[base64.charCodeAt(i + 2)], d = lookup[base64.charCodeAt(i + 3)];
-    result[j++] = (a << 2) | (b >> 4);
-    result[j++] = ((b & 15) << 4) | (c >> 2);
-    result[j++] = ((c & 3) << 6) | d;
-  }
-  return result;
+// HMAC-SHA256 for AWS Signature V4
+const hmacSha256 = async (key: ArrayBuffer | string, data: string): Promise<ArrayBuffer> => {
+  const keyData = typeof key === 'string'
+    ? new TextEncoder().encode(key)
+    : new Uint8Array(key);
+  const cryptoKey = await crypto.subtle.importKey('raw', keyData, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  return crypto.subtle.sign('HMAC', cryptoKey, new TextEncoder().encode(data));
 };
 
-/** Uploads a photo URI to Supabase and inserts a receipt_photos row.
+const toHex = (buf: ArrayBuffer) =>
+  Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+
+const sha256 = async (data: ArrayBuffer | string): Promise<string> => {
+  const buf = typeof data === 'string' ? new TextEncoder().encode(data) : data;
+  return toHex(await crypto.subtle.digest('SHA-256', buf));
+};
+
+// Sign and upload to R2 using AWS Signature V4
+const uploadToR2 = async (fileName: string, body: ArrayBuffer): Promise<string> => {
+  const now = new Date();
+  const dateStr = now.toISOString().replace(/[:-]|\.\d{3}/g, '').slice(0, 15) + 'Z';
+  const dateShort = dateStr.slice(0, 8);
+  const region = 'auto';
+  const service = 's3';
+  const host = R2_ENDPOINT.replace('https://', '');
+  const url = `${R2_ENDPOINT}/${R2_BUCKET}/${fileName}`;
+
+  const payloadHash = await sha256(body);
+  const canonicalHeaders = `host:${host}\nx-amz-content-sha256:${payloadHash}\nx-amz-date:${dateStr}\n`;
+  const signedHeaders = 'host;x-amz-content-sha256;x-amz-date';
+  const canonicalRequest = `PUT\n/${R2_BUCKET}/${fileName}\n\n${canonicalHeaders}\n${signedHeaders}\n${payloadHash}`;
+
+  const credentialScope = `${dateShort}/${region}/${service}/aws4_request`;
+  const stringToSign = `AWS4-HMAC-SHA256\n${dateStr}\n${credentialScope}\n${await sha256(canonicalRequest)}`;
+
+  const kDate = await hmacSha256(`AWS4${R2_SECRET_KEY}`, dateShort);
+  const kRegion = await hmacSha256(kDate, region);
+  const kService = await hmacSha256(kRegion, service);
+  const kSigning = await hmacSha256(kService, 'aws4_request');
+  const signature = toHex(await hmacSha256(kSigning, stringToSign));
+
+  const authorization = `AWS4-HMAC-SHA256 Credential=${R2_ACCESS_KEY}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
+
+  const res = await fetch(url, {
+    method: 'PUT',
+    headers: {
+      'Authorization': authorization,
+      'Content-Type': 'image/jpeg',
+      'x-amz-content-sha256': payloadHash,
+      'x-amz-date': dateStr,
+    },
+    body,
+  });
+
+  if (!res.ok) throw new Error(`R2 upload failed: ${res.status} ${await res.text()}`);
+  return `${R2_PUBLIC_URL}/${fileName}`;
+};
+
+/** Uploads a photo URI to R2 and inserts a receipt_photos row.
  *  Returns { id, url, path } on success, null on failure. */
 export const uploadReceiptPhoto = async (
   uri: string,
@@ -39,20 +86,27 @@ export const uploadReceiptPhoto = async (
 
   const fileName = `${user.id}/${entryId}/${Date.now()}_${Math.random().toString(36).slice(2)}.jpg`;
 
-  let uploadData: Uint8Array | Blob;
+  // Get file as ArrayBuffer
+  let buffer: ArrayBuffer;
   if (typeof window !== 'undefined' && (uri.startsWith('blob:') || uri.startsWith('data:'))) {
-    uploadData = await fetch(uri).then(r => r.blob());
+    buffer = await fetch(uri).then(r => r.arrayBuffer());
   } else {
     const b64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
-    uploadData = decode(b64);
+    const binary = atob(b64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    buffer = bytes.buffer;
   }
 
-  const { error } = await supabase.storage.from('receipts').upload(fileName, uploadData, { contentType: 'image/jpeg' });
-  if (error) throw error;
+  const publicUrl = await uploadToR2(fileName, buffer);
 
-  const { data: row } = await supabase.from('receipt_photos').insert({ entry_id: entryId, storage_path: fileName }).select().single();
-  const { data: signed } = await supabase.storage.from('receipts').createSignedUrl(fileName, 3600);
+  // Store public URL directly — no more signed URLs needed
+  const { data: row } = await supabase
+    .from('receipt_photos')
+    .insert({ entry_id: entryId, storage_path: fileName, url: publicUrl })
+    .select()
+    .single();
 
-  if (!row || !signed) return null;
-  return { id: row.id, url: signed.signedUrl, path: fileName };
+  if (!row) return null;
+  return { id: row.id, url: publicUrl, path: fileName };
 };

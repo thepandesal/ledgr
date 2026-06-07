@@ -56,8 +56,7 @@ export default function ReceiptsScreen() {
 
       let firstPhoto = '';
       if (photos && photos.length > 0) {
-        const { data: signed } = await supabase.storage.from('receipts').createSignedUrl(photos[0].storage_path, 3600);
-        firstPhoto = signed?.signedUrl ?? '';
+        firstPhoto = photos[0].url ?? '';
       }
 
       let recording = null;

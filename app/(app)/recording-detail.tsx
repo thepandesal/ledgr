@@ -120,7 +120,7 @@ export default function RecordingDetailScreen() {
     try {
       const recordingDate = recording?.transaction_date ?? null;
       if (deleteReceipt && linkedReceipt) {
-        const { data: photos } = await supabase.from('receipt_photos').select('storage_path').eq('entry_id', linkedReceipt.id);
+        const { data: photos } = await supabase.from('receipt_photos').select('storage_path, url').eq('entry_id', linkedReceipt.id);
         if (photos && photos.length > 0) {
           await supabase.storage.from('receipts').remove(photos.map((p: any) => p.storage_path));
           await supabase.from('receipt_photos').delete().eq('entry_id', linkedReceipt.id);
@@ -536,12 +536,9 @@ export default function RecordingDetailScreen() {
     const { data: entry } = await supabase.from('receipt_entries').select('id, note, created_at').eq('recording_id', recordingId).single();
     if (!entry) return;
     setLinkedReceipt(entry);
-    const { data: photos } = await supabase.from('receipt_photos').select('id, storage_path').eq('entry_id', entry.id).order('created_at').limit(5);
+    const { data: photos } = await supabase.from('receipt_photos').select('id, storage_path, url').eq('entry_id', entry.id).order('created_at').limit(5);
     if (photos) {
-      const urls = await Promise.all(photos.map(async (p: any) => {
-        const { data } = await supabase.storage.from('receipts').createSignedUrl(p.storage_path, 3600);
-        return { id: p.id, url: data?.signedUrl ?? '' };
-      }));
+      const urls = photos.map((p: any) => ({ id: p.id, url: p.url ?? '' }));
       setReceiptPhotos(urls.filter(u => u.url));
     }
   };

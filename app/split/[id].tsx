@@ -104,11 +104,10 @@ export default function SplitSharePage() {
     if (!receiptId) return;
     setReceiptLoading(true);
     setReceiptModal(true);
-    const { data: photos } = await supabase.from('receipt_photos').select('storage_path').eq('entry_id', receiptId).order('created_at');
+    const { data: photos } = await supabase.from('receipt_photos').select('storage_path, url').eq('entry_id', receiptId).order('created_at');
     if (photos && photos.length > 0) {
       const urls = await Promise.all(photos.map(async (p: any) => {
-        const { data: signed } = await supabase.storage.from('receipts').createSignedUrl(p.storage_path, 3600);
-        return signed?.signedUrl ?? '';
+        return p.url ?? '';
       }));
       setReceiptPhotos(urls.filter(Boolean));
     }
