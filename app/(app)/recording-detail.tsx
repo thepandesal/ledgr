@@ -1024,16 +1024,14 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
         <ScrollView contentContainerStyle={pageStyles.scroll} showsVerticalScrollIndicator={false}>
 
           {/* Header */}
-          <View style={pageStyles.titleBlock}>
-            <Text style={{ fontFamily: 'ChillaxRegular', fontSize: 11, color: Colors.muted, marginBottom: 2 }}>recordings</Text>
-            <View style={pageStyles.titleRow}>
-              <Text style={{ fontFamily: 'ChillaxMedium', fontSize: 24, color: Colors.text, flex: 1 }} numberOfLines={1} ellipsizeMode="tail">
-                {truncate(recording?.name ?? '', MAX_NAME_CHARS).toLowerCase()}
-              </Text>
-              <Text style={{ fontFamily: Fonts.monoBold, fontSize: 22, color: amountColor(), flexShrink: 0 }}>
-                {recording ? Number(recording.amount).toLocaleString('en-US', { minimumFractionDigits: 2 }) : '—'}
-              </Text>
-            </View>
+          <View style={[pageStyles.titleBlock, { marginBottom: 20 }]}>
+            <Text style={{ fontFamily: 'ChillaxRegular', fontSize: 13, color: Colors.muted, marginBottom: 4 }}>recordings</Text>
+            <Text style={{ fontFamily: Fonts.calSans, fontSize: 32, color: Colors.text, letterSpacing: -0.5 }} numberOfLines={2}>
+              {truncate(recording?.name ?? '', MAX_NAME_CHARS).toLowerCase()}
+            </Text>
+            <Text style={{ fontFamily: Fonts.monoBold, fontSize: 22, color: amountColor(), marginTop: 4 }}>
+              {recording ? Number(recording.amount).toLocaleString('en-US', { minimumFractionDigits: 2 }) : '—'}
+            </Text>
             <Text style={{ fontFamily: Fonts.mono, fontSize: 11, color: Colors.muted, marginTop: 4 }}>
               {formatDate(recording?.transaction_date)} · {typeLabel(recording?.type ?? '', recording?.status ?? '')}
             </Text>
