@@ -83,7 +83,13 @@ export default function ReceiptDetailScreen() {
     for (const p of photos) await supabase.storage.from('receipts').remove([p.path]);
     await supabase.from('receipt_photos').delete().eq('entry_id', receiptId);
     await supabase.from('receipt_entries').delete().eq('id', receiptId);
-    handleBack();
+    // If came from recording-detail, go back twice to refresh it
+    if (router.canGoBack()) {
+      router.back();
+      setTimeout(() => { if (router.canGoBack()) router.back(); }, 100);
+    } else {
+      handleBack();
+    }
   };
 
   const deletePhoto = async (photo: Photo) => {
