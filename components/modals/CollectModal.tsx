@@ -71,21 +71,21 @@ export default function CollectModal({ visible, onClose, recording, items, fille
           </View>
         </>
       ) : (
-        <>
+        <View style={{ gap: 12, width: '100%' }}>
           <Text style={formStyles.hintMuted}>{(recording?.name ?? '').toLowerCase()} · {Number(recording?.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
           <Text style={[formStyles.hintMuted, { color: Colors.cyan }]}>{account?.account_name} · {account?.bank}</Text>
-          <View style={{ flexDirection: 'row', gap: 6, width: '100%' }}>
+          <View style={{ flexDirection: 'row', gap: 6 }}>
             {(['full', 'manual', ...(filledPeople.length > 0 && items.length > 0 ? ['split'] : [])] as const).map(m => (
               <TouchableOpacity key={m} style={[itemStyles.personSelectChip, { flex: 1, justifyContent: 'center' }, mode === m && itemStyles.personSelectChipActive]} onPress={() => setMode(m as any)}>
                 <Text style={[itemStyles.personSelectText, mode === m && itemStyles.personSelectTextActive]}>{m}</Text>
               </TouchableOpacity>
             ))}
           </View>
-          {mode === 'full' && <Text style={[formStyles.hintMuted, { color: Colors.income, fontSize: 15 }]}>{Number(recording?.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>}
+          {mode === 'full' && <Text style={{ fontFamily: Fonts.monoBold, fontSize: 22, color: Colors.cyan }}>{Number(recording?.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>}
           {mode === 'manual' && <TextInput style={[formStyles.input, { width: '100%' }]} placeholder="0.00" placeholderTextColor={Colors.faint} value={manualAmount} onChangeText={setManualAmount} keyboardType="decimal-pad" autoFocus />}
           {mode === 'split' && (
-            <View style={{ width: '100%', gap: 8 }}>
-              <Text style={formStyles.hintMuted}>select who paid this session</Text>
+            <View style={{ gap: 8 }}>
+              <Text style={formStyles.hintMuted}>select who collected this session</Text>
               {filledPeople.map((p, i) => {
                 const sel = selectedPeople.includes(p);
                 return (
@@ -98,14 +98,14 @@ export default function CollectModal({ visible, onClose, recording, items, fille
                   </TouchableOpacity>
                 );
               })}
-              {selectedPeople.length > 0 && <Text style={{ fontFamily: Fonts.monoBold, fontSize: 18, color: Colors.income }}>{getAmount().toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>}
+              {selectedPeople.length > 0 && <Text style={{ fontFamily: Fonts.monoBold, fontSize: 18, color: Colors.cyan }}>{getAmount().toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>}
             </View>
           )}
-          <View style={{ gap: 6, width: '100%' }}>
+          <View style={{ gap: 6 }}>
             <Text style={formStyles.hintMuted}>collection date</Text>
             <TextInput style={[formStyles.input, { width: '100%' }]} placeholder="YYYY-MM-DD" placeholderTextColor={Colors.faint} value={date} onChangeText={setDate} />
           </View>
-          <View style={{ gap: 6, width: '100%' }}>
+          <View style={{ gap: 6 }}>
             <Text style={formStyles.hintMuted}>complete collection?</Text>
             <View style={{ flexDirection: 'row', gap: 8 }}>
               {([true, false] as const).map(val => (
@@ -123,7 +123,7 @@ export default function CollectModal({ visible, onClose, recording, items, fille
               <Text style={formStyles.primaryBtnText}>{loading ? 'saving...' : 'confirm'}</Text>
             </TouchableOpacity>
           </View>
-        </>
+        </View>
       )}
     </BottomSheet>
   );

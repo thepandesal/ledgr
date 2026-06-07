@@ -207,7 +207,7 @@ export default function SpaceDetailScreen() {
   const totalExpenses = recordings.filter(r => r.type === 'expense').reduce((s, r) => s + Number(r.amount), 0);
   const totalIncomeSavings = recordings.filter(r => r.type === 'income' || r.type === 'savings').reduce((s, r) => s + Number(r.amount), 0);
   const countPayables = recordings.filter(r => r.type === 'payable' && r.status !== 'paid').length;
-  const countReceivables = recordings.filter(r => r.type === 'receivable' && r.status !== 'received').length;
+  const countReceivables = recordings.filter(r => r.type === 'receivable' && r.status === 'pending').length;
 
   const shortAmount = (n: number) => {
     if (n >= 1_000_000) return (n / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
