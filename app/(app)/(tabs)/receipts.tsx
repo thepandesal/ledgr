@@ -122,15 +122,15 @@ export default function ReceiptsScreen() {
   const typeColor = (type: string) => type === 'expense' ? Colors.expense : type === 'income' ? Colors.income : Colors.text;
 
   return (
-    <SafeAreaView style={pageStyles.container}>
+    <SafeAreaView style={s.container}>
       <View style={s.header}>
         <View>
-          <Text style={pageStyles.pageLabel}>your</Text>
-          <Text style={[pageStyles.pageName, { fontSize: 32, lineHeight: 36, letterSpacing: -1 }]}>receipts</Text>
+          <Text style={s.pageTitle}>receipts</Text>
+          <Text style={s.pageSubtitle}>your paper trail, digitized.</Text>
         </View>
-        <TouchableOpacity style={pageStyles.actionBtn} onPress={() => setAddModal(true)} activeOpacity={0.85}>
-          <Ionicons name="add" size={14} color={Colors.text} />
-          <Text style={pageStyles.actionBtnText}>add receipt</Text>
+        <TouchableOpacity style={s.addBtn} onPress={() => setAddModal(true)} activeOpacity={0.85}>
+          <Ionicons name="add" size={14} color={Colors.muted} />
+          <Text style={s.addBtnText}>add receipt</Text>
         </TouchableOpacity>
       </View>
 
@@ -139,9 +139,9 @@ export default function ReceiptsScreen() {
       ) : entries.length === 0 ? (
         <View style={s.center}>
           <Ionicons name="receipt-outline" size={40} color={Colors.borderMid} />
-          <Text style={pageStyles.emptyText}>no receipts yet</Text>
-          <TouchableOpacity style={s.emptyBtn} onPress={() => setAddModal(true)}>
-            <Text style={s.emptyBtnText}>add your first receipt</Text>
+          <Text style={s.emptyText}>no receipts yet</Text>
+          <TouchableOpacity style={s.emptyActionBtn} onPress={() => setAddModal(true)}>
+            <Text style={s.emptyActionBtnText}>add your first receipt</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -214,23 +214,37 @@ export default function ReceiptsScreen() {
 }
 
 const s = StyleSheet.create({
-  header: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', paddingHorizontal: Spacing.page, paddingTop: 52, paddingBottom: 16 },
+  container: { flex: 1, backgroundColor: Colors.white },
+  header: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', paddingHorizontal: Spacing.page, paddingTop: 32, paddingBottom: 16 },
+  pageTitle: { fontFamily: Fonts.calSans, fontSize: 36, color: '#425252', marginBottom: 4 },
+  pageSubtitle: { fontFamily: 'ChillaxRegular', fontSize: 13, color: Colors.muted },
+  addBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingVertical: 8, paddingHorizontal: 14,
+    borderRadius: Radius.pill, borderWidth: 2, borderStyle: 'dotted',
+    borderColor: Colors.cyan, backgroundColor: 'transparent',
+  },
+  addBtnText: { fontFamily: 'ChillaxMedium', fontSize: 12, color: Colors.muted },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
-  emptyBtn: { backgroundColor: Colors.text, borderRadius: Radius.pill, paddingVertical: 10, paddingHorizontal: 20, marginTop: 8 },
-  emptyBtnText: { fontFamily: Fonts.monoBold, fontSize: 12, color: Colors.white },
-  list: { paddingHorizontal: Spacing.page, paddingBottom: 60, gap: 12 },
-  folderCard: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: 12, borderWidth: 1, borderColor: Colors.border },
-  folderThumb: { width: 60, height: 60, borderRadius: Radius.md, flexShrink: 0 },
-  folderThumbEmpty: { width: 60, height: 60, borderRadius: Radius.md, backgroundColor: Colors.border, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
+  emptyText: { fontFamily: 'ChillaxRegular', fontSize: 13, color: Colors.muted },
+  emptyActionBtn: { borderRadius: Radius.pill, paddingVertical: 10, paddingHorizontal: 20, borderWidth: 2, borderStyle: 'dotted', borderColor: Colors.cyan, marginTop: 8 },
+  emptyActionBtnText: { fontFamily: 'ChillaxMedium', fontSize: 12, color: Colors.muted },
+  list: { paddingHorizontal: Spacing.page, paddingBottom: 60, gap: 12, paddingTop: 8 },
+  folderCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    backgroundColor: Colors.white, borderRadius: Radius.pill,
+    paddingVertical: 10, paddingHorizontal: 14,
+    borderWidth: 1, borderStyle: 'dashed', borderColor: Colors.borderMid,
+  },
+  folderThumb: { width: 48, height: 48, borderRadius: Radius.md, flexShrink: 0 },
+  folderThumbEmpty: { width: 48, height: 48, borderRadius: Radius.md, backgroundColor: Colors.input, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
   folderInfo: { flex: 1, gap: 2 },
   folderDate: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted },
-  folderName: { fontFamily: Fonts.heading, fontSize: 14, color: Colors.text },
+  folderName: { fontFamily: 'ChillaxMedium', fontSize: 14, color: Colors.text },
   folderCount: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.faint },
   linkedBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
   linkedDot: { width: 6, height: 6, borderRadius: 3 },
   linkedText: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.text, maxWidth: 140 },
   unlinkedText: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.faint, marginTop: 2 },
-  modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  modalBox: { backgroundColor: Colors.white, borderRadius: Radius.xl, padding: 20, width: 300, gap: 10 },
 });
 
