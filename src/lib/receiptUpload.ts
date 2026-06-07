@@ -1,6 +1,7 @@
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as FileSystem from 'expo-file-system/legacy';
 import { supabase } from './supabase';
+import { Platform } from 'react-native';
 
 const R2_ENDPOINT = process.env.EXPO_PUBLIC_R2_ENDPOINT!;
 const R2_ACCESS_KEY = process.env.EXPO_PUBLIC_R2_ACCESS_KEY!;
@@ -34,7 +35,6 @@ const sha256 = async (data: ArrayBuffer | string): Promise<string> => {
   return toHex(await crypto.subtle.digest('SHA-256', buf));
 };
 
-// Sign and upload to R2 using AWS Signature V4
 const uploadToR2 = async (fileName: string, body: ArrayBuffer): Promise<string> => {
   const now = new Date();
   const dateStr = now.toISOString().replace(/[:-]|\.\d{3}/g, '').slice(0, 15) + 'Z';
@@ -48,7 +48,6 @@ const uploadToR2 = async (fileName: string, body: ArrayBuffer): Promise<string> 
   const canonicalHeaders = `host:${host}\nx-amz-content-sha256:${payloadHash}\nx-amz-date:${dateStr}\n`;
   const signedHeaders = 'host;x-amz-content-sha256;x-amz-date';
   const canonicalRequest = `PUT\n/${R2_BUCKET}/${fileName}\n\n${canonicalHeaders}\n${signedHeaders}\n${payloadHash}`;
-
   const credentialScope = `${dateShort}/${region}/${service}/aws4_request`;
   const stringToSign = `AWS4-HMAC-SHA256\n${dateStr}\n${credentialScope}\n${await sha256(canonicalRequest)}`;
 
@@ -57,7 +56,6 @@ const uploadToR2 = async (fileName: string, body: ArrayBuffer): Promise<string> 
   const kService = await hmacSha256(kRegion, service);
   const kSigning = await hmacSha256(kService, 'aws4_request');
   const signature = toHex(await hmacSha256(kSigning, stringToSign));
-
   const authorization = `AWS4-HMAC-SHA256 Credential=${R2_ACCESS_KEY}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
 
   const res = await fetch(url, {
@@ -75,8 +73,14 @@ const uploadToR2 = async (fileName: string, body: ArrayBuffer): Promise<string> 
   return `${R2_PUBLIC_URL}/${fileName}`;
 };
 
-/** Uploads a photo URI to R2 and inserts a receipt_photos row.
- *  Returns { id, url, path } on success, null on failure. */
+const uploadToSupabase = async (fileName: string, buffer: ArrayBuffer): Promise<string> => {
+  const { error } = await supabase.storage.from('receipts').upload(fileName, buffer, { contentType: 'image/jpeg' });
+  if (error) throw error;
+  const { data } = await supabase.storage.from('receipts').createSignedUrl(fileName, 3600 * 24 * 365);
+  return data?.signedUrl ?? '';
+};
+
+/** Uploads a photo URI — uses Supabase on web (CORS safe), R2 on native */
 export const uploadReceiptPhoto = async (
   uri: string,
   entryId: string
@@ -86,7 +90,6 @@ export const uploadReceiptPhoto = async (
 
   const fileName = `${user.id}/${entryId}/${Date.now()}_${Math.random().toString(36).slice(2)}.jpg`;
 
-  // Get file as ArrayBuffer
   let buffer: ArrayBuffer;
   if (typeof window !== 'undefined' && (uri.startsWith('blob:') || uri.startsWith('data:'))) {
     buffer = await fetch(uri).then(r => r.arrayBuffer());
@@ -98,9 +101,15 @@ export const uploadReceiptPhoto = async (
     buffer = bytes.buffer;
   }
 
-  const publicUrl = await uploadToR2(fileName, buffer);
+  // Web: use Supabase Storage (avoids CORS issues with R2 direct upload)
+  // Native: use R2
+  let publicUrl: string;
+  if (Platform.OS === 'web') {
+    publicUrl = await uploadToSupabase(fileName, buffer);
+  } else {
+    publicUrl = await uploadToR2(fileName, buffer);
+  }
 
-  // Store public URL directly — no more signed URLs needed
   const { data: row } = await supabase
     .from('receipt_photos')
     .insert({ entry_id: entryId, storage_path: fileName, url: publicUrl })
