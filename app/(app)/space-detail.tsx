@@ -57,6 +57,16 @@ function recordingColor(type: string, status: string): string {
   return Colors.cyan;
 }
 
+function recordingBg(type: string, status: string): string {
+  if (type === 'expense') return '#ffe4e4';
+  if (type === 'income' || type === 'savings') return '#ebf6e4';
+  if (type === 'payable' || type === 'receivable') {
+    if (status === 'paid' || status === 'received') return '#f6f6f6';
+    return '#f7eaff';
+  }
+  return '#ebf6e4';
+}
+
 export default function SpaceDetailScreen() {
   const { spaceId, name } = useLocalSearchParams<{ spaceId: string; name: string; color: string }>();
   const router = useRouter();
@@ -351,7 +361,7 @@ export default function SpaceDetailScreen() {
                       };
                       const showPartial = (item.type === 'receivable' || item.type === 'payable') && item.status === 'partial' && item.paid_amount;
                       return (
-                        <TouchableOpacity key={item.id} style={[s.recordingCard, { borderColor: amountColor }]} activeOpacity={0.85}
+                        <TouchableOpacity key={item.id} style={[s.recordingCard, { borderColor: amountColor, backgroundColor: recordingBg(item.type, item.status) }]} activeOpacity={0.85}
                           onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: item.id } } as any)}>
                           <Ionicons name={item.categories?.icon ?? 'ellipse-outline'} size={22} color={amountColor} style={{ flexShrink: 0 }} />
                           <View style={s.recordingMiddle}>
@@ -551,11 +561,11 @@ const s = StyleSheet.create({
   // Recording list
   list: { paddingHorizontal: Spacing.page, paddingBottom: 100, gap: 16, paddingTop: 16 },
   dateGroupLabel: { fontFamily: Fonts.calSans, fontSize: 13, color: Colors.cyan, marginBottom: 8, marginTop: 16 },
-  recordingCard: { flexDirection: 'row', alignItems: 'center', borderRadius: Radius.pill, paddingVertical: 10, paddingHorizontal: 14, gap: 10, backgroundColor: Colors.white, borderWidth: 1, borderStyle: 'dashed' },
+  recordingCard: { flexDirection: 'row', alignItems: 'center', borderRadius: Radius.pill, paddingVertical: 10, paddingHorizontal: 14, gap: 10, borderWidth: 1 },
   recordingMiddle: { flex: 1, gap: 2, overflow: 'hidden' },
-  recordingName: { fontFamily: 'ChillaxMedium', fontSize: 13, color: Colors.text },
-  recordingMeta: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted },
-  recordingAmount: { fontFamily: Fonts.monoBold, fontSize: 14 },
+  recordingName: { fontFamily: 'ChillaxMedium', fontSize: 13, color: '#292929' },
+  recordingMeta: { fontFamily: Fonts.mono, fontSize: 10, color: '#292929' },
+  recordingAmount: { fontFamily: Fonts.monoBold, fontSize: 14, color: '#292929' },
 
   // Stats
   statsGrid: { flexDirection: 'row', gap: 8 },
