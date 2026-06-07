@@ -76,6 +76,7 @@ export default function SpaceDetailScreen() {
   const contentSlide = useRef(new Animated.Value(0)).current;
 
   const [viewMode, setViewMode] = useState<ViewMode>('monthly');
+  const [viewLayout, setViewLayout] = useState<'list' | 'grid' | 'calendar'>('list');
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [recordings, setRecordings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -135,6 +136,11 @@ export default function SpaceDetailScreen() {
       contentSlide.setValue(goLeft ? width : -width);
       Animated.timing(contentSlide, { toValue: 0, duration: 220, useNativeDriver: false }).start();
     });
+  };
+
+  const switchLayout = (layout: 'list' | 'grid' | 'calendar') => {
+    setViewLayout(layout);
+    if (layout === 'calendar') switchMode('monthly');
   };
 
   const loadRecordings = async () => {
@@ -261,6 +267,20 @@ export default function SpaceDetailScreen() {
           )}
         </View>
 
+        {/* Layout toggle */}
+        <View style={s.layoutRow}>
+          {([['list', 'list-outline'], ['grid', 'grid-outline'], ['calendar', 'calendar-outline']] as const).map(([layout, icon]) => (
+            <TouchableOpacity
+              key={layout}
+              style={[s.layoutBtn, viewLayout === layout && s.layoutBtnActive]}
+              onPress={() => switchLayout(layout)}
+              activeOpacity={0.7}
+            >
+              <Ionicons name={icon as any} size={16} color={viewLayout === layout ? Colors.cyan : Colors.muted} />
+            </TouchableOpacity>
+          ))}
+        </View>
+
         {/* Date nav */}
         <View style={s.modeRow}>
           {MODES.map(mode => (
@@ -341,6 +361,25 @@ export default function SpaceDetailScreen() {
               <Ionicons name="receipt-outline" size={40} color={Colors.borderMid} />
               <Text style={pageStyles.emptyText}>no recordings</Text>
             </View>
+          ) : viewLayout === 'grid' ? (
+            <ScrollView contentContainerStyle={[s.list, { flexDirection: 'row', flexWrap: 'wrap', gap: 10 }]} showsVerticalScrollIndicator={false}>
+              {filteredRecordings.map(item => {
+                const amountColor = recordingColor(item.type, item.status);
+                return (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={[s.gridCard, { backgroundColor: recordingBg(item.type, item.status) }]}
+                    activeOpacity={0.85}
+                    onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: item.id } } as any)}
+                  >
+                    <Ionicons name={item.categories?.icon ?? 'ellipse-outline'} size={18} color={amountColor} />
+                    <Text style={s.gridName} numberOfLines={2}>{item.name}</Text>
+                    <Text style={s.gridAmount}>{Number(item.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+                    <Text style={s.gridDate}>{new Date(item.transaction_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
           ) : (
             <ScrollView contentContainerStyle={s.list} showsVerticalScrollIndicator={false}>
               {grouped.map(group => (
@@ -532,6 +571,17 @@ export default function SpaceDetailScreen() {
 }
 
 const s = StyleSheet.create({
+  // Layout toggle
+  layoutRow: { flexDirection: 'row', justifyContent: 'center', gap: 8, paddingHorizontal: Spacing.page, marginBottom: 10 },
+  layoutBtn: { width: 36, height: 36, borderRadius: Radius.pill, borderWidth: 1, borderColor: Colors.borderMid, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center' },
+  layoutBtnActive: { borderColor: Colors.cyan, backgroundColor: Colors.cyan + '18' },
+
+  // Grid view
+  gridCard: { width: '47%', borderRadius: Radius.lg, padding: 12, gap: 6 },
+  gridName: { fontFamily: 'ChillaxMedium', fontSize: 13, color: '#292929' },
+  gridAmount: { fontFamily: Fonts.monoBold, fontSize: 14, color: '#292929' },
+  gridDate: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted },
+
   // Date nav
   addRecordBtn: { paddingVertical: 8, paddingHorizontal: 16, borderRadius: Radius.pill, borderWidth: 1, borderColor: Colors.borderMid, backgroundColor: Colors.surface, alignItems: 'center', alignSelf: 'flex-start' },
   modeRow: { flexDirection: 'row', paddingHorizontal: Spacing.page, gap: 8, marginBottom: 10 },
