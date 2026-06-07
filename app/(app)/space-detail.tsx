@@ -210,9 +210,8 @@ export default function SpaceDetailScreen() {
           <Ionicons name="arrow-back" size={22} color={Colors.muted} />
         </TouchableOpacity>
 
-        <View style={[pageStyles.titleBlock, { paddingHorizontal: Spacing.page, marginTop: 8 }]}>
-          <Text style={pageStyles.pageLabel}>spaces</Text>
-          <Text style={[pageStyles.pageName, { color: Colors.cyan, fontSize: 26, letterSpacing: -1 }]}>{(name ?? '').toLowerCase()}</Text>
+        <View style={[s.spaceHeader, { paddingHorizontal: Spacing.page }]}>
+          <Text style={s.spaceName}>{(name ?? '').toLowerCase()}</Text>
         </View>
 
         {/* Stats row — 4 columns 1 row */}
@@ -240,7 +239,7 @@ export default function SpaceDetailScreen() {
 
         {/* Recordings header */}
         <View style={s.recordingsHeader}>
-          <Text style={[pageStyles.sectionHeader, { marginBottom: 0, marginTop: 0 }]}>recordings</Text>
+          <Text style={[pageStyles.sectionHeader, { marginBottom: 0, marginTop: 0, fontFamily: Fonts.calSans }]}>recordings</Text>
           {spaceId !== 'all' && (
             <TouchableOpacity
               style={s.modeBtn}
@@ -526,14 +525,16 @@ const s = StyleSheet.create({
   modeRow: { flexDirection: 'row', paddingHorizontal: Spacing.page, gap: 8, marginBottom: 10 },
   modeBtn: { flex: 1, paddingVertical: 8, borderRadius: Radius.pill, borderWidth: 1, borderColor: Colors.borderMid, backgroundColor: Colors.surface, alignItems: 'center' },
   modeBtnActive: { backgroundColor: Colors.cyan, borderColor: Colors.cyan },
-  modeBtnText: { fontFamily: Fonts.mono, fontSize: 11, color: Colors.muted },
-  modeBtnTextActive: { fontFamily: Fonts.monoBold, color: Colors.white },
+  modeBtnText: { fontFamily: 'ChillaxMedium', fontSize: 12, color: Colors.muted },
+  modeBtnTextActive: { fontFamily: 'ChillaxMedium', color: Colors.white },
   dateNavRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.page, marginBottom: 8 },
   dateNavArrow: { padding: 8 },
   dateNavCenter: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
-  dateNavLabel: { fontFamily: Fonts.monoBold, fontSize: 12, color: Colors.text },
+  dateNavLabel: { fontFamily: 'ChillaxMedium', fontSize: 13, color: Colors.text },
   recordingsHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.page, marginBottom: 8 },
   contentArea: { flex: 1 },
+  spaceHeader: { marginTop: 4, marginBottom: 12 },
+  spaceName: { fontFamily: Fonts.calSans, fontSize: 32, color: '#425252', letterSpacing: -0.5 },
 
   // Date chips
   dateChipsRow: { flexDirection: 'row', paddingHorizontal: Spacing.page, marginBottom: 8, marginTop: 6, gap: 6, justifyContent: 'center' },
@@ -548,12 +549,12 @@ const s = StyleSheet.create({
 
   // Recording list
   list: { paddingHorizontal: Spacing.page, paddingBottom: 100, gap: 16, paddingTop: 16 },
-  dateGroupLabel: { fontFamily: Fonts.heading, fontSize: 13, color: Colors.cyan, marginBottom: 8, marginTop: 16 },
+  dateGroupLabel: { fontFamily: Fonts.calSans, fontSize: 13, color: Colors.cyan, marginBottom: 8, marginTop: 16 },
   recordingCard: { flexDirection: 'row', alignItems: 'center', borderRadius: Radius.pill, paddingVertical: 10, paddingHorizontal: 14, gap: 10, backgroundColor: Colors.white, borderWidth: 1, borderStyle: 'dashed' },
   recordingMiddle: { flex: 1, gap: 2, overflow: 'hidden' },
-  recordingName: { fontFamily: Fonts.monoBold, fontSize: 12, color: Colors.text },
+  recordingName: { fontFamily: 'ChillaxMedium', fontSize: 13, color: Colors.text },
   recordingMeta: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted },
-  recordingAmount: { fontFamily: Fonts.mono, fontSize: 14 },
+  recordingAmount: { fontFamily: Fonts.monoBold, fontSize: 14 },
 
   // Stats
   statsGrid: { flexDirection: 'row', gap: 8 },
@@ -567,8 +568,8 @@ const s = StyleSheet.create({
     borderColor: Colors.border,
     alignItems: 'center',
   },
-  statValue: { fontFamily: Fonts.monoBold, fontSize: 13, marginBottom: 2 },
-  statLabel: { fontFamily: Fonts.mono, fontSize: 8, color: Colors.muted, textAlign: 'center' },
+  statValue: { fontFamily: 'ChillaxMedium', fontSize: 13, marginBottom: 2 },
+  statLabel: { fontFamily: 'ChillaxLight', fontSize: 9, color: Colors.muted, textAlign: 'center' },
 
   // Filter
   filterOption: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, paddingHorizontal: 14, borderRadius: Radius.pill, borderWidth: 1, borderColor: Colors.borderMid },
