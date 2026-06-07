@@ -292,7 +292,7 @@ const s = StyleSheet.create({
   // Space cards — d8efea bg
   spaceCard: { width: '47%', borderRadius: Radius.pill, paddingVertical: 12, paddingLeft: 16, paddingRight: 8, flexDirection: 'row', alignItems: 'center', backgroundColor: '#d8efea' },
   spaceCardMain: { flex: 1 },
-  spaceCardText: { fontFamily: 'ChillaxMedium', fontSize: 15, color: '#292929' },
+  spaceCardText: { fontFamily: 'ChillaxMedium', fontSize: 15, color: '#292929', textAlign: 'center', flex: 1 },
   spaceMenuBtn: { padding: 6 },
 
   // Add a space — dotted border, no bg

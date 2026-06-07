@@ -57,21 +57,30 @@ export default function CategoriesScreen() {
     <SafeAreaView style={s.container}>
       <View style={s.header}>
         <Text style={s.title}>categories</Text>
+        <Text style={s.subtitle}>organize your recordings.</Text>
       </View>
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
         <View style={s.list}>
           {categories.map(cat => (
-            <View key={cat.id} style={[s.catBtn, { backgroundColor: cat.color }]}>
-              <Ionicons name={cat.icon as any} size={16} color={Colors.text} />
+            <View key={cat.id} style={s.catBtn}>
+              <View style={[s.catIcon, { backgroundColor: Colors.cyan + '22' }]}>
+                <Ionicons name={cat.icon as any} size={16} color={Colors.cyan} />
+              </View>
               <Text style={s.catName}>{cat.name}</Text>
               {cat.is_default && <Text style={s.defaultBadge}>default</Text>}
               <TouchableOpacity onPress={() => { setSelected(cat); setMenuModal(true); }} style={s.menuBtn}>
-                <Ionicons name="ellipsis-vertical" size={15} color={Colors.text} />
+                <Ionicons name="ellipsis-vertical" size={15} color={Colors.muted} />
               </TouchableOpacity>
             </View>
           ))}
+          {categories.length === 0 && (
+            <View style={s.emptyBox}>
+              <Ionicons name="pricetag-outline" size={32} color={Colors.faint} />
+              <Text style={s.emptyText}>no categories yet</Text>
+            </View>
+          )}
           <TouchableOpacity style={s.addBtn} onPress={openAdd} activeOpacity={0.8}>
-            <Ionicons name="add" size={16} color={Colors.faint} />
+            <Ionicons name="add" size={14} color={Colors.muted} />
             <Text style={s.addBtnText}>add a category</Text>
           </TouchableOpacity>
         </View>
@@ -136,17 +145,31 @@ export default function CategoriesScreen() {
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.input },
-  header: { paddingHorizontal: Spacing.xxl, paddingTop: 52, paddingBottom: 16 },
-  title: { fontFamily: Fonts.display, fontSize: 36, color: Colors.text },
-  scroll: { paddingHorizontal: Spacing.xxl, paddingBottom: 40 },
+  container: { flex: 1, backgroundColor: Colors.white },
+  header: { paddingHorizontal: Spacing.page, paddingTop: 32, paddingBottom: 8 },
+  title: { fontFamily: Fonts.calSans, fontSize: 36, color: '#425252', marginBottom: 4 },
+  subtitle: { fontFamily: 'ChillaxRegular', fontSize: 13, color: Colors.muted },
+  scroll: { paddingHorizontal: Spacing.page, paddingBottom: 40, paddingTop: 16 },
   list: { gap: 10 },
-  catBtn: { borderRadius: Radius.pill, paddingVertical: 14, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  catName: { fontFamily: Fonts.sansSemiBold, fontSize: 14, color: Colors.text, flex: 1 },
-  defaultBadge: { fontFamily: Fonts.sans, fontSize: 10, color: 'rgba(0,0,0,0.4)', backgroundColor: 'rgba(0,0,0,0.1)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: Radius.pill },
+  catBtn: {
+    borderRadius: Radius.pill, paddingVertical: 12, paddingHorizontal: 16,
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: Colors.white, borderWidth: 1,
+    borderStyle: 'dashed', borderColor: Colors.borderMid,
+  },
+  catIcon: { width: 32, height: 32, borderRadius: Radius.pill, justifyContent: 'center', alignItems: 'center' },
+  catName: { fontFamily: 'ChillaxMedium', fontSize: 14, color: Colors.text, flex: 1 },
+  defaultBadge: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted, backgroundColor: Colors.input, paddingHorizontal: 8, paddingVertical: 2, borderRadius: Radius.pill },
   menuBtn: { padding: 4 },
-  addBtn: { borderRadius: Radius.pill, paddingVertical: 14, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.white, borderWidth: 1, borderColor: Colors.borderMid, gap: 6 },
-  addBtnText: { fontFamily: Fonts.sans, fontSize: 13, color: Colors.faint },
+  emptyBox: { alignItems: 'center', gap: 8, paddingVertical: 32 },
+  emptyText: { fontFamily: 'ChillaxRegular', fontSize: 13, color: Colors.faint },
+  addBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    paddingVertical: 12, paddingHorizontal: 20,
+    borderRadius: Radius.pill, borderWidth: 2, borderStyle: 'dotted',
+    borderColor: Colors.cyan, backgroundColor: 'transparent', alignSelf: 'flex-start',
+  },
+  addBtnText: { fontFamily: 'ChillaxMedium', fontSize: 13, color: Colors.muted },
   colorRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   colorDot: { width: 30, height: 30, borderRadius: 15 },
   colorDotSelected: { borderWidth: 3, borderColor: Colors.text },
