@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../src/lib/supabase';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Fonts, Radius, Spacing } from '@/components/ui/theme';
+import { Colors, Fonts, Radius } from '@/components/ui/theme';
 
 export default function SplitSharePage() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -319,51 +319,70 @@ export default function SplitSharePage() {
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.white },
-  scroll: { paddingHorizontal: Spacing.xxl + 4, paddingTop: 60, paddingBottom: 60 },
+  scroll: { paddingHorizontal: 48, paddingTop: 52, paddingBottom: 60 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.white, gap: 12 },
-  notFound: { fontFamily: Fonts.mono, fontSize: 13, color: Colors.muted },
-  appLabel: { fontFamily: 'MuseoModerno_Black', fontSize: 18, color: Colors.cyan, marginBottom: 8 },
-  recName: { fontFamily: Fonts.display, fontSize: 26, color: Colors.text, letterSpacing: -0.5, lineHeight: 30, marginBottom: 4 },
-  recAmount: { fontFamily: Fonts.mono, fontSize: 20, marginBottom: 2 },
-  recDate: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted, marginBottom: 28 },
-  sectionHeader: { fontFamily: Fonts.heading, fontSize: 14, color: Colors.cyan, letterSpacing: -0.3, marginBottom: 10 },
-  card: { backgroundColor: Colors.surface, borderRadius: Radius.lg, paddingHorizontal: 16, paddingVertical: 4, borderWidth: 1, borderColor: Colors.border, marginBottom: 24 },
-  infoRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10 },
-  infoLabel: { fontFamily: Fonts.mono, fontSize: 12, color: Colors.text, flexShrink: 0 },
+  notFound: { fontFamily: 'ChillaxRegular', fontSize: 13, color: Colors.muted },
+
+  // Header
+  appLabel: { fontFamily: 'MuseoModerno_Black', fontSize: 22, color: Colors.cyan, marginBottom: 16 },
+  recName: { fontFamily: 'ChillaxMedium', fontSize: 28, color: Colors.text, lineHeight: 32, marginBottom: 6 },
+  recAmount: { fontFamily: Fonts.monoBold, fontSize: 24, marginBottom: 4 },
+  recDate: { fontFamily: Fonts.mono, fontSize: 11, color: Colors.muted, marginBottom: 32 },
+
+  // Section headers
+  sectionHeader: { fontFamily: 'CalSans', fontSize: 13, color: Colors.text, marginBottom: 10, marginTop: 24 },
+
+  // Cards
+  card: { backgroundColor: Colors.surface, borderRadius: Radius.lg, paddingHorizontal: 16, paddingVertical: 4, borderWidth: 1, borderColor: Colors.border, marginBottom: 8 },
+  infoRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12 },
+  infoLabel: { fontFamily: 'ChillaxRegular', fontSize: 13, color: Colors.text, flexShrink: 0 },
   dots: { flex: 1, borderBottomWidth: 1, borderStyle: 'dotted', borderColor: Colors.faint, marginHorizontal: 8 },
-  infoValue: { fontFamily: Fonts.monoBold, fontSize: 12, color: Colors.text, flexShrink: 0 },
+  infoValue: { fontFamily: Fonts.monoBold, fontSize: 13, color: Colors.text, flexShrink: 0 },
   divider: { height: 1, backgroundColor: Colors.border },
-  itemBlock: { backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: 14, borderWidth: 1, borderColor: Colors.border, marginBottom: 10 },
-  itemHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
-  itemName: { fontFamily: Fonts.monoBold, fontSize: 13, color: Colors.text },
+
+  // Items
+  itemBlock: { backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: 14, borderWidth: 1, borderColor: Colors.border, marginBottom: 8 },
+  itemHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
+  itemName: { fontFamily: 'ChillaxMedium', fontSize: 14, color: Colors.text },
   itemCost: { fontFamily: Fonts.mono, fontSize: 12, color: Colors.muted },
   itemPeopleRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, alignItems: 'center' },
   subRow: { flexDirection: 'row', gap: 8, marginBottom: 8 },
   arrow: { fontSize: 11, color: Colors.faint, marginTop: 2 },
   subTop: { flexDirection: 'row', justifyContent: 'space-between' },
-  subName: { fontFamily: Fonts.monoBold, fontSize: 11, color: Colors.text },
+  subName: { fontFamily: 'ChillaxMedium', fontSize: 12, color: Colors.text },
   subCost: { fontFamily: Fonts.mono, fontSize: 11, color: Colors.muted },
-  subSplit: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
-  chip: { backgroundColor: Colors.border, borderRadius: Radius.pill, paddingVertical: 3, paddingHorizontal: 8 },
-  chipText: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.text },
-  receiptBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: Colors.successBg, borderRadius: Radius.md, padding: 14, borderWidth: 1, borderColor: Colors.cyan, marginBottom: 24 },
-  receiptBtnText: { fontFamily: Fonts.mono, fontSize: 12, color: Colors.cyan, flex: 1 },
-  receiptUnavailable: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: Colors.surface, borderRadius: Radius.md, padding: 14, borderWidth: 1, borderColor: Colors.border, marginBottom: 24 },
-  receiptUnavailableText: { fontFamily: Fonts.mono, fontSize: 12, color: Colors.faint },
+  subSplit: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted, marginTop: 2 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 },
+  chip: { backgroundColor: Colors.border, borderRadius: Radius.pill, paddingVertical: 3, paddingHorizontal: 10 },
+  chipText: { fontFamily: 'ChillaxRegular', fontSize: 10, color: Colors.text },
+
+  // Receipt
+  receiptBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: Colors.white, borderRadius: Radius.pill, padding: 14, borderWidth: 1, borderStyle: 'dashed', borderColor: Colors.cyan, marginBottom: 8 },
+  receiptBtnText: { fontFamily: 'ChillaxRegular', fontSize: 13, color: Colors.cyan, flex: 1 },
+  receiptUnavailable: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: Colors.surface, borderRadius: Radius.pill, padding: 14, borderWidth: 1, borderColor: Colors.border, marginBottom: 8 },
+  receiptUnavailableText: { fontFamily: 'ChillaxRegular', fontSize: 13, color: Colors.faint },
+
+  // Payment
   qrHint: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.faint, textAlign: 'right', paddingBottom: 8 },
-  payRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12 },
-  payName: { fontFamily: Fonts.heading, fontSize: 14, color: Colors.text },
-  payBank: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted },
-  payNumber: { fontFamily: Fonts.monoBold, fontSize: 13, color: Colors.text },
-  copyRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  qr: { width: 80, height: 80, borderRadius: Radius.sm },
+  payRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14 },
+  payName: { fontFamily: 'ChillaxMedium', fontSize: 16, color: Colors.text },
+  payBank: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted, marginTop: 2 },
+  payNumber: { fontFamily: Fonts.monoBold, fontSize: 14, color: Colors.text },
+  copyRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
+  qr: { width: 72, height: 72, borderRadius: Radius.md },
   qrOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   qrLarge: { width: 260, height: 260, borderRadius: Radius.lg },
   qrTap: { fontFamily: Fonts.mono, fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 16 },
-  footer: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.faint, textAlign: 'center', marginTop: 24 },
-  shareBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: Radius.pill, paddingVertical: 10, paddingHorizontal: 20, borderWidth: 1, borderColor: Colors.cyan, backgroundColor: Colors.successBg, marginBottom: 28 },
-  shareBtnText: { fontFamily: Fonts.mono, fontSize: 12, color: Colors.cyan },
-  urlBar: { flexDirection: 'row', alignItems: 'center', borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.cyan, backgroundColor: Colors.successBg, paddingHorizontal: 12, marginBottom: 28, gap: 8 },
+
+  // Footer + share
+  footer: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.faint, textAlign: 'center', marginTop: 32 },
+  shareBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    borderRadius: Radius.pill, paddingVertical: 12, paddingHorizontal: 24,
+    borderWidth: 2, borderStyle: 'dotted', borderColor: Colors.cyan,
+    backgroundColor: 'transparent', marginBottom: 16, marginTop: 24,
+  },
+  shareBtnText: { fontFamily: 'ChillaxMedium', fontSize: 14, color: Colors.cyan },
+  urlBar: { flexDirection: 'row', alignItems: 'center', borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.cyan, backgroundColor: Colors.successBg, paddingHorizontal: 12, marginBottom: 16, gap: 8 },
   urlInput: { flex: 1, fontFamily: Fonts.mono, fontSize: 12, color: Colors.text, paddingVertical: 10 },
 });
