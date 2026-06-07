@@ -1040,27 +1040,6 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
           </View>
 
           {/* Action buttons */}
-          <View style={[pageStyles.actionRow, { marginBottom: 8 }]}>
-            <TouchableOpacity
-              style={pageStyles.actionBtn}
-              onPress={() => {
-                if (linkedReceipt) {
-                  router.push({ pathname: '/(app)/receipt-detail', params: { receiptId: linkedReceipt.id } } as any);
-                } else {
-                  setAddReceiptModal(true);
-                }
-              }}
-            >
-              <Ionicons name="receipt-outline" size={15} color={Colors.text} />
-              <Text style={pageStyles.actionBtnText}>{linkedReceipt ? 'view receipt' : 'add receipt'}</Text>
-            </TouchableOpacity>
-            {!linkedReceipt && (
-              <TouchableOpacity style={pageStyles.actionBtn} onPress={openLinkReceiptModal}>
-                <Ionicons name="link-outline" size={15} color={Colors.text} />
-                <Text style={pageStyles.actionBtnText}>link receipt</Text>
-              </TouchableOpacity>
-            )}
-          </View>
           <View style={pageStyles.actionRow}>
             {recording?.type === 'expense' && (
               <TouchableOpacity style={pageStyles.actionBtn} onPress={() => {
@@ -1317,7 +1296,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
           </View>
 
           {/* Items */}
-          <Text style={[pageStyles.sectionHeader, { fontFamily: Fonts.calSans }]}>items</Text>
+          <Text style={itemStyles.peopleHeader}>items</Text>
           {(() => {
             const totalItemsCost = items.reduce((s, i) => s + i.cost, 0);
             const recordingAmount = recording ? Number(recording.amount) : 0;
