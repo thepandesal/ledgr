@@ -242,7 +242,7 @@ export default function SpaceDetailScreen() {
           <Text style={[pageStyles.sectionHeader, { marginBottom: 0, marginTop: 0, fontFamily: Fonts.calSans }]}>recordings</Text>
           {spaceId !== 'all' && (
             <TouchableOpacity
-              style={s.modeBtn}
+              style={s.addRecordBtn}
               onPress={() => router.push({ pathname: '/(app)/add-recording', params: { spaceId, spaceName: name, defaultDate: selectedDate.toISOString().split('T')[0] } } as any)}
               activeOpacity={0.85}
             >
@@ -522,6 +522,7 @@ export default function SpaceDetailScreen() {
 
 const s = StyleSheet.create({
   // Date nav
+  addRecordBtn: { paddingVertical: 8, paddingHorizontal: 16, borderRadius: Radius.pill, borderWidth: 1, borderColor: Colors.borderMid, backgroundColor: Colors.surface, alignItems: 'center' },
   modeRow: { flexDirection: 'row', paddingHorizontal: Spacing.page, gap: 8, marginBottom: 10 },
   modeBtn: { flex: 1, paddingVertical: 8, borderRadius: Radius.pill, borderWidth: 1, borderColor: Colors.borderMid, backgroundColor: Colors.surface, alignItems: 'center' },
   modeBtnActive: { backgroundColor: Colors.cyan, borderColor: Colors.cyan },
