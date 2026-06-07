@@ -361,16 +361,13 @@ export default function SpaceDetailScreen() {
                       };
                       const showPartial = (item.type === 'receivable' || item.type === 'payable') && item.status === 'partial' && item.paid_amount;
                       return (
-                        <TouchableOpacity key={item.id} style={[s.recordingCard, { borderColor: amountColor, backgroundColor: recordingBg(item.type, item.status) }]} activeOpacity={0.85}
+                        <TouchableOpacity key={item.id} style={[s.recordingCard, { backgroundColor: recordingBg(item.type, item.status) }]} activeOpacity={0.85}
                           onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: item.id } } as any)}>
                           <Ionicons name={item.categories?.icon ?? 'ellipse-outline'} size={22} color={amountColor} style={{ flexShrink: 0 }} />
                           <View style={s.recordingMiddle}>
                             <Text style={s.recordingName} numberOfLines={1}>{item.name}</Text>
                             <View style={{ flexDirection: 'row', gap: 3 }}>
-                              <Text style={[s.recordingMeta, { color: amountColor }]} numberOfLines={1}>
-                                {item.type.charAt(0).toUpperCase() + item.type.slice(1)}:
-                              </Text>
-                              <Text style={[s.recordingMeta, { color: amountColor, fontFamily: Fonts.monoBold }]} numberOfLines={1}>
+                              <Text style={[s.recordingMeta, { fontFamily: Fonts.monoBold }]} numberOfLines={1}>
                                 {statusLabel || item.categories?.name || '—'}
                               </Text>
                             </View>
@@ -382,7 +379,7 @@ export default function SpaceDetailScreen() {
                             )}
                           </View>
                           <View style={{ alignItems: 'flex-end', gap: 3, flexShrink: 0 }}>
-                            <Text style={[s.recordingAmount, { color: amountColor }]}>
+                            <Text style={s.recordingAmount}>
                               {Number(item.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                             </Text>
                             {showPartial && (
@@ -561,7 +558,7 @@ const s = StyleSheet.create({
   // Recording list
   list: { paddingHorizontal: Spacing.page, paddingBottom: 100, gap: 16, paddingTop: 16 },
   dateGroupLabel: { fontFamily: Fonts.calSans, fontSize: 13, color: Colors.cyan, marginBottom: 8, marginTop: 16 },
-  recordingCard: { flexDirection: 'row', alignItems: 'center', borderRadius: Radius.pill, paddingVertical: 10, paddingHorizontal: 14, gap: 10, borderWidth: 1 },
+  recordingCard: { flexDirection: 'row', alignItems: 'center', borderRadius: Radius.pill, paddingVertical: 10, paddingHorizontal: 14, gap: 10 },
   recordingMiddle: { flex: 1, gap: 2, overflow: 'hidden' },
   recordingName: { fontFamily: 'ChillaxMedium', fontSize: 13, color: '#292929' },
   recordingMeta: { fontFamily: Fonts.mono, fontSize: 10, color: '#292929' },
