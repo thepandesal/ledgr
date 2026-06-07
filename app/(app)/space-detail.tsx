@@ -412,7 +412,7 @@ export default function SpaceDetailScreen() {
                       if (!day) return <View key={`e${i}`} style={s.calDayCell} />;
                       const cellDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), day);
                       const key = dateKey(cellDate);
-                      const dayRecordings = recordings.filter(r => {
+                      const dayRecordings = filteredRecordings.filter(r => {
                         const parts = r.transaction_date.split('-');
                         return dateKey(new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]))) === key;
                       });
