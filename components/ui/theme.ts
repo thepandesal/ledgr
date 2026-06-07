@@ -96,6 +96,7 @@ export const LetterSpacing = {
   widest: 1,
 } as const;
 
+export const Shadow = {
   card: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
