@@ -212,6 +212,12 @@ export default function SpaceDetailScreen() {
     return n.toFixed(0);
   };
 
+  const shortAmt = (n: number) => {
+    if (n >= 1_000_000) return (n / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
+    if (n >= 1_000) return (n / 1_000).toFixed(1).replace(/\.0$/, '') + 'k';
+    return Math.round(n).toString();
+  };
+
   // Set of dateKeys that have recordings (for dots)
   const recordingDates = new Set(recordings.map(r => {
     const parts = r.transaction_date.split('-');
@@ -356,6 +362,57 @@ export default function SpaceDetailScreen() {
           
           {loading ? (
             <ActivityIndicator color={Colors.income} style={{ marginTop: 40 }} />
+          ) : viewLayout === 'calendar' ? (
+            <ScrollView contentContainerStyle={s.calendarGrid} showsVerticalScrollIndicator={false}>
+              {(() => {
+                const firstDay = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1).getDay();
+                const daysInMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0).getDate();
+                const cells = Array(firstDay).fill(null).concat(Array.from({ length: daysInMonth }, (_, i) => i + 1));
+                return (
+                  <>
+                    {/* Day headers */}
+                    {['Su','Mo','Tu','We','Th','Fr','Sa'].map(d => (
+                      <View key={d} style={s.calHeaderCell}>
+                        <Text style={s.calHeaderText}>{d}</Text>
+                      </View>
+                    ))}
+                    {cells.map((day, i) => {
+                      if (!day) return <View key={`e${i}`} style={s.calDayCell} />;
+                      const cellDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), day);
+                      const key = dateKey(cellDate);
+                      const dayRecordings = recordings.filter(r => {
+                        const parts = r.transaction_date.split('-');
+                        return dateKey(new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]))) === key;
+                      });
+                      const isToday = isSameDay(cellDate, new Date());
+                      const visible = dayRecordings.slice(0, 3);
+                      const extra = dayRecordings.length - 3;
+                      return (
+                        <TouchableOpacity
+                          key={day}
+                          style={[s.calDayCell, isToday && s.calDayCellToday]}
+                          activeOpacity={0.7}
+                          onPress={() => {
+                            setSelectedDate(cellDate);
+                            setViewLayout('list');
+                            switchMode('daily');
+                          }}
+                        >
+                          <Text style={[s.calDayNum, isToday && { color: Colors.cyan }]}>{day}</Text>
+                          {visible.map((r, ri) => (
+                            <View key={ri} style={s.calItem}>
+                              <Ionicons name={r.categories?.icon ?? 'ellipse-outline'} size={10} color={recordingColor(r.type, r.status)} />
+                              <Text style={s.calItemText} numberOfLines={1}>{shortAmt(Number(r.amount))}</Text>
+                            </View>
+                          ))}
+                          {extra > 0 && <Text style={s.calItemMore}>+{extra} more</Text>}
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </>
+                );
+              })()}
+            </ScrollView>
           ) : grouped.length === 0 ? (
             <View style={[pageStyles.emptyBox, { borderWidth: 0, backgroundColor: 'transparent', paddingTop: 60 }]}>
               <Ionicons name="receipt-outline" size={40} color={Colors.borderMid} />
@@ -581,6 +638,17 @@ const s = StyleSheet.create({
   gridName: { fontFamily: 'ChillaxMedium', fontSize: 13, color: '#292929' },
   gridAmount: { fontFamily: Fonts.monoBold, fontSize: 14, color: '#292929' },
   gridDate: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted },
+
+  // Calendar grid
+  calendarGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: Spacing.page, paddingBottom: 100 },
+  calHeaderCell: { width: '14.28%', alignItems: 'center', paddingVertical: 6 },
+  calHeaderText: { fontFamily: 'ChillaxMedium', fontSize: 11, color: Colors.muted },
+  calDayCell: { width: '14.28%', minHeight: 64, padding: 4, borderWidth: 0.5, borderColor: Colors.border, gap: 2 },
+  calDayCellToday: { backgroundColor: Colors.cyan + '11' },
+  calDayNum: { fontFamily: 'ChillaxMedium', fontSize: 12, color: '#292929', marginBottom: 2 },
+  calItem: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  calItemText: { fontFamily: Fonts.mono, fontSize: 9, color: '#292929', flex: 1 },
+  calItemMore: { fontFamily: Fonts.mono, fontSize: 8, color: Colors.muted },
 
   // Date nav
   addRecordBtn: { paddingVertical: 8, paddingHorizontal: 16, borderRadius: Radius.pill, borderWidth: 1, borderColor: Colors.borderMid, backgroundColor: Colors.surface, alignItems: 'center', alignSelf: 'flex-start' },
