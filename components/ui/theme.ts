@@ -88,7 +88,14 @@ export const Spacing = {
   page: 32,
 } as const;
 
-export const Shadow = {
+export const LetterSpacing = {
+  tight: -0.5,
+  normal: 0,
+  wide: 0.3,
+  wider: 0.5,
+  widest: 1,
+} as const;
+
   card: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },

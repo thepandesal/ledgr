@@ -24,17 +24,17 @@ const pageStyles = StyleSheet.create({
 
   // ─── Page title block ─────────────────────────────────────────────────────────
   titleBlock: { marginBottom: 16 },
-  pageLabel: { fontFamily: Fonts.heading, fontSize: 11, color: Colors.muted, marginBottom: 2 },
+  pageLabel: { fontFamily: Fonts.heading, fontSize: 11, color: Colors.muted, marginBottom: 2, letterSpacing: 0.5 },
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   pageName: { fontFamily: Fonts.display, fontSize: 26, color: Colors.text, lineHeight: 30, letterSpacing: -1, flex: 1 },
-  pageAmount: { fontFamily: Fonts.mono, fontSize: 20, flexShrink: 0 },
+  pageAmount: { fontFamily: Fonts.mono, fontSize: 20, flexShrink: 0, letterSpacing: 0.2 },
 
   // ─── Section header ───────────────────────────────────────────────────────────
   sectionHeader: {
     fontFamily: Fonts.heading,
     fontSize: 15,
     color: Colors.cyan,
-    letterSpacing: -0.5,
+    letterSpacing: 0.3,
     marginBottom: 10,
     marginTop: 4,
   },

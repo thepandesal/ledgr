@@ -38,6 +38,7 @@ const formStyles = StyleSheet.create({
     fontFamily: 'ChillaxMedium',
     fontSize: 11,
     color: '#929090',
+    letterSpacing: 0.3,
   },
   headerTitle: {
     fontFamily: 'Avenelle',
@@ -56,6 +57,7 @@ const formStyles = StyleSheet.create({
     paddingVertical: 10,
     fontFamily: 'RobotoMono_400Regular',
     fontSize: 16,
+    letterSpacing: 0.2,
     color: '#425252',
     borderWidth: 1,
     borderColor: '#e8e8e8',
@@ -65,6 +67,7 @@ const formStyles = StyleSheet.create({
     flex: 1,
     fontFamily: 'RobotoMono_400Regular',
     fontSize: 16,
+    letterSpacing: 0.2,
     color: '#425252',
     padding: 0,
   },
@@ -73,6 +76,7 @@ const formStyles = StyleSheet.create({
   sectionLabel: {
     fontFamily: 'RobotoMono_400Regular',
     fontSize: 10,
+    letterSpacing: 0.2,
     color: '#929090',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -102,6 +106,7 @@ const formStyles = StyleSheet.create({
   blockLabel: {
     fontFamily: 'RobotoMono_400Regular',
     fontSize: 11,
+    letterSpacing: 0.2,
     color: '#929090',
     width: 60,
     flexShrink: 0,
@@ -133,6 +138,7 @@ const formStyles = StyleSheet.create({
   chipText: {
     fontFamily: 'RobotoMono_400Regular',
     fontSize: 12,
+    letterSpacing: 0.2,
     color: '#929090',
   },
   chipTextActive: {
@@ -160,16 +166,19 @@ const formStyles = StyleSheet.create({
   selectorPlaceholder: {
     fontFamily: 'RobotoMono_400Regular',
     fontSize: 16,
+    letterSpacing: 0.2,
     color: '#c0c0c0',
   },
   selectorValue: {
     fontFamily: 'RobotoMono_400Regular',
     fontSize: 16,
+    letterSpacing: 0.2,
     color: '#425252',
   },
   selectorSub: {
     fontFamily: 'RobotoMono_400Regular',
     fontSize: 10,
+    letterSpacing: 0.2,
     color: '#929090',
     marginTop: 1,
   },
@@ -190,6 +199,7 @@ const formStyles = StyleSheet.create({
   cancelBtnText: {
     fontFamily: 'RobotoMono_700Bold',
     fontSize: 13,
+    letterSpacing: 0.2,
     color: '#8a8a8a',
   },
   primaryBtn: {
@@ -202,6 +212,7 @@ const formStyles = StyleSheet.create({
   primaryBtnText: {
     fontFamily: 'RobotoMono_700Bold',
     fontSize: 13,
+    letterSpacing: 0.2,
     color: '#ffffff',
   },
   dangerBtn: {
@@ -229,6 +240,7 @@ const formStyles = StyleSheet.create({
   listItemText: {
     fontFamily: 'RobotoMono_400Regular',
     fontSize: 13,
+    letterSpacing: 0.2,
     color: '#425252',
     flex: 1,
   },
@@ -239,6 +251,7 @@ const formStyles = StyleSheet.create({
   listItemSub: {
     fontFamily: 'RobotoMono_400Regular',
     fontSize: 10,
+    letterSpacing: 0.2,
     color: '#929090',
   },
   listItemSubActive: {
@@ -247,6 +260,7 @@ const formStyles = StyleSheet.create({
   listEmpty: {
     fontFamily: 'RobotoMono_400Regular',
     fontSize: 12,
+    letterSpacing: 0.2,
     color: '#c0c0c0',
     textAlign: 'center',
     paddingVertical: 16,
@@ -260,6 +274,7 @@ const formStyles = StyleSheet.create({
     paddingVertical: 10,
     fontFamily: 'RobotoMono_400Regular',
     fontSize: 16,
+    letterSpacing: 0.2,
     color: '#425252',
     borderWidth: 1,
     borderColor: '#f0f0f0',
@@ -270,12 +285,14 @@ const formStyles = StyleSheet.create({
   hint: {
     fontFamily: 'RobotoMono_400Regular',
     fontSize: 10,
+    letterSpacing: 0.2,
     color: '#0ccfcf',
     marginTop: 4,
   },
   hintMuted: {
     fontFamily: 'RobotoMono_400Regular',
     fontSize: 10,
+    letterSpacing: 0.2,
     color: '#929090',
   },
 
@@ -283,6 +300,7 @@ const formStyles = StyleSheet.create({
   errorText: {
     fontFamily: 'RobotoMono_400Regular',
     fontSize: 11,
+    letterSpacing: 0.2,
     color: '#ed6a6a',
     marginBottom: 8,
   },
