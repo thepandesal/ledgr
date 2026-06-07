@@ -229,10 +229,8 @@ const s = StyleSheet.create({
   letterSpacing: 0.3,
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
   emptyText: { fontFamily: 'ChillaxRegular', fontSize: 13, color: Colors.muted },
-  letterSpacing: 0.3,
   emptyActionBtn: { borderRadius: Radius.pill, paddingVertical: 10, paddingHorizontal: 20, borderWidth: 2, borderStyle: 'dotted', borderColor: Colors.cyan, marginTop: 8 },
   emptyActionBtnText: { fontFamily: 'ChillaxMedium', fontSize: 12, color: Colors.muted },
-  letterSpacing: 0.3,
   list: { paddingHorizontal: Spacing.page, paddingBottom: 60, gap: 12, paddingTop: 8 },
   folderCard: {
     flexDirection: 'row', alignItems: 'center', gap: 14,
@@ -247,7 +245,6 @@ const s = StyleSheet.create({
   folderName: { fontFamily: 'ChillaxMedium', fontSize: 14, color: Colors.text },
   letterSpacing: 0.3,
   folderCount: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.faint },
-  letterSpacing: 0.3,
   linkedBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
   linkedDot: { width: 6, height: 6, borderRadius: 3 },
   linkedText: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.text, maxWidth: 140 },

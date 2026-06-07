@@ -679,24 +679,18 @@ const s = StyleSheet.create({
   gridName: { fontFamily: 'ChillaxMedium', fontSize: 13, color: '#292929' },
   letterSpacing: 0.3,
   gridAmount: { fontFamily: Fonts.monoBold, fontSize: 14, color: '#292929' },
-  letterSpacing: 0.3,
   gridDate: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted },
-  letterSpacing: 0.3,
 
   // Calendar grid
   calendarGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: Spacing.page, paddingBottom: 100 },
   calHeaderCell: { width: '14.28%', alignItems: 'center', paddingVertical: 6 },
   calHeaderText: { fontFamily: 'ChillaxMedium', fontSize: 11, color: Colors.muted },
-  letterSpacing: 0.3,
   calDayCell: { width: '14.28%', minHeight: 64, padding: 4, borderWidth: 0.5, borderColor: Colors.border, gap: 2 },
   calDayCellToday: { backgroundColor: Colors.cyan + '11' },
   calDayNum: { fontFamily: 'ChillaxMedium', fontSize: 12, color: '#292929', marginBottom: 2 },
-  letterSpacing: 0.3,
   calItem: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   calItemText: { fontFamily: Fonts.mono, fontSize: 9, color: '#292929', flex: 1 },
-  letterSpacing: 0.3,
   calItemMore: { fontFamily: Fonts.mono, fontSize: 8, color: Colors.muted },
-  letterSpacing: 0.3,
 
   // Date nav
   addRecordBtn: { paddingVertical: 8, paddingHorizontal: 16, borderRadius: Radius.pill, borderWidth: 1, borderColor: Colors.borderMid, backgroundColor: Colors.surface, alignItems: 'center', alignSelf: 'flex-start' },
@@ -704,13 +698,11 @@ const s = StyleSheet.create({
   modeBtn: { flex: 1, paddingVertical: 8, borderRadius: Radius.pill, borderWidth: 1, borderColor: Colors.borderMid, backgroundColor: Colors.surface, alignItems: 'center' },
   modeBtnActive: { backgroundColor: Colors.cyan, borderColor: Colors.cyan },
   modeBtnText: { fontFamily: 'ChillaxMedium', fontSize: 12, color: Colors.muted },
-  letterSpacing: 0.3,
   modeBtnTextActive: { fontFamily: 'ChillaxMedium', color: Colors.white },
   dateNavRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.page, marginBottom: 8 },
   dateNavArrow: { padding: 8 },
   dateNavCenter: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   dateNavLabel: { fontFamily: 'ChillaxMedium', fontSize: 13, color: Colors.text },
-  letterSpacing: 0.3,
   recordingsHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.page, marginBottom: 8, gap: 12 },
   contentArea: { flex: 1 },
   spaceHeader: { marginTop: 4, marginBottom: 12 },
@@ -735,11 +727,8 @@ const s = StyleSheet.create({
   recordingCard: { flexDirection: 'row', alignItems: 'center', borderRadius: Radius.pill, paddingVertical: 10, paddingHorizontal: 14, gap: 10 },
   recordingMiddle: { flex: 1, gap: 2, overflow: 'hidden' },
   recordingName: { fontFamily: 'ChillaxMedium', fontSize: 13, color: '#292929' },
-  letterSpacing: 0.3,
   recordingMeta: { fontFamily: Fonts.mono, fontSize: 10, color: '#292929' },
-  letterSpacing: 0.3,
   recordingAmount: { fontFamily: Fonts.monoBold, fontSize: 14, color: '#292929' },
-  letterSpacing: 0.3,
 
   // Stats
   statsGrid: { flexDirection: 'row', gap: 8 },
@@ -756,7 +745,6 @@ const s = StyleSheet.create({
   statValue: { fontFamily: 'ChillaxMedium', fontSize: 13, marginBottom: 2 },
   letterSpacing: 0.3,
   statLabel: { fontFamily: 'ChillaxLight', fontSize: 9, color: Colors.muted, textAlign: 'center' },
-  letterSpacing: 0.3,
 
   // Filter
   filterOption: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, paddingHorizontal: 14, borderRadius: Radius.pill, borderWidth: 1, borderColor: Colors.borderMid },

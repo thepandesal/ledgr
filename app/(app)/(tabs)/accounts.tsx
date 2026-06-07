@@ -331,12 +331,10 @@ const s = StyleSheet.create({
   accountName: { fontFamily: 'ChillaxMedium', fontSize: 15, color: Colors.text },
   letterSpacing: 0.3,
   accountMeta: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted },
-  letterSpacing: 0.3,
   qrThumb: { width: 36, height: 36, borderRadius: Radius.sm },
   qrEmpty: { width: 36, height: 36, borderRadius: Radius.sm, backgroundColor: Colors.input, justifyContent: 'center', alignItems: 'center' },
   emptyBox: { alignItems: 'center', gap: 8, paddingVertical: 32 },
   emptyText: { fontFamily: 'ChillaxRegular', fontSize: 13, color: Colors.faint },
-  letterSpacing: 0.3,
   addBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
     paddingVertical: 12, paddingHorizontal: 20,

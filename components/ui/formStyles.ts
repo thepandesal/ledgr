@@ -79,7 +79,6 @@ const formStyles = StyleSheet.create({
     letterSpacing: 0.2,
     color: '#929090',
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
     marginBottom: 8,
     marginTop: 16,
   },

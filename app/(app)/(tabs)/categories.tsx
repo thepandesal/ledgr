@@ -162,11 +162,9 @@ const s = StyleSheet.create({
   catName: { fontFamily: 'ChillaxMedium', fontSize: 14, color: Colors.text, flex: 1 },
   letterSpacing: 0.3,
   defaultBadge: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted, backgroundColor: Colors.input, paddingHorizontal: 8, paddingVertical: 2, borderRadius: Radius.pill },
-  letterSpacing: 0.3,
   menuBtn: { padding: 4 },
   emptyBox: { alignItems: 'center', gap: 8, paddingVertical: 32 },
   emptyText: { fontFamily: 'ChillaxRegular', fontSize: 13, color: Colors.faint },
-  letterSpacing: 0.3,
   addBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
     paddingVertical: 12, paddingHorizontal: 20,
