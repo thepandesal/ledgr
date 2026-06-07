@@ -50,22 +50,15 @@ export default function AccountsScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white }}>
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
-        <View style={[pageStyles.titleBlock, { marginBottom: 20 }]}>
-          <Text style={pageStyles.pageLabel}>your</Text>
-          <Text style={[pageStyles.pageName, { fontSize: 32, lineHeight: 36, letterSpacing: -1 }]}>accounts</Text>
-        </View>
-        <Text style={pageStyles.sectionHeader}>saved accounts</Text>
+        <Text style={s.pageTitle}>accounts</Text>
+        <Text style={s.pageSubtitle}>your saved payment methods.</Text>
         <View style={{ gap: 10, marginBottom: 16 }}>
           {accounts.map(account => (
             <TouchableOpacity key={account.id} style={s.accountCard} activeOpacity={0.85} onLongPress={() => { setSelected(account); setMenuModal(true); }}>
               <View style={s.accountLeft}>
-                <View style={s.accountIconWrap}>
-                  <Ionicons name="card-outline" size={18} color={Colors.cyan} />
-                </View>
-                <View style={{ flex: 1, gap: 2 }}>
+                <View style={{ flex: 1, gap: 3 }}>
                   <Text style={s.accountName} numberOfLines={1}>{account.account_name}</Text>
-                  <Text style={s.accountMeta}>{account.bank}</Text>
-                  {account.account_number ? <Text style={s.accountMeta}>•••• {account.account_number.slice(-4)}</Text> : null}
+                  <Text style={s.accountMeta}>{account.bank} · •••• {account.account_number.slice(-4)}</Text>
                 </View>
               </View>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -78,10 +71,16 @@ export default function AccountsScreen() {
               </View>
             </TouchableOpacity>
           ))}
+          {accounts.length === 0 && (
+            <View style={s.emptyBox}>
+              <Ionicons name="card-outline" size={32} color={Colors.faint} />
+              <Text style={s.emptyText}>no accounts saved yet</Text>
+            </View>
+          )}
         </View>
-        <TouchableOpacity style={[pageStyles.actionBtn, { alignSelf: 'flex-end' }]} onPress={() => setAddModal(true)} activeOpacity={0.8}>
-          <Ionicons name="add" size={14} color={Colors.text} />
-          <Text style={pageStyles.actionBtnText}>add an account</Text>
+        <TouchableOpacity style={s.addBtn} onPress={() => setAddModal(true)} activeOpacity={0.8}>
+          <Ionicons name="add" size={14} color={Colors.muted} />
+          <Text style={s.addBtnText}>add an account</Text>
         </TouchableOpacity>
       </ScrollView>
 
@@ -318,14 +317,29 @@ function AccountForm({ visible, userId, initial, onClose, onSaved }: {
 }
 
 const s = StyleSheet.create({
-  scroll: { paddingHorizontal: Spacing.page, paddingBottom: 60, paddingTop: 52 },
-  accountCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: Colors.surface, borderRadius: Radius.lg, paddingVertical: 12, paddingHorizontal: 14, borderWidth: 1, borderColor: Colors.border },
+  scroll: { paddingHorizontal: Spacing.page, paddingBottom: 60, paddingTop: 32 },
+  pageTitle: { fontFamily: Fonts.calSans, fontSize: 36, color: '#425252', marginBottom: 4 },
+  pageSubtitle: { fontFamily: 'ChillaxRegular', fontSize: 13, color: Colors.muted, marginBottom: 24 },
+  accountCard: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: Colors.white, borderRadius: Radius.pill,
+    paddingVertical: 14, paddingHorizontal: 18,
+    borderWidth: 1, borderStyle: 'dashed', borderColor: Colors.borderMid,
+  },
   accountLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
-  accountIconWrap: { width: 36, height: 36, borderRadius: Radius.md, backgroundColor: '#f0fffe', justifyContent: 'center', alignItems: 'center' },
-  accountName: { fontFamily: Fonts.heading, fontSize: 16, color: Colors.text, letterSpacing: -0.5 },
+  accountName: { fontFamily: 'ChillaxMedium', fontSize: 15, color: Colors.text },
   accountMeta: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted },
-  qrThumb: { width: 32, height: 32, borderRadius: Radius.sm },
-  qrEmpty: { width: 32, height: 32, borderRadius: Radius.sm, backgroundColor: Colors.input, justifyContent: 'center', alignItems: 'center' },
+  qrThumb: { width: 36, height: 36, borderRadius: Radius.sm },
+  qrEmpty: { width: 36, height: 36, borderRadius: Radius.sm, backgroundColor: Colors.input, justifyContent: 'center', alignItems: 'center' },
+  emptyBox: { alignItems: 'center', gap: 8, paddingVertical: 32 },
+  emptyText: { fontFamily: 'ChillaxRegular', fontSize: 13, color: Colors.faint },
+  addBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    paddingVertical: 12, paddingHorizontal: 20,
+    borderRadius: Radius.pill, borderWidth: 2, borderStyle: 'dotted',
+    borderColor: Colors.cyan, backgroundColor: 'transparent', alignSelf: 'flex-start',
+  },
+  addBtnText: { fontFamily: 'ChillaxMedium', fontSize: 13, color: Colors.muted },
   suggestionBox: { backgroundColor: Colors.white, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.border, marginBottom: 8, overflow: 'hidden' },
   qrUploadBtn: { borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface, overflow: 'hidden', marginBottom: 8 },
   qrPreview: { width: 160, height: 160, borderRadius: Radius.md },
