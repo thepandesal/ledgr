@@ -49,7 +49,7 @@ export default function ReceiptsScreen() {
     const full: Entry[] = await Promise.all(data.map(async (e: any) => {
       const { data: photos, count } = await supabase
         .from('receipt_photos')
-        .select('storage_path', { count: 'exact' })
+        .select('storage_path, url', { count: 'exact' })
         .eq('entry_id', e.id)
         .order('created_at')
         .limit(1);
