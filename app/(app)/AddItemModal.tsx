@@ -53,6 +53,9 @@ export default function AddItemModal({
             <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: overBudget ? Colors.expense : Colors.cyan }}>
               {totalUsed.toLocaleString('en-US', { minimumFractionDigits: 2 })} allocated
             </Text>
+            <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: overBudget ? Colors.expense : Colors.income }}>
+              {overBudget ? '-' : ''}{Math.abs(recAmt - totalUsed).toLocaleString('en-US', { minimumFractionDigits: 2 })} {overBudget ? 'over' : 'remaining'}
+            </Text>
             <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted }}>
               {recAmt.toLocaleString('en-US', { minimumFractionDigits: 2 })} total
             </Text>
