@@ -58,13 +58,13 @@ function recordingColor(type: string, status: string): string {
 }
 
 function recordingBg(type: string, status: string): string {
-  if (type === 'expense') return '#ffe4e4';
-  if (type === 'income' || type === 'savings') return '#ebf6e4';
+  if (type === 'expense') return '#fdeded';
+  if (type === 'income' || type === 'savings') return '#f6fded';
   if (type === 'payable' || type === 'receivable') {
-    if (status === 'paid' || status === 'received') return '#f6f6f6';
-    return '#f7eaff';
+    if (status === 'paid' || status === 'received') return '#f8f8f8';
+    return '#f8edfd';
   }
-  return '#ebf6e4';
+  return '#f6fded';
 }
 
 export default function SpaceDetailScreen() {
