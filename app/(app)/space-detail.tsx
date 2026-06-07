@@ -345,7 +345,11 @@ export default function SpaceDetailScreen() {
             <ScrollView contentContainerStyle={s.list} showsVerticalScrollIndicator={false}>
               {grouped.map(group => (
                 <View key={group.dateLabel}>
-                  <Text style={s.dateGroupLabel}>{group.dateLabel}</Text>
+                  <View style={s.dateGroupRow}>
+                    <View style={s.dateGroupLine} />
+                    <Text style={s.dateGroupLabel}>{group.dateLabel}</Text>
+                    <View style={s.dateGroupLine} />
+                  </View>
                   <View style={{ gap: 10 }}>
                     {group.items.map(item => {
                       const amountColor = recordingColor(item.type, item.status);
@@ -557,7 +561,9 @@ const s = StyleSheet.create({
 
   // Recording list
   list: { paddingHorizontal: Spacing.page, paddingBottom: 100, gap: 16, paddingTop: 16 },
-  dateGroupLabel: { fontFamily: Fonts.calSans, fontSize: 13, color: Colors.cyan, marginBottom: 8, marginTop: 16 },
+  dateGroupRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8, marginTop: 16 },
+  dateGroupLine: { flex: 1, height: 1, backgroundColor: Colors.borderMid },
+  dateGroupLabel: { fontFamily: Fonts.calSans, fontSize: 11, color: '#555555', textAlign: 'center' },
   recordingCard: { flexDirection: 'row', alignItems: 'center', borderRadius: Radius.pill, paddingVertical: 10, paddingHorizontal: 14, gap: 10 },
   recordingMiddle: { flex: 1, gap: 2, overflow: 'hidden' },
   recordingName: { fontFamily: 'ChillaxMedium', fontSize: 13, color: '#292929' },
