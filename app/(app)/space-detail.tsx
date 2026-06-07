@@ -522,7 +522,7 @@ export default function SpaceDetailScreen() {
 
 const s = StyleSheet.create({
   // Date nav
-  addRecordBtn: { paddingVertical: 8, paddingHorizontal: 16, borderRadius: Radius.pill, borderWidth: 1, borderColor: Colors.borderMid, backgroundColor: Colors.surface, alignItems: 'center' },
+  addRecordBtn: { paddingVertical: 8, paddingHorizontal: 16, borderRadius: Radius.pill, borderWidth: 1, borderColor: Colors.borderMid, backgroundColor: Colors.surface, alignItems: 'center', alignSelf: 'flex-start' },
   modeRow: { flexDirection: 'row', paddingHorizontal: Spacing.page, gap: 8, marginBottom: 10 },
   modeBtn: { flex: 1, paddingVertical: 8, borderRadius: Radius.pill, borderWidth: 1, borderColor: Colors.borderMid, backgroundColor: Colors.surface, alignItems: 'center' },
   modeBtnActive: { backgroundColor: Colors.cyan, borderColor: Colors.cyan },
@@ -532,7 +532,7 @@ const s = StyleSheet.create({
   dateNavArrow: { padding: 8 },
   dateNavCenter: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   dateNavLabel: { fontFamily: 'ChillaxMedium', fontSize: 13, color: Colors.text },
-  recordingsHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.page, marginBottom: 8 },
+  recordingsHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.page, marginBottom: 8, gap: 12 },
   contentArea: { flex: 1 },
   spaceHeader: { marginTop: 4, marginBottom: 12 },
   spaceName: { fontFamily: Fonts.calSans, fontSize: 32, color: '#425252', letterSpacing: -0.5 },
