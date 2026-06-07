@@ -1038,7 +1038,6 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
               {formatDate(recording?.transaction_date)} · {typeLabel(recording?.type ?? '', recording?.status ?? '')}
             </Text>
           </View>
-          </View>
 
           {/* Action buttons */}
           <View style={[pageStyles.actionRow, { marginBottom: 8 }]}>
