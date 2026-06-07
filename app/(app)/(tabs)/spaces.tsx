@@ -116,6 +116,7 @@ export default function SpacesScreen() {
 
         {/* Section title */}
         <Text style={s.sectionTitle}>spaces</Text>
+        <Text style={s.sectionSubtitle}>your money, grouped your way.</Text>
 
         <View style={s.grid}>
 
@@ -135,14 +136,14 @@ export default function SpacesScreen() {
                 <Text style={s.spaceCardText} numberOfLines={1}>{space.name.toLowerCase()}</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={() => openMenu(space)} style={s.spaceMenuBtn}>
-                <Ionicons name="ellipsis-vertical" size={14} color={Colors.white} />
+                <Ionicons name="ellipsis-vertical" size={14} color={Colors.text} />
               </TouchableOpacity>
             </View>
           ))}
 
           {/* Add a space */}
           <TouchableOpacity style={s.addCard} activeOpacity={0.8} onPress={openCreate}>
-            <Ionicons name="add" size={14} color={Colors.text} />
+            <Ionicons name="add" size={14} color={Colors.muted} />
             <Text style={s.addCardText}>add a space</Text>
           </TouchableOpacity>
 
@@ -270,46 +271,46 @@ const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.white },
   header: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: PAGE_PAD, paddingTop: 32, paddingBottom: 16 },
   avatarFallback: { width: 34, height: 34, borderRadius: 17, backgroundColor: Colors.borderMid, justifyContent: 'center', alignItems: 'center' },
-  greeting: { fontFamily: 'MuseoModerno_Regular', fontSize: 16, color: Colors.muted },
-  greetingName: { fontFamily: 'MuseoModerno_Regular', color: Colors.text },
+  greeting: { fontFamily: Fonts.museoRegular, fontSize: 16, color: Colors.muted },
+  greetingName: { fontFamily: Fonts.museoRegular, color: Colors.text },
   scroll: { paddingHorizontal: PAGE_PAD, paddingBottom: 40, paddingTop: 8 },
-  sectionTitle: { fontFamily: 'MuseoModerno_Medium', fontSize: 36, color: Colors.text, marginBottom: 20 },
+  sectionTitle: { fontFamily: Fonts.calSans, fontSize: 36, color: '#425252', marginBottom: 4 },
+  sectionSubtitle: { fontFamily: 'ChillaxRegular', fontSize: 13, color: Colors.muted, marginBottom: 20 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
 
-  // All spaces — dotted border, #ed6a6a text, no bg
+  // All spaces — f0ff97 bg, same size as other cards
   allSpacesCard: {
-    width: '100%',
+    width: '47%',
     borderRadius: Radius.pill,
     paddingVertical: 12,
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     alignItems: 'center',
-    borderWidth: 3,
-    borderStyle: 'dotted',
-    borderColor: Colors.expense,
-    backgroundColor: 'transparent',
+    backgroundColor: '#f0ff97',
   },
-  allSpacesText: { fontFamily: 'ChillaxMedium', fontSize: 15, color: Colors.expense },
+  allSpacesText: { fontFamily: 'ChillaxMedium', fontSize: 15, color: '#292929' },
 
-  // Space cards — #7fd8cd bg, no icon
-  spaceCard: { width: '47%', borderRadius: Radius.pill, paddingVertical: 12, paddingLeft: 16, paddingRight: 8, flexDirection: 'row', alignItems: 'center', backgroundColor: '#7fd8cd' },
+  // Space cards — d8efea bg
+  spaceCard: { width: '47%', borderRadius: Radius.pill, paddingVertical: 12, paddingLeft: 16, paddingRight: 8, flexDirection: 'row', alignItems: 'center', backgroundColor: '#d8efea' },
   spaceCardMain: { flex: 1 },
-  spaceCardText: { fontFamily: 'ChillaxMedium', fontSize: 15, color: Colors.white },
+  spaceCardText: { fontFamily: 'ChillaxMedium', fontSize: 15, color: '#292929' },
   spaceMenuBtn: { padding: 6 },
 
-  // Add a space button
+  // Add a space — dotted border, no bg
   addCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
+    width: '47%',
     borderRadius: Radius.pill,
-    borderWidth: 1,
-    borderColor: Colors.borderMid,
-    backgroundColor: Colors.surface,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 2,
+    borderStyle: 'dotted',
+    borderColor: Colors.cyan,
+    backgroundColor: 'transparent',
   },
-  addCardText: { fontFamily: Fonts.mono, fontSize: 11, color: Colors.text },
+  addCardText: { fontFamily: 'ChillaxMedium', fontSize: 13, color: Colors.muted },
 
   // Form
   colorRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },

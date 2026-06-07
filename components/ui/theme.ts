@@ -43,8 +43,12 @@ export const Fonts = {
   // Display — page titles, space names
   display: 'Avenelle',
 
-  // Section headers — ChillaxMedium
+  // Section headers — Chillax
   heading: 'ChillaxMedium',
+  headingRegular: 'ChillaxRegular',
+  headingBold: 'ChillaxBold',
+  headingSemibold: 'ChillaxSemibold',
+  headingLight: 'ChillaxLight',
 
   // Museo Moderno
   museoBlack: 'MuseoModerno_Black',
