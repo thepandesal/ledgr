@@ -320,7 +320,6 @@ const s = StyleSheet.create({
   scroll: { paddingHorizontal: Spacing.page, paddingBottom: 60, paddingTop: 32 },
   pageTitle: { fontFamily: Fonts.calSans, fontSize: 36, color: '#425252', marginBottom: 4 },
   pageSubtitle: { fontFamily: 'ChillaxRegular', fontSize: 13, color: Colors.muted, marginBottom: 24 },
-  letterSpacing: 0.3,
   accountCard: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     backgroundColor: Colors.white, borderRadius: Radius.pill,
@@ -329,7 +328,6 @@ const s = StyleSheet.create({
   },
   accountLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
   accountName: { fontFamily: 'ChillaxMedium', fontSize: 15, color: Colors.text },
-  letterSpacing: 0.3,
   accountMeta: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted },
   qrThumb: { width: 36, height: 36, borderRadius: Radius.sm },
   qrEmpty: { width: 36, height: 36, borderRadius: Radius.sm, backgroundColor: Colors.input, justifyContent: 'center', alignItems: 'center' },
@@ -342,7 +340,6 @@ const s = StyleSheet.create({
     borderColor: Colors.cyan, backgroundColor: 'transparent', alignSelf: 'flex-start',
   },
   addBtnText: { fontFamily: 'ChillaxMedium', fontSize: 13, color: Colors.muted },
-  letterSpacing: 0.3,
   suggestionBox: { backgroundColor: Colors.white, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.border, marginBottom: 8, overflow: 'hidden' },
   qrUploadBtn: { borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface, overflow: 'hidden', marginBottom: 8 },
   qrPreview: { width: 160, height: 160, borderRadius: Radius.md },

@@ -149,7 +149,6 @@ const s = StyleSheet.create({
   header: { paddingHorizontal: Spacing.page, paddingTop: 32, paddingBottom: 8 },
   title: { fontFamily: Fonts.calSans, fontSize: 36, color: '#425252', marginBottom: 4 },
   subtitle: { fontFamily: 'ChillaxRegular', fontSize: 13, color: Colors.muted },
-  letterSpacing: 0.3,
   scroll: { paddingHorizontal: Spacing.page, paddingBottom: 40, paddingTop: 16 },
   list: { gap: 10 },
   catBtn: {
@@ -160,7 +159,6 @@ const s = StyleSheet.create({
   },
   catIcon: { width: 32, height: 32, borderRadius: Radius.pill, justifyContent: 'center', alignItems: 'center' },
   catName: { fontFamily: 'ChillaxMedium', fontSize: 14, color: Colors.text, flex: 1 },
-  letterSpacing: 0.3,
   defaultBadge: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted, backgroundColor: Colors.input, paddingHorizontal: 8, paddingVertical: 2, borderRadius: Radius.pill },
   menuBtn: { padding: 4 },
   emptyBox: { alignItems: 'center', gap: 8, paddingVertical: 32 },
@@ -172,7 +170,6 @@ const s = StyleSheet.create({
     borderColor: Colors.cyan, backgroundColor: 'transparent', alignSelf: 'flex-start',
   },
   addBtnText: { fontFamily: 'ChillaxMedium', fontSize: 13, color: Colors.muted },
-  letterSpacing: 0.3,
   colorRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   colorDot: { width: 30, height: 30, borderRadius: 15 },
   colorDotSelected: { borderWidth: 3, borderColor: Colors.text },

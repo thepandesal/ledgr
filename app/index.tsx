@@ -70,7 +70,6 @@ const s = StyleSheet.create({
   },
   brand: { fontFamily: 'MuseoModerno_Black', fontSize: 72, color: '#7fd8cd', letterSpacing: -1, marginBottom: 4 },
   tagline: { fontFamily: 'ChillaxMedium', fontSize: 14, color: '#545454', marginBottom: 32 },
-  letterSpacing: 0.3,
   buttons: { width: '100%', gap: 12 },
   button: {
     borderRadius: 999,
