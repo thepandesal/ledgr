@@ -218,7 +218,6 @@ const s = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', paddingHorizontal: Spacing.page, paddingTop: 32, paddingBottom: 16 },
   pageTitle: { fontFamily: Fonts.calSans, fontSize: 36, color: '#425252', marginBottom: 4 },
   pageSubtitle: { fontFamily: 'ChillaxRegular', fontSize: 13, color: Colors.muted },
-  letterSpacing: 0.3,
   addBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     paddingVertical: 8, paddingHorizontal: 14,
@@ -226,7 +225,6 @@ const s = StyleSheet.create({
     borderColor: Colors.cyan, backgroundColor: 'transparent',
   },
   addBtnText: { fontFamily: 'ChillaxMedium', fontSize: 12, color: Colors.muted },
-  letterSpacing: 0.3,
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
   emptyText: { fontFamily: 'ChillaxRegular', fontSize: 13, color: Colors.muted },
   emptyActionBtn: { borderRadius: Radius.pill, paddingVertical: 10, paddingHorizontal: 20, borderWidth: 2, borderStyle: 'dotted', borderColor: Colors.cyan, marginTop: 8 },
@@ -243,7 +241,6 @@ const s = StyleSheet.create({
   folderInfo: { flex: 1, gap: 2 },
   folderDate: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted },
   folderName: { fontFamily: 'ChillaxMedium', fontSize: 14, color: Colors.text },
-  letterSpacing: 0.3,
   folderCount: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.faint },
   linkedBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
   linkedDot: { width: 6, height: 6, borderRadius: 3 },

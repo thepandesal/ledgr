@@ -677,7 +677,6 @@ const s = StyleSheet.create({
   // Grid view
   gridCard: { width: '47%', borderRadius: Radius.lg, padding: 12, gap: 6 },
   gridName: { fontFamily: 'ChillaxMedium', fontSize: 13, color: '#292929' },
-  letterSpacing: 0.3,
   gridAmount: { fontFamily: Fonts.monoBold, fontSize: 14, color: '#292929' },
   gridDate: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted },
 
@@ -743,7 +742,6 @@ const s = StyleSheet.create({
     alignItems: 'center',
   },
   statValue: { fontFamily: 'ChillaxMedium', fontSize: 13, marginBottom: 2 },
-  letterSpacing: 0.3,
   statLabel: { fontFamily: 'ChillaxLight', fontSize: 9, color: Colors.muted, textAlign: 'center' },
 
   // Filter

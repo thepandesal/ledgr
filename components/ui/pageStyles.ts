@@ -34,7 +34,6 @@ const pageStyles = StyleSheet.create({
     fontFamily: Fonts.heading,
     fontSize: 15,
     color: Colors.cyan,
-    letterSpacing: 0.3,
     marginBottom: 10,
     marginTop: 4,
   },
