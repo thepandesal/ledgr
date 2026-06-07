@@ -1018,15 +1018,19 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
 
           {/* Header */}
           <View style={pageStyles.titleBlock}>
-            <Text style={pageStyles.pageLabel}>recordings</Text>
+            <Text style={{ fontFamily: 'ChillaxRegular', fontSize: 11, color: Colors.muted, marginBottom: 2 }}>recordings</Text>
             <View style={pageStyles.titleRow}>
-              <Text style={pageStyles.pageName} numberOfLines={1} ellipsizeMode="tail">
+              <Text style={{ fontFamily: 'ChillaxMedium', fontSize: 24, color: Colors.text, flex: 1 }} numberOfLines={1} ellipsizeMode="tail">
                 {truncate(recording?.name ?? '', MAX_NAME_CHARS).toLowerCase()}
               </Text>
-              <Text style={[pageStyles.pageAmount, { color: amountColor() }]}>
+              <Text style={{ fontFamily: Fonts.monoBold, fontSize: 22, color: amountColor(), flexShrink: 0 }}>
                 {recording ? Number(recording.amount).toLocaleString('en-US', { minimumFractionDigits: 2 }) : '—'}
               </Text>
             </View>
+            <Text style={{ fontFamily: Fonts.mono, fontSize: 11, color: Colors.muted, marginTop: 4 }}>
+              {formatDate(recording?.transaction_date)} · {typeLabel(recording?.type ?? '', recording?.status ?? '')}
+            </Text>
+          </View>
           </View>
 
           {/* Action buttons */}
@@ -1094,7 +1098,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
           </View>
 
           {/* Receipt strip */}
-          {linkedReceipt && receiptPhotos.length > 0 && (
+          {linkedReceipt && (
             <View style={accountStyles.receiptStrip}>
               <View style={accountStyles.receiptStripHeader}>
                 <Text style={accountStyles.receiptStripLabel}>receipt</Text>
@@ -1116,7 +1120,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
           )}
 
           {/* Information */}
-          <Text style={pageStyles.sectionHeader}>information</Text>
+          <Text style={[pageStyles.sectionHeader, { fontFamily: Fonts.calSans }]}>information</Text>
           <View style={pageStyles.infoBlock}>
             <InfoRow label="Date of transaction" value={formatDate(recording?.transaction_date)} />
             <InfoRow label="Transaction type" value={typeLabel(recording?.type ?? '', recording?.status ?? '')} />
@@ -1148,7 +1152,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
           {/* Payment/collection history */}
           {(recording?.type === 'payable' || recording?.type === 'receivable') && linkedPayments.length > 0 && (
             <>
-              <Text style={pageStyles.sectionHeader}>{recording.type === 'receivable' ? 'collections' : 'payments'}</Text>
+              <Text style={[pageStyles.sectionHeader, { fontFamily: Fonts.calSans }]}>{recording.type === 'receivable' ? 'collections' : 'payments'}</Text>
               <View style={pageStyles.infoBlock}>
                 {linkedPayments.map((p: any, i: number) => (
                   <TouchableOpacity key={p.id} onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: p.id } } as any)}>
@@ -1176,7 +1180,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
               {/* Per-person payment status */}
               {personPayStatus.length > 0 && (
                 <>
-                  <Text style={pageStyles.sectionHeader}>per person status</Text>
+                  <Text style={[pageStyles.sectionHeader, { fontFamily: Fonts.calSans }]}>per person status</Text>
                   <View style={pageStyles.infoBlock}>
                     {personPayStatus.map((s, i) => {
                       const fullyPaid = s.total > 0 && s.paid >= s.total - 0.01;
@@ -1212,7 +1216,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
           )}
 
           {/* Split bill */}
-          <Text style={pageStyles.sectionHeader}>split bill</Text>
+          <Text style={[pageStyles.sectionHeader, { fontFamily: Fonts.calSans }]}>split bill</Text>
           {linkedPayable ? (
             <>
               <TouchableOpacity style={pageStyles.linkedBtn} onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: linkedPayable.id } } as any)}>
@@ -1298,7 +1302,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
           </View>
 
           {/* Items */}
-          <Text style={pageStyles.sectionHeader}>items</Text>
+          <Text style={[pageStyles.sectionHeader, { fontFamily: Fonts.calSans }]}>items</Text>
           {(() => {
             const totalItemsCost = items.reduce((s, i) => s + i.cost, 0);
             const recordingAmount = recording ? Number(recording.amount) : 0;
