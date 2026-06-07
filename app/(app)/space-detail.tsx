@@ -251,7 +251,6 @@ export default function SpaceDetailScreen() {
             </TouchableOpacity>
           )}
         </View>
-        </View>
 
         {/* Date nav */}
         <View style={s.modeRow}>
