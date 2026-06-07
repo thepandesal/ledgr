@@ -59,8 +59,8 @@ export default function ReceiptDetailScreen() {
     const { data: rows } = await supabase.from('receipt_photos').select('id, storage_path, url').eq('entry_id', receiptId).order('created_at');
     if (rows) {
       const withUrls = await Promise.all(rows.map(async (p: any) => {
-        const { data } = await supabase.storage.from('receipts').createSignedUrl(p.storage_path, 3600);
-        return { id: p.id, url: data?.signedUrl ?? '', path: p.storage_path };
+        let url = p.url ?? ''; if (!url && p.storage_path) { const { data } = await supabase.storage.from('receipts').createSignedUrl(p.storage_path, 3600); url = data?.signedUrl ?? ''; }
+        return { id: p.id, url, path: p.storage_path };
       }));
       setPhotos(withUrls);
     }

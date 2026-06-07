@@ -107,7 +107,10 @@ export default function SplitSharePage() {
     const { data: photos } = await supabase.from('receipt_photos').select('storage_path, url').eq('entry_id', receiptId).order('created_at');
     if (photos && photos.length > 0) {
       const urls = await Promise.all(photos.map(async (p: any) => {
-        return p.url ?? '';
+        if (p.url) return p.url;
+        // fallback to signed URL
+        let url = p.url ?? ''; if (!url && p.storage_path) { const { data } = await supabase.storage.from('receipts').createSignedUrl(p.storage_path, 3600); url = data?.signedUrl ?? ''; }
+        return url;
       }));
       setReceiptPhotos(urls.filter(Boolean));
     }
