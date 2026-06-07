@@ -87,6 +87,7 @@ export default function SpaceDetailScreen() {
   const [showPicker, setShowPicker] = useState(false);
   const [activeFilter, setActiveFilter] = useState<string[]>([]);
   const [showFilter, setShowFilter] = useState(false);
+  const [spaceBudget, setSpaceBudget] = useState<number | null>(null);
   const [pickerMonth, setPickerMonth] = useState(new Date().getMonth());
   const [pickerYear, setPickerYear] = useState(new Date().getFullYear());
   const [pickerDay, setPickerDay] = useState<number | null>(null);
@@ -148,7 +149,6 @@ export default function SpaceDetailScreen() {
     const query = supabase.from('recordings')
       .select('*, categories:category_id(name, color, icon), account:account_id(account_name, bank, color)');
     if (spaceId === 'all') {
-      // load all recordings for this user across all spaces
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         const { data } = await query.eq('user_id', user.id).order('transaction_date', { ascending: false });
@@ -157,6 +157,9 @@ export default function SpaceDetailScreen() {
     } else {
       const { data } = await query.eq('space_id', spaceId).order('transaction_date', { ascending: false });
       if (data) setRecordings(data);
+      // Load budget
+      const { data: space } = await supabase.from('spaces').select('budget').eq('id', spaceId).single();
+      if (space) setSpaceBudget(space.budget ?? null);
     }
     setLoading(false);
   };
@@ -258,6 +261,35 @@ export default function SpaceDetailScreen() {
             );
           })}
         </View>
+
+        {/* Budget bar */}
+        {spaceId !== 'all' && (
+          <View style={[s.budgetWrap, { marginHorizontal: Spacing.page, marginBottom: 12 }]}>
+            {(() => {
+              const pct = spaceBudget ? Math.min(totalExpenses / spaceBudget, 1) : 0;
+              const overBudget = spaceBudget ? totalExpenses > spaceBudget : false;
+              const barColor = !spaceBudget ? Colors.borderMid : overBudget ? Colors.expense : pct >= 0.8 ? Colors.pending : Colors.income;
+              return (
+                <>
+                  <View style={s.budgetLabelRow}>
+                    <Text style={s.budgetLabel}>budget</Text>
+                    <Text style={[s.budgetValue, overBudget && { color: Colors.expense }]}>
+                      {shortAmount(totalExpenses)} / {spaceBudget ? shortAmount(spaceBudget) : '∞'}
+                    </Text>
+                  </View>
+                  <View style={s.budgetTrack}>
+                    {spaceBudget ? (
+                      <View style={[s.budgetFill, { width: `${pct * 100}%` as any, backgroundColor: barColor }]} />
+                    ) : (
+                      <View style={[s.budgetFill, { width: '100%', backgroundColor: Colors.borderMid, opacity: 0.4 }]} />
+                    )}
+                  </View>
+                  {overBudget && <Text style={s.budgetOver}>over budget by {shortAmount(totalExpenses - spaceBudget!)}</Text>}
+                </>
+              );
+            })()}
+          </View>
+        )}
 
         {/* Recordings header */}
         <View style={s.recordingsHeader}>
@@ -628,6 +660,15 @@ export default function SpaceDetailScreen() {
 }
 
 const s = StyleSheet.create({
+  // Budget bar
+  budgetWrap: { gap: 6 },
+  budgetLabelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  budgetLabel: { fontFamily: 'ChillaxRegular', fontSize: 11, color: Colors.muted, letterSpacing: 0.3 },
+  budgetValue: { fontFamily: Fonts.monoBold, fontSize: 11, color: Colors.text, letterSpacing: 0.2 },
+  budgetTrack: { height: 6, backgroundColor: Colors.border, borderRadius: Radius.pill, overflow: 'hidden' },
+  budgetFill: { height: '100%', borderRadius: Radius.pill },
+  budgetOver: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.expense, letterSpacing: 0.2 },
+
   // Layout toggle
   layoutRow: { flexDirection: 'row', justifyContent: 'center', gap: 8, paddingHorizontal: Spacing.page, marginBottom: 10 },
   layoutBtn: { width: 36, height: 36, borderRadius: Radius.pill, borderWidth: 1, borderColor: Colors.borderMid, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center' },

@@ -36,6 +36,7 @@ export default function SpacesScreen() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [createModal, setCreateModal] = useState(false);
   const [spaceName, setSpaceName] = useState('');
+  const [spaceBudget, setSpaceBudget] = useState('');
   const [selectedColor, setSelectedColor] = useState(PASTEL_COLORS[0]);
   const [selectedIcon, setSelectedIcon] = useState(ICONS[0]);
   const [useDefaultCategory, setUseDefaultCategory] = useState(false);
@@ -66,6 +67,7 @@ export default function SpacesScreen() {
   const openCreate = () => {
     setSpaceName(''); setSelectedColor(PASTEL_COLORS[0]); setSelectedIcon(ICONS[0]);
     setError(''); setUseDefaultCategory(false); setSelectedCategory(null); setCategoryInput('');
+    setSpaceBudget('');
     setCreateModal(true);
   };
 
@@ -80,6 +82,7 @@ export default function SpacesScreen() {
     const { data, error: err } = await supabase.from('spaces').insert({
       user_id: userId, name: spaceName.trim(), color: selectedColor, icon: selectedIcon,
       default_category_id: useDefaultCategory && selectedCategory ? selectedCategory.id : null,
+      budget: spaceBudget.trim() ? parseFloat(spaceBudget) : null,
     }).select().single();
     if (err) { setError(err.message); setLoading(false); return; }
     setSpaces(prev => [...prev, data]); setLoading(false); setCreateModal(false);
@@ -164,6 +167,17 @@ export default function SpacesScreen() {
           autoFocus
         />
         <Text style={[formStyles.hintMuted, { alignSelf: 'flex-end' }]}>{spaceName.length}/15</Text>
+
+        <Text style={formStyles.sectionLabel}>budget <Text style={{ textTransform: 'none' }}>(optional)</Text></Text>
+        <TextInput
+          style={formStyles.input}
+          placeholder="e.g. 10000"
+          placeholderTextColor={Colors.faint}
+          value={spaceBudget}
+          onChangeText={setSpaceBudget}
+          keyboardType="decimal-pad"
+        />
+        <Text style={formStyles.hintMuted}>leave empty for no budget limit</Text>
 
         <Text style={formStyles.sectionLabel}>color</Text>
         <View style={s.colorRow}>
