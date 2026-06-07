@@ -58,7 +58,7 @@ export default function AccountsScreen() {
               <View style={s.accountLeft}>
                 <View style={{ flex: 1, gap: 3 }}>
                   <Text style={s.accountName} numberOfLines={1}>{account.account_name}</Text>
-                  <Text style={s.accountMeta}>{account.bank} · •••• {account.account_number.slice(-4)}</Text>
+                  <Text style={s.accountMeta}>{account.bank} · •••• {account.account_number?.slice(-4) ?? ''}</Text>
                 </View>
               </View>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
