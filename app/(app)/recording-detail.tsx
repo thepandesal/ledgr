@@ -546,7 +546,7 @@ export default function RecordingDetailScreen() {
         }
         return { id: p.id, url };
       }));
-      setReceiptPhotos(urls.filter(u => u.url));
+      setReceiptPhotos(urls);
     }
   };
 
@@ -1115,13 +1115,22 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                   <Text style={accountStyles.receiptUnlink}>unlink</Text>
                 </TouchableOpacity>
               </View>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 8 }}>
-                {receiptPhotos.map(p => (
-                  <TouchableOpacity key={p.id} onPress={() => router.push({ pathname: '/(app)/receipt-detail', params: { receiptId: linkedReceipt.id } } as any)}>
-                    <Image source={{ uri: p.url }} style={accountStyles.receiptThumb} resizeMode="cover" />
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
+              {receiptPhotos.length > 0 ? (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 8 }}>
+                  {receiptPhotos.map(p => (
+                    <Image key={p.id} source={{ uri: p.url }} style={[accountStyles.receiptThumb, { backgroundColor: Colors.input }]} resizeMode="cover" />
+                  ))}
+                </ScrollView>
+              ) : (
+                <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: Colors.faint, marginTop: 8 }}>loading photos...</Text>
+              )}
+              <TouchableOpacity
+                style={[pageStyles.actionBtn, { marginTop: 10 }]}
+                onPress={() => router.push({ pathname: '/(app)/receipt-detail', params: { receiptId: linkedReceipt.id } } as any)}
+              >
+                <Ionicons name="arrow-forward-circle-outline" size={15} color={Colors.cyan} />
+                <Text style={[pageStyles.actionBtnText, { color: Colors.cyan }]}>go to receipt</Text>
+              </TouchableOpacity>
             </View>
           )}
 
