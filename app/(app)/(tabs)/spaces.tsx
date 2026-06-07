@@ -212,28 +212,6 @@ export default function SpacesScreen() {
         />
         <Text style={formStyles.hintMuted}>leave empty for no budget limit</Text>
 
-        <Text style={formStyles.sectionLabel}>color</Text>
-        <View style={s.colorRow}>
-          {PASTEL_COLORS.map(c => (
-            <TouchableOpacity key={c} style={[s.colorDot, { backgroundColor: c }, selectedColor === c && s.colorDotSelected]} onPress={() => setSelectedColor(c)} />
-          ))}
-        </View>
-
-        <Text style={formStyles.sectionLabel}>icon</Text>
-        <View style={s.iconRow}>
-          {ICONS.map(i => (
-            <TouchableOpacity key={i} style={[s.iconBtn, selectedIcon === i && s.iconBtnSelected]} onPress={() => setSelectedIcon(i)}>
-              <Ionicons name={i as any} size={20} color={selectedIcon === i ? Colors.white : Colors.muted} />
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        <Text style={formStyles.sectionLabel}>preview</Text>
-        <View style={[s.preview, { backgroundColor: selectedColor }]}>
-          <Ionicons name={selectedIcon as any} size={16} color={Colors.text} />
-          <Text style={s.previewText}>{spaceName || 'my space'}</Text>
-        </View>
-
         <Text style={formStyles.sectionLabel}>default category</Text>
         <View style={s.toggleRow}>
           <Text style={s.toggleLabel}>use a default category?</Text>

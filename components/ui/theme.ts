@@ -41,7 +41,7 @@ export const Colors = {
 
 export const Fonts = {
   // Display — page titles, space names
-  display: 'Avenelle',
+  display: 'CalSans',
 
   // Section headers — Chillax
   heading: 'ChillaxMedium',
