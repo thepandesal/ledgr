@@ -63,6 +63,8 @@ export default function AddRecordingScreen() {
   const [personName, setPersonName] = useState('');
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState('');
+  const [spaceBudget, setSpaceBudget] = useState<number | null>(null);
+  const [spaceSpent, setSpaceSpent] = useState<number>(0);
 
   // ── Recurring ────────────────────────────────────────────────────────────
   const [isRecurring, setIsRecurring]     = useState(false);
@@ -111,6 +113,16 @@ export default function AddRecordingScreen() {
     ]);
     if (cats.data) setCategories(cats.data);
     if (accs.data) setAccounts(accs.data);
+
+    // Load space budget if adding a new expense
+    if (!editId && spaceId) {
+      const { data: space } = await supabase.from('spaces').select('budget').eq('id', spaceId).single();
+      if (space?.budget) {
+        setSpaceBudget(space.budget);
+        const { data: recs } = await supabase.from('recordings').select('amount').eq('space_id', spaceId).eq('type', 'expense');
+        if (recs) setSpaceSpent(recs.reduce((s: number, r: any) => s + Number(r.amount), 0));
+      }
+    }
 
     if (editId) {
       const { data: rec } = await supabase
@@ -489,6 +501,37 @@ export default function AddRecordingScreen() {
         </ScrollView>
       )}
 
+      {/* ── Budget indicator ── */}
+      {type === 'expense' && spaceBudget && (
+        (() => {
+          const enteredAmt = parseFloat(amount || '0') || 0;
+          const remaining = spaceBudget - spaceSpent - enteredAmt;
+          const pct = Math.min((spaceSpent + enteredAmt) / spaceBudget, 1);
+          const overBudget = remaining < 0;
+          const barColor = overBudget ? Colors.expense : pct >= 0.8 ? Colors.pending : Colors.income;
+          const fmt = (n: number) => {
+            const abs = Math.abs(n);
+            if (abs >= 1_000_000) return (abs / 1_000_000).toFixed(1) + 'M';
+            if (abs >= 1_000) return (abs / 1_000).toFixed(1) + 'k';
+            return Math.round(abs).toString();
+          };
+          return (
+            <View style={s.budgetWrap}>
+              <View style={s.budgetLabelRow}>
+                <Text style={s.budgetLabel}>budget remaining</Text>
+                <Text style={[s.budgetValue, overBudget && { color: Colors.expense }]}>
+                  {overBudget ? `-${fmt(remaining)}` : fmt(remaining)}
+                </Text>
+              </View>
+              <View style={s.budgetTrack}>
+                <View style={[s.budgetFill, { width: `${pct * 100}%` as any, backgroundColor: barColor }]} />
+              </View>
+              {overBudget && <Text style={s.budgetOver}>this will exceed your budget</Text>}
+            </View>
+          );
+        })()
+      )}
+
       {/* ── Save button ── */}
       <TouchableOpacity
         style={[s.saveBtn, (!recName.trim() || !amount) && s.saveBtnDisabled]}
@@ -596,5 +639,14 @@ const s = StyleSheet.create({
   saveBtn: { backgroundColor: Colors.text, borderRadius: Radius.pill, paddingVertical: 14, alignItems: 'center', marginTop: 16 },
   saveBtnDisabled: { opacity: 0.4 },
   saveBtnText: { fontFamily: Fonts.monoBold, fontSize: 13, color: Colors.white },
+
+  // Budget
+  budgetWrap: { gap: 6, padding: 14, backgroundColor: Colors.surface, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.border },
+  budgetLabelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  budgetLabel: { fontFamily: 'ChillaxRegular', fontSize: 11, color: Colors.muted, letterSpacing: 0.3 },
+  budgetValue: { fontFamily: Fonts.monoBold, fontSize: 11, color: Colors.text, letterSpacing: 0.2 },
+  budgetTrack: { height: 6, backgroundColor: Colors.border, borderRadius: Radius.pill, overflow: 'hidden' },
+  budgetFill: { height: '100%', borderRadius: Radius.pill },
+  budgetOver: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.expense, letterSpacing: 0.2 },
 });
 
