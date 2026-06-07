@@ -82,11 +82,10 @@ export default function ReceiptDetailScreen() {
   const deleteEntry = async () => {
     for (const p of photos) await supabase.storage.from('receipts').remove([p.path]);
     await supabase.from('receipt_photos').delete().eq('entry_id', receiptId);
+    const recordingId = entry?.recording_id;
     await supabase.from('receipt_entries').delete().eq('id', receiptId);
-    // If came from recording-detail, go back twice to refresh it
-    if (router.canGoBack()) {
-      router.back();
-      setTimeout(() => { if (router.canGoBack()) router.back(); }, 100);
+    if (recordingId) {
+      router.replace({ pathname: '/(app)/recording-detail', params: { recordingId } } as any);
     } else {
       handleBack();
     }
@@ -95,9 +94,20 @@ export default function ReceiptDetailScreen() {
   const deletePhoto = async (photo: Photo) => {
     await supabase.storage.from('receipts').remove([photo.path]);
     await supabase.from('receipt_photos').delete().eq('id', photo.id);
-    setPhotos(prev => prev.filter(p => p.id !== photo.id));
+    const remaining = photos.filter(p => p.id !== photo.id);
+    setPhotos(remaining);
     setCarouselIdx(null);
     setDeletePhotoConfirm(null);
+    // If no photos left, delete the whole entry and go back to recording if linked
+    if (remaining.length === 0) {
+      const recordingId = entry?.recording_id;
+      await supabase.from('receipt_entries').delete().eq('id', receiptId);
+      if (recordingId) {
+        router.replace({ pathname: '/(app)/recording-detail', params: { recordingId } } as any);
+      } else {
+        handleBack();
+      }
+    }
   };
 
   const addFromGallery = async () => {

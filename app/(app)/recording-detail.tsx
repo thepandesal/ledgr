@@ -495,7 +495,7 @@ export default function RecordingDetailScreen() {
         const note = recording?.transaction_date && recording?.name
           ? `${new Date(recording.transaction_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}: ${recording.name}`
           : recording?.name ?? '';
-        const { data: entry } = await supabase.from('receipt_entries').insert({ user_id: user.id, note, recording_id: recordingId }).select().single();
+        const { data: entry } = await supabase.from('receipt_entries').insert({ user_id: user.id, note, recording_id: recordingId }).select().maybeSingle();
         entryId = entry?.id;
       }
       if (!entryId) return;
@@ -518,7 +518,7 @@ export default function RecordingDetailScreen() {
         const note = recording?.transaction_date && recording?.name
           ? `${new Date(recording.transaction_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}: ${recording.name}`
           : recording?.name ?? '';
-        const { data: entry } = await supabase.from('receipt_entries').insert({ user_id: user.id, note, recording_id: recordingId }).select().single();
+        const { data: entry } = await supabase.from('receipt_entries').insert({ user_id: user.id, note, recording_id: recordingId }).select().maybeSingle();
         entryId = entry?.id;
       }
       if (!entryId) return;
@@ -533,7 +533,7 @@ export default function RecordingDetailScreen() {
 
   const loadLinkedReceipt = async () => {
     if (!recordingId) return;
-    const { data: entry } = await supabase.from('receipt_entries').select('id, note, created_at').eq('recording_id', recordingId).single();
+    const { data: entry } = await supabase.from('receipt_entries').select('id, note, created_at').eq('recording_id', recordingId).maybeSingle();
     if (!entry) return;
     setLinkedReceipt(entry);
     const { data: photos } = await supabase.from('receipt_photos').select('id, storage_path, url').eq('entry_id', entry.id).order('created_at').limit(5);
