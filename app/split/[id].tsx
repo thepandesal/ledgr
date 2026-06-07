@@ -291,7 +291,6 @@ export default function SplitSharePage() {
             <ActivityIndicator color="#fff" />
           ) : receiptPhotos.length === 0 ? (
             <Text style={{ fontFamily: 'RobotoMono_400Regular', fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>no photos found</Text>
-            letterSpacing: 0.2,
           ) : (
             <ScrollView style={{ width: '100%' }} contentContainerStyle={{ padding: 24, paddingTop: 80, gap: 16 }} showsVerticalScrollIndicator={false}>
               {receiptPhotos.map((url, i) => (
