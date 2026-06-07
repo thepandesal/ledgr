@@ -538,7 +538,14 @@ export default function RecordingDetailScreen() {
     setLinkedReceipt(entry);
     const { data: photos } = await supabase.from('receipt_photos').select('id, storage_path, url').eq('entry_id', entry.id).order('created_at').limit(5);
     if (photos) {
-      const urls = photos.map((p: any) => ({ id: p.id, url: p.url ?? '' }));
+      const urls = await Promise.all(photos.map(async (p: any) => {
+        let url = p.url ?? '';
+        if (!url && p.storage_path) {
+          const { data } = await supabase.storage.from('receipts').createSignedUrl(p.storage_path, 3600);
+          url = data?.signedUrl ?? '';
+        }
+        return { id: p.id, url };
+      }));
       setReceiptPhotos(urls.filter(u => u.url));
     }
   };
