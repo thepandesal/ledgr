@@ -478,14 +478,14 @@ export default function AddRecordingScreen() {
 
       {/* ── Receipt ── */}
       <FormLabel optional>receipt</FormLabel>
-      <View style={accountStyles.photoButtons}>
-        <TouchableOpacity style={accountStyles.photoBtn} onPress={addFromCamera}>
-          <Ionicons name="camera-outline" size={24} color={Colors.cyan} />
-          <Text style={accountStyles.photoBtnText}>camera</Text>
+      <View style={{ flexDirection: 'row', gap: 8 }}>
+        <TouchableOpacity style={s.photoBtn} onPress={addFromCamera}>
+          <Ionicons name="camera-outline" size={16} color={Colors.cyan} />
+          <Text style={s.photoBtnText}>camera</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={accountStyles.photoBtn} onPress={addFromGallery}>
-          <Ionicons name="images-outline" size={24} color={Colors.text} />
-          <Text style={[accountStyles.photoBtnText, { color: Colors.text }]}>photos</Text>
+        <TouchableOpacity style={s.photoBtn} onPress={addFromGallery}>
+          <Ionicons name="images-outline" size={16} color={Colors.text} />
+          <Text style={[s.photoBtnText, { color: Colors.text }]}>photos</Text>
         </TouchableOpacity>
       </View>
       {receiptPhotos.length > 0 && (
@@ -636,6 +636,8 @@ const s = StyleSheet.create({
   chipActive: { backgroundColor: Colors.cyan, borderColor: Colors.cyan },
   chipText: { fontFamily: Fonts.mono, fontSize: 11, color: Colors.muted },
   chipTextActive: { color: Colors.white, fontFamily: Fonts.monoBold },
+  photoBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: Radius.pill, borderWidth: 1, borderColor: Colors.borderMid, backgroundColor: Colors.surface },
+  photoBtnText: { fontFamily: Fonts.mono, fontSize: 12, color: Colors.cyan },
   saveBtn: { backgroundColor: Colors.text, borderRadius: Radius.pill, paddingVertical: 14, alignItems: 'center', marginTop: 16 },
   saveBtnDisabled: { opacity: 0.4 },
   saveBtnText: { fontFamily: Fonts.monoBold, fontSize: 13, color: Colors.white },

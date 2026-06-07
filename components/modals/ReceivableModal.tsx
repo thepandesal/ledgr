@@ -38,8 +38,9 @@ export default function ReceivableModal({ visible, onClose, recording, items, fi
 
   return (
     <BottomSheet visible={visible} onClose={onClose} sub="expense" title="create receivable">
+      <View style={{ gap: 12, width: '100%' }}>
       <Text style={formStyles.hintMuted}>{(recording?.name ?? '').toLowerCase()} · {Number(recording?.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
-      <View style={{ flexDirection: 'row', gap: 6, width: '100%', marginTop: 8 }}>
+      <View style={{ flexDirection: 'row', gap: 6, width: '100%' }}>
         {(['full', 'manual', ...(filledPeople.length > 0 && items.length > 0 ? ['split'] : [])] as const).map(m => (
           <TouchableOpacity key={m} style={[itemStyles.personSelectChip, { flex: 1, justifyContent: 'center' }, mode === m && itemStyles.personSelectChipActive]} onPress={() => setMode(m as any)}>
             <Text style={[itemStyles.personSelectText, mode === m && itemStyles.personSelectTextActive]}>{m}</Text>
@@ -47,15 +48,15 @@ export default function ReceivableModal({ visible, onClose, recording, items, fi
         ))}
       </View>
       {mode === 'full' && (
-        <Text style={{ fontFamily: Fonts.monoBold, fontSize: 22, color: Colors.cyan, marginTop: 8 }}>
+        <Text style={{ fontFamily: Fonts.monoBold, fontSize: 22, color: Colors.cyan }}>
           {Number(recording?.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
         </Text>
       )}
       {mode === 'manual' && (
-        <TextInput style={[formStyles.input, { width: '100%', marginTop: 8 }]} placeholder="0.00" placeholderTextColor={Colors.faint} value={manualAmount} onChangeText={setManualAmount} keyboardType="decimal-pad" autoFocus />
+        <TextInput style={[formStyles.input, { width: '100%' }]} placeholder="0.00" placeholderTextColor={Colors.faint} value={manualAmount} onChangeText={setManualAmount} keyboardType="decimal-pad" autoFocus />
       )}
       {mode === 'split' && (
-        <View style={{ width: '100%', gap: 8, marginTop: 8 }}>
+        <View style={{ width: '100%', gap: 8 }}>
           <Text style={formStyles.hintMuted}>select who owes you</Text>
           {filledPeople.map((p, i) => {
             const sel = selectedPeople.includes(p);
@@ -76,6 +77,7 @@ export default function ReceivableModal({ visible, onClose, recording, items, fi
           )}
         </View>
       )}
+      </View>
       <View style={formStyles.actions}>
         <TouchableOpacity style={formStyles.cancelBtn} onPress={onClose}>
           <Text style={formStyles.cancelBtnText}>cancel</Text>

@@ -27,7 +27,7 @@ export default function ShareModal({ visible, onClose, shareRowId, shareAccounts
       actions={[{ label: 'cancel', onPress: onClose, muted: true }]}
     >
       <Text style={formStyles.hintMuted}>choose payment account(s)</Text>
-      <ScrollView style={{ width: '100%', maxHeight: 200 }} showsVerticalScrollIndicator={false}>
+      <ScrollView style={{ width: '100%' }} showsVerticalScrollIndicator={false}>
         {shareAccounts.map((acc: any) => {
           const selected = selectedAccountIds.includes(acc.id);
           return (

@@ -50,7 +50,7 @@ export default function PayModal({ visible, onClose, recording, items, filledPeo
       {step === 'account' ? (
         <>
           <Text style={formStyles.hintMuted}>which account are you paying from?</Text>
-          <ScrollView style={{ width: '100%', maxHeight: 200 }} showsVerticalScrollIndicator={false}>
+          <ScrollView style={{ width: '100%' }} showsVerticalScrollIndicator={false}>
             {accounts.map((acc: any) => (
               <TouchableOpacity key={acc.id} style={[accountStyles.option, account?.id === acc.id && accountStyles.optionActive]} onPress={() => setAccount(acc)}>
                 <View style={{ flex: 1 }}>
@@ -101,11 +101,11 @@ export default function PayModal({ visible, onClose, recording, items, filledPeo
               {selectedPeople.length > 0 && <Text style={{ fontFamily: Fonts.monoBold, fontSize: 18, color: Colors.cyan }}>{getAmount().toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>}
             </View>
           )}
-          <View style={{ gap: 6 }}>
+          <View style={{ gap: 4 }}>
             <Text style={formStyles.hintMuted}>payment date</Text>
             <TextInput style={[formStyles.input, { width: '100%' }]} placeholder="YYYY-MM-DD" placeholderTextColor={Colors.faint} value={date} onChangeText={setDate} />
           </View>
-          <View style={{ gap: 6 }}>
+          <View style={{ gap: 4 }}>
             <Text style={formStyles.hintMuted}>complete payment?</Text>
             <View style={{ flexDirection: 'row', gap: 8 }}>
               {([true, false] as const).map(val => (

@@ -174,7 +174,7 @@ export default function AddItemModal({
         );
       })}
 
-      <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 14, justifyContent: 'center' }} onPress={addItemForm}>
+      <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, justifyContent: 'center' }} onPress={addItemForm}>
         <Ionicons name="add-circle-outline" size={16} color={Colors.cyan} />
         <Text style={{ fontFamily: Fonts.mono, fontSize: 13, color: Colors.cyan }}>add another item</Text>
       </TouchableOpacity>
