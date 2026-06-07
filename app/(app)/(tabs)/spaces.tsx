@@ -47,6 +47,7 @@ export default function SpacesScreen() {
   const [error, setError] = useState('');
   const [menuModal, setMenuModal] = useState(false);
   const [selectedSpace, setSelectedSpace] = useState<Space | null>(null);
+  const [editMode, setEditMode] = useState(false);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -68,6 +69,7 @@ export default function SpacesScreen() {
     setSpaceName(''); setSelectedColor(PASTEL_COLORS[0]); setSelectedIcon(ICONS[0]);
     setError(''); setUseDefaultCategory(false); setSelectedCategory(null); setCategoryInput('');
     setSpaceBudget('');
+    setEditMode(false);
     setCreateModal(true);
   };
 
@@ -79,17 +81,48 @@ export default function SpacesScreen() {
   const handleCreate = async () => {
     if (!spaceName.trim()) { setError('Name is required.'); return; }
     setLoading(true);
-    const { data, error: err } = await supabase.from('spaces').insert({
-      user_id: userId, name: spaceName.trim(), color: selectedColor, icon: selectedIcon,
-      default_category_id: useDefaultCategory && selectedCategory ? selectedCategory.id : null,
-      budget: spaceBudget.trim() ? parseFloat(spaceBudget) : null,
-    }).select().single();
-    if (err) { setError(err.message); setLoading(false); return; }
-    setSpaces(prev => [...prev, data]); setLoading(false); setCreateModal(false);
+    if (editMode && selectedSpace) {
+      const { error: err } = await supabase.from('spaces').update({
+        name: spaceName.trim(), color: selectedColor, icon: selectedIcon,
+        budget: spaceBudget.trim() ? parseFloat(spaceBudget) : null,
+      }).eq('id', selectedSpace.id);
+      if (err) { setError(err.message); setLoading(false); return; }
+      setSpaces(prev => prev.map(s => s.id === selectedSpace.id
+        ? { ...s, name: spaceName.trim(), color: selectedColor, icon: selectedIcon }
+        : s
+      ));
+    } else {
+      const { data, error: err } = await supabase.from('spaces').insert({
+        user_id: userId, name: spaceName.trim(), color: selectedColor, icon: selectedIcon,
+        default_category_id: useDefaultCategory && selectedCategory ? selectedCategory.id : null,
+        budget: spaceBudget.trim() ? parseFloat(spaceBudget) : null,
+      }).select().single();
+      if (err) { setError(err.message); setLoading(false); return; }
+      setSpaces(prev => [...prev, data]);
+    }
+    setLoading(false); setCreateModal(false); setEditMode(false);
   };
 
   const openMenu = (space: Space) => { setSelectedSpace(space); setMenuModal(true); };
   const closeMenu = () => setMenuModal(false);
+
+  const handleEditSpace = () => {
+    if (!selectedSpace) return;
+    closeMenu();
+    setEditMode(true);
+    setSpaceName(selectedSpace.name);
+    setSelectedColor(selectedSpace.color);
+    setSelectedIcon(selectedSpace.icon);
+    setSpaceBudget('');
+    // Load budget for this space
+    supabase.from('spaces').select('budget').eq('id', selectedSpace.id).single()
+      .then(({ data }) => { if (data?.budget) setSpaceBudget(String(data.budget)); });
+    setError('');
+    setUseDefaultCategory(false);
+    setSelectedCategory(null);
+    setCategoryInput('');
+    setCreateModal(true);
+  };
 
   const handleDeleteSpace = () => {
     closeMenu();
@@ -154,7 +187,7 @@ export default function SpacesScreen() {
       </ScrollView>
 
       {/* Create space sheet */}
-      <BottomSheet visible={createModal} onClose={() => setCreateModal(false)} sub="spaces" title="new space">
+      <BottomSheet visible={createModal} onClose={() => { setCreateModal(false); setEditMode(false); }} sub="spaces" title={editMode ? 'edit space' : 'new space'}>
         {error ? <Text style={formStyles.errorText}>{error}</Text> : null}
         <Text style={formStyles.sectionLabel}>name</Text>
         <TextInput
@@ -262,7 +295,7 @@ export default function SpacesScreen() {
             disabled={loading || !spaceName.trim()}
             activeOpacity={0.8}
           >
-            {loading ? <ActivityIndicator color={Colors.white} /> : <Text style={formStyles.primaryBtnText}>create space</Text>}
+            {loading ? <ActivityIndicator color={Colors.white} /> : <Text style={formStyles.primaryBtnText}>{editMode ? 'save changes' : 'create space'}</Text>}
           </TouchableOpacity>
         </View>
       </BottomSheet>
@@ -274,6 +307,7 @@ export default function SpacesScreen() {
         title={selectedSpace?.name?.toLowerCase() ?? 'space'}
         actions={[
           { label: 'cancel', onPress: () => closeMenu(), muted: true },
+          { label: 'edit', onPress: handleEditSpace },
           { label: 'delete', onPress: handleDeleteSpace, destructive: true },
         ]}
       />
