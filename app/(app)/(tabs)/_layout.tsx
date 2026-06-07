@@ -77,17 +77,29 @@ export default function TabsLayout() {
           </Animated.View>
         ))}
       </View>
+
+      {/* Floating nav */}
       <SafeAreaView style={styles.navSafeArea}>
-        <View style={styles.nav}>
+        <View style={styles.navGap} />
+        <View style={styles.navPill}>
           {TABS.map(tab => {
             const isActive = activeTab === tab.key;
             return (
-              <TouchableOpacity key={tab.key} style={styles.navItem} onPress={() => switchTab(tab.key)} activeOpacity={0.7}>
-                <Ionicons name={tab.icon as any} size={22} color={isActive ? Colors.cyan : Colors.faint} />
+              <TouchableOpacity
+                key={tab.key}
+                style={styles.navItem}
+                onPress={() => switchTab(tab.key)}
+                activeOpacity={0.7}
+              >
+                <Ionicons name={tab.icon as any} size={20} color={isActive ? Colors.cyan : Colors.faint} />
+                <Text style={[styles.navLabel, isActive && styles.navLabelActive]}>
+                  {tab.label}
+                </Text>
               </TouchableOpacity>
             );
           })}
         </View>
+        <View style={styles.navGap} />
       </SafeAreaView>
     </View>
   );
@@ -97,8 +109,23 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f5f5f5' },
   content: { flex: 1, position: 'relative' },
   screen: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#f5f5f5' },
-  navSafeArea: { backgroundColor: Colors.white, borderTopWidth: 1, borderTopColor: Colors.muted, borderStyle: 'dashed' },
-  nav: { flexDirection: 'row', paddingVertical: 12 },
-  navItem: { flex: 1, alignItems: 'center' },
+  navSafeArea: { backgroundColor: 'transparent' },
+  navGap: { height: 10 },
+  navPill: {
+    flexDirection: 'row',
+    backgroundColor: '#425252',
+    marginHorizontal: 20,
+    borderRadius: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  navItem: { flex: 1, alignItems: 'center', gap: 4 },
+  navLabel: { fontFamily: 'ChillaxRegular', fontSize: 9, color: Colors.faint },
+  navLabelActive: { color: Colors.cyan, fontFamily: 'ChillaxMedium' },
 });
 
