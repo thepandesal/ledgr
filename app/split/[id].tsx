@@ -52,7 +52,7 @@ export default function SplitSharePage() {
     if (receiptRes.data) setReceiptId(receiptRes.data.id);
 
     if (accountIds.length > 0) {
-      const { data: accs } = await supabase.from('accounts').select('account_name, bank, account_number, qr_code').in('id', accountIds);
+      const { data: accs } = await supabase.from('accounts').select('account_name, holder_name, bank, account_number, qr_code').in('id', accountIds);
       if (accs) setPayments(accs);
     }
 
