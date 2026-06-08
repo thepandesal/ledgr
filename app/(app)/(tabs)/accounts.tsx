@@ -7,6 +7,8 @@ import { supabase } from '../../../src/lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useUser } from '../../../src/hooks/useUser';
+import type { Account } from '../../../src/types';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import BottomSheet from '@/components/ui/BottomSheet';
@@ -25,19 +27,13 @@ interface Account { id: string; bank: string; account_name: string; account_numb
 
 export default function AccountsScreen() {
   const queryClient = useQueryClient();
-  const [userId, setUserId] = useState('');
+  const { userId } = useUser();
   const [addModal, setAddModal] = useState(false);
   const [editAccount, setEditAccount] = useState<Account | null>(null);
   const [menuModal, setMenuModal] = useState(false);
   const [selected, setSelected] = useState<Account | null>(null);
 
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) setUserId(user.id);
-    });
-  }, []);
-
-  const { data: accounts = [] } = useQuery({
+const { data: accounts = [] } = useQuery<Account[]>({
     queryKey: ['accounts', userId],
     queryFn: async () => {
       const { data } = await supabase.from('accounts').select().eq('user_id', userId).order('created_at');

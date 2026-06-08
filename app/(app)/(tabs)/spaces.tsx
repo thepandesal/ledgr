@@ -7,6 +7,8 @@ import { supabase } from '../../../src/lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
+import { useUser } from '../../../src/hooks/useUser';
+import type { Space, Category } from '../../../src/types';
 import BottomSheet from '@/components/ui/BottomSheet';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import formStyles from '@/components/ui/formStyles';
@@ -32,8 +34,7 @@ interface Category { id: string; name: string; color: string; icon: string; }
 export default function SpacesScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const [userName, setUserName] = useState('');
-  const [userId, setUserId] = useState('');
+  const { userId, userName } = useUser();
   const [categories, setCategories] = useState<Category[]>([]);
   const [createModal, setCreateModal] = useState(false);
   const [spaceName, setSpaceName] = useState('');
@@ -51,12 +52,10 @@ export default function SpacesScreen() {
   const [editMode, setEditMode] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) { setUserName(user.user_metadata?.full_name ?? ''); setUserId(user.id); loadCategories(user.id); }
-    });
-  }, []);
+    if (userId) loadCategories(userId);
+  }, [userId]);
 
-  const { data: spaces = [] } = useQuery({
+  const { data: spaces = [] } = useQuery<Space[]>({
     queryKey: ['spaces', userId],
     queryFn: async () => {
       const { data } = await supabase.from('spaces').select().eq('user_id', userId).order('created_at');

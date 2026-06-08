@@ -5,6 +5,8 @@ import { supabase } from '../../../src/lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useUser } from '../../../src/hooks/useUser';
+import type { Category } from '../../../src/types';
 import BottomSheet from '@/components/ui/BottomSheet';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import formStyles from '@/components/ui/formStyles';
@@ -17,7 +19,7 @@ interface Category { id: string; name: string; color: string; icon: string; is_d
 
 export default function CategoriesScreen() {
   const queryClient = useQueryClient();
-  const [userId, setUserId] = useState('');
+  const { userId } = useUser();
   const [modal, setModal] = useState(false);
   const [menuModal, setMenuModal] = useState(false);
   const [selected, setSelected] = useState<Category | null>(null);
@@ -27,13 +29,7 @@ export default function CategoriesScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) setUserId(user.id);
-    });
-  }, []);
-
-  const { data: categories = [] } = useQuery({
+const { data: categories = [] } = useQuery<Category[]>({
     queryKey: ['categories', userId],
     queryFn: async () => {
       const { data } = await supabase.from('categories').select().eq('user_id', userId).order('created_at');
