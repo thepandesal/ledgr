@@ -209,6 +209,14 @@ export default function SpaceDetailScreen() {
   const countPayables = recordings.filter(r => r.type === 'payable' && r.status !== 'paid').length;
   const countReceivables = recordings.filter(r => r.type === 'receivable' && r.status === 'pending').length;
 
+  // Budget bar uses monthly expenses for the selected month
+  const monthlyExpenses = recordings.filter(r => {
+    if (r.type !== 'expense') return false;
+    const parts = r.transaction_date.split('-');
+    const rDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+    return rDate.getMonth() === selectedDate.getMonth() && rDate.getFullYear() === selectedDate.getFullYear();
+  }).reduce((s, r) => s + Number(r.amount), 0);
+
   const shortAmount = (n: number) => {
     if (n >= 1_000_000) return (n / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
     if (n >= 1_000) return (n / 1_000).toFixed(1).replace(/\.0$/, '') + 'K';
@@ -266,15 +274,15 @@ export default function SpaceDetailScreen() {
         {spaceId !== 'all' && (
           <View style={[s.budgetWrap, { marginHorizontal: Spacing.page, marginBottom: 12 }]}>
             {(() => {
-              const pct = spaceBudget ? Math.min(totalExpenses / spaceBudget, 1) : 0;
-              const overBudget = spaceBudget ? totalExpenses > spaceBudget : false;
+              const pct = spaceBudget ? Math.min(monthlyExpenses / spaceBudget, 1) : 0;
+              const overBudget = spaceBudget ? monthlyExpenses > spaceBudget : false;
               const barColor = !spaceBudget ? Colors.borderMid : overBudget ? Colors.expense : pct >= 0.8 ? Colors.pending : Colors.income;
               return (
                 <>
                   <View style={s.budgetLabelRow}>
                     <Text style={s.budgetLabel}>budget</Text>
                     <Text style={[s.budgetValue, overBudget && { color: Colors.expense }]}>
-                      {shortAmount(totalExpenses)} / {spaceBudget ? shortAmount(spaceBudget) : '∞'}
+                      {shortAmount(monthlyExpenses)} / {spaceBudget ? shortAmount(spaceBudget) : '∞'}
                     </Text>
                   </View>
                   <View style={s.budgetTrack}>
@@ -284,7 +292,7 @@ export default function SpaceDetailScreen() {
                       <View style={[s.budgetFill, { width: '100%', backgroundColor: Colors.borderMid, opacity: 0.4 }]} />
                     )}
                   </View>
-                  {overBudget && <Text style={s.budgetOver}>over budget by {shortAmount(totalExpenses - spaceBudget!)}</Text>}
+                  {overBudget && <Text style={s.budgetOver}>over budget by {shortAmount(monthlyExpenses - spaceBudget!)}</Text>}
                 </>
               );
             })()}
