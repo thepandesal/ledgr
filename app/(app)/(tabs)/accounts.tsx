@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { supabase } from '../../../src/lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useUser } from '../../../src/hooks/useUser';
 import type { Account } from '../../../src/types';
@@ -22,8 +22,6 @@ const DEFAULT_BANKS = ['BDO', 'BPI', 'Metrobank', 'UnionBank', 'Security Bank', 
 const MIN_CROP = 80;
 const INIT_CROP = SW * 0.7;
 const HANDLE_HIT = 32;
-
-interface Account { id: string; bank: string; account_name: string; account_number: string; qr_code: string | null; holder_name: string; }
 
 export default function AccountsScreen() {
   const queryClient = useQueryClient();

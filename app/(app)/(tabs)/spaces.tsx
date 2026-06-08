@@ -6,7 +6,7 @@ import { useRouter } from 'expo-router';
 import { supabase } from '../../../src/lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useUser } from '../../../src/hooks/useUser';
 import type { Space, Category } from '../../../src/types';
 import BottomSheet from '@/components/ui/BottomSheet';
@@ -29,13 +29,11 @@ const ICONS = [
 const PAGE_PAD = 32;
 
 interface Space { id: string; name: string; color: string; icon: string; default_category_id?: string; budget?: number | null; spent?: number; }
-interface Category { id: string; name: string; color: string; icon: string; }
 
 export default function SpacesScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { userId, userName } = useUser();
-  const [categories, setCategories] = useState<Category[]>([]);
   const [createModal, setCreateModal] = useState(false);
   const [spaceName, setSpaceName] = useState('');
   const [spaceBudget, setSpaceBudget] = useState('');
@@ -51,10 +49,6 @@ export default function SpacesScreen() {
   const [selectedSpace, setSelectedSpace] = useState<Space | null>(null);
   const [editMode, setEditMode] = useState(false);
 
-  useEffect(() => {
-    if (userId) loadCategories(userId);
-  }, [userId]);
-
   const { data: spaces = [] } = useQuery<Space[]>({
     queryKey: ['spaces', userId],
     queryFn: async () => {
@@ -68,10 +62,14 @@ export default function SpacesScreen() {
     enabled: !!userId,
   });
 
-  const loadCategories = async (uid: string) => {
-    const { data } = await supabase.from('categories').select().eq('user_id', uid).order('name');
-    if (data) setCategories(data);
-  };
+  const { data: categories = [] } = useQuery<Category[]>({
+    queryKey: ['categories', userId],
+    queryFn: async () => {
+      const { data } = await supabase.from('categories').select().eq('user_id', userId).order('name');
+      return (data ?? []) as Category[];
+    },
+    enabled: !!userId,
+  });
 
   const openCreate = () => {
     setSpaceName(''); setSelectedColor(PASTEL_COLORS[0]); setSelectedIcon(ICONS[0]);

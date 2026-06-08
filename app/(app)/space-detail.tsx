@@ -6,6 +6,8 @@ import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useUser } from '../../src/hooks/useUser';
+import type { Recording } from '../../src/types';
 import { supabase } from '../../src/lib/supabase';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import pageStyles from '@/components/ui/pageStyles';
@@ -77,6 +79,7 @@ export default function SpaceDetailScreen() {
   const contentSlide = useRef(new Animated.Value(0)).current;
 
   const queryClient = useQueryClient();
+  const { userId } = useUser();
   const [viewMode, setViewMode] = useState<ViewMode>('monthly');
   const [viewLayout, setViewLayout] = useState<'list' | 'grid' | 'calendar'>('list');
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -98,9 +101,8 @@ export default function SpaceDetailScreen() {
       const query = supabase.from('recordings')
         .select('*, categories:category_id(name, color, icon), account:account_id(account_name, bank, color)');
       if (spaceId === 'all') {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return [];
-        const { data } = await query.eq('user_id', user.id).order('transaction_date', { ascending: false });
+        if (!userId) return [];
+        const { data } = await query.eq('user_id', userId).order('transaction_date', { ascending: false });
         return data ?? [];
       } else {
         const { data } = await query.eq('space_id', spaceId).order('transaction_date', { ascending: false });
