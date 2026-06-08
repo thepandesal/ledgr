@@ -347,7 +347,7 @@ export default function SpaceDetailScreen() {
           <TouchableOpacity onPress={() => {
             if (viewMode === 'daily') setSelectedDate(d => addDays(d, -1));
             else if (viewMode === 'weekly') setSelectedDate(d => addDays(d, -7));
-            else setSelectedDate(d => { const n = new Date(d); n.setMonth(n.getMonth() - 1); return n; });
+            else { setSelectedDate(d => { const n = new Date(d); n.setMonth(n.getMonth() - 1); return n; }); setCalSelectedDate(null); }
           }} style={s.dateNavArrow}>
             <Ionicons name="chevron-back" size={18} color={Colors.muted} />
           </TouchableOpacity>
@@ -358,7 +358,7 @@ export default function SpaceDetailScreen() {
           <TouchableOpacity onPress={() => {
             if (viewMode === 'daily') setSelectedDate(d => addDays(d, 1));
             else if (viewMode === 'weekly') setSelectedDate(d => addDays(d, 7));
-            else setSelectedDate(d => { const n = new Date(d); n.setMonth(n.getMonth() + 1); return n; });
+            else { setSelectedDate(d => { const n = new Date(d); n.setMonth(n.getMonth() + 1); return n; }); setCalSelectedDate(null); }
           }} style={s.dateNavArrow}>
             <Ionicons name="chevron-forward" size={18} color={Colors.muted} />
           </TouchableOpacity>
@@ -448,37 +448,47 @@ export default function SpaceDetailScreen() {
                       );
                     })}
 
-                    {/* Selected day detail */}
-                    {calSelectedDate && (() => {
-                      const key = dateKey(calSelectedDate);
-                      const dayRecs = filteredRecordings.filter(r => {
-                        const parts = r.transaction_date.split('-');
-                        return dateKey(new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]))) === key;
-                      });
+                    {/* Day detail / month list below calendar */}
+                    {(() => {
+                      const recs = calSelectedDate
+                        ? filteredRecordings.filter(r => {
+                            const parts = r.transaction_date.split('-');
+                            return dateKey(new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]))) === dateKey(calSelectedDate);
+                          })
+                        : filteredRecordings;
+                      const label = calSelectedDate
+                        ? calSelectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).toLowerCase()
+                        : selectedDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }).toLowerCase();
                       return (
                         <View style={s.calDayDetail}>
-                          <Text style={s.calDayDetailLabel}>
-                            {calSelectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).toLowerCase()}
-                          </Text>
-                          {dayRecs.length === 0 ? (
+                          <Text style={s.calDayDetailLabel}>{label}</Text>
+                          {recs.length === 0 ? (
                             <Text style={s.calDayDetailEmpty}>no recordings</Text>
                           ) : (
                             <View style={{ gap: 8 }}>
-                              {dayRecs.map(item => (
-                                <TouchableOpacity
-                                  key={item.id}
-                                  style={[s.recordingCard, { backgroundColor: recordingBg(item.type, item.status) }]}
-                                  activeOpacity={0.85}
-                                  onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: item.id } } as any)}
-                                >
-                                  <Ionicons name={item.categories?.icon ?? 'ellipse-outline'} size={20} color={recordingColor(item.type, item.status)} style={{ flexShrink: 0 }} />
-                                  <View style={s.recordingMiddle}>
-                                    <Text style={s.recordingName} numberOfLines={1}>{item.name}</Text>
-                                    <Text style={s.recordingMeta} numberOfLines={1}>{item.categories?.name || item.type}</Text>
-                                  </View>
-                                  <Text style={s.recordingAmount}>{Number(item.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
-                                </TouchableOpacity>
-                              ))}
+                              {recs.map(item => {
+                                const amountColor = recordingColor(item.type, item.status);
+                                const statusLabel = item.type === 'payable'
+                                  ? (item.status === 'paid' ? 'paid' : item.status === 'partial' ? 'partial' : 'unpaid')
+                                  : item.type === 'receivable'
+                                    ? (item.status === 'received' ? 'received' : item.status === 'partial' ? 'partial' : 'pending')
+                                    : item.type;
+                                return (
+                                  <TouchableOpacity
+                                    key={item.id}
+                                    style={[s.recordingCard, { backgroundColor: recordingBg(item.type, item.status) }]}
+                                    activeOpacity={0.85}
+                                    onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: item.id } } as any)}
+                                  >
+                                    <Ionicons name={item.categories?.icon ?? 'ellipse-outline'} size={20} color={amountColor} style={{ flexShrink: 0 }} />
+                                    <View style={s.recordingMiddle}>
+                                      <Text style={s.recordingName} numberOfLines={1}>{item.name}</Text>
+                                      <Text style={[s.recordingMeta, { fontFamily: Fonts.monoBold }]} numberOfLines={1}>{statusLabel}</Text>
+                                    </View>
+                                    <Text style={[s.recordingAmount, { color: amountColor }]}>{Number(item.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+                                  </TouchableOpacity>
+                                );
+                              })}
                             </View>
                           )}
                         </View>
@@ -729,7 +739,7 @@ const s = StyleSheet.create({
   calHeaderText: { fontFamily: 'ChillaxMedium', fontSize: 11, color: Colors.muted },
   calDayCell: { width: '14.28%', minHeight: 64, padding: 4, borderWidth: 0.5, borderColor: Colors.border, gap: 2 },
   calDayCellSelected: { backgroundColor: Colors.text, borderColor: Colors.text },
-  calDayDetail: { width: '100%', marginTop: 16, paddingHorizontal: Spacing.page, gap: 8 },
+  calDayDetail: { width: '100%', marginTop: 16, gap: 8, paddingBottom: 16 },
   calDayDetailLabel: { fontFamily: Fonts.calSans, fontSize: 13, color: Colors.cyan, marginBottom: 4 },
   calDayDetailEmpty: { fontFamily: Fonts.mono, fontSize: 12, color: Colors.faint },
   calDayNum: { fontFamily: 'ChillaxMedium', fontSize: 12, color: '#292929', marginBottom: 2 },
