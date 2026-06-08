@@ -5,6 +5,7 @@ import {
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../src/lib/supabase';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import pageStyles from '@/components/ui/pageStyles';
@@ -75,11 +76,10 @@ export default function SpaceDetailScreen() {
   const circleAnim = useRef(new Animated.Value(0)).current;
   const contentSlide = useRef(new Animated.Value(0)).current;
 
+  const queryClient = useQueryClient();
   const [viewMode, setViewMode] = useState<ViewMode>('monthly');
   const [viewLayout, setViewLayout] = useState<'list' | 'grid' | 'calendar'>('list');
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [recordings, setRecordings] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [confirmModal, setConfirmModal] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState('');
   const [pendingDeleteName, setPendingDeleteName] = useState('');
@@ -87,11 +87,39 @@ export default function SpaceDetailScreen() {
   const [showPicker, setShowPicker] = useState(false);
   const [activeFilter, setActiveFilter] = useState<string[]>([]);
   const [showFilter, setShowFilter] = useState(false);
-  const [spaceBudget, setSpaceBudget] = useState<number | null>(null);
   const [pickerMonth, setPickerMonth] = useState(new Date().getMonth());
   const [pickerYear, setPickerYear] = useState(new Date().getFullYear());
   const [pickerDay, setPickerDay] = useState<number | null>(null);
   const [calSelectedDate, setCalSelectedDate] = useState<Date | null>(null);
+
+  const { data: recordings = [], isLoading: loading } = useQuery({
+    queryKey: ['recordings', spaceId],
+    queryFn: async () => {
+      const query = supabase.from('recordings')
+        .select('*, categories:category_id(name, color, icon), account:account_id(account_name, bank, color)');
+      if (spaceId === 'all') {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return [];
+        const { data } = await query.eq('user_id', user.id).order('transaction_date', { ascending: false });
+        return data ?? [];
+      } else {
+        const { data } = await query.eq('space_id', spaceId).order('transaction_date', { ascending: false });
+        return data ?? [];
+      }
+    },
+    enabled: !!spaceId,
+  });
+
+  const { data: spaceData } = useQuery({
+    queryKey: ['space-budget', spaceId],
+    queryFn: async () => {
+      const { data } = await supabase.from('spaces').select('budget').eq('id', spaceId).single();
+      return data;
+    },
+    enabled: !!spaceId && spaceId !== 'all',
+  });
+
+  const spaceBudget = spaceData?.budget ?? null;
 
   const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
@@ -106,11 +134,9 @@ export default function SpaceDetailScreen() {
     Animated.timing(slideAnim, { toValue: 0, duration: 280, useNativeDriver: false }).start();
   }, []);
 
-  useEffect(() => { if (spaceId) loadRecordings(); }, [spaceId]);
-
   useFocusEffect(useCallback(() => {
     if (!spaceId) return;
-    loadRecordings();
+    queryClient.invalidateQueries({ queryKey: ['recordings', spaceId] });
     if (pendingFocusDate) {
       const parts = pendingFocusDate.split('-');
       const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
@@ -145,33 +171,13 @@ export default function SpaceDetailScreen() {
     if (layout === 'calendar') switchMode('monthly');
   };
 
-  const loadRecordings = async () => {
-    setLoading(true);
-    const query = supabase.from('recordings')
-      .select('*, categories:category_id(name, color, icon), account:account_id(account_name, bank, color)');
-    if (spaceId === 'all') {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data } = await query.eq('user_id', user.id).order('transaction_date', { ascending: false });
-        if (data) setRecordings(data);
-      }
-    } else {
-      const { data } = await query.eq('space_id', spaceId).order('transaction_date', { ascending: false });
-      if (data) setRecordings(data);
-      // Load budget
-      const { data: space } = await supabase.from('spaces').select('budget').eq('id', spaceId).single();
-      if (space) setSpaceBudget(space.budget ?? null);
-    }
-    setLoading(false);
-  };
-
   const handleBack = () => {
     Animated.timing(slideAnim, { toValue: width, duration: 250, useNativeDriver: false }).start(() => router.back());
   };
 
   const confirmDelete = async () => {
     await supabase.from('recordings').delete().eq('id', pendingDeleteId);
-    setRecordings(prev => prev.filter(r => r.id !== pendingDeleteId));
+    queryClient.invalidateQueries({ queryKey: ['recordings', spaceId] });
     setConfirmModal(false);
   };
 

@@ -6,6 +6,7 @@ import {
 import { supabase } from '../../../src/lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import BottomSheet from '@/components/ui/BottomSheet';
@@ -23,7 +24,7 @@ const HANDLE_HIT = 32;
 interface Account { id: string; bank: string; account_name: string; account_number: string; qr_code: string | null; holder_name: string; }
 
 export default function AccountsScreen() {
-  const [accounts, setAccounts] = useState<Account[]>([]);
+  const queryClient = useQueryClient();
   const [userId, setUserId] = useState('');
   const [addModal, setAddModal] = useState(false);
   const [editAccount, setEditAccount] = useState<Account | null>(null);
@@ -32,19 +33,23 @@ export default function AccountsScreen() {
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) { setUserId(user.id); loadAccounts(user.id); }
+      if (user) setUserId(user.id);
     });
   }, []);
 
-  const loadAccounts = async (uid: string) => {
-    const { data } = await supabase.from('accounts').select().eq('user_id', uid).order('created_at');
-    if (data) setAccounts(data);
-  };
+  const { data: accounts = [] } = useQuery({
+    queryKey: ['accounts', userId],
+    queryFn: async () => {
+      const { data } = await supabase.from('accounts').select().eq('user_id', userId).order('created_at');
+      return (data ?? []) as Account[];
+    },
+    enabled: !!userId,
+  });
 
   const handleDelete = async () => {
     setMenuModal(false);
     await supabase.from('accounts').delete().eq('id', selected!.id);
-    loadAccounts(userId);
+    queryClient.invalidateQueries({ queryKey: ['accounts', userId] });
   };
 
   return (
@@ -84,8 +89,8 @@ export default function AccountsScreen() {
         </TouchableOpacity>
       </ScrollView>
 
-      <AccountForm visible={addModal} userId={userId} onClose={() => setAddModal(false)} onSaved={() => { setAddModal(false); loadAccounts(userId); }} />
-      <AccountForm visible={!!editAccount} userId={userId} initial={editAccount} onClose={() => setEditAccount(null)} onSaved={() => { setEditAccount(null); loadAccounts(userId); }} />
+      <AccountForm visible={addModal} userId={userId} onClose={() => setAddModal(false)} onSaved={() => { setAddModal(false); queryClient.invalidateQueries({ queryKey: ['accounts', userId] }); }} />
+      <AccountForm visible={!!editAccount} userId={userId} initial={editAccount} onClose={() => setEditAccount(null)} onSaved={() => { setEditAccount(null); queryClient.invalidateQueries({ queryKey: ['accounts', userId] }); }} />
 
       <ConfirmModal
         visible={menuModal}
