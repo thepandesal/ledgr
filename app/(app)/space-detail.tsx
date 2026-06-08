@@ -91,6 +91,7 @@ export default function SpaceDetailScreen() {
   const [pickerMonth, setPickerMonth] = useState(new Date().getMonth());
   const [pickerYear, setPickerYear] = useState(new Date().getFullYear());
   const [pickerDay, setPickerDay] = useState<number | null>(null);
+  const [calSelectedDate, setCalSelectedDate] = useState<Date | null>(null);
 
   const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
@@ -425,30 +426,64 @@ export default function SpaceDetailScreen() {
                         return dateKey(new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]))) === key;
                       });
                       const isToday = isSameDay(cellDate, new Date());
+                      const isCalSelected = calSelectedDate ? isSameDay(cellDate, calSelectedDate) : false;
                       const visible = dayRecordings.slice(0, 3);
                       const extra = dayRecordings.length - 3;
                       return (
                         <TouchableOpacity
                           key={day}
-                          style={[s.calDayCell, isToday && s.calDayCellToday]}
+                          style={[s.calDayCell, isToday && s.calDayCellToday, isCalSelected && s.calDayCellSelected]}
                           activeOpacity={0.7}
-                          onPress={() => {
-                            setSelectedDate(cellDate);
-                            setViewLayout('list');
-                            switchMode('daily');
-                          }}
+                          onPress={() => setCalSelectedDate(isCalSelected ? null : cellDate)}
                         >
-                          <Text style={[s.calDayNum, isToday && { color: Colors.cyan }]}>{day}</Text>
+                          <Text style={[s.calDayNum, isToday && { color: Colors.cyan }, isCalSelected && { color: Colors.white }]}>{day}</Text>
                           {visible.map((r, ri) => (
                             <View key={ri} style={s.calItem}>
-                              <Ionicons name={r.categories?.icon ?? 'ellipse-outline'} size={10} color={recordingColor(r.type, r.status)} />
-                              <Text style={s.calItemText} numberOfLines={1}>{shortAmt(Number(r.amount))}</Text>
+                              <Ionicons name={r.categories?.icon ?? 'ellipse-outline'} size={10} color={isCalSelected ? Colors.white : recordingColor(r.type, r.status)} />
+                              <Text style={[s.calItemText, isCalSelected && { color: Colors.white }]} numberOfLines={1}>{shortAmt(Number(r.amount))}</Text>
                             </View>
                           ))}
-                          {extra > 0 && <Text style={s.calItemMore}>+{extra} more</Text>}
+                          {extra > 0 && <Text style={[s.calItemMore, isCalSelected && { color: Colors.white }]}>+{extra} more</Text>}
                         </TouchableOpacity>
                       );
                     })}
+
+                    {/* Selected day detail */}
+                    {calSelectedDate && (() => {
+                      const key = dateKey(calSelectedDate);
+                      const dayRecs = filteredRecordings.filter(r => {
+                        const parts = r.transaction_date.split('-');
+                        return dateKey(new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]))) === key;
+                      });
+                      return (
+                        <View style={s.calDayDetail}>
+                          <Text style={s.calDayDetailLabel}>
+                            {calSelectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).toLowerCase()}
+                          </Text>
+                          {dayRecs.length === 0 ? (
+                            <Text style={s.calDayDetailEmpty}>no recordings</Text>
+                          ) : (
+                            <View style={{ gap: 8 }}>
+                              {dayRecs.map(item => (
+                                <TouchableOpacity
+                                  key={item.id}
+                                  style={[s.recordingCard, { backgroundColor: recordingBg(item.type, item.status) }]}
+                                  activeOpacity={0.85}
+                                  onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: item.id } } as any)}
+                                >
+                                  <Ionicons name={item.categories?.icon ?? 'ellipse-outline'} size={20} color={recordingColor(item.type, item.status)} style={{ flexShrink: 0 }} />
+                                  <View style={s.recordingMiddle}>
+                                    <Text style={s.recordingName} numberOfLines={1}>{item.name}</Text>
+                                    <Text style={s.recordingMeta} numberOfLines={1}>{item.categories?.name || item.type}</Text>
+                                  </View>
+                                  <Text style={s.recordingAmount}>{Number(item.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+                                </TouchableOpacity>
+                              ))}
+                            </View>
+                          )}
+                        </View>
+                      );
+                    })()}
                   </>
                 );
               })()}
@@ -693,7 +728,10 @@ const s = StyleSheet.create({
   calHeaderCell: { width: '14.28%', alignItems: 'center', paddingVertical: 6 },
   calHeaderText: { fontFamily: 'ChillaxMedium', fontSize: 11, color: Colors.muted },
   calDayCell: { width: '14.28%', minHeight: 64, padding: 4, borderWidth: 0.5, borderColor: Colors.border, gap: 2 },
-  calDayCellToday: { backgroundColor: Colors.cyan + '11' },
+  calDayCellSelected: { backgroundColor: Colors.text, borderColor: Colors.text },
+  calDayDetail: { width: '100%', marginTop: 16, paddingHorizontal: Spacing.page, gap: 8 },
+  calDayDetailLabel: { fontFamily: Fonts.calSans, fontSize: 13, color: Colors.cyan, marginBottom: 4 },
+  calDayDetailEmpty: { fontFamily: Fonts.mono, fontSize: 12, color: Colors.faint },
   calDayNum: { fontFamily: 'ChillaxMedium', fontSize: 12, color: '#292929', marginBottom: 2 },
   calItem: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   calItemText: { fontFamily: Fonts.mono, fontSize: 9, color: '#292929', flex: 1 },
