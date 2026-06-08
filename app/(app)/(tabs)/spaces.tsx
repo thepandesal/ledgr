@@ -5,6 +5,7 @@ import {
 import { useRouter } from 'expo-router';
 import { supabase } from '../../../src/lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import BottomSheet from '@/components/ui/BottomSheet';
 import ConfirmModal from '@/components/ui/ConfirmModal';
@@ -30,8 +31,8 @@ interface Category { id: string; name: string; color: string; icon: string; }
 
 export default function SpacesScreen() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [userName, setUserName] = useState('');
-  const [spaces, setSpaces] = useState<Space[]>([]);
   const [userId, setUserId] = useState('');
   const [categories, setCategories] = useState<Category[]>([]);
   const [createModal, setCreateModal] = useState(false);
@@ -51,18 +52,22 @@ export default function SpacesScreen() {
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) { setUserName(user.user_metadata?.full_name ?? ''); setUserId(user.id); loadSpaces(user.id); loadCategories(user.id); }
+      if (user) { setUserName(user.user_metadata?.full_name ?? ''); setUserId(user.id); loadCategories(user.id); }
     });
   }, []);
 
-  const loadSpaces = async (uid: string) => {
-    const { data } = await supabase.from('spaces').select().eq('user_id', uid).order('created_at');
-    if (!data) return;
-    const { data: recs } = await supabase.from('recordings').select('space_id, amount').eq('user_id', uid).eq('type', 'expense');
-    const spentMap: Record<string, number> = {};
-    (recs ?? []).forEach((r: any) => { spentMap[r.space_id] = (spentMap[r.space_id] || 0) + Number(r.amount); });
-    setSpaces(data.map((s: any) => ({ ...s, spent: spentMap[s.id] ?? 0 })));
-  };
+  const { data: spaces = [] } = useQuery({
+    queryKey: ['spaces', userId],
+    queryFn: async () => {
+      const { data } = await supabase.from('spaces').select().eq('user_id', userId).order('created_at');
+      if (!data) return [];
+      const { data: recs } = await supabase.from('recordings').select('space_id, amount').eq('user_id', userId).eq('type', 'expense');
+      const spentMap: Record<string, number> = {};
+      (recs ?? []).forEach((r: any) => { spentMap[r.space_id] = (spentMap[r.space_id] || 0) + Number(r.amount); });
+      return data.map((s: any) => ({ ...s, spent: spentMap[s.id] ?? 0 })) as Space[];
+    },
+    enabled: !!userId,
+  });
 
   const loadCategories = async (uid: string) => {
     const { data } = await supabase.from('categories').select().eq('user_id', uid).order('name');
@@ -91,19 +96,15 @@ export default function SpacesScreen() {
         budget: spaceBudget.trim() ? parseFloat(spaceBudget) : null,
       }).eq('id', selectedSpace.id);
       if (err) { setError(err.message); setLoading(false); return; }
-      setSpaces(prev => prev.map(s => s.id === selectedSpace.id
-        ? { ...s, name: spaceName.trim(), color: selectedColor, icon: selectedIcon }
-        : s
-      ));
     } else {
-      const { data, error: err } = await supabase.from('spaces').insert({
+      const { error: err } = await supabase.from('spaces').insert({
         user_id: userId, name: spaceName.trim(), color: selectedColor, icon: selectedIcon,
         default_category_id: useDefaultCategory && selectedCategory ? selectedCategory.id : null,
         budget: spaceBudget.trim() ? parseFloat(spaceBudget) : null,
       }).select().single();
       if (err) { setError(err.message); setLoading(false); return; }
-      setSpaces(prev => [...prev, data]);
     }
+    queryClient.invalidateQueries({ queryKey: ['spaces', userId] });
     setLoading(false); setCreateModal(false); setEditMode(false);
   };
 
@@ -134,7 +135,7 @@ export default function SpacesScreen() {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: async () => {
         await supabase.from('spaces').delete().eq('id', selectedSpace!.id);
-        setSpaces(prev => prev.filter(s => s.id !== selectedSpace!.id));
+        queryClient.invalidateQueries({ queryKey: ['spaces', userId] });
       }},
     ]);
   };

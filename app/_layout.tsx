@@ -4,6 +4,17 @@ import { RobotoMono_400Regular, RobotoMono_700Bold } from '@expo-google-fonts/ro
 import { View, ActivityIndicator } from 'react-native';
 import { useEffect, useState } from 'react';
 import { supabase } from '../src/lib/supabase';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5,  // data stays fresh for 5 minutes
+      gcTime: 1000 * 60 * 10,    // cache kept for 10 minutes
+      retry: 2,
+    },
+  },
+});
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -58,6 +69,7 @@ export default function RootLayout() {
   }
 
   return (
+    <QueryClientProvider client={queryClient}>
     <Stack
       screenOptions={{
         headerShown: false,
@@ -71,6 +83,7 @@ export default function RootLayout() {
       <Stack.Screen name="(app)" options={{ animation: 'none' }} />
       <Stack.Screen name="split" options={{ animation: 'fade', headerShown: false }} />
     </Stack>
+    </QueryClientProvider>
   );
 }
 
