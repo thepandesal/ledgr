@@ -25,7 +25,7 @@ const ICONS = [
 
 const PAGE_PAD = 32;
 
-interface Space { id: string; name: string; color: string; icon: string; default_category_id?: string; }
+interface Space { id: string; name: string; color: string; icon: string; default_category_id?: string; budget?: number | null; spent?: number; }
 interface Category { id: string; name: string; color: string; icon: string; }
 
 export default function SpacesScreen() {
@@ -57,7 +57,11 @@ export default function SpacesScreen() {
 
   const loadSpaces = async (uid: string) => {
     const { data } = await supabase.from('spaces').select().eq('user_id', uid).order('created_at');
-    if (data) setSpaces(data);
+    if (!data) return;
+    const { data: recs } = await supabase.from('recordings').select('space_id, amount').eq('user_id', uid).eq('type', 'expense');
+    const spentMap: Record<string, number> = {};
+    (recs ?? []).forEach((r: any) => { spentMap[r.space_id] = (spentMap[r.space_id] || 0) + Number(r.amount); });
+    setSpaces(data.map((s: any) => ({ ...s, spent: spentMap[s.id] ?? 0 })));
   };
 
   const loadCategories = async (uid: string) => {
@@ -170,6 +174,10 @@ export default function SpacesScreen() {
               <TouchableOpacity style={s.spaceCardMain} activeOpacity={0.8}
                 onPress={() => router.push({ pathname: '/(app)/space-detail', params: { spaceId: space.id, name: space.name, color: space.color } })}>
                 <Text style={s.spaceCardText} numberOfLines={1}>{space.name.toLowerCase()}</Text>
+                <Text style={s.spaceCardMeta} numberOfLines={1}>
+                  {(space.spent ?? 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                  {space.budget ? ` / ${space.budget.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : ''}
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={() => openMenu(space)} style={s.spaceMenuBtn}>
                 <Ionicons name="ellipsis-vertical" size={14} color={Colors.text} />
@@ -319,6 +327,7 @@ const s = StyleSheet.create({
   spaceCard: { width: '47%', borderRadius: Radius.pill, paddingVertical: 12, paddingLeft: 16, paddingRight: 8, flexDirection: 'row', alignItems: 'center', backgroundColor: '#d8efea' },
   spaceCardMain: { flex: 1 },
   spaceCardText: { fontFamily: 'ChillaxMedium', fontSize: 15, color: '#292929', textAlign: 'center', flex: 1 },
+  spaceCardMeta: { fontFamily: Fonts.mono, fontSize: 9, color: '#5a7a72', textAlign: 'center', marginTop: 2 },
   spaceMenuBtn: { padding: 6 },
 
   // Add a space — dotted border, no bg
