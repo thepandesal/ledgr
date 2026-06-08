@@ -1,29 +1,33 @@
-import { View, TouchableOpacity, Text, StyleSheet, Animated, Dimensions, SafeAreaView } from 'react-native';
+import { View, TouchableOpacity, Text, StyleSheet, Animated, Dimensions, SafeAreaView, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useRef, memo } from 'react';
+import { BlurView } from 'expo-blur';
 import SpacesScreen from './spaces';
 import AccountsScreen from './accounts';
 import BillSplitScreen from './bill-split';
 import ReceiptsScreen from './receipts';
 import CategoriesScreen from './categories';
-import { Colors, Fonts } from '@/components/ui/theme';
+import { Colors, Fonts, Radius, Spacing } from '@/components/ui/theme';
+import { useRouter } from 'expo-router';
 
 const { width } = Dimensions.get('window');
 
 const MAIN_TABS = [
-  { key: 'spaces',     label: 'Spaces',     icon: 'grid' },
-  { key: 'accounts',   label: 'Accounts',   icon: 'wallet-outline' },
-  { key: 'categories', label: 'Categories', icon: 'pricetag-outline' },
-  { key: 'notifications', label: 'Notifs',  icon: 'notifications-outline' },
-  { key: 'others',     label: 'Others',     icon: 'apps-outline' },
+  { key: 'spaces',        label: 'Spaces',     icon: 'grid' },
+  { key: 'accounts',      label: 'Accounts',   icon: 'wallet-outline' },
+  { key: 'categories',    label: 'Categories', icon: 'pricetag-outline' },
+  { key: 'notifications', label: 'Notifs',     icon: 'notifications-outline' },
+  { key: 'others',        label: 'Others',     icon: 'apps-outline' },
 ];
 
 const OTHERS_ITEMS = [
-  { key: 'receipts',   label: 'Receipts',   icon: 'receipt-outline' },
-  { key: 'bill-split', label: 'Bill Split', icon: 'people-outline' },
+  { key: 'receipts',    label: 'Receipts',     icon: 'receipt-outline',  route: null },
+  { key: 'bill-split',  label: 'Bill Split',   icon: 'people-outline',   route: null },
+  { key: 'loans',       label: 'Loans',        icon: 'cash-outline',     route: '/(app)/loans' },
+  { key: 'receivables', label: 'Receivables',  icon: 'arrow-undo-outline', route: '/(app)/receivables' },
 ];
 
-const ALL_SCREENS = ['spaces', 'accounts', 'categories', 'receipts', 'bill-split'];
+const SLIDE_KEYS = ['spaces', 'accounts', 'categories', 'receipts', 'bill-split'];
 
 const MemoSpaces     = memo(SpacesScreen);
 const MemoAccounts   = memo(AccountsScreen);
@@ -32,14 +36,13 @@ const MemoReceipts   = memo(ReceiptsScreen);
 const MemoCategories = memo(CategoriesScreen);
 
 const SCREENS: Record<string, React.ReactNode> = {
-  spaces:     <MemoSpaces />,
-  accounts:   <MemoAccounts />,
-  categories: <MemoCategories />,
+  spaces:       <MemoSpaces />,
+  accounts:     <MemoAccounts />,
+  categories:   <MemoCategories />,
   'bill-split': <MemoBillSplit />,
-  receipts:   <MemoReceipts />,
+  receipts:     <MemoReceipts />,
 };
 
-// Notifications placeholder screen
 function NotificationsScreen() {
   return (
     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#ffffff', gap: 12 }}>
@@ -49,159 +52,168 @@ function NotificationsScreen() {
     </View>
   );
 }
-
 const MemoNotifications = memo(NotificationsScreen);
 
 export default function TabsLayout() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState('spaces');
   const [othersOpen, setOthersOpen] = useState(false);
   const activeTabRef = useRef('spaces');
 
-  // Bubble animation
-  const bubbleAnim = useRef(new Animated.Value(0)).current;
-  const bubbleScale = useRef(new Animated.Value(0.8)).current;
+  const bubbleAnim  = useRef(new Animated.Value(0)).current;
+  const bubbleScale = useRef(new Animated.Value(0.92)).current;
 
   const slideAnims = useRef<Record<string, Animated.Value>>(
-    Object.fromEntries(ALL_SCREENS.map((k, i) => [k, new Animated.Value(i === 0 ? 0 : width)]))
+    Object.fromEntries(SLIDE_KEYS.map((k, i) => [k, new Animated.Value(i === 0 ? 0 : width)]))
   ).current;
+
+  // Notification slide anim
+  const notifAnim = useRef(new Animated.Value(width)).current;
 
   const switchTab = (key: string) => {
     if (key === activeTabRef.current) return;
     const prev = activeTabRef.current;
     activeTabRef.current = key;
-    slideAnims[key]?.setValue(width);
     setActiveTab(key);
+
+    const incoming = key === 'notifications' ? notifAnim : slideAnims[key];
+    const outgoing = prev === 'notifications' ? notifAnim : slideAnims[prev];
+
+    incoming?.setValue(width);
     Animated.parallel([
-      Animated.timing(slideAnims[key], { toValue: 0, duration: 260, useNativeDriver: false }),
-      Animated.timing(slideAnims[prev], { toValue: -width, duration: 260, useNativeDriver: false }),
-    ]).start(() => { slideAnims[prev]?.setValue(width); });
+      Animated.timing(incoming, { toValue: 0, duration: 260, useNativeDriver: false }),
+      Animated.timing(outgoing, { toValue: -width, duration: 260, useNativeDriver: false }),
+    ]).start(() => { outgoing?.setValue(width); });
   };
 
   const openOthers = () => {
     setOthersOpen(true);
     Animated.parallel([
-      Animated.spring(bubbleAnim, { toValue: 1, useNativeDriver: true, tension: 80, friction: 10 }),
-      Animated.spring(bubbleScale, { toValue: 1, useNativeDriver: true, tension: 80, friction: 10 }),
+      Animated.spring(bubbleAnim,  { toValue: 1, useNativeDriver: true, tension: 70, friction: 10 }),
+      Animated.spring(bubbleScale, { toValue: 1, useNativeDriver: true, tension: 70, friction: 10 }),
     ]).start();
   };
 
   const closeOthers = () => {
     Animated.parallel([
-      Animated.timing(bubbleAnim, { toValue: 0, duration: 180, useNativeDriver: true }),
-      Animated.timing(bubbleScale, { toValue: 0.8, duration: 180, useNativeDriver: true }),
+      Animated.timing(bubbleAnim,  { toValue: 0, duration: 180, useNativeDriver: true }),
+      Animated.timing(bubbleScale, { toValue: 0.92, duration: 180, useNativeDriver: true }),
     ]).start(() => setOthersOpen(false));
   };
 
   const handleNavPress = (key: string) => {
-    if (key === 'others') {
-      if (othersOpen) closeOthers();
-      else openOthers();
-      return;
-    }
+    if (key === 'others') { othersOpen ? closeOthers() : openOthers(); return; }
     if (othersOpen) closeOthers();
-    if (key === 'notifications') {
-      // Just show the notifications screen placeholder
-      if (activeTabRef.current !== 'notifications') {
-        const prev = activeTabRef.current;
-        activeTabRef.current = 'notifications';
-        setActiveTab('notifications');
-        if (slideAnims[prev]) {
-          Animated.timing(slideAnims[prev], { toValue: -width, duration: 260, useNativeDriver: false })
-            .start(() => { slideAnims[prev]?.setValue(width); });
-        }
-      }
-      return;
-    }
     switchTab(key);
   };
 
-  const handleOthersItem = (key: string) => {
+  const handleOthersItem = (item: typeof OTHERS_ITEMS[0]) => {
     closeOthers();
-    switchTab(key);
+    if (item.route) {
+      router.push(item.route as any);
+    } else {
+      switchTab(item.key);
+    }
   };
 
-  const isOthersItemActive = OTHERS_ITEMS.some(i => i.key === activeTab);
+  const isOthersActive = OTHERS_ITEMS.some(i => i.key === activeTab) || othersOpen;
 
   return (
-    <View style={styles.container}>
-      <View style={styles.content}>
-        {/* Main screens */}
-        {ALL_SCREENS.map(key => (
+    <View style={s.container}>
+      <View style={s.content}>
+        {/* Slideable screens */}
+        {SLIDE_KEYS.map(key => (
           <Animated.View
             key={key}
-            style={[styles.screen, { transform: [{ translateX: slideAnims[key] }], zIndex: activeTab === key ? 10 : 0 }]}
+            style={[s.screen, { transform: [{ translateX: slideAnims[key] }], zIndex: activeTab === key ? 10 : 0 }]}
             pointerEvents={activeTab === key ? 'auto' : 'none'}
           >
             {SCREENS[key]}
           </Animated.View>
         ))}
 
-        {/* Notifications screen */}
-        {activeTab === 'notifications' && (
-          <View style={[styles.screen, { zIndex: 10 }]}>
-            <MemoNotifications />
-          </View>
-        )}
+        {/* Notifications — animated like other tabs */}
+        <Animated.View
+          style={[s.screen, { transform: [{ translateX: notifAnim }], zIndex: activeTab === 'notifications' ? 10 : 0 }]}
+          pointerEvents={activeTab === 'notifications' ? 'auto' : 'none'}
+        >
+          <MemoNotifications />
+        </Animated.View>
       </View>
 
-      {/* Others bubble menu */}
+      {/* Others bubble */}
       {othersOpen && (
         <>
-          {/* Dismiss backdrop */}
           <TouchableOpacity style={StyleSheet.absoluteFill} onPress={closeOthers} activeOpacity={1} />
-
-          <Animated.View style={[styles.bubbleMenu, {
+          <Animated.View style={[s.bubbleWrap, {
             opacity: bubbleAnim,
-            transform: [{ scale: bubbleScale }, { translateY: bubbleAnim.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }],
+            transform: [
+              { scale: bubbleScale },
+              { translateY: bubbleAnim.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) },
+            ],
           }]}>
-            {OTHERS_ITEMS.map((item, i) => {
-              const isActive = activeTab === item.key;
-              return (
-                <TouchableOpacity
-                  key={item.key}
-                  style={[styles.bubbleItem, i < OTHERS_ITEMS.length - 1 && styles.bubbleItemBorder, isActive && styles.bubbleItemActive]}
-                  onPress={() => handleOthersItem(item.key)}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons name={item.icon as any} size={18} color={isActive ? Colors.cyan : Colors.faint} />
-                  <Text style={[styles.bubbleItemLabel, isActive && styles.bubbleItemLabelActive]}>{item.label}</Text>
-                </TouchableOpacity>
-              );
-            })}
+            {Platform.OS === 'ios' ? (
+              <BlurView intensity={60} tint="light" style={s.bubbleInner}>
+                <BubbleContent items={OTHERS_ITEMS} activeTab={activeTab} onPress={handleOthersItem} />
+              </BlurView>
+            ) : (
+              <View style={[s.bubbleInner, s.bubbleInnerAndroid]}>
+                <BubbleContent items={OTHERS_ITEMS} activeTab={activeTab} onPress={handleOthersItem} />
+              </View>
+            )}
           </Animated.View>
         </>
       )}
 
-      {/* Floating nav */}
-      <SafeAreaView style={styles.navSafeArea}>
-        <View style={styles.navGap} />
-        <View style={styles.navPill}>
+      {/* Nav pill */}
+      <SafeAreaView style={s.navSafeArea}>
+        <View style={s.navGap} />
+        <View style={s.navPill}>
           {MAIN_TABS.map(tab => {
-            const isActive = tab.key === 'others'
-              ? isOthersItemActive || othersOpen
-              : activeTab === tab.key;
+            const isActive = tab.key === 'others' ? isOthersActive : activeTab === tab.key;
             return (
-              <TouchableOpacity
-                key={tab.key}
-                style={styles.navItem}
-                onPress={() => handleNavPress(tab.key)}
-                activeOpacity={0.7}
-              >
+              <TouchableOpacity key={tab.key} style={s.navItem} onPress={() => handleNavPress(tab.key)} activeOpacity={0.7}>
                 <Ionicons name={tab.icon as any} size={20} color={isActive ? Colors.cyan : Colors.faint} />
-                <Text style={[styles.navLabel, isActive && styles.navLabelActive]}>
-                  {tab.label}
-                </Text>
+                <Text style={[s.navLabel, isActive && s.navLabelActive]}>{tab.label}</Text>
               </TouchableOpacity>
             );
           })}
         </View>
-        <View style={styles.navGap} />
+        <View style={s.navGap} />
       </SafeAreaView>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+function BubbleContent({ items, activeTab, onPress }: {
+  items: typeof OTHERS_ITEMS;
+  activeTab: string;
+  onPress: (item: typeof OTHERS_ITEMS[0]) => void;
+}) {
+  return (
+    <>
+      {items.map((item, i) => {
+        const isActive = activeTab === item.key;
+        return (
+          <TouchableOpacity
+            key={item.key}
+            style={[s.bubbleItem, i < items.length - 1 && s.bubbleItemBorder]}
+            onPress={() => onPress(item)}
+            activeOpacity={0.7}
+          >
+            <View style={[s.bubbleIconWrap, isActive && s.bubbleIconWrapActive]}>
+              <Ionicons name={item.icon as any} size={16} color={isActive ? Colors.white : Colors.text} />
+            </View>
+            <Text style={[s.bubbleItemLabel, isActive && s.bubbleItemLabelActive]}>{item.label}</Text>
+            <Ionicons name="chevron-forward" size={12} color={Colors.faint} style={{ marginLeft: 'auto' }} />
+          </TouchableOpacity>
+        );
+      })}
+    </>
+  );
+}
+
+const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f5f5f5' },
   content: { flex: 1, position: 'relative' },
   screen: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#f5f5f5' },
@@ -224,35 +236,51 @@ const styles = StyleSheet.create({
   navLabel: { fontFamily: 'ChillaxRegular', fontSize: 9, color: Colors.faint },
   navLabelActive: { color: Colors.cyan, fontFamily: 'ChillaxMedium' },
 
-  // Others bubble menu
-  bubbleMenu: {
+  // Bubble
+  bubbleWrap: {
     position: 'absolute',
     bottom: 110,
-    right: 24,
-    backgroundColor: '#425252',
-    borderRadius: 16,
-    paddingVertical: 6,
-    paddingHorizontal: 0,
+    left: 20,
+    right: 20,
+    borderRadius: 20,
+    overflow: 'hidden',
+    zIndex: 100,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2,
-    shadowRadius: 16,
+    shadowOpacity: 0.12,
+    shadowRadius: 20,
     elevation: 12,
-    minWidth: 140,
-    zIndex: 100,
+  },
+  bubbleInner: {
+    paddingVertical: 6,
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  bubbleInnerAndroid: {
+    backgroundColor: 'rgba(255,255,255,0.95)',
   },
   bubbleItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    gap: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
   },
   bubbleItemBorder: {
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.08)',
+    borderBottomColor: 'rgba(0,0,0,0.06)',
   },
-  bubbleItemActive: {},
-  bubbleItemLabel: { fontFamily: 'ChillaxRegular', fontSize: 13, color: Colors.faint },
-  bubbleItemLabelActive: { color: Colors.cyan, fontFamily: 'ChillaxMedium' },
+  bubbleIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  bubbleIconWrapActive: {
+    backgroundColor: Colors.cyan,
+  },
+  bubbleItemLabel: { fontFamily: 'ChillaxMedium', fontSize: 14, color: Colors.text },
+  bubbleItemLabelActive: { color: Colors.cyan },
 });
