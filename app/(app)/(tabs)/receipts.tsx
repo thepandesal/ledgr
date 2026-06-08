@@ -2,6 +2,7 @@ import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView, Ima
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../../src/lib/supabase';
 import * as ImagePicker from 'expo-image-picker';
 import BottomSheet from '@/components/ui/BottomSheet';
@@ -23,54 +24,38 @@ interface Entry {
 
 export default function ReceiptsScreen() {
   const router = useRouter();
-  const [entries, setEntries] = useState<Entry[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [addModal, setAddModal] = useState(false);
   const [addStep, setAddStep] = useState<'name' | 'photos'>('name');
   const [folderName, setFolderName] = useState('');
   const [creating, setCreating] = useState(false);
   const [activeEntryId, setActiveEntryId] = useState<string | null>(null);
 
-  useFocusEffect(useCallback(() => { loadEntries(); }, []));
+  useFocusEffect(useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['receipts'] });
+  }, []));
 
-  const loadEntries = async () => {
-    setLoading(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { setLoading(false); return; }
-
-    const { data } = await supabase
-      .from('receipt_entries')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
-
-    if (!data) { setLoading(false); return; }
-
-    const full: Entry[] = await Promise.all(data.map(async (e: any) => {
-      const { data: photos, count } = await supabase
-        .from('receipt_photos')
-        .select('storage_path, url', { count: 'exact' })
-        .eq('entry_id', e.id)
-        .order('created_at')
-        .limit(1);
-
-      let firstPhoto = '';
-      if (photos && photos.length > 0) {
-        firstPhoto = photos[0].url ?? '';
-      }
-
-      let recording = null;
-      if (e.recording_id) {
-        const { data: rec } = await supabase.from('recordings').select('name, type').eq('id', e.recording_id).single();
-        recording = rec;
-      }
-
-      return { ...e, firstPhoto, photoCount: count ?? 0, recording };
-    }));
-
-    setEntries(full);
-    setLoading(false);
-  };
+  const { data: entries = [], isLoading: loading } = useQuery({
+    queryKey: ['receipts'],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return [];
+      const { data } = await supabase.from('receipt_entries').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
+      if (!data) return [];
+      const full: Entry[] = await Promise.all(data.map(async (e: any) => {
+        const { data: photos, count } = await supabase.from('receipt_photos').select('storage_path, url', { count: 'exact' }).eq('entry_id', e.id).order('created_at').limit(1);
+        let firstPhoto = '';
+        if (photos && photos.length > 0) firstPhoto = photos[0].url ?? '';
+        let recording = null;
+        if (e.recording_id) {
+          const { data: rec } = await supabase.from('recordings').select('name, type').eq('id', e.recording_id).single();
+          recording = rec;
+        }
+        return { ...e, firstPhoto, photoCount: count ?? 0, recording };
+      }));
+      return full;
+    },
+  });
 
   const createEntry = async () => {
     setCreating(true);
@@ -92,7 +77,7 @@ export default function ReceiptsScreen() {
     setAddStep('name');
     setFolderName('');
     setActiveEntryId(null);
-    loadEntries();
+    queryClient.invalidateQueries({ queryKey: ['receipts'] });
   };
 
   const addFromCamera = async () => {

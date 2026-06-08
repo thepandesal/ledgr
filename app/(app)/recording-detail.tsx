@@ -1402,7 +1402,6 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
               </>
             );
           })()}
-          </>
 
         </ScrollView>
       </SafeAreaView>

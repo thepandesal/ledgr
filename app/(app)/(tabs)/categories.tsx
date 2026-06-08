@@ -4,6 +4,7 @@ import {
 import { supabase } from '../../../src/lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import BottomSheet from '@/components/ui/BottomSheet';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import formStyles from '@/components/ui/formStyles';
@@ -15,7 +16,7 @@ const SUGGESTED_ICONS = ['fast-food-outline', 'car-outline', 'flash-outline', 'h
 interface Category { id: string; name: string; color: string; icon: string; is_default: boolean; }
 
 export default function CategoriesScreen() {
-  const [categories, setCategories] = useState<Category[]>([]);
+  const queryClient = useQueryClient();
   const [userId, setUserId] = useState('');
   const [modal, setModal] = useState(false);
   const [menuModal, setMenuModal] = useState(false);
@@ -28,14 +29,18 @@ export default function CategoriesScreen() {
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) { setUserId(user.id); load(user.id); }
+      if (user) setUserId(user.id);
     });
   }, []);
 
-  const load = async (uid: string) => {
-    const { data } = await supabase.from('categories').select().eq('user_id', uid).order('created_at');
-    if (data) setCategories(data);
-  };
+  const { data: categories = [] } = useQuery({
+    queryKey: ['categories', userId],
+    queryFn: async () => {
+      const { data } = await supabase.from('categories').select().eq('user_id', userId).order('created_at');
+      return (data ?? []) as Category[];
+    },
+    enabled: !!userId,
+  });
 
   const openAdd = () => { setName(''); setColor(PASTEL_COLORS[0]); setIcon(SUGGESTED_ICONS[0]); setError(''); setModal(true); };
 
@@ -44,13 +49,14 @@ export default function CategoriesScreen() {
     setLoading(true);
     const { error: err } = await supabase.from('categories').insert({ user_id: userId, name: name.trim(), color, icon, is_default: false });
     if (err) { setError(err.message); setLoading(false); return; }
-    await load(userId); setLoading(false); setModal(false);
+    queryClient.invalidateQueries({ queryKey: ['categories', userId] });
+    setLoading(false); setModal(false);
   };
 
   const handleDelete = async () => {
     setMenuModal(false);
     await supabase.from('categories').delete().eq('id', selected!.id);
-    await load(userId);
+    queryClient.invalidateQueries({ queryKey: ['categories', userId] });
   };
 
   return (
