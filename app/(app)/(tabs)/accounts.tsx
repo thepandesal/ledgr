@@ -20,7 +20,7 @@ const MIN_CROP = 80;
 const INIT_CROP = SW * 0.7;
 const HANDLE_HIT = 32;
 
-interface Account { id: string; bank: string; account_name: string; account_number: string; qr_code: string | null; }
+interface Account { id: string; bank: string; account_name: string; account_number: string; qr_code: string | null; holder_name: string; }
 
 export default function AccountsScreen() {
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -57,8 +57,8 @@ export default function AccountsScreen() {
             <TouchableOpacity key={account.id} style={s.accountCard} activeOpacity={0.85} onLongPress={() => { setSelected(account); setMenuModal(true); }}>
               <View style={s.accountLeft}>
                 <View style={{ flex: 1, gap: 3 }}>
-                  <Text style={s.accountName} numberOfLines={1}>{account.account_name}</Text>
-                  <Text style={s.accountMeta}>{account.bank} · •••• {account.account_number?.slice(-4) ?? ''}</Text>
+                  <Text style={s.accountName} numberOfLines={1}>{account.holder_name || account.account_name}</Text>
+                  <Text style={s.accountMeta}>{account.account_name} · {account.bank} · •••• {account.account_number?.slice(-4) ?? ''}</Text>
                 </View>
               </View>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -90,7 +90,7 @@ export default function AccountsScreen() {
       <ConfirmModal
         visible={menuModal}
         onClose={() => setMenuModal(false)}
-        title={selected?.account_name ?? 'account'}
+        title={selected?.holder_name || selected?.account_name ?? 'account'}
         actions={[
           { label: 'cancel', onPress: () => setMenuModal(false), muted: true },
           { label: 'edit', onPress: () => { setMenuModal(false); setEditAccount(selected); } },
@@ -210,6 +210,7 @@ function AccountForm({ visible, userId, initial, onClose, onSaved }: {
 }) {
   const [bankInput, setBankInput] = useState(initial?.bank ?? '');
   const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [holderName, setHolderName] = useState(initial?.holder_name ?? '');
   const [accountName, setAccountName] = useState(initial?.account_name ?? '');
   const [accountNumber, setAccountNumber] = useState(initial?.account_number ?? '');
   const [qrCode, setQrCode] = useState<string | null>(initial?.qr_code ?? null);
@@ -220,13 +221,14 @@ function AccountForm({ visible, userId, initial, onClose, onSaved }: {
   // Sync fields when editing a different account
   useEffect(() => {
     setBankInput(initial?.bank ?? '');
+    setHolderName(initial?.holder_name ?? '');
     setAccountName(initial?.account_name ?? '');
     setAccountNumber(initial?.account_number ?? '');
     setQrCode(initial?.qr_code ?? null);
     setError('');
   }, [initial]);
 
-  const canSave = bankInput.trim() && accountName.trim() && accountNumber.trim();
+  const canSave = bankInput.trim() && holderName.trim() && accountName.trim() && accountNumber.trim();
 
   const handleBankInput = (val: string) => {
     setBankInput(val);
@@ -244,7 +246,8 @@ function AccountForm({ visible, userId, initial, onClose, onSaved }: {
     if (!canSave) { setError('bank, account name and account number are required.'); return; }
     setLoading(true); setError('');
     try {
-      const payload = { bank: bankInput.trim(), account_name: accountName.trim(), account_number: accountNumber.trim(), qr_code: qrCode, account_type: 'Savings', account_details: '', color: Colors.border };
+      const payload = { bank: bankInput.trim(), holder_name: holderName.trim(), account_name: accountName.trim(), account_number: accountNumber.trim(), qr_code: qrCode, account_type: 'Savings', account_details: '', color: Colors.border };
+      if (!canSave) { setError('all fields except QR are required.'); setLoading(false); return; }
       if (initial) { const { error: err } = await supabase.from('accounts').update(payload).eq('id', initial.id); if (err) throw err; }
       else { const { error: err } = await supabase.from('accounts').insert({ ...payload, user_id: userId }); if (err) throw err; }
       onSaved();
@@ -262,8 +265,13 @@ function AccountForm({ visible, userId, initial, onClose, onSaved }: {
           {error ? <Text style={formStyles.errorText}>{error}</Text> : null}
           <View style={formStyles.block}>
             <View style={formStyles.blockRow}>
+              <Text style={formStyles.blockLabel}>holder</Text>
+              <TextInput style={formStyles.inlineInput} placeholder="e.g. juan dela cruz" placeholderTextColor={Colors.faint} value={holderName} onChangeText={setHolderName} autoFocus />
+            </View>
+            <View style={formStyles.blockDivider} />
+            <View style={formStyles.blockRow}>
               <Text style={formStyles.blockLabel}>name</Text>
-              <TextInput style={formStyles.inlineInput} placeholder="e.g. my gcash" placeholderTextColor={Colors.faint} value={accountName} onChangeText={setAccountName} autoFocus />
+              <TextInput style={formStyles.inlineInput} placeholder="e.g. my gcash" placeholderTextColor={Colors.faint} value={accountName} onChangeText={setAccountName} />
             </View>
             <View style={formStyles.blockDivider} />
             <View style={formStyles.blockRow}>

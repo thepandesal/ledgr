@@ -54,7 +54,7 @@ export default function CollectModal({ visible, onClose, recording, items, fille
             {accounts.map((acc: any) => (
               <TouchableOpacity key={acc.id} style={[accountStyles.option, account?.id === acc.id && accountStyles.optionActive]} onPress={() => setAccount(acc)}>
                 <View style={{ flex: 1 }}>
-                  <Text style={[accountStyles.optionName, account?.id === acc.id && accountStyles.optionNameActive]}>{acc.account_name}</Text>
+                  <Text style={[accountStyles.optionName, account?.id === acc.id && accountStyles.optionNameActive]}>{acc.holder_name || acc.account_name}</Text>
                   <Text style={[accountStyles.optionBank, account?.id === acc.id && accountStyles.optionBankActive]}>{acc.bank} · {acc.account_number}</Text>
                 </View>
                 {account?.id === acc.id && <Ionicons name="checkmark" size={14} color={Colors.white} />}
@@ -73,7 +73,7 @@ export default function CollectModal({ visible, onClose, recording, items, fille
       ) : (
         <View style={{ gap: 12, width: '100%' }}>
           <Text style={formStyles.hintMuted}>{(recording?.name ?? '').toLowerCase()} · {Number(recording?.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
-          <Text style={[formStyles.hintMuted, { color: Colors.cyan }]}>{account?.account_name} · {account?.bank}</Text>
+          <Text style={[formStyles.hintMuted, { color: Colors.cyan }]}>{account?.holder_name || account?.account_name} · {account?.bank}</Text>
           <View style={{ flexDirection: 'row', gap: 6 }}>
             {(['full', 'manual', ...(filledPeople.length > 0 && items.length > 0 ? ['split'] : [])] as const).map(m => (
               <TouchableOpacity key={m} style={[itemStyles.personSelectChip, { flex: 1, justifyContent: 'center' }, mode === m && itemStyles.personSelectChipActive]} onPress={() => setMode(m as any)}>

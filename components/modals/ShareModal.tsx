@@ -37,7 +37,7 @@ export default function ShareModal({ visible, onClose, shareRowId, shareAccounts
               onPress={() => setSelectedAccountIds(prev => selected ? prev.filter(id => id !== acc.id) : [...prev, acc.id])}
             >
               <View style={{ flex: 1 }}>
-                <Text style={[accountStyles.optionName, selected && accountStyles.optionNameActive]}>{acc.account_name}</Text>
+                <Text style={[accountStyles.optionName, selected && accountStyles.optionNameActive]}>{acc.holder_name || acc.account_name}</Text>
                 <Text style={[accountStyles.optionBank, selected && accountStyles.optionBankActive]}>{acc.bank} · {acc.account_number}</Text>
               </View>
               <Ionicons name={selected ? 'checkbox' : 'square-outline'} size={18} color={selected ? Colors.white : Colors.faint} />
