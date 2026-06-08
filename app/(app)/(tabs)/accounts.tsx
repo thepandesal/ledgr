@@ -57,8 +57,8 @@ export default function AccountsScreen() {
             <TouchableOpacity key={account.id} style={s.accountCard} activeOpacity={0.85} onLongPress={() => { setSelected(account); setMenuModal(true); }}>
               <View style={s.accountLeft}>
                 <View style={{ flex: 1, gap: 3 }}>
-                  <Text style={s.accountName} numberOfLines={1}>{account.holder_name || account.account_name}</Text>
-                  <Text style={s.accountMeta}>{account.account_name} · {account.bank} · •••• {account.account_number?.slice(-4) ?? ''}</Text>
+                  <Text style={s.accountName} numberOfLines={1}>{account.account_name}</Text>
+                  <Text style={s.accountMeta}>{account.holder_name} · {account.bank} · •••• {account.account_number?.slice(-4) ?? ''}</Text>
                 </View>
               </View>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
