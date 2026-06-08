@@ -250,6 +250,7 @@ function AccountForm({ visible, userId, initial, onClose, onSaved }: {
       if (!canSave) { setError('all fields except QR are required.'); setLoading(false); return; }
       if (initial) { const { error: err } = await supabase.from('accounts').update(payload).eq('id', initial.id); if (err) throw err; }
       else { const { error: err } = await supabase.from('accounts').insert({ ...payload, user_id: userId }); if (err) throw err; }
+      setLoading(false);
       onSaved();
     } catch (e: any) { setError(e.message); setLoading(false); }
   };
@@ -265,13 +266,8 @@ function AccountForm({ visible, userId, initial, onClose, onSaved }: {
           {error ? <Text style={formStyles.errorText}>{error}</Text> : null}
           <View style={formStyles.block}>
             <View style={formStyles.blockRow}>
-              <Text style={formStyles.blockLabel}>holder</Text>
-              <TextInput style={formStyles.inlineInput} placeholder="e.g. juan dela cruz" placeholderTextColor={Colors.faint} value={holderName} onChangeText={setHolderName} autoFocus />
-            </View>
-            <View style={formStyles.blockDivider} />
-            <View style={formStyles.blockRow}>
               <Text style={formStyles.blockLabel}>name</Text>
-              <TextInput style={formStyles.inlineInput} placeholder="e.g. my gcash" placeholderTextColor={Colors.faint} value={accountName} onChangeText={setAccountName} />
+              <TextInput style={formStyles.inlineInput} placeholder="e.g. my gcash" placeholderTextColor={Colors.faint} value={accountName} onChangeText={setAccountName} autoFocus />
             </View>
             <View style={formStyles.blockDivider} />
             <View style={formStyles.blockRow}>
@@ -282,6 +278,11 @@ function AccountForm({ visible, userId, initial, onClose, onSaved }: {
             <View style={formStyles.blockRow}>
               <Text style={formStyles.blockLabel}>acct no.</Text>
               <TextInput style={formStyles.inlineInput} placeholder="required" placeholderTextColor={Colors.faint} value={accountNumber} onChangeText={setAccountNumber} keyboardType="numeric" />
+            </View>
+            <View style={formStyles.blockDivider} />
+            <View style={formStyles.blockRow}>
+              <Text style={formStyles.blockLabel}>holder</Text>
+              <TextInput style={formStyles.inlineInput} placeholder="e.g. juan dela cruz" placeholderTextColor={Colors.faint} value={holderName} onChangeText={setHolderName} />
             </View>
           </View>
           {suggestions.length > 0 && (
