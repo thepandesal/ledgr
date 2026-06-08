@@ -19,14 +19,12 @@ function isSameDay(a: Date, b: Date) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
-type StatusFilter = 'all' | 'pending' | 'received';
-
 export default function ReceivablesScreen() {
   const router = useRouter();
   const slideAnim = useRef(new Animated.Value(width)).current;
   const { userId } = useUser();
 
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [activeFilters, setActiveFilters] = useState<string[]>([]);
   const [dateFrom, setDateFrom] = useState<Date | null>(null);
   const [dateTo, setDateTo] = useState<Date | null>(null);
   const [showPicker, setShowPicker] = useState(false);
@@ -53,8 +51,14 @@ export default function ReceivablesScreen() {
   });
 
   const filtered = receivables.filter(r => {
-    if (statusFilter === 'pending' && r.status === 'received') return false;
-    if (statusFilter === 'received' && r.status !== 'received') return false;
+    if (activeFilters.length > 0) {
+      const isReceived = r.status === 'received';
+      const isPending = r.status !== 'received';
+      const matchReceived = activeFilters.includes('received') && isReceived;
+      const matchPending = activeFilters.includes('pending') && isPending;
+      const matchUnreceived = activeFilters.includes('unreceived') && isPending;
+      if (!matchReceived && !matchPending && !matchUnreceived) return false;
+    }
     if (dateFrom || dateTo) {
       const parts = r.transaction_date.split('-');
       const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
@@ -139,34 +143,30 @@ export default function ReceivablesScreen() {
           <Text style={s.pageSubtitle}>money owed to you, tracked.</Text>
         </View>
 
-        {/* Stats */}
+        {/* Stats as filter toggles */}
         <View style={{ flexDirection: 'row', gap: 8, marginHorizontal: Spacing.page, marginBottom: 16 }}>
           {[
-            { label: 'pending', value: countPending, color: Colors.pending },
-            { label: 'pending total', value: totalPending.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }), color: Colors.expense },
-            { label: 'received', value: totalReceived.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }), color: Colors.income },
-          ].map((st, i) => (
-            <View key={i} style={s.statCard}>
-              <Text style={[s.statValue, { color: st.color }]}>{st.value}</Text>
-              <Text style={s.statLabel}>{st.label}</Text>
-            </View>
-          ))}
+            { key: 'pending',    label: 'pending',       value: countPending, color: Colors.pending },
+            { key: 'unreceived', label: 'pending total', value: totalPending.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }), color: Colors.expense },
+            { key: 'received',   label: 'received',      value: totalReceived.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }), color: Colors.income },
+          ].map((st) => {
+            const isActive = activeFilters.includes(st.key);
+            return (
+              <TouchableOpacity
+                key={st.key}
+                style={[s.statCard, isActive && { borderColor: Colors.cyan, backgroundColor: Colors.cyan + '18' }]}
+                onPress={() => setActiveFilters(prev => isActive ? prev.filter(k => k !== st.key) : [...prev, st.key])}
+                activeOpacity={0.7}
+              >
+                <Text style={[s.statValue, { color: isActive ? Colors.cyan : st.color }]}>{st.value}</Text>
+                <Text style={[s.statLabel, isActive && { color: Colors.cyan }]}>{st.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
-        {/* Filters */}
-        <View style={{ paddingHorizontal: Spacing.page, gap: 10, marginBottom: 12 }}>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            {(['all', 'pending', 'received'] as StatusFilter[]).map(f => (
-              <TouchableOpacity
-                key={f}
-                style={[s.filterChip, statusFilter === f && s.filterChipActive]}
-                onPress={() => setStatusFilter(f)}
-              >
-                <Text style={[s.filterChipText, statusFilter === f && s.filterChipTextActive]}>{f}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          <TouchableOpacity style={s.dateRangeBtn} onPress={() => { setPickingDate('from'); setShowPicker(true); }}>
+        {/* Date range */}
+        <View style={{ paddingHorizontal: Spacing.page, marginBottom: 12 }}>
             <Ionicons name="calendar-outline" size={14} color={dateFrom ? Colors.cyan : Colors.muted} />
             <Text style={[s.dateRangeBtnText, dateFrom && { color: Colors.cyan }]}>{dateLabel()}</Text>
             {(dateFrom || dateTo) && (

@@ -19,14 +19,12 @@ function isSameDay(a: Date, b: Date) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
-type StatusFilter = 'all' | 'ongoing' | 'paid';
-
 export default function LoansScreen() {
   const router = useRouter();
   const slideAnim = useRef(new Animated.Value(width)).current;
   const { userId } = useUser();
 
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [activeFilters, setActiveFilters] = useState<string[]>([]);
   const [dateFrom, setDateFrom] = useState<Date | null>(null);
   const [dateTo, setDateTo] = useState<Date | null>(null);
   const [showPicker, setShowPicker] = useState(false);
@@ -53,8 +51,14 @@ export default function LoansScreen() {
   });
 
   const filtered = loans.filter(r => {
-    if (statusFilter === 'ongoing' && r.status === 'paid') return false;
-    if (statusFilter === 'paid' && r.status !== 'paid') return false;
+    if (activeFilters.length > 0) {
+      const isPaid = r.status === 'paid';
+      const isOngoing = r.status !== 'paid';
+      const matchPaid = activeFilters.includes('paid') && isPaid;
+      const matchOngoing = activeFilters.includes('ongoing') && isOngoing;
+      const matchUnpaid = activeFilters.includes('unpaid') && r.status !== 'paid';
+      if (!matchPaid && !matchOngoing && !matchUnpaid) return false;
+    }
     if (dateFrom || dateTo) {
       const parts = r.transaction_date.split('-');
       const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
@@ -139,36 +143,30 @@ export default function LoansScreen() {
           <Text style={s.pageSubtitle}>your payables, tracked.</Text>
         </View>
 
-        {/* Stats */}
+        {/* Stats as filter toggles */}
         <View style={{ flexDirection: 'row', gap: 8, marginHorizontal: Spacing.page, marginBottom: 16 }}>
           {[
-            { label: 'ongoing', value: countOngoing, color: Colors.pending },
-            { label: 'unpaid total', value: totalUnpaid.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }), color: Colors.expense },
-            { label: 'paid total', value: totalPaid.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }), color: Colors.income },
-          ].map((st, i) => (
-            <View key={i} style={s.statCard}>
-              <Text style={[s.statValue, { color: st.color }]}>{st.value}</Text>
-              <Text style={s.statLabel}>{st.label}</Text>
-            </View>
-          ))}
+            { key: 'ongoing', label: 'ongoing', value: countOngoing, color: Colors.pending },
+            { key: 'unpaid',  label: 'unpaid total', value: totalUnpaid.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }), color: Colors.expense },
+            { key: 'paid',    label: 'paid total', value: totalPaid.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }), color: Colors.income },
+          ].map((st) => {
+            const isActive = activeFilters.includes(st.key);
+            return (
+              <TouchableOpacity
+                key={st.key}
+                style={[s.statCard, isActive && { borderColor: Colors.cyan, backgroundColor: Colors.cyan + '18' }]}
+                onPress={() => setActiveFilters(prev => isActive ? prev.filter(k => k !== st.key) : [...prev, st.key])}
+                activeOpacity={0.7}
+              >
+                <Text style={[s.statValue, { color: isActive ? Colors.cyan : st.color }]}>{st.value}</Text>
+                <Text style={[s.statLabel, isActive && { color: Colors.cyan }]}>{st.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
-        {/* Filters */}
-        <View style={{ paddingHorizontal: Spacing.page, gap: 10, marginBottom: 12 }}>
-          {/* Status filter */}
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            {(['all', 'ongoing', 'paid'] as StatusFilter[]).map(f => (
-              <TouchableOpacity
-                key={f}
-                style={[s.filterChip, statusFilter === f && s.filterChipActive]}
-                onPress={() => setStatusFilter(f)}
-              >
-                <Text style={[s.filterChipText, statusFilter === f && s.filterChipTextActive]}>{f}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {/* Date range */}
+        {/* Date range */}
+        <View style={{ paddingHorizontal: Spacing.page, marginBottom: 12 }}>
           <TouchableOpacity style={s.dateRangeBtn} onPress={() => { setPickingDate('from'); setShowPicker(true); }}>
             <Ionicons name="calendar-outline" size={14} color={dateFrom ? Colors.cyan : Colors.muted} />
             <Text style={[s.dateRangeBtnText, dateFrom && { color: Colors.cyan }]}>{dateLabel()}</Text>
@@ -179,8 +177,6 @@ export default function LoansScreen() {
             )}
           </TouchableOpacity>
         </View>
-
-        {/* List */}
         {isLoading ? (
           <ActivityIndicator color={Colors.cyan} style={{ marginTop: 40 }} />
         ) : filtered.length === 0 ? (
