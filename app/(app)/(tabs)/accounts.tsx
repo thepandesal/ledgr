@@ -90,7 +90,7 @@ export default function AccountsScreen() {
       <ConfirmModal
         visible={menuModal}
         onClose={() => setMenuModal(false)}
-        title={selected?.holder_name || selected?.account_name ?? 'account'}
+        title={selected?.holder_name || selected?.account_name || 'account'}
         actions={[
           { label: 'cancel', onPress: () => setMenuModal(false), muted: true },
           { label: 'edit', onPress: () => { setMenuModal(false); setEditAccount(selected); } },
