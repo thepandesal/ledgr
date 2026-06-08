@@ -110,7 +110,7 @@ const styles = StyleSheet.create({
   content: { flex: 1, position: 'relative' },
   screen: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#f5f5f5' },
   navSafeArea: { backgroundColor: '#ffffff' },
-  navGap: { height: 10 },
+  navGap: { height: 20 },
   navPill: {
     flexDirection: 'row',
     backgroundColor: '#425252',
