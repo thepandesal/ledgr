@@ -52,6 +52,8 @@ export default function RecordingDetailScreen() {
   const [linkReceiptModal, setLinkReceiptModal] = useState(false);
   const [linkReceiptEntries, setLinkReceiptEntries] = useState<any[]>([]);
   const [captureHtml, setCaptureHtml] = useState<string | null>(null);
+  const [photoModal, setPhotoModal] = useState(false);
+  const [photoModalIndex, setPhotoModalIndex] = useState(0);
   const webviewRef = useRef<any>(null);
   const [copiedToast, setCopiedToast] = useState(false);
   const [tooltip, setTooltip] = useState<{ name: string } | null>(null);
@@ -1094,8 +1096,10 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
               </View>
               {receiptPhotos.length > 0 ? (
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 8 }}>
-                  {receiptPhotos.map(p => (
-                    <Image key={p.id} source={{ uri: p.url }} style={[accountStyles.receiptThumb, { backgroundColor: Colors.input }]} resizeMode="cover" />
+                  {receiptPhotos.map((p, idx) => (
+                    <TouchableOpacity key={p.id} onPress={() => { setPhotoModalIndex(idx); setPhotoModal(true); }} activeOpacity={0.85}>
+                      <Image source={{ uri: p.url }} style={[accountStyles.receiptThumb, { backgroundColor: Colors.input }]} resizeMode="cover" />
+                    </TouchableOpacity>
                   ))}
                 </ScrollView>
               ) : (
@@ -1745,6 +1749,28 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
           </TouchableOpacity>
         </View>
       </BottomSheet>
+
+      {/* Photo carousel modal */}
+      <Modal visible={photoModal} transparent animationType="fade" onRequestClose={() => setPhotoModal(false)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center' }}>
+          <TouchableOpacity style={{ position: 'absolute', top: 52, right: 24, zIndex: 10 }} onPress={() => setPhotoModal(false)}>
+            <Ionicons name="close" size={26} color="#fff" />
+          </TouchableOpacity>
+          <ScrollView
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            contentOffset={{ x: photoModalIndex * width, y: 0 }}
+          >
+            {receiptPhotos.map((p, i) => (
+              <View key={p.id} style={{ width, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 16 }}>
+                <Image source={{ uri: p.url }} style={{ width: width - 32, height: width - 32, borderRadius: 12 }} resizeMode="contain" />
+                <Text style={{ fontFamily: Fonts.mono, fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 12 }}>{i + 1} / {receiptPhotos.length}</Text>
+              </View>
+            ))}
+          </ScrollView>
+        </View>
+      </Modal>
 
       {/* Hidden WebView for image capture - native only */}
       {captureHtml && Platform.OS !== 'web' && (() => {
