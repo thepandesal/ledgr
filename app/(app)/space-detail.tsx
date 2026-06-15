@@ -110,7 +110,7 @@ export default function SpaceDetailScreen() {
   const [pickingCustom, setPickingCustom] = useState<'from' | 'to'>('from');
 
   const { data: recordings = [], isLoading: loading } = useQuery({
-    queryKey: ['recordings', spaceId],
+    queryKey: ['recordings', spaceId, userId],
     queryFn: async () => {
       const query = supabase.from('recordings')
         .select('*, categories:category_id(name, color, icon), account:account_id(account_name, bank, color)');
@@ -123,7 +123,7 @@ export default function SpaceDetailScreen() {
         return data ?? [];
       }
     },
-    enabled: !!spaceId,
+    enabled: !!spaceId && (spaceId !== 'all' || !!userId),
   });
 
   const { data: spaceData } = useQuery({
