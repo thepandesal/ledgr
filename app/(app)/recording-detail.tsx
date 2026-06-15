@@ -54,6 +54,10 @@ export default function RecordingDetailScreen() {
   const [captureHtml, setCaptureHtml] = useState<string | null>(null);
   const [photoModal, setPhotoModal] = useState(false);
   const [photoModalIndex, setPhotoModalIndex] = useState(0);
+  const [editModal, setEditModal] = useState(false);
+  const [editDate, setEditDate] = useState('');
+  const [editAccountId, setEditAccountId] = useState('');
+  const [editAccounts, setEditAccounts] = useState<any[]>([]);
   const webviewRef = useRef<any>(null);
   const [copiedToast, setCopiedToast] = useState(false);
   const [tooltip, setTooltip] = useState<{ name: string } | null>(null);
@@ -799,6 +803,26 @@ export default function RecordingDetailScreen() {
     Animated.timing(slideAnim, { toValue: width, duration: 250, useNativeDriver: false }).start(() => router.back());
   };
 
+  const openEditModal = async () => {
+    setEditDate(recording?.transaction_date ?? '');
+    setEditAccountId(recording?.account_id ?? '');
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data: accs } = await supabase.from('accounts').select().eq('user_id', user.id).order('account_name');
+    if (accs) setEditAccounts(accs);
+    setEditModal(true);
+  };
+
+  const saveEdit = async () => {
+    if (!editDate) return;
+    await supabase.from('recordings').update({
+      transaction_date: editDate,
+      account_id: editAccountId || null,
+    }).eq('id', recordingId);
+    setEditModal(false);
+    loadRecording();
+  };
+
   const openPeopleModal = () => {
     setSavedPeople([...people]);
     setTagInputVal('');
@@ -1021,6 +1045,9 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
       <SafeAreaView style={pageStyles.inner}>
         <TouchableOpacity onPress={handleBack} style={pageStyles.backBtn}>
           <Ionicons name="arrow-back" size={22} color={Colors.muted} />
+        </TouchableOpacity>
+        <TouchableOpacity onPress={openEditModal} style={{ position: 'absolute', top: 14, right: 28, zIndex: 20, padding: 6 }}>
+          <Ionicons name="create-outline" size={20} color={Colors.muted} />
         </TouchableOpacity>
 
         <ScrollView contentContainerStyle={pageStyles.scroll} showsVerticalScrollIndicator={false}>
@@ -1745,6 +1772,50 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
         <View style={formStyles.actions}>
           <TouchableOpacity style={formStyles.cancelBtn} onPress={() => setAddReceiptModal(false)}>
             <Text style={formStyles.cancelBtnText}>cancel</Text>
+          </TouchableOpacity>
+        </View>
+      </BottomSheet>
+
+      {/* Edit recording modal */}
+      <BottomSheet visible={editModal} onClose={() => setEditModal(false)} sub="recording" title="edit recording">
+        <View style={formStyles.block}>
+          <View style={formStyles.blockRow}>
+            <Text style={formStyles.blockLabel}>date</Text>
+            <TextInput
+              style={formStyles.inlineInput}
+              placeholder="YYYY-MM-DD"
+              placeholderTextColor={Colors.faint}
+              value={editDate}
+              onChangeText={setEditDate}
+            />
+          </View>
+          <View style={formStyles.blockDivider} />
+          <View style={[formStyles.blockRow, { flexDirection: 'column', alignItems: 'flex-start', gap: 8 }]}>
+            <Text style={formStyles.blockLabel}>bank / account</Text>
+            <ScrollView style={{ maxHeight: 180, width: '100%' }} showsVerticalScrollIndicator={false}>
+              {editAccounts.map(acc => (
+                <TouchableOpacity
+                  key={acc.id}
+                  style={[{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, gap: 10, borderBottomWidth: 1, borderBottomColor: Colors.border },
+                    editAccountId === acc.id && { backgroundColor: Colors.cyan + '11', borderRadius: Radius.md, paddingHorizontal: 8 }]}
+                  onPress={() => setEditAccountId(acc.id)}
+                >
+                  <Ionicons name={editAccountId === acc.id ? 'checkmark-circle' : 'ellipse-outline'} size={16} color={editAccountId === acc.id ? Colors.cyan : Colors.faint} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontFamily: Fonts.heading, fontSize: 13, color: Colors.text }}>{acc.account_name}</Text>
+                    <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted }}>{acc.bank} · {acc.account_number}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+        <View style={formStyles.actions}>
+          <TouchableOpacity style={formStyles.cancelBtn} onPress={() => setEditModal(false)}>
+            <Text style={formStyles.cancelBtnText}>cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[formStyles.primaryBtn, !editDate && { opacity: 0.4 }]} onPress={saveEdit} disabled={!editDate}>
+            <Text style={formStyles.primaryBtnText}>save</Text>
           </TouchableOpacity>
         </View>
       </BottomSheet>

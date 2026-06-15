@@ -308,32 +308,33 @@ const s = StyleSheet.create({
   scroll: { paddingHorizontal: PAGE_PAD, paddingBottom: 40, paddingTop: 8 },
   sectionTitle: { fontFamily: Fonts.calSans, fontSize: 36, color: '#425252', marginBottom: 4 },
   sectionSubtitle: { fontFamily: 'ChillaxRegular', fontSize: 13, color: Colors.muted, marginBottom: 20 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  grid: { flexDirection: 'column', gap: 10 },
 
-  // All spaces — f0ff97 bg, same size as other cards
+  // All spaces
   allSpacesCard: {
-    width: '47%',
+    width: '100%',
     borderRadius: Radius.pill,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#f0ff97',
   },
   allSpacesText: { fontFamily: 'ChillaxMedium', fontSize: 15, color: '#292929' },
 
-  // Space cards — d8efea bg
-  spaceCard: { width: '47%', borderRadius: Radius.pill, paddingVertical: 12, paddingLeft: 16, paddingRight: 8, flexDirection: 'row', alignItems: 'center', backgroundColor: '#d8efea' },
+  // Space cards
+  spaceCard: { width: '100%', borderRadius: Radius.pill, paddingVertical: 14, paddingLeft: 20, paddingRight: 12, flexDirection: 'row', alignItems: 'center', backgroundColor: '#d8efea' },
   spaceCardMain: { flex: 1 },
-  spaceCardText: { fontFamily: 'ChillaxMedium', fontSize: 15, color: '#292929', textAlign: 'center', flex: 1 },
-  spaceCardMeta: { fontFamily: Fonts.mono, fontSize: 9, color: '#5a7a72', textAlign: 'center', marginTop: 2 },
+  spaceCardText: { fontFamily: 'ChillaxMedium', fontSize: 15, color: '#292929' },
+  spaceCardMeta: { fontFamily: Fonts.mono, fontSize: 9, color: '#5a7a72', marginTop: 2 },
   spaceMenuBtn: { padding: 6 },
 
-  // Add a space — dotted border, no bg
+  // Add a space
   addCard: {
-    width: '47%',
+    width: '100%',
     borderRadius: Radius.pill,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',

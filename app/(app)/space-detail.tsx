@@ -310,7 +310,17 @@ export default function SpaceDetailScreen() {
 
         {/* Recordings header */}
         <View style={s.recordingsHeader}>
-          <Text style={[pageStyles.sectionHeader, { marginBottom: 0, marginTop: 0, fontFamily: Fonts.calSans }]}>recordings</Text>
+          <View>
+            <Text style={[pageStyles.sectionHeader, { marginBottom: 0, marginTop: 0, fontFamily: Fonts.calSans }]}>recordings</Text>
+            <View style={{ flexDirection: 'row', gap: 12, marginTop: 4 }}>
+              <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: Colors.expense }}>
+                spent {shortAmount(filteredRecordings.filter(r => r.type === 'expense').reduce((s, r) => s + Number(r.amount), 0))}
+              </Text>
+              <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: Colors.income }}>
+                income {shortAmount(filteredRecordings.filter(r => r.type === 'income' || r.type === 'savings').reduce((s, r) => s + Number(r.amount), 0))}
+              </Text>
+            </View>
+          </View>
           {spaceId !== 'all' && (
             <TouchableOpacity
               style={s.addRecordBtn}
