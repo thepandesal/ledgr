@@ -383,23 +383,26 @@ export default function SpaceDetailScreen() {
         </View>
 
         {/* Content filter + add memo */}
-        <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: Spacing.page, marginBottom: 8 }}>
-          {(['both', 'money', 'tasks'] as const).map(f => (
-            <TouchableOpacity
-              key={f}
-              style={[s.modeBtn, { flex: 0, paddingHorizontal: 14 }, contentFilter === f && s.modeBtnActive]}
-              onPress={() => setContentFilter(f)}
-              activeOpacity={0.7}
-            >
-              <Text style={[s.modeBtnText, contentFilter === f && s.modeBtnTextActive]}>{f}</Text>
-            </TouchableOpacity>
-          ))}
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.page, marginBottom: 8 }}>
+          <View style={{ flexDirection: 'row', gap: 6 }}>
+            {(['both', 'money', 'tasks'] as const).map(f => (
+              <TouchableOpacity
+                key={f}
+                style={[s.filterChip, contentFilter === f && s.filterChipActive]}
+                onPress={() => setContentFilter(f)}
+                activeOpacity={0.7}
+              >
+                <Text style={[s.filterChipText, contentFilter === f && s.filterChipTextActive]}>{f}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
           <TouchableOpacity
-            style={[s.modeBtn, { flex: 0, paddingHorizontal: 14, marginLeft: 'auto' }]}
+            style={s.addTaskBtn}
             onPress={() => { setMemoContent(''); setMemoDueDate(''); setAddMemoModal(true); }}
             activeOpacity={0.7}
           >
-            <Text style={s.modeBtnText}>+ task</Text>
+            <Ionicons name="add" size={13} color={Colors.cyan} />
+            <Text style={s.addTaskBtnText}>task</Text>
           </TouchableOpacity>
         </View>
 
@@ -1058,6 +1061,14 @@ const s = StyleSheet.create({
   monthBtn: { width: '30%', paddingVertical: 10, borderRadius: Radius.pill, alignItems: 'center', borderWidth: 1, borderColor: Colors.borderMid },
   monthBtnActive: { backgroundColor: Colors.cyan, borderColor: Colors.cyan },
   monthBtnText: { fontFamily: Fonts.display, fontSize: 14, color: Colors.text },
+
+  // Content filter chips
+  filterChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: Radius.pill, borderWidth: 1, borderColor: Colors.borderMid, backgroundColor: Colors.surface },
+  filterChipActive: { backgroundColor: Colors.text, borderColor: Colors.text },
+  filterChipText: { fontFamily: 'ChillaxMedium', fontSize: 11, color: Colors.muted },
+  filterChipTextActive: { color: Colors.white },
+  addTaskBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 6, borderRadius: Radius.pill, borderWidth: 1, borderColor: Colors.cyan, backgroundColor: 'transparent' },
+  addTaskBtnText: { fontFamily: 'ChillaxMedium', fontSize: 11, color: Colors.cyan },
 
   // Memos
   memoChip: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: Colors.surface, borderRadius: Radius.pill, paddingVertical: 8, paddingHorizontal: 14, borderWidth: 1, borderColor: Colors.borderMid, maxWidth: 200 },
