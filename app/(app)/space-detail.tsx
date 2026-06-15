@@ -1,16 +1,19 @@
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  SafeAreaView, Animated, Dimensions, ScrollView, ActivityIndicator,
+  SafeAreaView, Animated, Dimensions, ScrollView, ActivityIndicator, TextInput,
 } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useUser } from '../../src/hooks/useUser';
+import { useMemos } from '../../src/hooks/useMemos';
 import type { Recording } from '../../src/types';
 import { supabase } from '../../src/lib/supabase';
 import ConfirmModal from '@/components/ui/ConfirmModal';
+import BottomSheet from '@/components/ui/BottomSheet';
 import pageStyles from '@/components/ui/pageStyles';
+import formStyles from '@/components/ui/formStyles';
 import { Colors, Fonts, Radius, Shadow, Spacing } from '@/components/ui/theme';
 
 // Module-level store for cross-screen date focus signal
@@ -18,8 +21,8 @@ export let pendingFocusDate: string | null = null;
 export function setPendingFocusDate(date: string | null) { pendingFocusDate = date; }
 
 const { width } = Dimensions.get('window');
-type ViewMode = 'daily' | 'weekly' | 'monthly';
-const MODES: ViewMode[] = ['daily', 'weekly', 'monthly'];
+type ViewMode = 'daily' | 'weekly' | 'monthly' | 'custom';
+const MODES: ViewMode[] = ['daily', 'weekly', 'monthly', 'custom'];
 const DOODLE_W = 90;
 
 
@@ -94,6 +97,17 @@ export default function SpaceDetailScreen() {
   const [pickerYear, setPickerYear] = useState(new Date().getFullYear());
   const [pickerDay, setPickerDay] = useState<number | null>(null);
   const [calSelectedDate, setCalSelectedDate] = useState<Date | null>(null);
+  const [contentFilter, setContentFilter] = useState<'both' | 'money' | 'tasks'>('both');
+  const [addMemoModal, setAddMemoModal] = useState(false);
+  const [memoContent, setMemoContent] = useState('');
+  const [memoDueDate, setMemoDueDate] = useState('');
+  const { memos, addMemo, toggleMemo, deleteMemo } = useMemos(spaceId ?? '', userId);
+  const [customFrom, setCustomFrom] = useState<Date | null>(null);
+  const [customTo, setCustomTo] = useState<Date | null>(null);
+  const [showCustomPicker, setShowCustomPicker] = useState(false);
+  const [customPickerMonth, setCustomPickerMonth] = useState(new Date().getMonth());
+  const [customPickerYear, setCustomPickerYear] = useState(new Date().getFullYear());
+  const [pickingCustom, setPickingCustom] = useState<'from' | 'to'>('from');
 
   const { data: recordings = [], isLoading: loading } = useQuery({
     queryKey: ['recordings', spaceId],
@@ -122,6 +136,12 @@ export default function SpaceDetailScreen() {
   });
 
   const spaceBudget = spaceData?.budget ?? null;
+
+  // Load custom dates from space data
+  useEffect(() => {
+    if (spaceData?.custom_date_from) setCustomFrom(new Date(spaceData.custom_date_from + 'T00:00:00'));
+    if (spaceData?.custom_date_to) setCustomTo(new Date(spaceData.custom_date_to + 'T00:00:00'));
+  }, [spaceData]);
 
   const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
@@ -168,6 +188,31 @@ export default function SpaceDetailScreen() {
     });
   };
 
+  const saveCustomDates = async (from: Date, to: Date) => {
+    if (spaceId === 'all') return;
+    await supabase.from('spaces').update({
+      custom_date_from: from.toISOString().split('T')[0],
+      custom_date_to: to.toISOString().split('T')[0],
+    }).eq('id', spaceId);
+    queryClient.invalidateQueries({ queryKey: ['space-budget', spaceId] });
+  };
+
+  const handleCustomDayPress = (day: number) => {
+    const d = new Date(customPickerYear, customPickerMonth, day);
+    if (pickingCustom === 'from') {
+      setCustomFrom(d);
+      setCustomTo(null);
+      setPickingCustom('to');
+    } else {
+      if (customFrom && d < customFrom) {
+        setCustomFrom(d);
+        setPickingCustom('to');
+      } else {
+        setCustomTo(d);
+      }
+    }
+  };
+
   const switchLayout = (layout: 'list' | 'grid' | 'calendar') => {
     setViewLayout(layout);
     if (layout === 'calendar') switchMode('monthly');
@@ -191,6 +236,11 @@ export default function SpaceDetailScreen() {
     if (activeFilter.length > 0 && !activeFilter.includes(r.type)) return false;
     if (viewMode === 'daily') return isSameDay(rDate, selectedDate);
     if (viewMode === 'weekly') { const end = addDays(weekStart, 6); return rDate >= weekStart && rDate <= end; }
+    if (viewMode === 'custom') {
+      if (!customFrom || !customTo) return true;
+      const to = new Date(customTo); to.setHours(23, 59, 59);
+      return rDate >= customFrom && rDate <= to;
+    }
     return rDate.getMonth() === selectedDate.getMonth() && rDate.getFullYear() === selectedDate.getFullYear();
   });
 
@@ -332,6 +382,48 @@ export default function SpaceDetailScreen() {
           )}
         </View>
 
+        {/* Content filter + add memo */}
+        <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: Spacing.page, marginBottom: 8 }}>
+          {(['both', 'money', 'tasks'] as const).map(f => (
+            <TouchableOpacity
+              key={f}
+              style={[s.modeBtn, { flex: 0, paddingHorizontal: 14 }, contentFilter === f && s.modeBtnActive]}
+              onPress={() => setContentFilter(f)}
+              activeOpacity={0.7}
+            >
+              <Text style={[s.modeBtnText, contentFilter === f && s.modeBtnTextActive]}>{f}</Text>
+            </TouchableOpacity>
+          ))}
+          <TouchableOpacity
+            style={[s.modeBtn, { flex: 0, paddingHorizontal: 14, marginLeft: 'auto' }]}
+            onPress={() => { setMemoContent(''); setMemoDueDate(''); setAddMemoModal(true); }}
+            activeOpacity={0.7}
+          >
+            <Text style={s.modeBtnText}>+ task</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Memos section */}
+        {(contentFilter === 'both' || contentFilter === 'tasks') && memos.length > 0 && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ paddingHorizontal: Spacing.page, marginBottom: 8 }} contentContainerStyle={{ gap: 8 }}>
+            {memos.map(memo => (
+              <TouchableOpacity
+                key={memo.id}
+                style={[s.memoChip, memo.is_done && s.memoChipDone]}
+                onPress={() => toggleMemo(memo.id, !memo.is_done)}
+                onLongPress={() => deleteMemo(memo.id)}
+                activeOpacity={0.8}
+              >
+                <Ionicons name={memo.is_done ? 'checkmark-circle' : 'ellipse-outline'} size={14} color={memo.is_done ? Colors.income : Colors.cyan} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[s.memoText, memo.is_done && s.memoTextDone]} numberOfLines={1}>{memo.content}</Text>
+                  {memo.due_date && <Text style={s.memoDue}>{new Date(memo.due_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</Text>}
+                </View>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
+
         {/* Layout toggle */}
         <View style={s.layoutRow}>
           {([['list', 'list-outline'], ['grid', 'grid-outline'], ['calendar', 'calendar-outline']] as const).map(([layout, icon]) => (
@@ -352,11 +444,16 @@ export default function SpaceDetailScreen() {
             <TouchableOpacity
               key={mode}
               style={[s.modeBtn, viewMode === mode && s.modeBtnActive]}
-              onPress={() => switchMode(mode)}
+              onPress={() => {
+                if (mode === 'custom') { setShowCustomPicker(true); setPickingCustom('from'); }
+                else switchMode(mode);
+              }}
               activeOpacity={0.7}
             >
               <Text style={[s.modeBtnText, viewMode === mode && s.modeBtnTextActive]}>
-                {mode}
+                {mode === 'custom' && customFrom && customTo
+                  ? `${customFrom.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}–${customTo.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+                  : mode}
               </Text>
             </TouchableOpacity>
           ))}
@@ -421,6 +518,32 @@ export default function SpaceDetailScreen() {
           
           {loading ? (
             <ActivityIndicator color={Colors.income} style={{ marginTop: 40 }} />
+          ) : contentFilter === 'tasks' ? (
+            memos.length === 0 ? (
+              <View style={[pageStyles.emptyBox, { borderWidth: 0, backgroundColor: 'transparent', paddingTop: 60 }]}>
+                <Ionicons name="checkbox-outline" size={40} color={Colors.borderMid} />
+                <Text style={pageStyles.emptyText}>no tasks yet</Text>
+              </View>
+            ) : (
+              <ScrollView contentContainerStyle={s.list} showsVerticalScrollIndicator={false}>
+                {memos.map(memo => (
+                  <TouchableOpacity
+                    key={memo.id}
+                    style={[s.recordingCard, { backgroundColor: memo.is_done ? Colors.successBg : Colors.surface, borderWidth: 1, borderColor: memo.is_done ? Colors.income + '44' : Colors.borderMid }]}
+                    onPress={() => toggleMemo(memo.id, !memo.is_done)}
+                    onLongPress={() => deleteMemo(memo.id)}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name={memo.is_done ? 'checkmark-circle' : 'ellipse-outline'} size={22} color={memo.is_done ? Colors.income : Colors.cyan} />
+                    <View style={s.recordingMiddle}>
+                      <Text style={[s.recordingName, memo.is_done && { textDecorationLine: 'line-through', color: Colors.muted }]} numberOfLines={2}>{memo.content}</Text>
+                      {memo.due_date && <Text style={s.recordingMeta}>{new Date(memo.due_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</Text>}
+                    </View>
+                    <Ionicons name="trash-outline" size={14} color={Colors.faint} onPress={() => deleteMemo(memo.id)} />
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            )
           ) : viewLayout === 'calendar' ? (
             <ScrollView contentContainerStyle={s.calendarGrid} showsVerticalScrollIndicator={false}>
               {(() => {
@@ -607,6 +730,108 @@ export default function SpaceDetailScreen() {
         </Animated.View>
 
       </SafeAreaView>
+
+      {/* Add memo modal */}
+      <BottomSheet visible={addMemoModal} onClose={() => setAddMemoModal(false)} sub={name?.toLowerCase() ?? 'space'} title="new task">
+        <Text style={formStyles.sectionLabel}>task</Text>
+        <TextInput
+          style={formStyles.input}
+          placeholder="e.g. pay electricity bill"
+          placeholderTextColor={Colors.faint}
+          value={memoContent}
+          onChangeText={setMemoContent}
+          autoFocus
+          multiline
+        />
+        <Text style={formStyles.sectionLabel}>due date <Text style={{ textTransform: 'none' }}>(optional)</Text></Text>
+        <TextInput
+          style={formStyles.input}
+          placeholder="YYYY-MM-DD"
+          placeholderTextColor={Colors.faint}
+          value={memoDueDate}
+          onChangeText={setMemoDueDate}
+        />
+        <View style={formStyles.actions}>
+          <TouchableOpacity style={formStyles.cancelBtn} onPress={() => setAddMemoModal(false)}>
+            <Text style={formStyles.cancelBtnText}>cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[formStyles.primaryBtn, !memoContent.trim() && { opacity: 0.4 }]}
+            onPress={async () => { if (!memoContent.trim()) return; await addMemo(memoContent.trim(), memoDueDate.trim() || undefined); setAddMemoModal(false); }}
+            disabled={!memoContent.trim()}
+          >
+            <Text style={formStyles.primaryBtnText}>add task</Text>
+          </TouchableOpacity>
+        </View>
+      </BottomSheet>
+
+      {/* Custom date range picker */}
+      <ConfirmModal
+        visible={showCustomPicker}
+        onClose={() => setShowCustomPicker(false)}
+        title={pickingCustom === 'from' ? 'set start date' : 'set end date'}
+        actions={[
+          { label: 'cancel', onPress: () => { setShowCustomPicker(false); setPickingCustom('from'); }, muted: true },
+          {
+            label: 'ok',
+            onPress: () => {
+              if (!customFrom || !customTo) return;
+              setShowCustomPicker(false);
+              setPickingCustom('from');
+              switchMode('custom');
+              saveCustomDates(customFrom, customTo);
+            },
+            disabled: !customFrom || !customTo,
+          },
+        ]}
+      >
+        <View style={s.datePickerYearRow}>
+          <TouchableOpacity onPress={() => { if (customPickerMonth === 0) { setCustomPickerMonth(11); setCustomPickerYear(y => y - 1); } else setCustomPickerMonth(m => m - 1); }}>
+            <Ionicons name="chevron-back" size={20} color={Colors.text} />
+          </TouchableOpacity>
+          <Text style={{ fontFamily: Fonts.display, fontSize: 17, color: Colors.text }}>{MONTHS[customPickerMonth].toLowerCase()} {customPickerYear}</Text>
+          <TouchableOpacity onPress={() => { if (customPickerMonth === 11) { setCustomPickerMonth(0); setCustomPickerYear(y => y + 1); } else setCustomPickerMonth(m => m + 1); }}>
+            <Ionicons name="chevron-forward" size={20} color={Colors.text} />
+          </TouchableOpacity>
+        </View>
+        <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: Colors.cyan, marginBottom: 8 }}>
+          {pickingCustom === 'from'
+            ? 'tap start date'
+            : customFrom ? `from ${customFrom.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} — now tap end date` : 'tap end date'}
+        </Text>
+        <View style={{ flexDirection: 'row', marginBottom: 4 }}>
+          {['su','mo','tu','we','th','fr','sa'].map(d => (
+            <Text key={d} style={{ flex: 1, textAlign: 'center', fontFamily: Fonts.sans, fontSize: 11, color: Colors.faint }}>{d}</Text>
+          ))}
+        </View>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', width: '100%' }}>
+          {(() => {
+            const firstDay = new Date(customPickerYear, customPickerMonth, 1).getDay();
+            const daysInMonth = new Date(customPickerYear, customPickerMonth + 1, 0).getDate();
+            const cells = Array(firstDay).fill(null).concat(Array.from({ length: daysInMonth }, (_, i) => i + 1));
+            return cells.map((day, i) => {
+              if (!day) return <View key={`e${i}`} style={s.calCell} />;
+              const cellDate = new Date(customPickerYear, customPickerMonth, day);
+              const isFrom = customFrom && isSameDay(cellDate, customFrom);
+              const isTo = customTo && isSameDay(cellDate, customTo);
+              const isInRange = customFrom && customTo && cellDate > customFrom && cellDate < customTo;
+              const isEdge = isFrom || isTo;
+              return (
+                <TouchableOpacity
+                  key={day}
+                  style={[s.calCell,
+                    isInRange && { backgroundColor: Colors.cyan + '22', borderRadius: 0 },
+                    isEdge && { backgroundColor: Colors.cyan, borderRadius: Radius.pill },
+                  ]}
+                  onPress={() => handleCustomDayPress(day)}
+                >
+                  <Text style={[s.calCellText, isEdge && s.calCellTextActive]}>{day}</Text>
+                </TouchableOpacity>
+              );
+            });
+          })()}
+        </View>
+      </ConfirmModal>
 
       {/* Filter Modal */}
       <ConfirmModal
@@ -833,6 +1058,13 @@ const s = StyleSheet.create({
   monthBtn: { width: '30%', paddingVertical: 10, borderRadius: Radius.pill, alignItems: 'center', borderWidth: 1, borderColor: Colors.borderMid },
   monthBtnActive: { backgroundColor: Colors.cyan, borderColor: Colors.cyan },
   monthBtnText: { fontFamily: Fonts.display, fontSize: 14, color: Colors.text },
+
+  // Memos
+  memoChip: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: Colors.surface, borderRadius: Radius.pill, paddingVertical: 8, paddingHorizontal: 14, borderWidth: 1, borderColor: Colors.borderMid, maxWidth: 200 },
+  memoChipDone: { backgroundColor: Colors.successBg, borderColor: Colors.income + '44' },
+  memoText: { fontFamily: 'ChillaxRegular', fontSize: 12, color: Colors.text },
+  memoTextDone: { textDecorationLine: 'line-through', color: Colors.muted },
+  memoDue: { fontFamily: Fonts.mono, fontSize: 9, color: Colors.muted, marginTop: 1 },
 });
 
 

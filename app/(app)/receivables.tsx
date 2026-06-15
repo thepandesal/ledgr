@@ -167,6 +167,7 @@ export default function ReceivablesScreen() {
 
         {/* Date range */}
         <View style={{ paddingHorizontal: Spacing.page, marginBottom: 12 }}>
+          <TouchableOpacity style={s.dateRangeBtn} onPress={() => { setPickingDate('from'); setShowPicker(true); }}>
             <Ionicons name="calendar-outline" size={14} color={dateFrom ? Colors.cyan : Colors.muted} />
             <Text style={[s.dateRangeBtnText, dateFrom && { color: Colors.cyan }]}>{dateLabel()}</Text>
             {(dateFrom || dateTo) && (

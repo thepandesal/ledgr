@@ -3,6 +3,7 @@ import {
   TextInput, ActivityIndicator, Alert, Animated, Image,
   KeyboardAvoidingView, Platform, PanResponder, Dimensions,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { supabase } from '../../../src/lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
@@ -24,6 +25,7 @@ const INIT_CROP = SW * 0.7;
 const HANDLE_HIT = 32;
 
 export default function AccountsScreen() {
+  const router = useRouter();
   const queryClient = useQueryClient();
   const { userId } = useUser();
   const [addModal, setAddModal] = useState(false);
@@ -53,7 +55,9 @@ const { data: accounts = [] } = useQuery<Account[]>({
         <Text style={s.pageSubtitle}>your saved payment methods.</Text>
         <View style={{ gap: 10, marginBottom: 16 }}>
           {accounts.map(account => (
-            <TouchableOpacity key={account.id} style={s.accountCard} activeOpacity={0.85} onLongPress={() => { setSelected(account); setMenuModal(true); }}>
+            <TouchableOpacity key={account.id} style={s.accountCard} activeOpacity={0.85}
+              onPress={() => router.push({ pathname: '/(app)/account-detail', params: { accountId: account.id, accountName: account.account_name, bankName: account.bank } } as any)}
+              onLongPress={() => { setSelected(account); setMenuModal(true); }}>
               <View style={s.accountLeft}>
                 <View style={{ flex: 1, gap: 3 }}>
                   <Text style={s.accountName} numberOfLines={1}>{account.account_name}</Text>

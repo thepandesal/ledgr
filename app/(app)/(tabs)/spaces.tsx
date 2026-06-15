@@ -28,7 +28,7 @@ const ICONS = [
 
 const PAGE_PAD = 32;
 
-interface Space { id: string; name: string; color: string; icon: string; default_category_id?: string; budget?: number | null; spent?: number; }
+interface Space { id: string; name: string; color: string; icon: string; default_category_id?: string; budget?: number | null; spent?: number; pendingTasks?: number; }
 
 export default function SpacesScreen() {
   const router = useRouter();
@@ -57,7 +57,10 @@ export default function SpacesScreen() {
       const { data: recs } = await supabase.from('recordings').select('space_id, amount').eq('user_id', userId).eq('type', 'expense');
       const spentMap: Record<string, number> = {};
       (recs ?? []).forEach((r: any) => { spentMap[r.space_id] = (spentMap[r.space_id] || 0) + Number(r.amount); });
-      return data.map((s: any) => ({ ...s, spent: spentMap[s.id] ?? 0 })) as Space[];
+      const { data: memoData } = await supabase.from('memos').select('space_id, is_done').eq('user_id', userId).eq('is_done', false);
+      const memoMap: Record<string, number> = {};
+      (memoData ?? []).forEach((m: any) => { memoMap[m.space_id] = (memoMap[m.space_id] || 0) + 1; });
+      return data.map((s: any) => ({ ...s, spent: spentMap[s.id] ?? 0, pendingTasks: memoMap[s.id] ?? 0 })) as Space[];
     },
     enabled: !!userId,
   });
@@ -175,6 +178,7 @@ export default function SpacesScreen() {
                 <Text style={s.spaceCardMeta} numberOfLines={1}>
                   {(space.spent ?? 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                   {space.budget ? ` / ${space.budget.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : ''}
+                  {(space.pendingTasks ?? 0) > 0 ? ` · ${space.pendingTasks} task${space.pendingTasks === 1 ? '' : 's'}` : ''}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={() => openMenu(space)} style={s.spaceMenuBtn}>
