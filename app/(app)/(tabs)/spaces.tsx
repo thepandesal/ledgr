@@ -1,44 +1,88 @@
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  SafeAreaView, TextInput, ActivityIndicator, Alert,
+  SafeAreaView, TextInput, ActivityIndicator, Alert, Svg,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../../src/lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useUser } from '../../../src/hooks/useUser';
-import type { Space, Category } from '../../../src/types';
+import type { Category } from '../../../src/types';
 import BottomSheet from '@/components/ui/BottomSheet';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import formStyles from '@/components/ui/formStyles';
-import pageStyles from '@/components/ui/pageStyles';
-import { Colors, Fonts, Radius, Spacing } from '@/components/ui/theme';
+import { Colors, Fonts, Radius } from '@/components/ui/theme';
 
-const PASTEL_COLORS = [
-  '#FFB3B3', '#FFD9B3', '#FFFAB3', '#B3FFB3', '#B3FFE0',
-  '#B3F0FF', '#B3C6FF', '#D9B3FF', '#FFB3F0', '#FFB3C6',
-];
+// ─── Color tokens ─────────────────────────────────────────────────────────────
+const C = {
+  vividBlue:    '#4a7ff7',
+  lightBlue:    '#b4d7ff',
+  darkVividBlue:'#1f5eeb',
+  lightTurq:    '#cefaf4',
+  lightRed:     '#ffe0df',
+  grayCyan:     '#425252',
+  gray:         '#929090',
+  pastelAzure:  '#bec6c9',
+};
 
-const ICONS = [
-  'home-outline', 'briefcase-outline', 'airplane-outline', 'cart-outline',
-  'heart-outline', 'star-outline', 'leaf-outline', 'cafe-outline',
-  'car-outline', 'musical-notes-outline',
-];
+const PAGE_PAD = 24;
 
-const PAGE_PAD = 32;
+interface SpaceData {
+  id: string; name: string; color: string; icon: string;
+  budget?: number | null; spent?: number; saved?: number;
+  upcomingTasks?: number; space_type?: string;
+}
 
-interface Space { id: string; name: string; color: string; icon: string; default_category_id?: string; budget?: number | null; spent?: number; pendingTasks?: number; }
+// ─── Circular progress ────────────────────────────────────────────────────────
+function CircularProgress({ pct, size = 56 }: { pct: number; size?: number }) {
+  const stroke = 5;
+  const r = (size - stroke) / 2;
+  const circ = 2 * Math.PI * r;
+  const filled = circ * Math.min(pct, 1);
+  const cx = size / 2;
+  const cy = size / 2;
+
+  // Use a simple SVG-like approach with View rotation trick
+  // Since we can't use SVG directly without expo-svg, use a border arc trick
+  const deg = Math.min(pct, 1) * 360;
+
+  return (
+    <View style={{ width: size, height: size, justifyContent: 'center', alignItems: 'center' }}>
+      {/* Background circle */}
+      <View style={{
+        position: 'absolute', width: size, height: size,
+        borderRadius: size / 2, borderWidth: stroke,
+        borderColor: C.lightBlue,
+      }} />
+      {/* Filled arc — use clip trick */}
+      {deg > 0 && (
+        <View style={{
+          position: 'absolute', width: size, height: size,
+          borderRadius: size / 2, borderWidth: stroke,
+          borderColor: C.vividBlue,
+          borderTopColor: deg >= 90 ? C.vividBlue : 'transparent',
+          borderRightColor: deg >= 180 ? C.vividBlue : 'transparent',
+          borderBottomColor: deg >= 270 ? C.vividBlue : 'transparent',
+          borderLeftColor: deg >= 360 ? C.vividBlue : 'transparent',
+          transform: [{ rotate: '-90deg' }],
+        }} />
+      )}
+      <Text style={{ fontFamily: Fonts.monoBold, fontSize: 10, color: C.vividBlue }}>
+        {Math.round(pct * 100)}%
+      </Text>
+    </View>
+  );
+}
 
 export default function SpacesScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { userId, userName } = useUser();
+  const { userId } = useUser();
   const [createModal, setCreateModal] = useState(false);
   const [spaceName, setSpaceName] = useState('');
   const [spaceBudget, setSpaceBudget] = useState('');
-  const [selectedColor, setSelectedColor] = useState(PASTEL_COLORS[0]);
-  const [selectedIcon, setSelectedIcon] = useState(ICONS[0]);
+  const [spaceType, setSpaceType] = useState<'expense' | 'savings'>('expense');
   const [useDefaultCategory, setUseDefaultCategory] = useState(false);
   const [categoryInput, setCategoryInput] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
@@ -46,21 +90,37 @@ export default function SpacesScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [menuModal, setMenuModal] = useState(false);
-  const [selectedSpace, setSelectedSpace] = useState<Space | null>(null);
+  const [selectedSpace, setSelectedSpace] = useState<SpaceData | null>(null);
   const [editMode, setEditMode] = useState(false);
 
-  const { data: spaces = [] } = useQuery<Space[]>({
+  const now = new Date();
+  const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+
+  const { data: spaces = [] } = useQuery<SpaceData[]>({
     queryKey: ['spaces', userId],
     queryFn: async () => {
       const { data } = await supabase.from('spaces').select().eq('user_id', userId).order('created_at');
       if (!data) return [];
-      const { data: recs } = await supabase.from('recordings').select('space_id, amount').eq('user_id', userId).eq('type', 'expense');
+
+      const { data: expRecs } = await supabase.from('recordings').select('space_id, amount').eq('user_id', userId).eq('type', 'expense');
       const spentMap: Record<string, number> = {};
-      (recs ?? []).forEach((r: any) => { spentMap[r.space_id] = (spentMap[r.space_id] || 0) + Number(r.amount); });
-      const { data: memoData } = await supabase.from('memos').select('space_id, is_done').eq('user_id', userId).eq('is_done', false);
+      (expRecs ?? []).forEach((r: any) => { spentMap[r.space_id] = (spentMap[r.space_id] || 0) + Number(r.amount); });
+
+      const { data: savRecs } = await supabase.from('recordings').select('space_id, amount').eq('user_id', userId).in('type', ['income', 'savings']);
+      const savedMap: Record<string, number> = {};
+      (savRecs ?? []).forEach((r: any) => { savedMap[r.space_id] = (savedMap[r.space_id] || 0) + Number(r.amount); });
+
+      const { data: memoData } = await supabase.from('memos').select('space_id').eq('user_id', userId).eq('is_done', false).gte('due_date', monthStart).lte('due_date', monthEnd);
       const memoMap: Record<string, number> = {};
       (memoData ?? []).forEach((m: any) => { memoMap[m.space_id] = (memoMap[m.space_id] || 0) + 1; });
-      return data.map((s: any) => ({ ...s, spent: spentMap[s.id] ?? 0, pendingTasks: memoMap[s.id] ?? 0 })) as Space[];
+
+      return data.map((s: any) => ({
+        ...s,
+        spent: spentMap[s.id] ?? 0,
+        saved: savedMap[s.id] ?? 0,
+        upcomingTasks: memoMap[s.id] ?? 0,
+      })) as SpaceData[];
     },
     enabled: !!userId,
   });
@@ -75,11 +135,9 @@ export default function SpacesScreen() {
   });
 
   const openCreate = () => {
-    setSpaceName(''); setSelectedColor(PASTEL_COLORS[0]); setSelectedIcon(ICONS[0]);
-    setError(''); setUseDefaultCategory(false); setSelectedCategory(null); setCategoryInput('');
-    setSpaceBudget('');
-    setEditMode(false);
-    setCreateModal(true);
+    setSpaceName(''); setError(''); setUseDefaultCategory(false);
+    setSelectedCategory(null); setCategoryInput(''); setSpaceBudget('');
+    setSpaceType('expense'); setEditMode(false); setCreateModal(true);
   };
 
   const handleCategoryInput = (val: string) => {
@@ -92,15 +150,17 @@ export default function SpacesScreen() {
     setLoading(true);
     if (editMode && selectedSpace) {
       const { error: err } = await supabase.from('spaces').update({
-        name: spaceName.trim(), color: selectedColor, icon: selectedIcon,
+        name: spaceName.trim(),
         budget: spaceBudget.trim() ? parseFloat(spaceBudget) : null,
+        space_type: spaceType,
       }).eq('id', selectedSpace.id);
       if (err) { setError(err.message); setLoading(false); return; }
     } else {
       const { error: err } = await supabase.from('spaces').insert({
-        user_id: userId, name: spaceName.trim(), color: selectedColor, icon: selectedIcon,
+        user_id: userId, name: spaceName.trim(), color: '#4a7ff7', icon: 'grid',
         default_category_id: useDefaultCategory && selectedCategory ? selectedCategory.id : null,
         budget: spaceBudget.trim() ? parseFloat(spaceBudget) : null,
+        space_type: spaceType,
       }).select().single();
       if (err) { setError(err.message); setLoading(false); return; }
     }
@@ -108,7 +168,7 @@ export default function SpacesScreen() {
     setLoading(false); setCreateModal(false); setEditMode(false);
   };
 
-  const openMenu = (space: Space) => { setSelectedSpace(space); setMenuModal(true); };
+  const openMenu = (space: SpaceData) => { setSelectedSpace(space); setMenuModal(true); };
   const closeMenu = () => setMenuModal(false);
 
   const handleEditSpace = () => {
@@ -116,16 +176,11 @@ export default function SpacesScreen() {
     closeMenu();
     setEditMode(true);
     setSpaceName(selectedSpace.name);
-    setSelectedColor(selectedSpace.color);
-    setSelectedIcon(selectedSpace.icon);
+    setSpaceType((selectedSpace.space_type as any) ?? 'expense');
     setSpaceBudget('');
-    // Load budget for this space
     supabase.from('spaces').select('budget').eq('id', selectedSpace.id).single()
       .then(({ data }) => { if (data?.budget) setSpaceBudget(String(data.budget)); });
-    setError('');
-    setUseDefaultCategory(false);
-    setSelectedCategory(null);
-    setCategoryInput('');
+    setError(''); setUseDefaultCategory(false); setSelectedCategory(null); setCategoryInput('');
     setCreateModal(true);
   };
 
@@ -140,14 +195,15 @@ export default function SpacesScreen() {
     ]);
   };
 
+  const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+
   return (
     <SafeAreaView style={s.container}>
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
 
-        {/* Top margin box */}
         <View style={s.topMargin} />
 
-        {/* Header row: title + description + add button */}
+        {/* Header */}
         <View style={s.headerRow}>
           <View style={{ flex: 1 }}>
             <Text style={s.sectionTitle}>spaces</Text>
@@ -159,7 +215,6 @@ export default function SpacesScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Bottom margin box */}
         <View style={s.bottomMargin} />
 
         {/* All spaces */}
@@ -168,18 +223,21 @@ export default function SpacesScreen() {
           activeOpacity={0.8}
           onPress={() => router.push({ pathname: '/(app)/space-detail', params: { spaceId: 'all', name: 'all spaces' } })}>
           <Text style={s.allSpacesText}>all spaces</Text>
-          <Ionicons name="chevron-forward" size={14} color="#80b0dd" style={{ marginLeft: 'auto' }} />
+          <Ionicons name="chevron-forward" size={14} color={C.pastelAzure} style={{ marginLeft: 'auto' }} />
         </TouchableOpacity>
 
         {/* Space cards */}
         <View style={s.grid}>
           {spaces.map(space => {
+            const isExpense = (space.space_type ?? 'expense') === 'expense';
             const spent = space.spent ?? 0;
+            const saved = space.saved ?? 0;
             const budget = space.budget ?? 0;
-            const pct = budget > 0 ? Math.min(spent / budget, 1) : 0;
+            const pct = budget > 0 ? Math.min((isExpense ? spent : saved) / budget, 1) : 0;
             const remaining = Math.max(0, budget - spent);
-            // This month's recordings count
-            const now = new Date();
+            const upcoming = space.upcomingTasks ?? 0;
+            const name = space.name.charAt(0).toUpperCase() + space.name.slice(1);
+
             return (
               <View key={space.id} style={s.spaceCard}>
                 <TouchableOpacity
@@ -187,39 +245,63 @@ export default function SpacesScreen() {
                   activeOpacity={0.85}
                   onPress={() => router.push({ pathname: '/(app)/space-detail', params: { spaceId: space.id, name: space.name, color: space.color } })}
                 >
-                  {/* Space name + menu */}
-                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                    <Text style={s.spaceCardText} numberOfLines={1}>
-                      {space.name.charAt(0).toUpperCase() + space.name.slice(1)}
-                    </Text>
-                    <TouchableOpacity onPress={() => openMenu(space)} style={{ padding: 4 }} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-                      <Ionicons name="ellipsis-horizontal" size={14} color="#80b0dd" />
+                  {/* Name row + type badge + menu */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+                    <Text style={s.spaceCardText} numberOfLines={1}>{name}</Text>
+                    <View style={[s.typeBadge, { backgroundColor: isExpense ? C.lightRed : C.lightTurq }]}>
+                      <Text style={s.typeBadgeText}>{isExpense ? 'expense' : 'savings'}</Text>
+                    </View>
+                    <TouchableOpacity onPress={() => openMenu(space)} style={{ marginLeft: 'auto', padding: 4 }} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+                      <Ionicons name="ellipsis-horizontal" size={14} color={C.pastelAzure} />
                     </TouchableOpacity>
                   </View>
 
-                  {/* Budget row */}
-                  {budget > 0 && (
-                    <View style={{ marginBottom: 10 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                        <Text style={s.budgetLabel}>budget</Text>
-                        <View style={s.budgetDots} />
-                        <View style={s.progressPill}>
-                          <View style={[s.progressConsumed, { width: `${pct * 100}%` as any }]} />
+                  {isExpense ? (
+                    /* ── Expense layout ── */
+                    <View style={{ flexDirection: 'row', gap: 14, alignItems: 'center' }}>
+                      {/* Circular progress */}
+                      <CircularProgress pct={pct} size={60} />
+
+                      {/* Three info rows */}
+                      <View style={{ flex: 1, gap: 6 }}>
+                        <View style={s.infoRow}>
+                          <Text style={s.infoLabel}>expense</Text>
+                          <View style={s.infoDots} />
+                          <Text style={s.infoValue}>{fmt(spent)}</Text>
+                        </View>
+                        <View style={s.infoRow}>
+                          <Text style={s.infoLabel}>remaining budget</Text>
+                          <View style={s.infoDots} />
+                          <Text style={s.infoValue}>{budget > 0 ? fmt(remaining) : '—'}</Text>
+                        </View>
+                        <View style={s.infoRow}>
+                          <Text style={s.infoLabel}>upcoming events</Text>
+                          <View style={s.infoDots} />
+                          <Text style={s.infoValue}>{upcoming}</Text>
                         </View>
                       </View>
                     </View>
-                  )}
+                  ) : (
+                    /* ── Savings layout ── */
+                    <View style={{ gap: 10 }}>
+                      {/* Savings pill progress */}
+                      <View style={s.savingsPill}>
+                        <View style={[s.savingsConsumed, { flex: pct, minWidth: pct > 0 ? 8 : 0 }]}>
+                          {pct > 0.2 && <Text style={s.savingsConsumedText}>{fmt(saved)}</Text>}
+                        </View>
+                        <View style={[s.savingsRemaining, { flex: 1 - pct, minWidth: (1 - pct) > 0 ? 8 : 0 }]}>
+                          {(1 - pct) > 0.2 && <Text style={s.savingsRemainingText}>{budget > 0 ? fmt(remaining) : '—'}</Text>}
+                        </View>
+                      </View>
 
-                  {/* This month's events */}
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <Text style={s.eventsLabel}>this month's events</Text>
-                    <View style={s.eventsDots} />
-                    <View style={s.eventsBadge}>
-                      <Text style={s.eventsBadgeText}>
-                        {(space.pendingTasks ?? 0)} task{(space.pendingTasks ?? 0) !== 1 ? 's' : ''}
-                      </Text>
+                      {/* Upcoming events */}
+                      <View style={s.infoRow}>
+                        <Text style={s.infoLabel}>upcoming events</Text>
+                        <View style={s.infoDots} />
+                        <Text style={s.infoValue}>{upcoming}</Text>
+                      </View>
                     </View>
-                  </View>
+                  )}
                 </TouchableOpacity>
               </View>
             );
@@ -227,9 +309,24 @@ export default function SpacesScreen() {
         </View>
       </ScrollView>
 
-      {/* Create space sheet */}
+      {/* Create/edit space sheet */}
       <BottomSheet visible={createModal} onClose={() => { setCreateModal(false); setEditMode(false); }} sub="spaces" title={editMode ? 'edit space' : 'new space'}>
         {error ? <Text style={formStyles.errorText}>{error}</Text> : null}
+
+        {/* Type selector */}
+        <Text style={formStyles.sectionLabel}>type</Text>
+        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 4 }}>
+          {(['expense', 'savings'] as const).map(t => (
+            <TouchableOpacity
+              key={t}
+              style={[s.typeBtn, spaceType === t && s.typeBtnActive]}
+              onPress={() => setSpaceType(t)}
+            >
+              <Text style={[s.typeBtnText, spaceType === t && s.typeBtnTextActive]}>{t} tracker</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
         <Text style={formStyles.sectionLabel}>name</Text>
         <TextInput
           style={[formStyles.input, error ? { borderColor: Colors.danger } : null]}
@@ -252,57 +349,6 @@ export default function SpacesScreen() {
           keyboardType="decimal-pad"
         />
         <Text style={formStyles.hintMuted}>leave empty for no budget limit</Text>
-
-        <Text style={formStyles.sectionLabel}>default category</Text>
-        <View style={s.toggleRow}>
-          <Text style={s.toggleLabel}>use a default category?</Text>
-          <TouchableOpacity
-            style={[s.toggleBtn, useDefaultCategory && s.toggleBtnActive]}
-            onPress={() => { setUseDefaultCategory(!useDefaultCategory); setSelectedCategory(null); setCategoryInput(''); }}>
-            <Text style={[s.toggleBtnText, useDefaultCategory && s.toggleBtnTextActive]}>
-              {useDefaultCategory ? 'yes' : 'no'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {useDefaultCategory && (
-          selectedCategory ? (
-            <View style={s.badgeRow}>
-              <View style={[s.badge, { backgroundColor: selectedCategory.color }]}>
-                <Ionicons name={selectedCategory.icon as any} size={14} color={Colors.text} />
-                <Text style={s.badgeText}>{selectedCategory.name}</Text>
-                <TouchableOpacity onPress={() => setSelectedCategory(null)}>
-                  <Ionicons name="close" size={14} color={Colors.text} />
-                </TouchableOpacity>
-              </View>
-            </View>
-          ) : (
-            <>
-              <TextInput
-                style={[formStyles.input, { marginTop: 8 }]}
-                placeholder="search categories..."
-                placeholderTextColor={Colors.faint}
-                value={categoryInput}
-                onChangeText={handleCategoryInput}
-              />
-              {categorySuggestions.length > 0 && (
-                <View style={s.suggestions}>
-                  {categorySuggestions.map(c => (
-                    <TouchableOpacity key={c.id} style={formStyles.listItem} onPress={() => { setSelectedCategory(c); setCategoryInput(''); setCategorySuggestions([]); }}>
-                      <View style={[s.catDot, { backgroundColor: c.color }]}>
-                        <Ionicons name={c.icon as any} size={12} color={Colors.text} />
-                      </View>
-                      <Text style={formStyles.listItemText}>{c.name}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
-              {categoryInput.trim() !== '' && categorySuggestions.length === 0 && (
-                <Text style={formStyles.listEmpty}>no categories found</Text>
-              )}
-            </>
-          )
-        )}
 
         <View style={formStyles.actions}>
           <TouchableOpacity style={formStyles.cancelBtn} onPress={() => setCreateModal(false)}>
@@ -337,17 +383,15 @@ export default function SpacesScreen() {
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#ffffff' },
   scroll: { paddingHorizontal: PAGE_PAD, paddingBottom: 60 },
-
-  // Margin boxes
   topMargin: { height: 32 },
   bottomMargin: { height: 40 },
 
   // Header
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   sectionTitle: { fontFamily: Fonts.calSans, fontSize: 32, color: '#494a51', letterSpacing: -0.5 },
-  sectionSubtitle: { fontFamily: 'GlacialIndifference', fontSize: 13, color: '#8a8f9e', marginTop: 3 },
+  sectionSubtitle: { fontFamily: 'GlacialIndifference', fontSize: 13, color: C.gray, marginTop: 3 },
   addBtn: {
-    backgroundColor: '#929090',
+    backgroundColor: C.darkVividBlue,
     borderRadius: Radius.pill,
     paddingVertical: 10,
     paddingHorizontal: 16,
@@ -359,9 +403,8 @@ const s = StyleSheet.create({
   },
   addBtnText: { fontFamily: 'GlacialIndifference', fontSize: 12, color: '#ffffff' },
 
-  // All spaces card
+  // All spaces
   allSpacesCard: {
-    width: '100%',
     borderRadius: Radius.lg,
     paddingVertical: 14,
     paddingHorizontal: 20,
@@ -375,41 +418,63 @@ const s = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
   },
-  allSpacesText: { fontFamily: Fonts.calSans, fontSize: 15, color: '#4a7ff7' },
+  allSpacesText: { fontFamily: Fonts.calSans, fontSize: 15, color: C.vividBlue },
 
-  // Grid
-  grid: { flexDirection: 'column', gap: 12 },
+  grid: { flexDirection: 'column', gap: 14 },
 
   // Space card
   spaceCard: {
-    width: '100%',
     borderRadius: Radius.lg,
     padding: 18,
     backgroundColor: '#ffffff',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
+    shadowOpacity: 0.07,
+    shadowRadius: 10,
     elevation: 3,
   },
-  spaceCardText: { fontFamily: Fonts.calSans, fontSize: 17, color: '#4a7ff7', flex: 1 },
+  spaceCardText: { fontFamily: Fonts.calSans, fontSize: 17, color: C.vividBlue, flexShrink: 1 },
 
-  // Budget
-  budgetLabel: { fontFamily: 'GlacialIndifference', fontSize: 11, color: '#929090' },
-  budgetDots: { flex: 1, borderBottomWidth: 1, borderStyle: 'dotted', borderColor: '#e0e0e0' },
-  budgetValue: { fontFamily: 'GlacialIndifference', fontSize: 11, color: '#929090' },
-  // Progress pill: fixed width, consumed (#4a7ff7) + remaining (#edf2ff)
-  progressPill: { width: 80, height: 8, borderRadius: Radius.pill, overflow: 'hidden', backgroundColor: '#edf2ff', flexDirection: 'row' },
-  progressConsumed: { backgroundColor: '#4a7ff7', height: '100%' },
-  progressConsumedText: { fontFamily: 'GlacialIndifference', fontSize: 9, color: '#d1e9ff', paddingHorizontal: 4 },
-  progressRemaining: { backgroundColor: '#edf2ff', height: '100%' },
-  progressRemainingText: { fontFamily: 'GlacialIndifference', fontSize: 9, color: '#4a7ff7', paddingHorizontal: 4 },
+  // Type badge
+  typeBadge: { borderRadius: Radius.pill, paddingHorizontal: 8, paddingVertical: 3 },
+  typeBadgeText: { fontFamily: 'GlacialIndifference', fontSize: 10, color: C.grayCyan },
 
-  // Events
-  eventsLabel: { fontFamily: 'GlacialIndifference', fontSize: 11, color: '#929090' },
-  eventsDots: { flex: 1, borderBottomWidth: 1, borderStyle: 'dotted', borderColor: '#e0e0e0' },
-  eventsBadge: { backgroundColor: '#929090', borderRadius: Radius.pill, paddingHorizontal: 10, paddingVertical: 3 },
-  eventsBadgeText: { fontFamily: 'GlacialIndifference', fontSize: 10, color: '#ffffff' },
+  // Info rows
+  infoRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  infoLabel: { fontFamily: 'GlacialIndifference', fontSize: 11, color: C.gray, flexShrink: 0 },
+  infoDots: { flex: 1, borderBottomWidth: 1, borderStyle: 'dotted', borderColor: C.pastelAzure },
+  infoValue: { fontFamily: 'GlacialIndifference', fontSize: 11, color: C.vividBlue, flexShrink: 0 },
+
+  // Savings pill
+  savingsPill: {
+    height: 24,
+    borderRadius: Radius.pill,
+    overflow: 'hidden',
+    backgroundColor: C.lightBlue,
+    flexDirection: 'row',
+  },
+  savingsConsumed: {
+    backgroundColor: C.darkVividBlue,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  savingsConsumedText: { fontFamily: 'GlacialIndifference', fontSize: 9, color: C.lightBlue, paddingHorizontal: 6 },
+  savingsRemaining: {
+    backgroundColor: C.lightBlue,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  savingsRemainingText: { fontFamily: 'GlacialIndifference', fontSize: 9, color: C.darkVividBlue, paddingHorizontal: 6 },
+
+  // Type selector in form
+  typeBtn: {
+    flex: 1, paddingVertical: 10, borderRadius: Radius.pill,
+    borderWidth: 1, borderColor: Colors.borderMid,
+    backgroundColor: Colors.surface, alignItems: 'center',
+  },
+  typeBtnActive: { backgroundColor: C.vividBlue, borderColor: C.vividBlue },
+  typeBtnText: { fontFamily: 'GlacialIndifference', fontSize: 12, color: C.gray },
+  typeBtnTextActive: { color: '#ffffff' },
 
   // Form
   toggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },
@@ -423,12 +488,4 @@ const s = StyleSheet.create({
   badgeText: { fontFamily: Fonts.sansBold, fontSize: 14, color: Colors.text },
   suggestions: { backgroundColor: Colors.input, borderRadius: Radius.md, marginTop: 4, overflow: 'hidden', borderWidth: 1, borderColor: Colors.borderMid },
   catDot: { width: 24, height: 24, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-  colorRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  colorDot: { width: 30, height: 30, borderRadius: 15 },
-  colorDotSelected: { borderWidth: 3, borderColor: Colors.text },
-  iconRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  iconBtn: { width: 44, height: 44, borderRadius: Radius.md, backgroundColor: Colors.input, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: Colors.borderMid },
-  iconBtnSelected: { backgroundColor: Colors.text, borderColor: Colors.text },
-  preview: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: Radius.pill, paddingVertical: 14, paddingHorizontal: 16, marginTop: 4 },
-  previewText: { fontFamily: Fonts.sansBold, fontSize: 14, color: Colors.text },
 });
