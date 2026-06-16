@@ -189,7 +189,9 @@ export default function SpacesScreen() {
                 >
                   {/* Space name + menu */}
                   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                    <Text style={s.spaceCardText} numberOfLines={1}>{space.name}</Text>
+                    <Text style={s.spaceCardText} numberOfLines={1}>
+                      {space.name.charAt(0).toUpperCase() + space.name.slice(1)}
+                    </Text>
                     <TouchableOpacity onPress={() => openMenu(space)} style={{ padding: 4 }} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
                       <Ionicons name="ellipsis-horizontal" size={14} color="#80b0dd" />
                     </TouchableOpacity>
@@ -205,13 +207,14 @@ export default function SpacesScreen() {
                           {spent.toLocaleString('en-US', { maximumFractionDigits: 0 })} / {budget.toLocaleString('en-US', { maximumFractionDigits: 0 })}
                         </Text>
                       </View>
-                      {/* Progress bar */}
-                      <View style={s.progressTrack}>
-                        <View style={[s.progressFill, { width: `${pct * 100}%` as any }]} />
-                      </View>
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
-                        <Text style={s.progressLabelConsumed}>{spent.toLocaleString('en-US', { maximumFractionDigits: 0 })} spent</Text>
-                        <Text style={s.progressLabelRemaining}>{remaining.toLocaleString('en-US', { maximumFractionDigits: 0 })} left</Text>
+                      {/* Progress pill */}
+                      <View style={s.progressPill}>
+                        <View style={[s.progressConsumed, { flex: pct }]}>
+                          {pct > 0.15 && <Text style={s.progressConsumedText}>{spent.toLocaleString('en-US', { maximumFractionDigits: 0 })}</Text>}
+                        </View>
+                        <View style={[s.progressRemaining, { flex: 1 - pct }]}>
+                          {(1 - pct) > 0.15 && <Text style={s.progressRemainingText}>{remaining.toLocaleString('en-US', { maximumFractionDigits: 0 })}</Text>}
+                        </View>
                       </View>
                     </View>
                   )}
@@ -404,10 +407,12 @@ const s = StyleSheet.create({
   budgetLabel: { fontFamily: 'GlacialIndifference', fontSize: 11, color: '#80b0dd' },
   budgetDots: { flex: 1, borderBottomWidth: 1, borderStyle: 'dotted', borderColor: '#80b0dd' },
   budgetValue: { fontFamily: 'GlacialIndifference', fontSize: 11, color: '#80b0dd' },
-  progressTrack: { height: 6, backgroundColor: '#d1e9ff', borderRadius: Radius.pill, overflow: 'hidden' },
-  progressFill: { height: '100%', backgroundColor: '#80b0dd', borderRadius: Radius.pill },
-  progressLabelConsumed: { fontFamily: 'GlacialIndifference', fontSize: 9, color: '#d1e9ff', backgroundColor: '#80b0dd', paddingHorizontal: 6, paddingVertical: 2, borderRadius: Radius.pill },
-  progressLabelRemaining: { fontFamily: 'GlacialIndifference', fontSize: 9, color: '#80b0dd', backgroundColor: '#d1e9ff', paddingHorizontal: 6, paddingVertical: 2, borderRadius: Radius.pill },
+  // Single pill: consumed (#80b0dd) + remaining (#d1e9ff)
+  progressPill: { flexDirection: 'row', height: 22, borderRadius: Radius.pill, overflow: 'hidden', backgroundColor: '#d1e9ff' },
+  progressConsumed: { backgroundColor: '#80b0dd', justifyContent: 'center', alignItems: 'center', minWidth: 2 },
+  progressConsumedText: { fontFamily: 'GlacialIndifference', fontSize: 9, color: '#d1e9ff', paddingHorizontal: 4 },
+  progressRemaining: { backgroundColor: '#d1e9ff', justifyContent: 'center', alignItems: 'center', minWidth: 2 },
+  progressRemainingText: { fontFamily: 'GlacialIndifference', fontSize: 9, color: '#80b0dd', paddingHorizontal: 4 },
 
   // Events
   eventsLabel: { fontFamily: 'GlacialIndifference', fontSize: 11, color: '#80b0dd' },
