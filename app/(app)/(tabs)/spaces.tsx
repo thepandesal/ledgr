@@ -204,8 +204,7 @@ export default function SpacesScreen() {
                         <Text style={s.budgetLabel}>budget</Text>
                         <View style={s.budgetDots} />
                         <View style={s.progressPill}>
-                          <View style={[s.progressConsumed, { flex: pct }]} />
-                          <View style={[s.progressRemaining, { flex: 1 - pct }]} />
+                          <View style={[s.progressConsumed, { width: `${pct * 100}%` as any }]} />
                         </View>
                       </View>
                     </View>
@@ -336,19 +335,19 @@ export default function SpacesScreen() {
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f7fa' },
+  container: { flex: 1, backgroundColor: '#ffffff' },
   scroll: { paddingHorizontal: PAGE_PAD, paddingBottom: 60 },
 
   // Margin boxes
   topMargin: { height: 32 },
-  bottomMargin: { height: 20 },
+  bottomMargin: { height: 40 },
 
   // Header
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   sectionTitle: { fontFamily: Fonts.calSans, fontSize: 32, color: '#494a51', letterSpacing: -0.5 },
   sectionSubtitle: { fontFamily: 'GlacialIndifference', fontSize: 13, color: '#8a8f9e', marginTop: 3 },
   addBtn: {
-    backgroundColor: '#ffffff',
+    backgroundColor: '#929090',
     borderRadius: Radius.pill,
     paddingVertical: 10,
     paddingHorizontal: 16,
@@ -357,8 +356,6 @@ const s = StyleSheet.create({
     gap: 6,
     alignSelf: 'stretch',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#e8e8e8',
   },
   addBtnText: { fontFamily: 'GlacialIndifference', fontSize: 12, color: '#ffffff' },
 
@@ -371,7 +368,7 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#ffffff',
-    marginBottom: 10,
+    marginBottom: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.06,
@@ -398,20 +395,20 @@ const s = StyleSheet.create({
   spaceCardText: { fontFamily: Fonts.calSans, fontSize: 17, color: '#4a7ff7', flex: 1 },
 
   // Budget
-  budgetLabel: { fontFamily: 'GlacialIndifference', fontSize: 11, color: '#80b0dd' },
-  budgetDots: { flex: 1, borderBottomWidth: 1, borderStyle: 'dotted', borderColor: '#80b0dd' },
-  budgetValue: { fontFamily: 'GlacialIndifference', fontSize: 11, color: '#80b0dd' },
-  // Single pill: consumed (#80b0dd) + remaining (#d1e9ff)
-  progressPill: { flexDirection: 'row', height: 22, borderRadius: Radius.pill, overflow: 'hidden', backgroundColor: '#d1e9ff' },
-  progressConsumed: { backgroundColor: '#80b0dd', justifyContent: 'center', alignItems: 'center', minWidth: 2 },
+  budgetLabel: { fontFamily: 'GlacialIndifference', fontSize: 11, color: '#929090' },
+  budgetDots: { flex: 1, borderBottomWidth: 1, borderStyle: 'dotted', borderColor: '#e0e0e0' },
+  budgetValue: { fontFamily: 'GlacialIndifference', fontSize: 11, color: '#929090' },
+  // Progress pill: fixed width, consumed (#4a7ff7) + remaining (#edf2ff)
+  progressPill: { width: 80, height: 8, borderRadius: Radius.pill, overflow: 'hidden', backgroundColor: '#edf2ff', flexDirection: 'row' },
+  progressConsumed: { backgroundColor: '#4a7ff7', height: '100%' },
   progressConsumedText: { fontFamily: 'GlacialIndifference', fontSize: 9, color: '#d1e9ff', paddingHorizontal: 4 },
-  progressRemaining: { backgroundColor: '#d1e9ff', justifyContent: 'center', alignItems: 'center', minWidth: 2 },
-  progressRemainingText: { fontFamily: 'GlacialIndifference', fontSize: 9, color: '#80b0dd', paddingHorizontal: 4 },
+  progressRemaining: { backgroundColor: '#edf2ff', height: '100%' },
+  progressRemainingText: { fontFamily: 'GlacialIndifference', fontSize: 9, color: '#4a7ff7', paddingHorizontal: 4 },
 
   // Events
-  eventsLabel: { fontFamily: 'GlacialIndifference', fontSize: 11, color: '#80b0dd' },
-  eventsDots: { flex: 1, borderBottomWidth: 1, borderStyle: 'dotted', borderColor: '#80b0dd' },
-  eventsBadge: { backgroundColor: '#80b0dd', borderRadius: Radius.pill, paddingHorizontal: 10, paddingVertical: 3 },
+  eventsLabel: { fontFamily: 'GlacialIndifference', fontSize: 11, color: '#929090' },
+  eventsDots: { flex: 1, borderBottomWidth: 1, borderStyle: 'dotted', borderColor: '#e0e0e0' },
+  eventsBadge: { backgroundColor: '#929090', borderRadius: Radius.pill, paddingHorizontal: 10, paddingVertical: 3 },
   eventsBadgeText: { fontFamily: 'GlacialIndifference', fontSize: 10, color: '#ffffff' },
 
   // Form
