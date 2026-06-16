@@ -36,15 +36,13 @@ interface SpaceData {
 
 // ─── Circular progress ────────────────────────────────────────────────────────
 function CircularProgress({ pct, size = 56 }: { pct: number; size?: number }) {
-  const stroke = 5;
+  const stroke = 15;
   const r = (size - stroke) / 2;
   const circ = 2 * Math.PI * r;
   const filled = circ * Math.min(pct, 1);
   const cx = size / 2;
   const cy = size / 2;
 
-  // Use a simple SVG-like approach with View rotation trick
-  // Since we can't use SVG directly without expo-svg, use a border arc trick
   const deg = Math.min(pct, 1) * 360;
 
   return (
@@ -55,7 +53,7 @@ function CircularProgress({ pct, size = 56 }: { pct: number; size?: number }) {
         borderRadius: size / 2, borderWidth: stroke,
         borderColor: C.lightBlue,
       }} />
-      {/* Filled arc — use clip trick */}
+      {/* Filled arc */}
       {deg > 0 && (
         <View style={{
           position: 'absolute', width: size, height: size,
@@ -382,7 +380,7 @@ export default function SpacesScreen() {
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#ffffff' },
-  scroll: { paddingHorizontal: PAGE_PAD, paddingBottom: 60 },
+  scroll: { paddingHorizontal: 32, paddingBottom: 60 },
   topMargin: { height: 32 },
   bottomMargin: { height: 40 },
 
@@ -443,20 +441,22 @@ const s = StyleSheet.create({
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   infoLabel: { fontFamily: 'GlacialIndifference', fontSize: 11, color: C.gray, flexShrink: 0 },
   infoDots: { flex: 1, borderBottomWidth: 1, borderStyle: 'dotted', borderColor: C.pastelAzure },
-  infoValue: { fontFamily: 'GlacialIndifference', fontSize: 11, color: C.vividBlue, flexShrink: 0 },
+  infoValue: { fontFamily: 'GlacialIndifferenceBold', fontSize: 11, color: C.vividBlue, flexShrink: 0 },
 
   // Savings pill
   savingsPill: {
     height: 24,
     borderRadius: Radius.pill,
-    overflow: 'hidden',
+    overflow: 'visible',
     backgroundColor: C.lightBlue,
     flexDirection: 'row',
+    borderRadius: Radius.pill,
   },
   savingsConsumed: {
     backgroundColor: C.darkVividBlue,
     justifyContent: 'center',
     alignItems: 'center',
+    borderRadius: Radius.pill,
   },
   savingsConsumedText: { fontFamily: 'GlacialIndifference', fontSize: 9, color: C.lightBlue, paddingHorizontal: 6 },
   savingsRemaining: {
