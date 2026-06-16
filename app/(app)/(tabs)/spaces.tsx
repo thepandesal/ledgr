@@ -203,17 +203,9 @@ export default function SpacesScreen() {
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                         <Text style={s.budgetLabel}>budget</Text>
                         <View style={s.budgetDots} />
-                        <Text style={s.budgetValue}>
-                          {spent.toLocaleString('en-US', { maximumFractionDigits: 0 })} / {budget.toLocaleString('en-US', { maximumFractionDigits: 0 })}
-                        </Text>
-                      </View>
-                      {/* Progress pill */}
-                      <View style={s.progressPill}>
-                        <View style={[s.progressConsumed, { flex: pct }]}>
-                          {pct > 0.15 && <Text style={s.progressConsumedText}>{spent.toLocaleString('en-US', { maximumFractionDigits: 0 })}</Text>}
-                        </View>
-                        <View style={[s.progressRemaining, { flex: 1 - pct }]}>
-                          {(1 - pct) > 0.15 && <Text style={s.progressRemainingText}>{remaining.toLocaleString('en-US', { maximumFractionDigits: 0 })}</Text>}
+                        <View style={s.progressPill}>
+                          <View style={[s.progressConsumed, { flex: pct }]} />
+                          <View style={[s.progressRemaining, { flex: 1 - pct }]} />
                         </View>
                       </View>
                     </View>
@@ -356,7 +348,7 @@ const s = StyleSheet.create({
   sectionTitle: { fontFamily: Fonts.calSans, fontSize: 32, color: '#494a51', letterSpacing: -0.5 },
   sectionSubtitle: { fontFamily: 'GlacialIndifference', fontSize: 13, color: '#8a8f9e', marginTop: 3 },
   addBtn: {
-    backgroundColor: '#4a7ff7',
+    backgroundColor: '#ffffff',
     borderRadius: Radius.pill,
     paddingVertical: 10,
     paddingHorizontal: 16,
@@ -365,6 +357,8 @@ const s = StyleSheet.create({
     gap: 6,
     alignSelf: 'stretch',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#e8e8e8',
   },
   addBtnText: { fontFamily: 'GlacialIndifference', fontSize: 12, color: '#ffffff' },
 
