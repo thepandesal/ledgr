@@ -57,6 +57,8 @@ export const Fonts = {
 
   // CalSans
   calSans: 'CalSans',
+  glacial: 'GlacialIndifference',
+  glacialBold: 'GlacialIndifferenceBold',
 
   // Body / data / labels
   mono: 'RobotoMono_400Regular',

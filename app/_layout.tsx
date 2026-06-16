@@ -34,6 +34,8 @@ export default function RootLayout() {
     MuseoModerno_Medium: require('../assets/MuseoModerno-Medium.ttf'),
     MuseoModerno_Regular: require('../assets/MuseoModerno-Regular.ttf'),
     CalSans: require('../assets/CalSans-Regular.ttf'),
+    GlacialIndifference: require('../assets/GlacialIndifference-Regular.otf'),
+    GlacialIndifferenceBold: require('../assets/GlacialIndifference-Bold.otf'),
   });
 
   const router = useRouter();

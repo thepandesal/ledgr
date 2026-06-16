@@ -221,7 +221,7 @@ const s = StyleSheet.create({
   navGap: { height: 20 },
   navPill: {
     flexDirection: 'row',
-    backgroundColor: '#425252',
+    backgroundColor: '#223651',
     marginHorizontal: 20,
     borderRadius: 20,
     paddingVertical: 10,

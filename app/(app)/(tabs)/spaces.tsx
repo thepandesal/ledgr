@@ -142,47 +142,94 @@ export default function SpacesScreen() {
 
   return (
     <SafeAreaView style={s.container}>
-
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
 
-        {/* Section title */}
-        <Text style={s.sectionTitle}>spaces</Text>
-        <Text style={s.sectionSubtitle}>your money, grouped your way.</Text>
+        {/* Top margin box */}
+        <View style={s.topMargin} />
 
+        {/* Header row: title + description + add button */}
+        <View style={s.headerRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={s.sectionTitle}>spaces</Text>
+            <Text style={s.sectionSubtitle}>your money, grouped your way.</Text>
+          </View>
+          <TouchableOpacity style={s.addBtn} activeOpacity={0.85} onPress={openCreate}>
+            <Ionicons name="add" size={16} color="#fff" />
+            <Text style={s.addBtnText}>add a space</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Bottom margin box */}
+        <View style={s.bottomMargin} />
+
+        {/* All spaces */}
+        <TouchableOpacity
+          style={s.allSpacesCard}
+          activeOpacity={0.8}
+          onPress={() => router.push({ pathname: '/(app)/space-detail', params: { spaceId: 'all', name: 'all spaces' } })}>
+          <Text style={s.allSpacesText}>all spaces</Text>
+          <Ionicons name="chevron-forward" size={14} color="#80b0dd" style={{ marginLeft: 'auto' }} />
+        </TouchableOpacity>
+
+        {/* Space cards */}
         <View style={s.grid}>
+          {spaces.map(space => {
+            const spent = space.spent ?? 0;
+            const budget = space.budget ?? 0;
+            const pct = budget > 0 ? Math.min(spent / budget, 1) : 0;
+            const remaining = Math.max(0, budget - spent);
+            // This month's recordings count
+            const now = new Date();
+            return (
+              <View key={space.id} style={s.spaceCard}>
+                <TouchableOpacity
+                  style={{ flex: 1 }}
+                  activeOpacity={0.85}
+                  onPress={() => router.push({ pathname: '/(app)/space-detail', params: { spaceId: space.id, name: space.name, color: space.color } })}
+                >
+                  {/* Space name + menu */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                    <Text style={s.spaceCardText} numberOfLines={1}>{space.name}</Text>
+                    <TouchableOpacity onPress={() => openMenu(space)} style={{ padding: 4 }} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+                      <Ionicons name="ellipsis-horizontal" size={14} color="#80b0dd" />
+                    </TouchableOpacity>
+                  </View>
 
-          {/* All spaces */}
-          <TouchableOpacity
-            style={s.allSpacesCard}
-            activeOpacity={0.8}
-            onPress={() => router.push({ pathname: '/(app)/space-detail', params: { spaceId: 'all', name: 'all spaces' } })}>
-            <Text style={s.allSpacesText}>all spaces</Text>
-          </TouchableOpacity>
+                  {/* Budget row */}
+                  {budget > 0 && (
+                    <View style={{ marginBottom: 10 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                        <Text style={s.budgetLabel}>budget</Text>
+                        <View style={s.budgetDots} />
+                        <Text style={s.budgetValue}>
+                          {spent.toLocaleString('en-US', { maximumFractionDigits: 0 })} / {budget.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                        </Text>
+                      </View>
+                      {/* Progress bar */}
+                      <View style={s.progressTrack}>
+                        <View style={[s.progressFill, { width: `${pct * 100}%` as any }]} />
+                      </View>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
+                        <Text style={s.progressLabelConsumed}>{spent.toLocaleString('en-US', { maximumFractionDigits: 0 })} spent</Text>
+                        <Text style={s.progressLabelRemaining}>{remaining.toLocaleString('en-US', { maximumFractionDigits: 0 })} left</Text>
+                      </View>
+                    </View>
+                  )}
 
-          {/* Space cards */}
-          {spaces.map(space => (
-            <View key={space.id} style={s.spaceCard}>
-              <TouchableOpacity style={s.spaceCardMain} activeOpacity={0.8}
-                onPress={() => router.push({ pathname: '/(app)/space-detail', params: { spaceId: space.id, name: space.name, color: space.color } })}>
-                <Text style={s.spaceCardText} numberOfLines={1}>{space.name.toLowerCase()}</Text>
-                <Text style={s.spaceCardMeta} numberOfLines={1}>
-                  {(space.spent ?? 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                  {space.budget ? ` / ${space.budget.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : ''}
-                  {(space.pendingTasks ?? 0) > 0 ? ` · ${space.pendingTasks} task${space.pendingTasks === 1 ? '' : 's'}` : ''}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => openMenu(space)} style={s.spaceMenuBtn}>
-                <Ionicons name="ellipsis-vertical" size={14} color={Colors.text} />
-              </TouchableOpacity>
-            </View>
-          ))}
-
-          {/* Add a space */}
-          <TouchableOpacity style={s.addCard} activeOpacity={0.8} onPress={openCreate}>
-            <Ionicons name="add" size={14} color={Colors.muted} />
-            <Text style={s.addCardText}>add a space</Text>
-          </TouchableOpacity>
-
+                  {/* This month's events */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Text style={s.eventsLabel}>this month's events</Text>
+                    <View style={s.eventsDots} />
+                    <View style={s.eventsBadge}>
+                      <Text style={s.eventsBadgeText}>
+                        {(space.pendingTasks ?? 0)} task{(space.pendingTasks ?? 0) !== 1 ? 's' : ''}
+                      </Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              </View>
+            );
+          })}
         </View>
       </ScrollView>
 
@@ -294,61 +341,81 @@ export default function SpacesScreen() {
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.white },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: PAGE_PAD, paddingTop: 32, paddingBottom: 16 },
-  avatarFallback: { width: 34, height: 34, borderRadius: 17, backgroundColor: Colors.borderMid, justifyContent: 'center', alignItems: 'center' },
-  greeting: { fontFamily: Fonts.museoRegular, fontSize: 16, color: Colors.muted },
-  greetingName: { fontFamily: Fonts.museoRegular, color: Colors.text },
-  scroll: { paddingHorizontal: PAGE_PAD, paddingBottom: 40, paddingTop: 8 },
-  sectionTitle: { fontFamily: Fonts.calSans, fontSize: 36, color: '#425252', marginBottom: 4 },
-  sectionSubtitle: { fontFamily: 'ChillaxRegular', fontSize: 13, color: Colors.muted, marginBottom: 20 },
-  grid: { flexDirection: 'column', gap: 10 },
+  container: { flex: 1, backgroundColor: '#f5f7fa' },
+  scroll: { paddingHorizontal: PAGE_PAD, paddingBottom: 60 },
 
-  // All spaces
-  allSpacesCard: {
-    width: '100%',
+  // Margin boxes
+  topMargin: { height: 32 },
+  bottomMargin: { height: 20 },
+
+  // Header
+  headerRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  sectionTitle: { fontFamily: Fonts.calSans, fontSize: 32, color: '#494a51', letterSpacing: -0.5 },
+  sectionSubtitle: { fontFamily: 'GlacialIndifference', fontSize: 13, color: '#8a8f9e', marginTop: 3 },
+  addBtn: {
+    backgroundColor: '#4a7ff7',
     borderRadius: Radius.pill,
-    paddingVertical: 14,
-    paddingHorizontal: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
     flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f0ff97',
-  },
-  allSpacesText: { fontFamily: 'ChillaxMedium', fontSize: 15, color: '#292929' },
-
-  // Space cards
-  spaceCard: { width: '100%', borderRadius: Radius.pill, paddingVertical: 14, paddingLeft: 20, paddingRight: 12, flexDirection: 'row', alignItems: 'center', backgroundColor: '#d8efea' },
-  spaceCardMain: { flex: 1 },
-  spaceCardText: { fontFamily: 'ChillaxMedium', fontSize: 15, color: '#292929' },
-  spaceCardMeta: { fontFamily: Fonts.mono, fontSize: 9, color: '#5a7a72', marginTop: 2 },
-  spaceMenuBtn: { padding: 6 },
-
-  // Add a space
-  addCard: {
-    width: '100%',
-    borderRadius: Radius.pill,
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
     gap: 6,
-    borderWidth: 2,
-    borderStyle: 'dotted',
-    borderColor: Colors.cyan,
-    backgroundColor: 'transparent',
+    alignSelf: 'stretch',
+    justifyContent: 'center',
   },
-  addCardText: { fontFamily: 'ChillaxMedium', fontSize: 13, color: Colors.muted },
+  addBtnText: { fontFamily: 'GlacialIndifference', fontSize: 12, color: '#ffffff' },
+
+  // All spaces card
+  allSpacesCard: {
+    width: '100%',
+    borderRadius: Radius.lg,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  allSpacesText: { fontFamily: Fonts.calSans, fontSize: 15, color: '#4a7ff7' },
+
+  // Grid
+  grid: { flexDirection: 'column', gap: 12 },
+
+  // Space card
+  spaceCard: {
+    width: '100%',
+    borderRadius: Radius.lg,
+    padding: 18,
+    backgroundColor: '#ffffff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  spaceCardText: { fontFamily: Fonts.calSans, fontSize: 17, color: '#4a7ff7', flex: 1 },
+
+  // Budget
+  budgetLabel: { fontFamily: 'GlacialIndifference', fontSize: 11, color: '#80b0dd' },
+  budgetDots: { flex: 1, borderBottomWidth: 1, borderStyle: 'dotted', borderColor: '#80b0dd' },
+  budgetValue: { fontFamily: 'GlacialIndifference', fontSize: 11, color: '#80b0dd' },
+  progressTrack: { height: 6, backgroundColor: '#d1e9ff', borderRadius: Radius.pill, overflow: 'hidden' },
+  progressFill: { height: '100%', backgroundColor: '#80b0dd', borderRadius: Radius.pill },
+  progressLabelConsumed: { fontFamily: 'GlacialIndifference', fontSize: 9, color: '#d1e9ff', backgroundColor: '#80b0dd', paddingHorizontal: 6, paddingVertical: 2, borderRadius: Radius.pill },
+  progressLabelRemaining: { fontFamily: 'GlacialIndifference', fontSize: 9, color: '#80b0dd', backgroundColor: '#d1e9ff', paddingHorizontal: 6, paddingVertical: 2, borderRadius: Radius.pill },
+
+  // Events
+  eventsLabel: { fontFamily: 'GlacialIndifference', fontSize: 11, color: '#80b0dd' },
+  eventsDots: { flex: 1, borderBottomWidth: 1, borderStyle: 'dotted', borderColor: '#80b0dd' },
+  eventsBadge: { backgroundColor: '#80b0dd', borderRadius: Radius.pill, paddingHorizontal: 10, paddingVertical: 3 },
+  eventsBadgeText: { fontFamily: 'GlacialIndifference', fontSize: 10, color: '#ffffff' },
 
   // Form
-  colorRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  colorDot: { width: 30, height: 30, borderRadius: 15 },
-  colorDotSelected: { borderWidth: 3, borderColor: Colors.text },
-  iconRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  iconBtn: { width: 44, height: 44, borderRadius: Radius.md, backgroundColor: Colors.input, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: Colors.borderMid },
-  iconBtnSelected: { backgroundColor: Colors.text, borderColor: Colors.text },
-  preview: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: Radius.pill, paddingVertical: 14, paddingHorizontal: 16, marginTop: 4 },
-  previewText: { fontFamily: Fonts.sansBold, fontSize: 14, color: Colors.text },
   toggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },
   toggleLabel: { fontFamily: Fonts.sans, fontSize: 14, color: Colors.muted },
   toggleBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: Radius.pill, borderWidth: 1, borderColor: Colors.borderMid, backgroundColor: Colors.input },
@@ -357,8 +424,15 @@ const s = StyleSheet.create({
   toggleBtnTextActive: { color: Colors.white },
   badgeRow: { flexDirection: 'row', marginTop: 8 },
   badge: { flexDirection: 'row', alignItems: 'center', borderRadius: Radius.pill, paddingVertical: 8, paddingHorizontal: 14, gap: 6 },
-  badgeText: { fontFamily: Fonts.sansSemiBold, fontSize: 14, color: Colors.text },
+  badgeText: { fontFamily: Fonts.sansBold, fontSize: 14, color: Colors.text },
   suggestions: { backgroundColor: Colors.input, borderRadius: Radius.md, marginTop: 4, overflow: 'hidden', borderWidth: 1, borderColor: Colors.borderMid },
   catDot: { width: 24, height: 24, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+  colorRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  colorDot: { width: 30, height: 30, borderRadius: 15 },
+  colorDotSelected: { borderWidth: 3, borderColor: Colors.text },
+  iconRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  iconBtn: { width: 44, height: 44, borderRadius: Radius.md, backgroundColor: Colors.input, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: Colors.borderMid },
+  iconBtnSelected: { backgroundColor: Colors.text, borderColor: Colors.text },
+  preview: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: Radius.pill, paddingVertical: 14, paddingHorizontal: 16, marginTop: 4 },
+  previewText: { fontFamily: Fonts.sansBold, fontSize: 14, color: Colors.text },
 });
-
