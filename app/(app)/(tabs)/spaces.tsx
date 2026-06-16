@@ -143,16 +143,6 @@ export default function SpacesScreen() {
   return (
     <SafeAreaView style={s.container}>
 
-      {/* Header */}
-      <View style={s.header}>
-        <View style={s.avatarFallback}>
-          <Ionicons name="person" size={16} color={Colors.faint} />
-        </View>
-        <Text style={s.greeting}>
-          Hey, <Text style={s.greetingName}>{userName}!</Text>
-        </Text>
-      </View>
-
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
 
         {/* Section title */}
