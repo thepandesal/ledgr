@@ -31,41 +31,53 @@ const PAGE_PAD = 24;
 interface SpaceData {
   id: string; name: string; color: string; icon: string;
   budget?: number | null; spent?: number; saved?: number;
-  upcomingTasks?: number; space_type?: string;
+  upcomingTasks?: number; space_type?: string; savings_target_date?: string | null;
 }
 
 // ─── Circular progress ────────────────────────────────────────────────────────
-function CircularProgress({ pct, size = 56 }: { pct: number; size?: number }) {
+function CircularProgress({ pct, size = 60 }: { pct: number; size?: number }) {
   const stroke = 15;
-  const r = (size - stroke) / 2;
-  const circ = 2 * Math.PI * r;
-  const filled = circ * Math.min(pct, 1);
-  const cx = size / 2;
-  const cy = size / 2;
-
+  const half = size / 2;
   const deg = Math.min(pct, 1) * 360;
+  const rotate1 = deg > 180 ? 180 : deg;
+  const rotate2 = deg > 180 ? deg - 180 : 0;
 
   return (
     <View style={{ width: size, height: size, justifyContent: 'center', alignItems: 'center' }}>
-      {/* Background circle */}
+      {/* Track */}
       <View style={{
         position: 'absolute', width: size, height: size,
-        borderRadius: size / 2, borderWidth: stroke,
-        borderColor: C.lightBlue,
+        borderRadius: half, borderWidth: stroke, borderColor: C.lightBlue,
       }} />
-      {/* Filled arc */}
-      {deg > 0 && (
+
+      {/* Left half clip */}
+      <View style={{
+        position: 'absolute', width: half, height: size,
+        left: 0, overflow: 'hidden',
+      }}>
         <View style={{
           position: 'absolute', width: size, height: size,
-          borderRadius: size / 2, borderWidth: stroke,
-          borderColor: C.vividBlue,
-          borderTopColor: deg >= 90 ? C.vividBlue : 'transparent',
-          borderRightColor: deg >= 180 ? C.vividBlue : 'transparent',
-          borderBottomColor: deg >= 270 ? C.vividBlue : 'transparent',
-          borderLeftColor: deg >= 360 ? C.vividBlue : 'transparent',
-          transform: [{ rotate: '-90deg' }],
+          borderRadius: half, borderWidth: stroke,
+          borderColor: rotate1 > 0 ? C.vividBlue : 'transparent',
+          transform: [{ rotate: `${-90 + rotate1}deg` }],
         }} />
+      </View>
+
+      {/* Right half clip */}
+      {deg > 180 && (
+        <View style={{
+          position: 'absolute', width: half, height: size,
+          right: 0, overflow: 'hidden',
+        }}>
+          <View style={{
+            position: 'absolute', right: 0, width: size, height: size,
+            borderRadius: half, borderWidth: stroke,
+            borderColor: C.vividBlue,
+            transform: [{ rotate: `${-90 + rotate2}deg` }],
+          }} />
+        </View>
       )}
+
       <Text style={{ fontFamily: Fonts.monoBold, fontSize: 10, color: C.vividBlue }}>
         {Math.round(pct * 100)}%
       </Text>
@@ -81,6 +93,7 @@ export default function SpacesScreen() {
   const [spaceName, setSpaceName] = useState('');
   const [spaceBudget, setSpaceBudget] = useState('');
   const [spaceType, setSpaceType] = useState<'expense' | 'savings'>('expense');
+  const [spaceTargetDate, setSpaceTargetDate] = useState('');
   const [useDefaultCategory, setUseDefaultCategory] = useState(false);
   const [categoryInput, setCategoryInput] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
@@ -135,7 +148,7 @@ export default function SpacesScreen() {
   const openCreate = () => {
     setSpaceName(''); setError(''); setUseDefaultCategory(false);
     setSelectedCategory(null); setCategoryInput(''); setSpaceBudget('');
-    setSpaceType('expense'); setEditMode(false); setCreateModal(true);
+    setSpaceType('expense'); setSpaceTargetDate(''); setEditMode(false); setCreateModal(true);
   };
 
   const handleCategoryInput = (val: string) => {
@@ -151,6 +164,7 @@ export default function SpacesScreen() {
         name: spaceName.trim(),
         budget: spaceBudget.trim() ? parseFloat(spaceBudget) : null,
         space_type: spaceType,
+        savings_target_date: spaceType === 'savings' && spaceTargetDate.trim() ? spaceTargetDate.trim() : null,
       }).eq('id', selectedSpace.id);
       if (err) { setError(err.message); setLoading(false); return; }
     } else {
@@ -159,6 +173,7 @@ export default function SpacesScreen() {
         default_category_id: useDefaultCategory && selectedCategory ? selectedCategory.id : null,
         budget: spaceBudget.trim() ? parseFloat(spaceBudget) : null,
         space_type: spaceType,
+        savings_target_date: spaceType === 'savings' && spaceTargetDate.trim() ? spaceTargetDate.trim() : null,
       }).select().single();
       if (err) { setError(err.message); setLoading(false); return; }
     }
@@ -175,6 +190,7 @@ export default function SpacesScreen() {
     setEditMode(true);
     setSpaceName(selectedSpace.name);
     setSpaceType((selectedSpace.space_type as any) ?? 'expense');
+    setSpaceTargetDate(selectedSpace.savings_target_date ?? '');
     setSpaceBudget('');
     supabase.from('spaces').select('budget').eq('id', selectedSpace.id).single()
       .then(({ data }) => { if (data?.budget) setSpaceBudget(String(data.budget)); });
@@ -247,7 +263,7 @@ export default function SpacesScreen() {
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 }}>
                     <Text style={s.spaceCardText} numberOfLines={1}>{name}</Text>
                     <View style={[s.typeBadge, { backgroundColor: isExpense ? C.lightRed : C.lightTurq }]}>
-                      <Text style={s.typeBadgeText}>{isExpense ? 'expense' : 'savings'}</Text>
+                      <Text style={s.typeBadgeText}>{isExpense ? 'expense tracker' : 'savings tracker'}</Text>
                     </View>
                     <TouchableOpacity onPress={() => openMenu(space)} style={{ marginLeft: 'auto', padding: 4 }} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
                       <Ionicons name="ellipsis-horizontal" size={14} color={C.pastelAzure} />
@@ -288,11 +304,30 @@ export default function SpacesScreen() {
                           {pct > 0.2 && <Text style={s.savingsConsumedText}>{fmt(saved)}</Text>}
                         </View>
                         <View style={[s.savingsRemaining, { flex: 1 - pct, minWidth: (1 - pct) > 0 ? 8 : 0 }]}>
-                          {(1 - pct) > 0.2 && <Text style={s.savingsRemainingText}>{budget > 0 ? fmt(remaining) : '—'}</Text>}
+                          {(1 - pct) > 0.2 && <Text style={s.savingsRemainingText}>{budget > 0 ? fmt(Math.max(0, budget - saved)) : '—'}</Text>}
                         </View>
                       </View>
 
-                      {/* Upcoming events */}
+                      {/* Info rows */}
+                      <View style={s.infoRow}>
+                        <Text style={s.infoLabel}>saved</Text>
+                        <View style={s.infoDots} />
+                        <Text style={s.infoValue}>{fmt(saved)}</Text>
+                      </View>
+                      <View style={s.infoRow}>
+                        <Text style={s.infoLabel}>target goal</Text>
+                        <View style={s.infoDots} />
+                        <Text style={s.infoValue}>{budget > 0 ? fmt(budget) : '—'}</Text>
+                      </View>
+                      {(space as any).savings_target_date && (
+                        <View style={s.infoRow}>
+                          <Text style={s.infoLabel}>target date</Text>
+                          <View style={s.infoDots} />
+                          <Text style={s.infoValue}>
+                            {new Date((space as any).savings_target_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                          </Text>
+                        </View>
+                      )}
                       <View style={s.infoRow}>
                         <Text style={s.infoLabel}>upcoming events</Text>
                         <View style={s.infoDots} />
@@ -337,16 +372,42 @@ export default function SpacesScreen() {
         />
         <Text style={[formStyles.hintMuted, { alignSelf: 'flex-end' }]}>{spaceName.length}/15</Text>
 
-        <Text style={formStyles.sectionLabel}>budget <Text style={{ textTransform: 'none' }}>(optional)</Text></Text>
-        <TextInput
-          style={formStyles.input}
-          placeholder="e.g. 10000"
-          placeholderTextColor={Colors.faint}
-          value={spaceBudget}
-          onChangeText={setSpaceBudget}
-          keyboardType="decimal-pad"
-        />
-        <Text style={formStyles.hintMuted}>leave empty for no budget limit</Text>
+        {spaceType === 'expense' ? (
+          <>
+            <Text style={formStyles.sectionLabel}>budget <Text style={{ textTransform: 'none' }}>(optional)</Text></Text>
+            <TextInput
+              style={formStyles.input}
+              placeholder="e.g. 10000"
+              placeholderTextColor={Colors.faint}
+              value={spaceBudget}
+              onChangeText={setSpaceBudget}
+              keyboardType="decimal-pad"
+            />
+            <Text style={formStyles.hintMuted}>leave empty for no budget limit</Text>
+          </>
+        ) : (
+          <>
+            <Text style={formStyles.sectionLabel}>target goal <Text style={{ textTransform: 'none' }}>(optional)</Text></Text>
+            <TextInput
+              style={formStyles.input}
+              placeholder="e.g. 50000"
+              placeholderTextColor={Colors.faint}
+              value={spaceBudget}
+              onChangeText={setSpaceBudget}
+              keyboardType="decimal-pad"
+            />
+            <Text style={formStyles.hintMuted}>how much do you want to save?</Text>
+            <Text style={formStyles.sectionLabel}>target date <Text style={{ textTransform: 'none' }}>(optional)</Text></Text>
+            <TextInput
+              style={formStyles.input}
+              placeholder="YYYY-MM-DD"
+              placeholderTextColor={Colors.faint}
+              value={spaceTargetDate}
+              onChangeText={setSpaceTargetDate}
+            />
+            <Text style={formStyles.hintMuted}>when do you want to reach your goal?</Text>
+          </>
+        )}
 
         <View style={formStyles.actions}>
           <TouchableOpacity style={formStyles.cancelBtn} onPress={() => setCreateModal(false)}>
