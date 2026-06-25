@@ -7,6 +7,7 @@ import AccountsScreen from './accounts';
 import BillSplitScreen from './bill-split';
 import ReceiptsScreen from './receipts';
 import CategoriesScreen from './categories';
+import DashboardScreen from './dashboard';
 import { Colors, Fonts, Radius, Spacing } from '@/components/ui/theme';
 import { useRouter } from 'expo-router';
 
@@ -15,29 +16,32 @@ const { width } = Dimensions.get('window');
 const MAIN_TABS = [
   { key: 'spaces',        label: 'Spaces',     icon: 'grid' },
   { key: 'accounts',      label: 'Accounts',   icon: 'wallet-outline' },
-  { key: 'categories',    label: 'Categories', icon: 'pricetag-outline' },
+  { key: 'dashboard',     label: 'Dashboard',  icon: 'pulse-outline' },
   { key: 'notifications', label: 'Notifs',     icon: 'notifications-outline' },
   { key: 'others',        label: 'Others',     icon: 'apps-outline' },
 ];
 
 const OTHERS_ITEMS = [
-  { key: 'receipts',    label: 'Receipts',     icon: 'receipt-outline',  route: null },
-  { key: 'bill-split',  label: 'Bill Split',   icon: 'people-outline',   route: null },
-  { key: 'loans',       label: 'Loans',        icon: 'cash-outline',     route: '/(app)/loans' },
+  { key: 'receipts',    label: 'Receipts',     icon: 'receipt-outline',    route: null },
+  { key: 'bill-split',  label: 'Bill Split',   icon: 'people-outline',     route: null },
+  { key: 'categories',  label: 'Categories',   icon: 'pricetag-outline',   route: null },
+  { key: 'loans',       label: 'Loans',        icon: 'cash-outline',       route: '/(app)/loans' },
   { key: 'receivables', label: 'Receivables',  icon: 'arrow-undo-outline', route: '/(app)/receivables' },
 ];
 
-const SLIDE_KEYS = ['spaces', 'accounts', 'categories', 'receipts', 'bill-split'];
+const SLIDE_KEYS = ['spaces', 'accounts', 'dashboard', 'categories', 'receipts', 'bill-split'];
 
 const MemoSpaces     = memo(SpacesScreen);
 const MemoAccounts   = memo(AccountsScreen);
 const MemoBillSplit  = memo(BillSplitScreen);
 const MemoReceipts   = memo(ReceiptsScreen);
 const MemoCategories = memo(CategoriesScreen);
+const MemoDashboard  = memo(DashboardScreen);
 
 const SCREENS: Record<string, React.ReactNode> = {
   spaces:       <MemoSpaces />,
   accounts:     <MemoAccounts />,
+  dashboard:    <MemoDashboard />,
   categories:   <MemoCategories />,
   'bill-split': <MemoBillSplit />,
   receipts:     <MemoReceipts />,
