@@ -176,7 +176,7 @@ export default function TabsLayout() {
             const isActive = tab.key === 'others' ? isOthersActive : activeTab === tab.key;
             return (
               <TouchableOpacity key={tab.key} style={s.navItem} onPress={() => handleNavPress(tab.key)} activeOpacity={0.7}>
-                <Ionicons name={tab.icon as any} size={20} color={isActive ? '#F5A623' : '#6B6F80'} />
+                <Ionicons name={tab.icon as any} size={20} color={isActive ? '#D0E5DF' : '#555555'} />
               </TouchableOpacity>
             );
           })}
@@ -286,8 +286,8 @@ const s = StyleSheet.create({
     alignItems: 'center',
   },
   bubbleIconWrapActive: {
-    backgroundColor: '#F5A623',
+    backgroundColor: '#D0E5DF',
   },
   bubbleItemLabel: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 14, color: Colors.text },
-  bubbleItemLabelActive: { color: '#F5A623' },
+  bubbleItemLabelActive: { color: '#1A1A1A' },
 });

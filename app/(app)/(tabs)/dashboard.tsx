@@ -20,38 +20,27 @@ const FBK = 'PlusJakartaSans_700Bold';
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
-// ── Light dirty-white palette ───────────────────────────────────────────────
+// ── Minimalist palette: dirty white / black / mint ─────────────────────────
 const P = {
-  bg:          '#F2F4F6',
-  sheet:       '#F2F4F6',
-  card:        '#FFFFFF',
-  cardDark:    '#1A1A1A',
-  cardDeep:    '#111111',
-  border:      '#E8E8E8',
-  text:        '#1A1A1A',
-  textLight:   '#FFFFFF',
-  textDark:    '#1A1A1A',
-  secondary:   '#8A8D9F',
-  muted:       '#AAAAAA',
-  accent:      '#D4EAE4',
-  yellow:      '#F5A623',
-  yellowDark:  '#C47E00',
-  green:       '#00B894',
-  greenLight:  '#D4EAE4',
-  orange:      '#FF7675',
-  orangeLight: '#FF767522',
-  gold:        '#6C5CE7',
-  goldLight:   '#6C5CE722',
-  blue:        '#00CEC9',
-  blueLight:   '#00CEC922',
+  bg:        '#F4F4F6',
+  card:      '#FFFFFF',
+  cardDark:  '#1A1A1A',
+  border:    '#E8E8E8',
+  text:      '#1A1A1A',
+  textLight: '#FFFFFF',
+  textDark:  '#1A1A1A',
+  secondary: '#888888',
+  muted:     '#AAAAAA',
+  mint:      '#D0E5DF',
+  mintDark:  '#A8C9C1',
 } as const;
 
 const ACTIVITY_TABS = [
-  { key: 'all',         label: 'All',         icon: 'apps-outline',              types: ['income','savings','expense','payable','receivable'], color: P.yellow, bg: P.cardDark   },
-  { key: 'money-in',    label: 'Money In',    icon: 'arrow-down-circle-outline', types: ['income','savings'], color: P.green,  bg: P.greenLight  },
-  { key: 'money-out',   label: 'Money Out',   icon: 'arrow-up-circle-outline',   types: ['expense'],         color: P.orange, bg: P.orangeLight },
-  { key: 'loans',       label: 'Loans',       icon: 'cash-outline',              types: ['payable'],         color: P.gold,   bg: P.goldLight   },
-  { key: 'receivables', label: 'Receivables', icon: 'arrow-undo-outline',        types: ['receivable'],      color: P.blue,   bg: P.blueLight   },
+  { key: 'all',         label: 'All',         icon: 'apps-outline',              types: ['income','savings','expense','payable','receivable'], color: P.mint, bg: P.cardDark },
+  { key: 'money-in',    label: 'Money In',    icon: 'arrow-down-circle-outline', types: ['income','savings'], color: P.mint, bg: P.cardDark },
+  { key: 'money-out',   label: 'Money Out',   icon: 'arrow-up-circle-outline',   types: ['expense'],         color: P.mint, bg: P.cardDark },
+  { key: 'loans',       label: 'Loans',       icon: 'cash-outline',              types: ['payable'],         color: P.mint, bg: P.cardDark },
+  { key: 'receivables', label: 'Receivables', icon: 'arrow-undo-outline',        types: ['receivable'],      color: P.mint, bg: P.cardDark },
 ] as const;
 
 type ActivityTab = typeof ACTIVITY_TABS[number]['key'];
@@ -329,19 +318,19 @@ export default function DashboardScreen() {
   };
 
   const typeLabel = (r: any) => {
-    if (r.type === 'income')     return { label: 'money in',                color: P.green  };
-    if (r.type === 'savings')    return { label: 'savings',                 color: P.green  };
-    if (r.type === 'expense')    return { label: 'money out',               color: P.orange };
+    if (r.type === 'income')     return { label: 'money in',                color: P.mint };
+    if (r.type === 'savings')    return { label: 'savings',                 color: P.mint };
+    if (r.type === 'expense')    return { label: 'money out',               color: '#FFFFFF' };
     if (r.type === 'payable')    return r.status === 'paid'
-      ? { label: 'loan · paid',    color: P.green  }
+      ? { label: 'loan · paid',    color: P.mint }
       : r.status === 'partial'
-      ? { label: 'loan · partial', color: P.gold   }
-      : { label: 'loan',           color: P.gold   };
+      ? { label: 'loan · partial', color: P.mint }
+      : { label: 'loan',           color: '#FFFFFF' };
     if (r.type === 'receivable') return r.status === 'received'
-      ? { label: 'receivable · received', color: P.green }
+      ? { label: 'receivable · received', color: P.mint }
       : r.status === 'partial'
-      ? { label: 'receivable · partial',  color: P.gold  }
-      : { label: 'receivable',            color: P.blue  };
+      ? { label: 'receivable · partial',  color: P.mint }
+      : { label: 'receivable',            color: '#FFFFFF' };
     return null;
   };
 
@@ -360,7 +349,7 @@ export default function DashboardScreen() {
           {/* Date + Spaces buttons */}
           <View style={s.filterBtns}>
             <TouchableOpacity style={s.filterBtn} onPress={() => setShowDateModal(true)} activeOpacity={0.75}>
-              <Ionicons name="calendar-outline" size={13} color={P.yellow} />
+              <Ionicons name="calendar-outline" size={13} color={P.mintDark} />
               <Text style={s.filterBtnText}>{rangeLabel}</Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -398,12 +387,12 @@ export default function DashboardScreen() {
               </View>
               <View style={s.statDivider} />
               <View style={s.statItem}>
-                <Text style={[s.statValue, { color: P.gold }]}>{loansActive}</Text>
+                <Text style={[s.statValue, { color: P.mint }]}>{loansActive}</Text>
                 <Text style={s.statLabel}>Loans</Text>
               </View>
               <View style={s.statDivider} />
               <View style={s.statItem}>
-                <Text style={[s.statValue, { color: P.blue }]}>{receivablesPending}</Text>
+                <Text style={[s.statValue, { color: P.mint }]}>{receivablesPending}</Text>
                 <Text style={s.statLabel}>Receivables</Text>
               </View>
             </View>
@@ -413,17 +402,17 @@ export default function DashboardScreen() {
           if (hasLoan && !hasIn && !hasOut && !hasRec) return (
             <View style={s.statsRow}>
               <View style={s.statItem}>
-                <Text style={[s.statValue, { color: P.gold }]}>{loansActive}</Text>
+                <Text style={[s.statValue, { color: P.mint }]}>{loansActive}</Text>
                 <Text style={s.statLabel}>Active</Text>
               </View>
               <View style={s.statDivider} />
               <View style={s.statItem}>
-                <Text style={[s.statValue, { color: P.green }]}>{loansPaid}</Text>
+                <Text style={s.statValue}>{loansPaid}</Text>
                 <Text style={s.statLabel}>Paid</Text>
               </View>
               <View style={s.statDivider} />
               <View style={s.statItem}>
-                <Text style={[s.statValue, { color: P.gold }]}>{fmtAbbr(filteredTotal)}</Text>
+                <Text style={[s.statValue, { color: P.mint }]}>{fmtAbbr(filteredTotal)}</Text>
                 <Text style={s.statLabel}>Total</Text>
               </View>
             </View>
@@ -433,17 +422,17 @@ export default function DashboardScreen() {
           if (hasRec && !hasIn && !hasOut && !hasLoan) return (
             <View style={s.statsRow}>
               <View style={s.statItem}>
-                <Text style={[s.statValue, { color: P.blue }]}>{receivablesPending}</Text>
+                <Text style={[s.statValue, { color: P.mint }]}>{receivablesPending}</Text>
                 <Text style={s.statLabel}>Pending</Text>
               </View>
               <View style={s.statDivider} />
               <View style={s.statItem}>
-                <Text style={[s.statValue, { color: P.green }]}>{receivablesReceived}</Text>
+                <Text style={s.statValue}>{receivablesReceived}</Text>
                 <Text style={s.statLabel}>Received</Text>
               </View>
               <View style={s.statDivider} />
               <View style={s.statItem}>
-                <Text style={[s.statValue, { color: P.blue }]}>{fmtAbbr(filteredTotal)}</Text>
+                <Text style={[s.statValue, { color: P.mint }]}>{fmtAbbr(filteredTotal)}</Text>
                 <Text style={s.statLabel}>Total</Text>
               </View>
             </View>
@@ -453,12 +442,12 @@ export default function DashboardScreen() {
           if (hasLoan && hasRec && !hasIn && !hasOut) return (
             <View style={s.statsRow}>
               <View style={s.statItem}>
-                <Text style={[s.statValue, { color: P.gold }]}>{loansActive}</Text>
+                <Text style={[s.statValue, { color: P.mint }]}>{loansActive}</Text>
                 <Text style={s.statLabel}>Loans</Text>
               </View>
               <View style={s.statDivider} />
               <View style={s.statItem}>
-                <Text style={[s.statValue, { color: P.blue }]}>{receivablesPending}</Text>
+                <Text style={[s.statValue, { color: P.mint }]}>{receivablesPending}</Text>
                 <Text style={s.statLabel}>Pending</Text>
               </View>
               <View style={s.statDivider} />
@@ -473,24 +462,24 @@ export default function DashboardScreen() {
           if (hasIn && hasOut) return (
             <View style={s.statsRow}>
               <View style={s.statItem}>
-                <Text style={[s.statValue, { color: P.green }]}>{fmtAbbr(moneyInTotal)}</Text>
+                <Text style={[s.statValue, { color: P.mint }]}>{fmtAbbr(moneyInTotal)}</Text>
                 <Text style={s.statLabel}>Total In</Text>
               </View>
               <View style={s.statDivider} />
               <View style={s.statItem}>
-                <Text style={[s.statValue, { color: P.orange }]}>{fmtAbbr(moneyOutTotal)}</Text>
+                <Text style={s.statValue}>{fmtAbbr(moneyOutTotal)}</Text>
                 <Text style={s.statLabel}>Total Out</Text>
               </View>
               {(hasLoan || hasRec) && <View style={s.statDivider} />}
               {hasLoan && (
                 <View style={s.statItem}>
-                  <Text style={[s.statValue, { color: P.gold }]}>{loansActive}</Text>
+                  <Text style={[s.statValue, { color: P.mint }]}>{loansActive}</Text>
                   <Text style={s.statLabel}>Loans</Text>
                 </View>
               )}
               {hasRec && (
                 <View style={s.statItem}>
-                  <Text style={[s.statValue, { color: P.blue }]}>{receivablesPending}</Text>
+                  <Text style={[s.statValue, { color: P.mint }]}>{receivablesPending}</Text>
                   <Text style={s.statLabel}>Pending</Text>
                 </View>
               )}
@@ -501,7 +490,7 @@ export default function DashboardScreen() {
           if (hasIn) return (
             <View style={s.statsRow}>
               <View style={s.statItem}>
-                <Text style={[s.statValue, { color: P.green }]}>{fmtAbbr(moneyInTotal)}</Text>
+                <Text style={[s.statValue, { color: P.mint }]}>{fmtAbbr(moneyInTotal)}</Text>
                 <Text style={s.statLabel}>Total In</Text>
               </View>
               <View style={s.statDivider} />
@@ -512,11 +501,10 @@ export default function DashboardScreen() {
             </View>
           );
 
-          // money-out only
           if (hasOut) return (
             <View style={s.statsRow}>
               <View style={s.statItem}>
-                <Text style={[s.statValue, { color: P.orange }]}>{fmtAbbr(moneyOutTotal)}</Text>
+                <Text style={s.statValue}>{fmtAbbr(moneyOutTotal)}</Text>
                 <Text style={s.statLabel}>Total Out</Text>
               </View>
               <View style={s.statDivider} />
@@ -531,7 +519,7 @@ export default function DashboardScreen() {
           return (
             <View style={s.statsRow}>
               <View style={s.statItem}>
-                <Text style={[s.statValue, { color: activeTabData.color }]}>{fmtAbbr(filteredTotal)}</Text>
+                <Text style={[s.statValue, { color: P.mint }]}>{fmtAbbr(filteredTotal)}</Text>
                 <Text style={s.statLabel}>Total</Text>
               </View>
               <View style={s.statDivider} />
@@ -549,8 +537,8 @@ export default function DashboardScreen() {
             const isActive = selectedTabs.has(tab.key);
             return (
               <TouchableOpacity key={tab.key} style={s.tabWrap} onPress={() => handleTabToggle(tab.key)} activeOpacity={0.75}>
-                <View style={[s.tabCircle, { backgroundColor: isActive ? tab.color : '#2A2A2A' }]}>
-                  <Ionicons name={tab.icon as any} size={16} color={isActive ? (tab.color === P.yellow ? P.textDark : '#fff') : P.secondary} />
+                <View style={[s.tabCircle, { backgroundColor: isActive ? P.mint : '#2A2A2A' }]}>
+                  <Ionicons name={tab.icon as any} size={16} color={isActive ? P.textDark : '#666666'} />
                 </View>
               </TouchableOpacity>
             );
@@ -562,11 +550,11 @@ export default function DashboardScreen() {
       {/* ── White bottom sheet ── */}
       <View style={s.sheet}>
         {isLoading ? (
-          <ActivityIndicator color={P.yellow} style={{ marginTop: 48 }} />
+          <ActivityIndicator color={P.mint} style={{ marginTop: 48 }} />
         ) : filtered.length === 0 ? (
           <View style={s.emptyWrap}>
-            <View style={[s.emptyIconWrap, { backgroundColor: activeTabData.bg }]}>
-              <Ionicons name={activeTabData.icon as any} size={28} color={activeTabData.color} />
+            <View style={[s.emptyIconWrap, { backgroundColor: P.cardDark }]}>
+              <Ionicons name={activeTabData.icon as any} size={28} color={P.mint} />
             </View>
             <Text style={s.emptyTitle}>nothing here</Text>
             <Text style={s.emptyText}>no {activeTabData.label.toLowerCase()} found{`\n`}for this period</Text>
@@ -587,14 +575,14 @@ export default function DashboardScreen() {
                     </View>
                   )}
                   <TouchableOpacity style={s.row} activeOpacity={0.7} onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: item.id } } as any)}>
-                    <View style={[s.rowIconWrap, { backgroundColor: tl?.color ?? P.secondary }]}>
-                      <Ionicons name={(item.categories?.icon ?? activeTabData.icon) as any} size={16} color="#fff" />
+                    <View style={s.rowIconWrap}>
+                      <Ionicons name={(item.categories?.icon ?? activeTabData.icon) as any} size={16} color="#FFFFFF" />
                     </View>
                     <View style={s.rowMid}>
                       <Text style={s.rowName} numberOfLines={1}>{item.name}</Text>
                       <Text style={s.rowCategory}>{tl?.label ?? activeTabData.label}{item.space?.name ? ` · ${item.space.name}` : ''}</Text>
                     </View>
-                    <Text style={[s.rowAmount, { color: tl?.color ?? P.secondary }]}>
+                    <Text style={[s.rowAmount, { color: tl?.color ?? '#FFFFFF' }]}>
                       {Number(item.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </Text>
                   </TouchableOpacity>
@@ -759,11 +747,11 @@ const s = StyleSheet.create({
   filterBtns: { gap: 6, alignItems: 'flex-end', paddingTop: 4 },
   filterBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
-    backgroundColor: '#F2F4F6',
+    backgroundColor: P.bg,
     paddingHorizontal: 10, paddingVertical: 6,
     borderRadius: Radius.pill,
   },
-  filterBtnActive:     { backgroundColor: P.yellow },
+  filterBtnActive:     { backgroundColor: P.mint },
   filterBtnText:       { fontFamily: IM, fontSize: 11, color: P.secondary },
   filterBtnTextActive: { fontFamily: IS, fontSize: 11, color: P.textDark },
 
@@ -805,44 +793,41 @@ const s = StyleSheet.create({
 
   row: {
     flexDirection: 'row', alignItems: 'center', gap: 16,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#1A1A1A',
     borderRadius: 24,
     padding: 18,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 2,
   },
-  rowIconWrap: { width: 44, height: 44, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
+  rowIconWrap: { width: 44, height: 44, borderRadius: 14, justifyContent: 'center', alignItems: 'center', backgroundColor: '#2A2A2A' },
   rowMid:      { flex: 1, gap: 4 },
-  rowName:     { fontFamily: FB,  fontSize: 14, color: P.text, letterSpacing: 0.1, lineHeight: 20 },
-  rowCategory: { fontFamily: IM,  fontSize: 11, color: P.secondary, letterSpacing: 0.3, lineHeight: 16 },
+  rowName:     { fontFamily: FB,  fontSize: 14, color: '#FFFFFF', letterSpacing: 0.1, lineHeight: 20 },
+  rowCategory: { fontFamily: IM,  fontSize: 11, color: '#888888', letterSpacing: 0.3, lineHeight: 16 },
   rowAmount:   { fontFamily: FBK, fontSize: 15, letterSpacing: -0.4 },
 
-  // Date modal — preset chips
   modalPresetRow:        { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 },
-  modalPresetChip:       { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: '#F2F4F6' },
-  modalPresetChipActive: { backgroundColor: P.yellow },
+  modalPresetChip:       { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: P.bg },
+  modalPresetChipActive: { backgroundColor: P.mint },
   modalPresetText:       { fontFamily: IM, fontSize: 12, color: P.secondary },
   modalPresetTextActive: { fontFamily: IS, fontSize: 12, color: P.textDark },
 
-  // Cutoff
   cutoffRow:       { marginBottom: 16, width: '100%' },
   cutoffLabel:     { fontFamily: IM, fontSize: 12, color: P.secondary, marginBottom: 10 },
   cutoffChips:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
-  cutoffChip:      { paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: '#F2F4F6' },
-  cutoffChipActive:     { backgroundColor: P.green },
+  cutoffChip:      { paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: P.bg },
+  cutoffChipActive:     { backgroundColor: P.mint },
   cutoffChipText:       { fontFamily: IM, fontSize: 12, color: P.secondary },
-  cutoffChipTextActive: { color: '#fff' },
+  cutoffChipTextActive: { color: P.textDark },
   cutoffInputRow:   { flexDirection: 'row', alignItems: 'center', gap: 10 },
   cutoffInputLabel: { fontFamily: I, fontSize: 12, color: P.secondary, flex: 1 },
   cutoffInput: {
-    backgroundColor: '#F2F4F6', borderRadius: Radius.sm,
+    backgroundColor: P.bg, borderRadius: Radius.sm,
     paddingHorizontal: 12, paddingVertical: 8,
     fontFamily: FB, fontSize: 16, color: P.text,
     width: 70, textAlign: 'center',
   },
 
-  // Calendar
   calWrap:    { width: '100%' },
-  calHint:    { fontFamily: I, fontSize: 11, color: P.yellow, marginBottom: 10 },
+  calHint:    { fontFamily: I, fontSize: 11, color: P.mintDark, marginBottom: 10 },
   pickerNav: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     width: '100%', paddingHorizontal: 4, marginBottom: 10,
@@ -850,22 +835,20 @@ const s = StyleSheet.create({
   pickerMonthText:   { fontFamily: FB, fontSize: 15, color: P.text },
   calDay:            { flex: 1, textAlign: 'center', fontFamily: I, fontSize: 10, color: P.muted },
   calCell:           { width: '14.28%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center', borderRadius: Radius.pill },
-  calCellRange:      { backgroundColor: P.yellow + '22', borderRadius: 0 },
-  calCellEdge:       { backgroundColor: P.yellow },
-  calCellToday:      { backgroundColor: '#F2F4F6' },
+  calCellRange:      { backgroundColor: P.mint + '55', borderRadius: 0 },
+  calCellEdge:       { backgroundColor: P.mint },
+  calCellToday:      { backgroundColor: P.bg },
   calCellText:       { fontFamily: I,  fontSize: 13, color: P.text },
   calCellTextActive: { fontFamily: IS, color: P.textDark },
 
-  // Spaces modal
   spaceChips:        { flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingBottom: 16 },
-  spaceChip:         { paddingHorizontal: 16, paddingVertical: 10, borderRadius: Radius.pill, backgroundColor: '#F2F4F6' },
-  spaceChipActive:   { backgroundColor: P.yellow },
+  spaceChip:         { paddingHorizontal: 16, paddingVertical: 10, borderRadius: Radius.pill, backgroundColor: P.bg },
+  spaceChipActive:   { backgroundColor: P.mint },
   spaceChipText:     { fontFamily: IM, fontSize: 13, color: P.secondary },
   spaceChipTextActive: { fontFamily: IS, fontSize: 13, color: P.textDark },
 
-  // Status filter chips
   statusFilterRow:      { flexDirection: 'row', gap: 10 },
-  statusChip:           { flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: Radius.lg, backgroundColor: '#F2F4F6' },
+  statusChip:           { flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: Radius.lg, backgroundColor: P.bg },
   statusChipText:       { fontFamily: IS, fontSize: 13, color: P.secondary },
   statusChipTextActive: { color: P.text },
 });
