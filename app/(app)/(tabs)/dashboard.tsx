@@ -390,12 +390,12 @@ export default function DashboardScreen() {
               </View>
               <View style={s.statDivider} />
               <View style={s.statItem}>
-                <Text style={[s.statValue, { color: P.tealDark }]}>{loansActive}</Text>
+                <Text style={[s.statValue, { color: P.teal }]}>{loansActive}</Text>
                 <Text style={s.statLabel}>Loans</Text>
               </View>
               <View style={s.statDivider} />
               <View style={s.statItem}>
-                <Text style={[s.statValue, { color: P.tealDark }]}>{receivablesPending}</Text>
+                <Text style={[s.statValue, { color: P.teal }]}>{receivablesPending}</Text>
                 <Text style={s.statLabel}>Receivables</Text>
               </View>
             </View>
@@ -405,7 +405,7 @@ export default function DashboardScreen() {
           if (hasLoan && !hasIn && !hasOut && !hasRec) return (
             <View style={s.statsRow}>
               <View style={s.statItem}>
-                <Text style={[s.statValue, { color: P.tealDark }]}>{loansActive}</Text>
+                <Text style={[s.statValue, { color: P.teal }]}>{loansActive}</Text>
                 <Text style={s.statLabel}>Active</Text>
               </View>
               <View style={s.statDivider} />
@@ -415,7 +415,7 @@ export default function DashboardScreen() {
               </View>
               <View style={s.statDivider} />
               <View style={s.statItem}>
-                <Text style={[s.statValue, { color: P.tealDark }]}>{fmtAbbr(filteredTotal)}</Text>
+                <Text style={[s.statValue, { color: P.teal }]}>{fmtAbbr(filteredTotal)}</Text>
                 <Text style={s.statLabel}>Total</Text>
               </View>
             </View>
@@ -425,7 +425,7 @@ export default function DashboardScreen() {
           if (hasRec && !hasIn && !hasOut && !hasLoan) return (
             <View style={s.statsRow}>
               <View style={s.statItem}>
-                <Text style={[s.statValue, { color: P.tealDark }]}>{receivablesPending}</Text>
+                <Text style={[s.statValue, { color: P.teal }]}>{receivablesPending}</Text>
                 <Text style={s.statLabel}>Pending</Text>
               </View>
               <View style={s.statDivider} />
@@ -435,7 +435,7 @@ export default function DashboardScreen() {
               </View>
               <View style={s.statDivider} />
               <View style={s.statItem}>
-                <Text style={[s.statValue, { color: P.tealDark }]}>{fmtAbbr(filteredTotal)}</Text>
+                <Text style={[s.statValue, { color: P.teal }]}>{fmtAbbr(filteredTotal)}</Text>
                 <Text style={s.statLabel}>Total</Text>
               </View>
             </View>
@@ -445,12 +445,12 @@ export default function DashboardScreen() {
           if (hasLoan && hasRec && !hasIn && !hasOut) return (
             <View style={s.statsRow}>
               <View style={s.statItem}>
-                <Text style={[s.statValue, { color: P.tealDark }]}>{loansActive}</Text>
+                <Text style={[s.statValue, { color: P.teal }]}>{loansActive}</Text>
                 <Text style={s.statLabel}>Loans</Text>
               </View>
               <View style={s.statDivider} />
               <View style={s.statItem}>
-                <Text style={[s.statValue, { color: P.tealDark }]}>{receivablesPending}</Text>
+                <Text style={[s.statValue, { color: P.teal }]}>{receivablesPending}</Text>
                 <Text style={s.statLabel}>Pending</Text>
               </View>
               <View style={s.statDivider} />
@@ -465,7 +465,7 @@ export default function DashboardScreen() {
           if (hasIn && hasOut) return (
             <View style={s.statsRow}>
               <View style={s.statItem}>
-                <Text style={[s.statValue, { color: P.tealDark }]}>{fmtAbbr(moneyInTotal)}</Text>
+                <Text style={[s.statValue, { color: P.teal }]}>{fmtAbbr(moneyInTotal)}</Text>
                 <Text style={s.statLabel}>Total In</Text>
               </View>
               <View style={s.statDivider} />
@@ -476,13 +476,13 @@ export default function DashboardScreen() {
               {(hasLoan || hasRec) && <View style={s.statDivider} />}
               {hasLoan && (
                 <View style={s.statItem}>
-                  <Text style={[s.statValue, { color: P.tealDark }]}>{loansActive}</Text>
+                  <Text style={[s.statValue, { color: P.teal }]}>{loansActive}</Text>
                   <Text style={s.statLabel}>Loans</Text>
                 </View>
               )}
               {hasRec && (
                 <View style={s.statItem}>
-                  <Text style={[s.statValue, { color: P.tealDark }]}>{receivablesPending}</Text>
+                  <Text style={[s.statValue, { color: P.teal }]}>{receivablesPending}</Text>
                   <Text style={s.statLabel}>Pending</Text>
                 </View>
               )}
@@ -493,7 +493,7 @@ export default function DashboardScreen() {
           if (hasIn) return (
             <View style={s.statsRow}>
               <View style={s.statItem}>
-                <Text style={[s.statValue, { color: P.tealDark }]}>{fmtAbbr(moneyInTotal)}</Text>
+                <Text style={[s.statValue, { color: P.teal }]}>{fmtAbbr(moneyInTotal)}</Text>
                 <Text style={s.statLabel}>Total In</Text>
               </View>
               <View style={s.statDivider} />
@@ -522,7 +522,7 @@ export default function DashboardScreen() {
           return (
             <View style={s.statsRow}>
               <View style={s.statItem}>
-                <Text style={[s.statValue, { color: P.tealDark }]}>{fmtAbbr(filteredTotal)}</Text>
+                <Text style={[s.statValue, { color: P.teal }]}>{fmtAbbr(filteredTotal)}</Text>
                 <Text style={s.statLabel}>Total</Text>
               </View>
               <View style={s.statDivider} />
@@ -543,6 +543,7 @@ export default function DashboardScreen() {
                 <View style={[s.tabCircle, isActive && s.tabCircleActive]}>
                   <Ionicons name={tab.icon as any} size={16} color={isActive ? '#FFFFFF' : P.secondary} />
                 </View>
+                <Text style={[s.tabLabel, isActive && s.tabLabelActive]}>{tab.label}</Text>
               </TouchableOpacity>
             );
           })}
@@ -738,7 +739,7 @@ const s = StyleSheet.create({
 
   // Stats + tabs dark floating card
   statsCard: {
-    backgroundColor: P.card,
+    backgroundColor: P.cardDark,
     borderRadius: 28,
     paddingTop: 24, paddingBottom: 20,
     marginBottom: 8,
@@ -764,9 +765,9 @@ const s = StyleSheet.create({
     paddingHorizontal: 24, marginBottom: 18,
   },
   statItem:    { flex: 1, alignItems: 'center', gap: 6 },
-  statValue:   { fontFamily: FBK, fontSize: 17, color: P.text, letterSpacing: -0.4 },
-  statLabel:   { fontFamily: I,   fontSize: 11, color: P.secondary, letterSpacing: 0.2 },
-  statDivider: { width: 1, height: 32, backgroundColor: P.border },
+  statValue:   { fontFamily: FBK, fontSize: 17, color: '#FFFFFF', letterSpacing: -0.4 },
+  statLabel:   { fontFamily: I,   fontSize: 11, color: 'rgba(255,255,255,0.5)', letterSpacing: 0.2 },
+  statDivider: { width: 1, height: 32, backgroundColor: 'rgba(255,255,255,0.1)' },
 
   // Tab filter row
   tabRow:  { flexDirection: 'row', justifyContent: 'space-around', paddingHorizontal: 24, paddingBottom: 8, paddingTop: 6 },
@@ -774,12 +775,13 @@ const s = StyleSheet.create({
   tabCircle: {
     width: 46, height: 46, borderRadius: 23,
     justifyContent: 'center', alignItems: 'center',
-    backgroundColor: P.bg,
+    backgroundColor: 'rgba(255,255,255,0.08)',
   },
   tabCircleActive: {
     backgroundColor: P.teal,
-    borderColor: P.teal,
   },
+  tabLabel:       { fontFamily: I,  fontSize: 9,  color: 'rgba(255,255,255,0.4)', marginTop: 5, letterSpacing: 0.2 },
+  tabLabelActive: { fontFamily: IS, fontSize: 9,  color: '#FFFFFF' },
 
   // Transaction list scroll area
   sheet: {
