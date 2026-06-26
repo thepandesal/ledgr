@@ -131,7 +131,15 @@ export default function DashboardScreen() {
       if (data.dashboard_preset) setActivePreset(data.dashboard_preset as Preset);
       if (data.dashboard_custom_from) setCustomFrom(new Date(data.dashboard_custom_from));
       if (data.dashboard_custom_to)   setCustomTo(new Date(data.dashboard_custom_to));
-      if (data.dashboard_space_ids) {\r\n        const ids = (data.dashboard_space_ids as string).split(',').filter(Boolean);\r\n        setSelectedSpaces(new Set(ids.length ? ids : ['all']));\r\n      }\r\n      if (data.dashboard_tab_ids) {\r\n        const tabs = (data.dashboard_tab_ids as string).split(',').filter(Boolean);\r\n        setSelectedTabs(new Set(tabs.length ? tabs as ActivityTab[] : ['all']));\r\n      }\r\n      return data;
+      if (data.dashboard_space_ids) {
+        const ids = (data.dashboard_space_ids as string).split(',').filter(Boolean);
+        setSelectedSpaces(new Set(ids.length ? ids : ['all']));
+      }
+      if (data.dashboard_tab_ids) {
+        const tabs = (data.dashboard_tab_ids as string).split(',').filter(Boolean);
+        setSelectedTabs(new Set(tabs.length ? tabs as ActivityTab[] : ['all']));
+      }
+      return data;
     },
     enabled: !!userId,
   });
