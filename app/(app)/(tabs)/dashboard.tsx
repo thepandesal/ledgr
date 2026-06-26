@@ -1,14 +1,14 @@
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  SafeAreaView, ActivityIndicator,
+  SafeAreaView, ActivityIndicator, TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useUser } from '../../../src/hooks/useUser';
 import { supabase } from '../../../src/lib/supabase';
 import ConfirmModal from '@/components/ui/ConfirmModal';
-import { Colors, Radius, Spacing } from '@/components/ui/theme';
+import { Colors, Fonts, Radius, Spacing } from '@/components/ui/theme';
 import { useRouter } from 'expo-router';
 
 const I  = 'Inter_400Regular';
@@ -19,6 +19,7 @@ const IB = 'Inter_700Bold';
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
 const ACTIVITY_TABS = [
+  { key: 'all',         label: 'All',         icon: 'apps-outline',              types: ['income','savings','expense','payable','receivable'], color: Colors.text },
   { key: 'money-in',    label: 'Money In',    icon: 'arrow-down-circle-outline', types: ['income','savings'], color: Colors.income },
   { key: 'money-out',   label: 'Money Out',   icon: 'arrow-up-circle-outline',   types: ['expense'],         color: Colors.expense },
   { key: 'loans',       label: 'Loans',       icon: 'cash-outline',              types: ['payable'],         color: Colors.pending },
@@ -71,9 +72,13 @@ export default function DashboardScreen() {
   const router    = useRouter();
   const { userId } = useUser();
 
+  const queryClient = useQueryClient();
+
   const [activePreset, setActivePreset] = useState<Preset>('this-month');
-  const [activeTab,    setActiveTab]    = useState<ActivityTab>('money-in');
+  const [activeTab,    setActiveTab]    = useState<ActivityTab>('all');
   const [cutoffDay,    setCutoffDay]    = useState(25);
+  const [showCutoff,   setShowCutoff]   = useState(false);
+  const [cutoffInput,  setCutoffInput]  = useState('25');
 
   // custom range state
   const [customFrom, setCustomFrom] = useState<Date>(new Date());
@@ -88,6 +93,43 @@ export default function DashboardScreen() {
   const range = activePreset === 'custom'
     ? { from: customFrom, to: customTo }
     : getRangeForPreset(activePreset, cutoffDay);
+
+  // ── load saved cutoff day ──
+  useQuery({
+    queryKey: ['user-settings', userId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('user_settings')
+        .select('cutoff_day')
+        .eq('user_id', userId)
+        .maybeSingle();
+      if (data?.cutoff_day) {
+        setCutoffDay(data.cutoff_day);
+        setCutoffInput(String(data.cutoff_day));
+      }
+      return data;
+    },
+    enabled: !!userId,
+  });
+
+  const saveCutoff = useMutation({
+    mutationFn: async (day: number) => {
+      await supabase.from('user_settings').upsert(
+        { user_id: userId, cutoff_day: day, updated_at: new Date().toISOString() },
+        { onConflict: 'user_id' }
+      );
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['user-settings', userId] }),
+  });
+
+  const handleSaveCutoff = () => {
+    const day = parseInt(cutoffInput);
+    if (!day || day < 1 || day > 31) return;
+    setCutoffDay(day);
+    saveCutoff.mutate(day);
+    setShowCutoff(false);
+    setActivePreset('cutoff');
+  };
 
   const { data: recordings = [], isLoading } = useQuery({
     queryKey: ['dashboard-activities', userId],
@@ -149,6 +191,11 @@ export default function DashboardScreen() {
   };
 
   const handlePreset = (key: Preset) => {
+    if (key === 'cutoff') {
+      setCutoffInput(String(cutoffDay));
+      setShowCutoff(true);
+      return;
+    }
     if (key === 'custom') {
       const r = getRangeForPreset('this-month', cutoffDay);
       setCustomFrom(r.from); setCustomTo(r.to);
@@ -158,8 +205,8 @@ export default function DashboardScreen() {
   };
 
   const statusLabel = (r: any) => {
-    if (activeTab === 'loans')       return r.status === 'paid'     ? 'paid'     : r.status === 'partial' ? 'partial' : 'unpaid';
-    if (activeTab === 'receivables') return r.status === 'received' ? 'received' : r.status === 'partial' ? 'partial' : 'pending';
+    if (r.type === 'payable')    return r.status === 'paid'     ? 'paid'     : r.status === 'partial' ? 'partial' : 'unpaid';
+    if (r.type === 'receivable') return r.status === 'received' ? 'received' : r.status === 'partial' ? 'partial' : 'pending';
     return null;
   };
   const statusColor = (r: any) => {
@@ -321,6 +368,42 @@ export default function DashboardScreen() {
         </ScrollView>
       )}
 
+      {/* ── Cutoff day modal ── */}
+      <ConfirmModal
+        visible={showCutoff}
+        onClose={() => setShowCutoff(false)}
+        title="billing cutoff day"
+        message="which day of the month does your billing cycle start?"
+        actions={[
+          { label: 'cancel', onPress: () => setShowCutoff(false), muted: true },
+          { label: 'save',   onPress: handleSaveCutoff, disabled: saveCutoff.isPending },
+        ]}
+      >
+        <View style={s.cutoffRow}>
+          {[1,5,10,15,20,25,28].map(d => (
+            <TouchableOpacity
+              key={d}
+              style={[s.cutoffChip, parseInt(cutoffInput) === d && s.cutoffChipActive]}
+              onPress={() => setCutoffInput(String(d))}
+            >
+              <Text style={[s.cutoffChipText, parseInt(cutoffInput) === d && s.cutoffChipTextActive]}>{d}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <View style={s.cutoffInputRow}>
+          <Text style={s.cutoffInputLabel}>or enter a day</Text>
+          <TextInput
+            style={s.cutoffInput}
+            value={cutoffInput}
+            onChangeText={v => setCutoffInput(v.replace(/[^0-9]/g, ''))}
+            keyboardType="number-pad"
+            maxLength={2}
+            placeholder="1–31"
+            placeholderTextColor={Colors.faint}
+          />
+        </View>
+      </ConfirmModal>
+
       {/* ── Custom date picker modal ── */}
       <ConfirmModal
         visible={showPicker}
@@ -460,6 +543,26 @@ const s = StyleSheet.create({
   rowRight: { alignItems: 'flex-end', gap: 3 },
   rowAmount: { fontFamily: IB, fontSize: 14 },
   rowStatus: { fontFamily: IM, fontSize: 10 },
+
+  // Cutoff modal
+  cutoffRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, width: '100%', marginBottom: 12 },
+  cutoffChip: {
+    paddingHorizontal: 14, paddingVertical: 8,
+    borderRadius: Radius.pill, borderWidth: 1,
+    borderColor: Colors.borderMid, backgroundColor: Colors.surface,
+  },
+  cutoffChipActive:     { backgroundColor: Colors.cyan, borderColor: Colors.cyan },
+  cutoffChipText:       { fontFamily: IM, fontSize: 12, color: Colors.muted },
+  cutoffChipTextActive: { color: Colors.white },
+  cutoffInputRow:  { flexDirection: 'row', alignItems: 'center', gap: 10, width: '100%' },
+  cutoffInputLabel: { fontFamily: I, fontSize: 12, color: Colors.muted, flex: 1 },
+  cutoffInput: {
+    backgroundColor: Colors.input, borderRadius: Radius.sm,
+    borderWidth: 1, borderColor: Colors.border,
+    paddingHorizontal: 12, paddingVertical: 8,
+    fontFamily: IB, fontSize: 16, color: Colors.text,
+    width: 70, textAlign: 'center',
+  },
 
   // Calendar
   pickerNav: {
