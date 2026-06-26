@@ -573,6 +573,8 @@ export default function DashboardScreen() {
           );
         })()}
 
+        </View>{/* end statsCard */}
+
         {/* Tab filter buttons */}
         <View style={s.tabRow}>
           {ACTIVITY_TABS.map(tab => {
@@ -587,7 +589,33 @@ export default function DashboardScreen() {
             );
           })}
         </View>
-        </View>{/* end statsCard */}
+
+        {/* Filter row: date nav + spaces */}
+        <View style={s.filterRow}>
+          <View style={s.dateNavRow}>
+            <TouchableOpacity style={s.dateNavArrow} onPress={() => navigateRange(-1)} activeOpacity={0.7}>
+              <Ionicons name="chevron-back" size={14} color={P.tealDark} />
+            </TouchableOpacity>
+            <TouchableOpacity style={s.filterBtn} onPress={() => setShowDateModal(true)} activeOpacity={0.75}>
+              <Ionicons name="calendar-outline" size={13} color={P.tealDark} />
+              <Text style={s.filterBtnText}>{rangeLabel}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.dateNavArrow} onPress={() => navigateRange(1)} activeOpacity={0.7}>
+              <Ionicons name="chevron-forward" size={14} color={P.tealDark} />
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity
+            style={[s.filterBtn, !isAllSpaces && s.filterBtnActive]}
+            onPress={() => setShowSpaceModal(true)}
+            activeOpacity={0.75}
+          >
+            <Ionicons name="layers-outline" size={13} color={!isAllSpaces ? P.teal : P.secondary} />
+            <Text style={[s.filterBtnText, !isAllSpaces && s.filterBtnTextActive]}>
+              {isAllSpaces ? 'All Spaces' : `${selectedSpaces.size} space${selectedSpaces.size > 1 ? 's' : ''}`}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
       </View>{/* end topSection */}
 
       {/* ── White bottom sheet ── */}
@@ -764,7 +792,7 @@ export default function DashboardScreen() {
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: P.bg },
-  topSection: { paddingHorizontal: 16, paddingTop: 20, gap: 12 },
+  topSection: { paddingHorizontal: 16, paddingTop: 20, gap: 14 },
 
   // Header floating white card
   headerCard: {
@@ -785,14 +813,15 @@ const s = StyleSheet.create({
 
   // Date + Spaces filter buttons
   filterBtns: { gap: 6, alignItems: 'flex-end', paddingTop: 4 },
+  filterRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 4 },
   filterBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
     paddingHorizontal: 10, paddingVertical: 6,
     borderRadius: Radius.pill,
   },
-  filterBtnActive:     { backgroundColor: 'transparent' },
+  filterBtnActive:     { backgroundColor: P.tealLight, borderColor: P.teal },
   filterBtnText:       { fontFamily: IM, fontSize: 11, color: P.text },
-  filterBtnTextActive: { fontFamily: IS, fontSize: 11, color: P.teal },
+  filterBtnTextActive: { fontFamily: IS, fontSize: 11, color: P.tealDark },
 
   // Stats row
   statsRow: {
@@ -800,9 +829,9 @@ const s = StyleSheet.create({
     paddingHorizontal: 24, marginBottom: 18,
   },
   statItem:    { flex: 1, alignItems: 'center', gap: 6 },
-  statValue:   { fontFamily: FBK, fontSize: 17, color: '#FFFFFF', letterSpacing: -0.4 },
-  statLabel:   { fontFamily: I,   fontSize: 11, color: 'rgba(255,255,255,0.5)', letterSpacing: 0.2 },
-  statDivider: { width: 1, height: 32, backgroundColor: 'rgba(255,255,255,0.1)' },
+  statValue:   { fontFamily: FBK, fontSize: 17, color: P.text, letterSpacing: -0.4 },
+  statLabel:   { fontFamily: I,   fontSize: 11, color: P.secondary, letterSpacing: 0.2 },
+  statDivider: { width: 1, height: 32, backgroundColor: P.border },
 
   // Tab filter row
   tabRow:  { flexDirection: 'row', justifyContent: 'space-around', paddingHorizontal: 24, paddingBottom: 8, paddingTop: 6 },
@@ -810,13 +839,13 @@ const s = StyleSheet.create({
   tabCircle: {
     width: 46, height: 46, borderRadius: 23,
     justifyContent: 'center', alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: P.tealLight,
   },
   tabCircleActive: {
     backgroundColor: P.teal,
   },
-  tabLabel:       { fontFamily: I,  fontSize: 9,  color: 'rgba(255,255,255,0.4)', marginTop: 5, letterSpacing: 0.2 },
-  tabLabelActive: { fontFamily: IS, fontSize: 9,  color: '#FFFFFF' },
+  tabLabel:       { fontFamily: I,  fontSize: 9,  color: P.secondary, marginTop: 5, letterSpacing: 0.2 },
+  tabLabelActive: { fontFamily: IS, fontSize: 9,  color: P.teal },
 
   // Transaction list scroll area
   sheet: {
