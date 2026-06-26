@@ -552,16 +552,16 @@ const s = StyleSheet.create({
   darkTop: { backgroundColor: P.bg, paddingBottom: 0 },
 
   // Header
-  header:   { paddingHorizontal: Spacing.page, paddingTop: 20, paddingBottom: 4 },
-  title:    { fontFamily: FBK, fontSize: 24, color: P.text, letterSpacing: -0.5 },
-  subtitle: { fontFamily: I,   fontSize: 11, color: P.secondary, marginTop: 1 },
+  header:   { paddingHorizontal: 24, paddingTop: 28, paddingBottom: 8 },
+  title:    { fontFamily: FBK, fontSize: 26, color: P.text, letterSpacing: -0.5 },
+  subtitle: { fontFamily: I,   fontSize: 12, color: P.secondary, marginTop: 3, lineHeight: 18 },
 
   // Preset chips
   presetScroll: { flexGrow: 0, flexShrink: 0 },
-  presetRow:    { paddingHorizontal: Spacing.page, gap: 6, paddingBottom: 0 },
+  presetRow:    { paddingHorizontal: 24, gap: 8, paddingBottom: 0 },
   presetChip: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    paddingHorizontal: 10, paddingVertical: 5,
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingHorizontal: 14, paddingVertical: 7,
     borderRadius: Radius.pill,
     backgroundColor: P.card,
   },
@@ -571,71 +571,73 @@ const s = StyleSheet.create({
 
   // Range label
   rangeLabelRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    paddingHorizontal: Spacing.page, marginTop: 6, marginBottom: 8,
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 24, marginTop: 10, marginBottom: 12,
   },
   rangeLabel:     { fontFamily: IM, fontSize: 11, color: '#8A8D9F', flex: 1, letterSpacing: 0.2 },
   rangeLabelEdit: { fontFamily: IS, fontSize: 11, color: P.yellow },
 
-  // Stats row (replaces yellow card)
+  // Stats row
   statsRow: {
     flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: Spacing.page, marginBottom: 10,
+    paddingHorizontal: 24, marginBottom: 14,
   },
-  statItem:    { flex: 1, alignItems: 'center', gap: 2 },
-  statValue:   { fontFamily: FBK, fontSize: 14, color: P.text, letterSpacing: -0.3 },
+  statItem:    { flex: 1, alignItems: 'center', gap: 5 },
+  statValue:   { fontFamily: FBK, fontSize: 15, color: P.text, letterSpacing: -0.3 },
   statLabel:   { fontFamily: IM,  fontSize: 10, color: '#8A8D9F', letterSpacing: 0.3 },
-  statDivider: { width: 1, height: 24, backgroundColor: P.border },
+  statDivider: { width: 1, height: 28, backgroundColor: P.border },
 
   // Focused summary card (non-all tabs)
   focusCard: {
-    marginHorizontal: Spacing.page, marginBottom: 8,
+    marginHorizontal: 24, marginBottom: 14,
     backgroundColor: P.card,
-    borderRadius: 16,
-    paddingHorizontal: 14, paddingVertical: 10,
-    flexDirection: 'row', alignItems: 'center', gap: 10,
+    borderRadius: 20,
+    paddingHorizontal: 20, paddingVertical: 16,
+    flexDirection: 'row', alignItems: 'center', gap: 14,
   },
-  focusIcon:    { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
-  focusLabel:   { fontFamily: IS,  fontSize: 13, color: P.text },
-  focusEntries: { fontFamily: I,   fontSize: 10, color: P.secondary, marginTop: 1 },
-  focusTotal:   { fontFamily: FBK, fontSize: 20, letterSpacing: -0.5 },
+  focusIcon:    { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
+  focusLabel:   { fontFamily: IS,  fontSize: 14, color: P.text },
+  focusEntries: { fontFamily: I,   fontSize: 11, color: P.secondary, marginTop: 2, lineHeight: 16 },
+  focusTotal:   { fontFamily: FBK, fontSize: 22, letterSpacing: -0.5 },
 
   // Tab filter row
-  tabRow:  { flexDirection: 'row', justifyContent: 'space-around', paddingHorizontal: Spacing.page, paddingBottom: 10, paddingTop: 4 },
+  tabRow:  { flexDirection: 'row', justifyContent: 'space-around', paddingHorizontal: 24, paddingBottom: 16, paddingTop: 6 },
   tabWrap: { alignItems: 'center' },
   tabCircle: {
-    width: 38, height: 38, borderRadius: 19,
+    width: 42, height: 42, borderRadius: 21,
     justifyContent: 'center', alignItems: 'center',
   },
 
-  // White bottom sheet
+  // Off-white bottom sheet
   sheet: {
     flex: 1,
-    backgroundColor: '#F7F6F3',
+    backgroundColor: '#F8F8F6',
     borderTopLeftRadius: 32, borderTopRightRadius: 32,
     overflow: 'hidden',
   },
 
   // Empty state
-  emptyWrap:     { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 10, paddingBottom: 80 },
-  emptyIconWrap: { width: 60, height: 60, borderRadius: 30, justifyContent: 'center', alignItems: 'center', marginBottom: 4 },
-  emptyTitle:    { fontFamily: FB, fontSize: 15, color: '#1C2632' },
-  emptyText:     { fontFamily: IM, fontSize: 12, color: '#5A5D70', textAlign: 'center', lineHeight: 20, letterSpacing: 0.2 },
+  emptyWrap:     { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 14, paddingBottom: 80 },
+  emptyIconWrap: { width: 64, height: 64, borderRadius: 32, justifyContent: 'center', alignItems: 'center', marginBottom: 6 },
+  emptyTitle:    { fontFamily: FB, fontSize: 16, color: '#1C2632' },
+  emptyText:     { fontFamily: IM, fontSize: 13, color: '#5A5D70', textAlign: 'center', lineHeight: 21, letterSpacing: 0.2 },
 
   // Transaction list
-  list:          { paddingHorizontal: Spacing.page, paddingTop: 20 },
-  dateHeaderRow: { marginTop: 20, marginBottom: 10 },
-  dateHeaderText: { fontFamily: IS, fontSize: 10, color: '#5A5D70', letterSpacing: 1.2, textTransform: 'uppercase' },
+  list:           { paddingHorizontal: 24, paddingTop: 28 },
+  dateHeaderRow:  { marginTop: 28, marginBottom: 12 },
+  dateHeaderText: { fontFamily: IS, fontSize: 10, color: '#5A5D70', letterSpacing: 1.4, textTransform: 'uppercase' },
 
   row: {
-    flexDirection: 'row', alignItems: 'center', gap: 14,
-    paddingVertical: 12,
+    flexDirection: 'row', alignItems: 'center', gap: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#EBEBEA',
   },
-  rowIconWrap: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center' },
-  rowMid:      { flex: 1, gap: 3 },
-  rowName:     { fontFamily: FB,  fontSize: 14, color: '#1C2632', letterSpacing: 0.02 * 14 },
-  rowCategory: { fontFamily: IM,  fontSize: 11, color: '#5A5D70', letterSpacing: 0.3 },
-  rowAmount:   { fontFamily: FBK, fontSize: 15, letterSpacing: -0.5 },
+  rowIconWrap: { width: 44, height: 44, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
+  rowMid:      { flex: 1, gap: 4 },
+  rowName:     { fontFamily: FB,  fontSize: 14, color: '#1A1A1A', letterSpacing: 0.1, lineHeight: 20 },
+  rowCategory: { fontFamily: IM,  fontSize: 11, color: '#6B6B6B', letterSpacing: 0.3, lineHeight: 16 },
+  rowAmount:   { fontFamily: FBK, fontSize: 15, letterSpacing: -0.4 },
 
   // Status filter chips
   statusFilterRow:      { flexDirection: 'row', gap: 10 },

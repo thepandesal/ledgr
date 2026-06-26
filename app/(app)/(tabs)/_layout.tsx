@@ -177,7 +177,7 @@ export default function TabsLayout() {
             const isActive = tab.key === 'others' ? isOthersActive : activeTab === tab.key;
             return (
               <TouchableOpacity key={tab.key} style={s.navItem} onPress={() => handleNavPress(tab.key)} activeOpacity={0.7}>
-                <Ionicons name={tab.icon as any} size={22} color={isActive ? '#F5A623' : '#8A8D9F'} />
+                <Ionicons name={tab.icon as any} size={18} color={isActive ? '#F5A623' : '#6B6F80'} />
                 <Text style={[s.navLabel, isActive && s.navLabelActive]}>{tab.label}</Text>
               </TouchableOpacity>
             );
@@ -218,27 +218,24 @@ function BubbleContent({ items, activeTab, onPress }: {
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#1C2632' },
+  container: { flex: 1, backgroundColor: '#151E29' },
   content: { flex: 1, position: 'relative' },
   screen: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#1C2632' },
-  navSafeArea: { backgroundColor: '#1C2632' },
-  navGap: { height: 16 },
+  navSafeArea: { backgroundColor: '#151E29' },
+  navGap: { height: 8 },
   navPill: {
     flexDirection: 'row',
-    backgroundColor: '#1E2A38',
-    marginHorizontal: 16,
-    borderRadius: 28,
-    paddingVertical: 12,
-    paddingHorizontal: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.30,
-    shadowRadius: 16,
-    elevation: 10,
+    backgroundColor: '#151E29',
+    marginHorizontal: 0,
+    borderRadius: 0,
+    paddingVertical: 6,
+    paddingHorizontal: 4,
+    borderTopWidth: 1,
+    borderTopColor: '#232F3E',
   },
-  navItem: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 2 },
-  navLabel: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 10, color: '#8A8D9F', letterSpacing: 0.2 },
-  navLabelActive: { color: '#F5A623', fontFamily: 'PlusJakartaSans_600SemiBold' },
+  navItem: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 3, paddingVertical: 4 },
+  navLabel: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 10, color: '#6B6F80', letterSpacing: 0.1 },
+  navLabelActive: { color: '#F5A623', fontFamily: 'PlusJakartaSans_500Medium' },
 
   // Bubble
   bubbleWrap: {
