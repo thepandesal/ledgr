@@ -122,7 +122,7 @@ export default function DashboardScreen() {
     queryFn: async () => {
       const { data } = await supabase
         .from('user_settings')
-        .select('cutoff_day, dashboard_preset, dashboard_custom_from, dashboard_custom_to, dashboard_space_ids')
+        .select('cutoff_day, dashboard_preset, dashboard_custom_from, dashboard_custom_to, dashboard_space_ids, dashboard_tab_ids')
         .eq('user_id', userId)
         .maybeSingle();
       if (!data) return data;
@@ -130,11 +130,7 @@ export default function DashboardScreen() {
       if (data.dashboard_preset) setActivePreset(data.dashboard_preset as Preset);
       if (data.dashboard_custom_from) setCustomFrom(new Date(data.dashboard_custom_from));
       if (data.dashboard_custom_to)   setCustomTo(new Date(data.dashboard_custom_to));
-      if (data.dashboard_space_ids) {
-        const ids = (data.dashboard_space_ids as string).split(',').filter(Boolean);
-        setSelectedSpaces(new Set(ids.length ? ids : ['all']));
-      }
-      return data;
+      if (data.dashboard_space_ids) {\r\n        const ids = (data.dashboard_space_ids as string).split(',').filter(Boolean);\r\n        setSelectedSpaces(new Set(ids.length ? ids : ['all']));\r\n      }\r\n      if (data.dashboard_tab_ids) {\r\n        const tabs = (data.dashboard_tab_ids as string).split(',').filter(Boolean);\r\n        setSelectedTabs(new Set(tabs.length ? tabs as ActivityTab[] : ['all']));\r\n      }\r\n      return data;
     },
     enabled: !!userId,
   });
@@ -294,6 +290,7 @@ export default function DashboardScreen() {
     setStatusFilter(null);
     if (key === 'all') {
       setSelectedTabs(new Set(['all']));
+      saveSettings.mutate({ dashboard_tab_ids: '' });
       return;
     }
     setSelectedTabs(prev => {
@@ -301,11 +298,18 @@ export default function DashboardScreen() {
       next.delete('all');
       if (next.has(key)) {
         next.delete(key);
-        if (next.size === 0) return new Set(['all']);
+        if (next.size === 0) {
+          saveSettings.mutate({ dashboard_tab_ids: '' });
+          return new Set(['all']);
+        }
       } else {
         next.add(key);
-        if (next.size === 4) return new Set(['all']);
+        if (next.size === 4) {
+          saveSettings.mutate({ dashboard_tab_ids: '' });
+          return new Set(['all']);
+        }
       }
+      saveSettings.mutate({ dashboard_tab_ids: [...next].join(',') });
       return next;
     });
   };
@@ -863,3 +867,5 @@ const s = StyleSheet.create({
   statusChipText:       { fontFamily: IS, fontSize: 13, color: P.secondary },
   statusChipTextActive: { color: P.text },
 });
+
+
