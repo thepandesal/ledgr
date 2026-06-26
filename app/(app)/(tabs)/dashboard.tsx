@@ -1,9 +1,9 @@
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  SafeAreaView, ActivityIndicator, Animated, Dimensions,
+  SafeAreaView, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useUser } from '../../../src/hooks/useUser';
 import { supabase } from '../../../src/lib/supabase';
@@ -11,50 +11,90 @@ import ConfirmModal from '@/components/ui/ConfirmModal';
 import { Colors, Radius, Spacing } from '@/components/ui/theme';
 import { useRouter } from 'expo-router';
 
-const { width } = Dimensions.get('window');
+const I  = 'Inter_400Regular';
+const IM = 'Inter_500Medium';
+const IS = 'Inter_600SemiBold';
+const IB = 'Inter_700Bold';
+
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
-const TABS = [
-  { key: 'money-in',    label: 'Money In',    icon: 'arrow-down-circle-outline',  types: ['income', 'savings'],   color: Colors.income },
-  { key: 'money-out',   label: 'Money Out',   icon: 'arrow-up-circle-outline',    types: ['expense'],             color: Colors.expense },
-  { key: 'loans',       label: 'Loans',       icon: 'cash-outline',               types: ['payable'],             color: Colors.pending },
-  { key: 'receivables', label: 'Receivables', icon: 'arrow-undo-outline',         types: ['receivable'],          color: Colors.paid },
+const ACTIVITY_TABS = [
+  { key: 'money-in',    label: 'Money In',    icon: 'arrow-down-circle-outline', types: ['income','savings'], color: Colors.income },
+  { key: 'money-out',   label: 'Money Out',   icon: 'arrow-up-circle-outline',   types: ['expense'],         color: Colors.expense },
+  { key: 'loans',       label: 'Loans',       icon: 'cash-outline',              types: ['payable'],         color: Colors.pending },
+  { key: 'receivables', label: 'Receivables', icon: 'arrow-undo-outline',        types: ['receivable'],      color: Colors.paid },
 ] as const;
 
-type TabKey = typeof TABS[number]['key'];
+type ActivityTab = typeof ACTIVITY_TABS[number]['key'];
+
+type Preset = 'this-month' | 'last-30' | 'cutoff' | 'custom';
+
+const PRESETS: { key: Preset; label: string }[] = [
+  { key: 'this-month', label: 'This Month' },
+  { key: 'last-30',    label: 'Last 30d'   },
+  { key: 'cutoff',     label: 'Cutoff'     },
+  { key: 'custom',     label: 'Custom'     },
+];
 
 function isSameDay(a: Date, b: Date) {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+  return a.getFullYear() === b.getFullYear()
+      && a.getMonth()    === b.getMonth()
+      && a.getDate()     === b.getDate();
 }
 
-function getDefaultRange() {
+function getRangeForPreset(preset: Preset, cutoffDay: number): { from: Date; to: Date } {
   const now = new Date();
-  const from = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
-  return { from, to: now };
+  if (preset === 'this-month') {
+    return { from: new Date(now.getFullYear(), now.getMonth(), 1), to: now };
+  }
+  if (preset === 'last-30') {
+    const from = new Date(now); from.setDate(now.getDate() - 30);
+    return { from, to: now };
+  }
+  if (preset === 'cutoff') {
+    const day = cutoffDay;
+    let from: Date, to: Date;
+    if (now.getDate() >= day) {
+      from = new Date(now.getFullYear(), now.getMonth(), day);
+      to   = new Date(now.getFullYear(), now.getMonth() + 1, day - 1);
+    } else {
+      from = new Date(now.getFullYear(), now.getMonth() - 1, day);
+      to   = new Date(now.getFullYear(), now.getMonth(), day - 1);
+    }
+    return { from, to };
+  }
+  // custom — caller manages dates
+  return { from: new Date(now.getFullYear(), now.getMonth(), 1), to: now };
 }
 
 export default function DashboardScreen() {
-  const router = useRouter();
+  const router    = useRouter();
   const { userId } = useUser();
 
-  const defaultRange = getDefaultRange();
-  const [dateFrom, setDateFrom] = useState<Date>(defaultRange.from);
-  const [dateTo, setDateTo]     = useState<Date>(defaultRange.to);
-  const [activeTab, setActiveTab] = useState<TabKey>('money-in');
+  const [activePreset, setActivePreset] = useState<Preset>('this-month');
+  const [activeTab,    setActiveTab]    = useState<ActivityTab>('money-in');
+  const [cutoffDay,    setCutoffDay]    = useState(25);
 
-  const [showPicker, setShowPicker]   = useState(false);
-  const [pickingDate, setPickingDate] = useState<'from' | 'to'>('from');
-  const [pickerMonth, setPickerMonth] = useState(new Date().getMonth());
-  const [pickerYear, setPickerYear]   = useState(new Date().getFullYear());
+  // custom range state
+  const [customFrom, setCustomFrom] = useState<Date>(new Date());
+  const [customTo,   setCustomTo]   = useState<Date>(new Date());
 
-  const tabScrollRef = useRef<ScrollView>(null);
+  // calendar picker state
+  const [showPicker,   setShowPicker]   = useState(false);
+  const [pickingDate,  setPickingDate]  = useState<'from' | 'to'>('from');
+  const [pickerMonth,  setPickerMonth]  = useState(new Date().getMonth());
+  const [pickerYear,   setPickerYear]   = useState(new Date().getFullYear());
+
+  const range = activePreset === 'custom'
+    ? { from: customFrom, to: customTo }
+    : getRangeForPreset(activePreset, cutoffDay);
 
   const { data: recordings = [], isLoading } = useQuery({
     queryKey: ['dashboard-activities', userId],
     queryFn: async () => {
       const { data } = await supabase
         .from('recordings')
-        .select('*, categories:category_id(name, color, icon)')
+        .select('*, categories:category_id(name,color,icon), space:space_id(name)')
         .eq('user_id', userId)
         .order('transaction_date', { ascending: false });
       return data ?? [];
@@ -62,71 +102,69 @@ export default function DashboardScreen() {
     enabled: !!userId,
   });
 
-  const currentTypes = TABS.find(t => t.key === activeTab)!.types as string[];
+  const currentTypes = ACTIVITY_TABS.find(t => t.key === activeTab)!.types as string[];
 
   const filtered = recordings.filter(r => {
     if (!currentTypes.includes(r.type)) return false;
-    const parts = r.transaction_date.split('-');
-    const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-    if (d < dateFrom) return false;
-    const to = new Date(dateTo); to.setHours(23, 59, 59);
-    if (d > to) return false;
+    const [y, m, d] = r.transaction_date.split('-').map(Number);
+    const date = new Date(y, m - 1, d);
+    if (date < range.from) return false;
+    const to = new Date(range.to); to.setHours(23, 59, 59);
+    if (date > to) return false;
     return true;
   });
 
   const total = filtered.reduce((s, r) => s + Number(r.amount), 0);
+  const activeTabData = ACTIVITY_TABS.find(t => t.key === activeTab)!;
+
+  // ── date label under preset chips ──
+  const fmtShort = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const fmtFull  = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const rangeLabel = isSameDay(range.from, range.to)
+    ? fmtFull(range.from)
+    : `${fmtShort(range.from)} – ${fmtFull(range.to)}`;
+
+  // ── calendar helpers ──
+  const firstDay    = new Date(pickerYear, pickerMonth, 1).getDay();
+  const daysInMonth = new Date(pickerYear, pickerMonth + 1, 0).getDate();
+  const cells = Array(firstDay).fill(null).concat(Array.from({ length: daysInMonth }, (_, i) => i + 1));
+
+  const isInRange = (day: number) => {
+    const d = new Date(pickerYear, pickerMonth, day);
+    return d > customFrom && d < customTo;
+  };
+  const isEdge = (day: number) => {
+    const d = new Date(pickerYear, pickerMonth, day);
+    return isSameDay(d, customFrom) || isSameDay(d, customTo);
+  };
 
   const handleDayPress = (day: number) => {
     const d = new Date(pickerYear, pickerMonth, day);
     if (pickingDate === 'from') {
-      setDateFrom(d);
-      setDateTo(d);
-      setPickingDate('to');
+      setCustomFrom(d); setCustomTo(d); setPickingDate('to');
     } else {
-      if (d < dateFrom) {
-        setDateFrom(d);
-        setPickingDate('to');
-      } else {
-        setDateTo(d);
-        setShowPicker(false);
-        setPickingDate('from');
-      }
+      if (d < customFrom) { setCustomFrom(d); setPickingDate('to'); }
+      else { setCustomTo(d); setShowPicker(false); setPickingDate('from'); }
     }
   };
 
-  const isInRange = (day: number) => {
-    const d = new Date(pickerYear, pickerMonth, day);
-    return d > dateFrom && d < dateTo;
+  const handlePreset = (key: Preset) => {
+    if (key === 'custom') {
+      const r = getRangeForPreset('this-month', cutoffDay);
+      setCustomFrom(r.from); setCustomTo(r.to);
+      setPickingDate('from'); setShowPicker(true);
+    }
+    setActivePreset(key);
   };
-
-  const isRangeEdge = (day: number) => {
-    const d = new Date(pickerYear, pickerMonth, day);
-    return isSameDay(d, dateFrom) || isSameDay(d, dateTo);
-  };
-
-  const dateLabel = () => {
-    const fmtShort = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    const fmtFull  = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    if (isSameDay(dateFrom, dateTo)) return fmtFull(dateFrom);
-    return `${fmtShort(dateFrom)} – ${fmtFull(dateTo)}`;
-  };
-
-  const firstDay   = new Date(pickerYear, pickerMonth, 1).getDay();
-  const daysInMonth = new Date(pickerYear, pickerMonth + 1, 0).getDate();
-  const cells = Array(firstDay).fill(null).concat(Array.from({ length: daysInMonth }, (_, i) => i + 1));
-
-  const activeTabData = TABS.find(t => t.key === activeTab)!;
 
   const statusLabel = (r: any) => {
     if (activeTab === 'loans')       return r.status === 'paid'     ? 'paid'     : r.status === 'partial' ? 'partial' : 'unpaid';
     if (activeTab === 'receivables') return r.status === 'received' ? 'received' : r.status === 'partial' ? 'partial' : 'pending';
     return null;
   };
-
   const statusColor = (r: any) => {
-    const s = r.status;
-    if (s === 'paid' || s === 'received') return Colors.income;
-    if (s === 'partial') return Colors.cyan;
+    if (r.status === 'paid' || r.status === 'received') return Colors.income;
+    if (r.status === 'partial') return Colors.cyan;
     return Colors.pending;
   };
 
@@ -136,47 +174,74 @@ export default function DashboardScreen() {
       {/* ── Header ── */}
       <View style={s.header}>
         <View>
-          <Text style={s.greeting}>activities</Text>
-          <Text style={s.sub}>your financial overview</Text>
+          <Text style={s.title}>Activities</Text>
+          <Text style={s.subtitle}>your financial overview</Text>
         </View>
+      </View>
 
-        {/* Date range pill */}
-        <TouchableOpacity
-          style={s.datePill}
-          onPress={() => { setPickingDate('from'); setShowPicker(true); }}
-          activeOpacity={0.75}
-        >
-          <Ionicons name="calendar-outline" size={13} color={Colors.cyan} />
-          <Text style={s.datePillText}>{dateLabel()}</Text>
-          <Ionicons name="chevron-down" size={11} color={Colors.muted} />
-        </TouchableOpacity>
+      {/* ── Preset chips ── */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={s.presetRow}
+        style={s.presetScroll}
+      >
+        {PRESETS.map(p => {
+          const isActive = p.key === activePreset;
+          return (
+            <TouchableOpacity
+              key={p.key}
+              style={[s.presetChip, isActive && s.presetChipActive]}
+              onPress={() => handlePreset(p.key)}
+              activeOpacity={0.75}
+            >
+              {p.key === 'cutoff' && (
+                <Ionicons name="cut-outline" size={12} color={isActive ? Colors.white : Colors.muted} />
+              )}
+              {p.key === 'custom' && (
+                <Ionicons name="calendar-outline" size={12} color={isActive ? Colors.white : Colors.muted} />
+              )}
+              <Text style={[s.presetChipText, isActive && s.presetChipTextActive]}>{p.label}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+
+      {/* ── Range label ── */}
+      <View style={s.rangeLabelRow}>
+        <Ionicons name="time-outline" size={11} color={Colors.faint} />
+        <Text style={s.rangeLabel}>{rangeLabel}</Text>
+        {activePreset === 'custom' && (
+          <TouchableOpacity onPress={() => { setPickingDate('from'); setShowPicker(true); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Text style={s.rangeLabelEdit}>edit</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* ── Summary card ── */}
-      <View style={s.summaryCard}>
-        <View style={s.summaryLeft}>
-          <View style={[s.summaryIconWrap, { backgroundColor: activeTabData.color + '18' }]}>
-            <Ionicons name={activeTabData.icon as any} size={20} color={activeTabData.color} />
+      <View style={[s.summaryCard, { borderLeftColor: activeTabData.color }]}>
+        <View style={s.summaryTop}>
+          <View style={[s.summaryIcon, { backgroundColor: activeTabData.color + '18' }]}>
+            <Ionicons name={activeTabData.icon as any} size={18} color={activeTabData.color} />
           </View>
-          <View>
-            <Text style={s.summaryLabel}>{activeTabData.label}</Text>
-            <Text style={s.summaryCount}>{filtered.length} {filtered.length === 1 ? 'entry' : 'entries'}</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={s.summaryTabLabel}>{activeTabData.label}</Text>
+            <Text style={s.summaryEntries}>{filtered.length} {filtered.length === 1 ? 'entry' : 'entries'}</Text>
           </View>
+          <Text style={[s.summaryTotal, { color: activeTabData.color }]}>
+            {total.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+          </Text>
         </View>
-        <Text style={[s.summaryAmount, { color: activeTabData.color }]}>
-          {total.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-        </Text>
       </View>
 
-      {/* ── Tab nav ── */}
+      {/* ── Activity tab nav ── */}
       <ScrollView
-        ref={tabScrollRef}
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={s.tabRow}
         style={s.tabScroll}
       >
-        {TABS.map(tab => {
+        {ACTIVITY_TABS.map(tab => {
           const isActive = tab.key === activeTab;
           return (
             <TouchableOpacity
@@ -185,126 +250,115 @@ export default function DashboardScreen() {
               onPress={() => setActiveTab(tab.key)}
               activeOpacity={0.75}
             >
-              <Ionicons
-                name={tab.icon as any}
-                size={13}
-                color={isActive ? '#fff' : Colors.muted}
-              />
+              <Ionicons name={tab.icon as any} size={12} color={isActive ? '#fff' : Colors.muted} />
               <Text style={[s.tabChipText, isActive && s.tabChipTextActive]}>{tab.label}</Text>
             </TouchableOpacity>
           );
         })}
       </ScrollView>
 
+      {/* ── Divider ── */}
+      <View style={s.divider} />
+
       {/* ── List ── */}
       {isLoading ? (
-        <ActivityIndicator color={Colors.cyan} style={{ marginTop: 40 }} />
+        <ActivityIndicator color={Colors.cyan} style={{ marginTop: 48 }} />
       ) : filtered.length === 0 ? (
         <View style={s.emptyWrap}>
-          <Ionicons name={activeTabData.icon as any} size={38} color={Colors.border} />
-          <Text style={s.emptyText}>no {activeTabData.label.toLowerCase()} in this period</Text>
+          <View style={s.emptyIconWrap}>
+            <Ionicons name={activeTabData.icon as any} size={28} color={Colors.faint} />
+          </View>
+          <Text style={s.emptyTitle}>nothing here</Text>
+          <Text style={s.emptyText}>no {activeTabData.label.toLowerCase()} found{'\n'}for this period</Text>
         </View>
       ) : (
-        <ScrollView
-          contentContainerStyle={s.list}
-          showsVerticalScrollIndicator={false}
-        >
+        <ScrollView contentContainerStyle={s.list} showsVerticalScrollIndicator={false}>
           {filtered.map((item, idx) => {
-            const prevItem = filtered[idx - 1];
-            const currDate = item.transaction_date;
-            const prevDate = prevItem?.transaction_date;
-            const showDate = currDate !== prevDate;
-
-            const dateStr = new Date(item.transaction_date + 'T00:00:00')
-              .toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-
+            const prevDate  = filtered[idx - 1]?.transaction_date;
+            const showDate  = item.transaction_date !== prevDate;
+            const dateStr   = new Date(item.transaction_date + 'T00:00:00')
+              .toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
             const sl = statusLabel(item);
             const sc = statusColor(item);
 
             return (
               <View key={item.id}>
                 {showDate && (
-                  <Text style={s.dateHeader}>{dateStr}</Text>
+                  <View style={s.dateHeaderRow}>
+                    <Text style={s.dateHeaderText}>{dateStr}</Text>
+                    <View style={s.dateHeaderLine} />
+                  </View>
                 )}
                 <TouchableOpacity
                   style={s.row}
-                  activeOpacity={0.8}
+                  activeOpacity={0.7}
                   onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: item.id } } as any)}
                 >
-                  {/* Icon */}
-                  <View style={[s.rowIcon, { backgroundColor: activeTabData.color + '15' }]}>
+                  <View style={[s.rowIconWrap, { backgroundColor: activeTabData.color + '12' }]}>
                     <Ionicons
                       name={(item.categories?.icon ?? activeTabData.icon) as any}
-                      size={16}
+                      size={15}
                       color={activeTabData.color}
                     />
                   </View>
-
-                  {/* Middle */}
                   <View style={s.rowMid}>
                     <Text style={s.rowName} numberOfLines={1}>{item.name}</Text>
-                    {item.categories?.name && (
-                      <Text style={s.rowMeta}>{item.categories.name}</Text>
+                    {item.space?.name && (
+                      <Text style={s.rowSpace} numberOfLines={1}>{item.space.name}</Text>
                     )}
                   </View>
-
-                  {/* Right */}
                   <View style={s.rowRight}>
                     <Text style={[s.rowAmount, { color: activeTabData.color }]}>
                       {Number(item.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </Text>
-                    {sl && (
-                      <Text style={[s.rowStatus, { color: sc }]}>{sl}</Text>
-                    )}
+                    {sl && <Text style={[s.rowStatus, { color: sc }]}>{sl}</Text>}
                   </View>
                 </TouchableOpacity>
               </View>
             );
           })}
-          <View style={{ height: 32 }} />
+          <View style={{ height: 40 }} />
         </ScrollView>
       )}
 
-      {/* ── Date picker modal ── */}
+      {/* ── Custom date picker modal ── */}
       <ConfirmModal
         visible={showPicker}
         onClose={() => { setShowPicker(false); setPickingDate('from'); }}
-        title={pickingDate === 'from' ? 'select start date' : 'select end date'}
+        title={pickingDate === 'from' ? 'start date' : 'end date'}
         actions={[
-          { label: 'reset', onPress: () => { const r = getDefaultRange(); setDateFrom(r.from); setDateTo(r.to); setShowPicker(false); setPickingDate('from'); }, muted: true },
-          { label: 'done',  onPress: () => { setShowPicker(false); setPickingDate('from'); } },
+          { label: 'cancel', onPress: () => { setShowPicker(false); setPickingDate('from'); }, muted: true },
+          { label: 'done',   onPress: () => { setShowPicker(false); setPickingDate('from'); } },
         ]}
       >
         <View style={s.pickerNav}>
           <TouchableOpacity onPress={() => { if (pickerMonth === 0) { setPickerMonth(11); setPickerYear(y => y - 1); } else setPickerMonth(m => m - 1); }}>
-            <Ionicons name="chevron-back" size={20} color={Colors.text} />
+            <Ionicons name="chevron-back" size={18} color={Colors.text} />
           </TouchableOpacity>
-          <Text style={s.pickerMonthLabel}>{MONTHS[pickerMonth].toLowerCase()} {pickerYear}</Text>
+          <Text style={s.pickerMonthText}>{MONTHS[pickerMonth].toLowerCase()} {pickerYear}</Text>
           <TouchableOpacity onPress={() => { if (pickerMonth === 11) { setPickerMonth(0); setPickerYear(y => y + 1); } else setPickerMonth(m => m + 1); }}>
-            <Ionicons name="chevron-forward" size={20} color={Colors.text} />
+            <Ionicons name="chevron-forward" size={18} color={Colors.text} />
           </TouchableOpacity>
         </View>
-        <Text style={s.pickerHint}>
-          {pickingDate === 'from' ? 'tap to set start date' : 'tap to set end date'}
-        </Text>
-        <View style={{ flexDirection: 'row', marginBottom: 4 }}>
+        <Text style={s.pickerHint}>{pickingDate === 'from' ? 'tap to set start date' : 'tap to set end date'}</Text>
+        <View style={{ flexDirection: 'row', marginBottom: 6 }}>
           {['su','mo','tu','we','th','fr','sa'].map(d => (
-            <Text key={d} style={s.calWeekday}>{d}</Text>
+            <Text key={d} style={s.calDay}>{d}</Text>
           ))}
         </View>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', width: '100%' }}>
           {cells.map((day, i) => {
             if (!day) return <View key={`e${i}`} style={s.calCell} />;
             const inRange = isInRange(day);
-            const isEdge  = isRangeEdge(day);
-            const isToday = isSameDay(new Date(pickerYear, pickerMonth, day), new Date());
+            const edge    = isEdge(day);
+            const today   = isSameDay(new Date(pickerYear, pickerMonth, day), new Date());
             return (
               <TouchableOpacity
                 key={day}
-                style={[s.calCell, inRange && s.calCellRange, isEdge && s.calCellEdge, !inRange && !isEdge && isToday && s.calCellToday]}
+                style={[s.calCell, inRange && s.calCellRange, edge && s.calCellEdge, !inRange && !edge && today && s.calCellToday]}
                 onPress={() => handleDayPress(day)}
               >
-                <Text style={[s.calCellText, (isEdge || isToday) && s.calCellTextActive]}>{day}</Text>
+                <Text style={[s.calCellText, (edge || today) && s.calCellTextActive]}>{day}</Text>
               </TouchableOpacity>
             );
           })}
@@ -315,126 +369,110 @@ export default function DashboardScreen() {
   );
 }
 
-const INTER_REGULAR = 'Inter_400Regular';
-const INTER_MEDIUM  = 'Inter_500Medium';
-const INTER_SEMI    = 'Inter_600SemiBold';
-const INTER_BOLD    = 'Inter_700Bold';
-
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.white },
 
   // Header
   header: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
     paddingHorizontal: Spacing.page,
-    paddingTop: Spacing.xl,
-    paddingBottom: Spacing.md,
+    paddingTop: 28,
+    paddingBottom: 20,
   },
-  greeting: { fontFamily: INTER_BOLD, fontSize: 26, color: Colors.text, letterSpacing: -0.5 },
-  sub:      { fontFamily: INTER_REGULAR, fontSize: 12, color: Colors.muted, marginTop: 2 },
+  title:    { fontFamily: IB, fontSize: 28, color: Colors.text, letterSpacing: -0.6 },
+  subtitle: { fontFamily: I,  fontSize: 12, color: Colors.muted, marginTop: 3 },
 
-  // Date pill
-  datePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.borderMid,
-    borderRadius: Radius.pill,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    alignSelf: 'flex-start',
-    marginTop: 4,
+  // Preset chips
+  presetScroll: { flexGrow: 0, flexShrink: 0 },
+  presetRow: { paddingHorizontal: Spacing.page, gap: 8, paddingBottom: 2 },
+  presetChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingHorizontal: 14, paddingVertical: 8,
+    borderRadius: Radius.pill, borderWidth: 1,
+    borderColor: Colors.borderMid, backgroundColor: Colors.surface,
   },
-  datePillText: { fontFamily: INTER_MEDIUM, fontSize: 11, color: Colors.text },
+  presetChipActive: { backgroundColor: Colors.text, borderColor: Colors.text },
+  presetChipText: { fontFamily: IM, fontSize: 12, color: Colors.muted },
+  presetChipTextActive: { color: Colors.white },
+
+  // Range label
+  rangeLabelRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingHorizontal: Spacing.page, marginTop: 10, marginBottom: 16,
+  },
+  rangeLabel:     { fontFamily: I, fontSize: 11, color: Colors.faint, flex: 1 },
+  rangeLabelEdit: { fontFamily: IM, fontSize: 11, color: Colors.cyan },
 
   // Summary card
   summaryCard: {
     marginHorizontal: Spacing.page,
-    marginBottom: Spacing.lg,
+    marginBottom: 18,
     backgroundColor: Colors.surface,
-    borderRadius: Radius.xl,
+    borderRadius: Radius.lg,
     borderWidth: 1,
     borderColor: Colors.border,
+    borderLeftWidth: 4,
     paddingHorizontal: 16,
     paddingVertical: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
   },
-  summaryLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  summaryIconWrap: { width: 40, height: 40, borderRadius: Radius.md, justifyContent: 'center', alignItems: 'center' },
-  summaryLabel: { fontFamily: INTER_SEMI, fontSize: 13, color: Colors.text },
-  summaryCount: { fontFamily: INTER_REGULAR, fontSize: 11, color: Colors.muted, marginTop: 2 },
-  summaryAmount: { fontFamily: INTER_BOLD, fontSize: 20, letterSpacing: -0.5 },
+  summaryTop: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  summaryIcon: { width: 38, height: 38, borderRadius: Radius.md, justifyContent: 'center', alignItems: 'center' },
+  summaryTabLabel: { fontFamily: IS, fontSize: 13, color: Colors.text },
+  summaryEntries:  { fontFamily: I,  fontSize: 11, color: Colors.muted, marginTop: 2 },
+  summaryTotal:    { fontFamily: IB, fontSize: 22, letterSpacing: -0.5 },
 
-  // Tabs
-  tabScroll: { flexGrow: 0, marginBottom: Spacing.md },
-  tabRow: { paddingHorizontal: Spacing.page, gap: 8, alignItems: 'center' },
+  // Activity tabs
+  tabScroll: { flexGrow: 0, flexShrink: 0 },
+  tabRow: { paddingHorizontal: Spacing.page, gap: 8, paddingVertical: 2 },
   tabChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: Radius.pill,
-    borderWidth: 1,
-    borderColor: Colors.borderMid,
-    backgroundColor: Colors.surface,
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingHorizontal: 14, paddingVertical: 8,
+    borderRadius: Radius.pill, borderWidth: 1,
+    borderColor: Colors.borderMid, backgroundColor: Colors.surface,
   },
-  tabChipText: { fontFamily: INTER_MEDIUM, fontSize: 12, color: Colors.muted },
+  tabChipText:       { fontFamily: IM, fontSize: 12, color: Colors.muted },
   tabChipTextActive: { color: '#fff' },
 
-  // Empty
-  emptyWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 10, paddingBottom: 60 },
-  emptyText: { fontFamily: INTER_REGULAR, fontSize: 13, color: Colors.muted },
+  // Divider
+  divider: { height: 1, backgroundColor: Colors.border, marginHorizontal: Spacing.page, marginTop: 16, marginBottom: 4 },
+
+  // Empty state
+  emptyWrap:     { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 8, paddingBottom: 80 },
+  emptyIconWrap: { width: 56, height: 56, borderRadius: Radius.xl, backgroundColor: Colors.surface, justifyContent: 'center', alignItems: 'center', marginBottom: 4 },
+  emptyTitle:    { fontFamily: IS, fontSize: 14, color: Colors.text },
+  emptyText:     { fontFamily: I,  fontSize: 12, color: Colors.muted, textAlign: 'center', lineHeight: 18 },
 
   // List
-  list: { paddingHorizontal: Spacing.page, paddingTop: 4 },
-  dateHeader: {
-    fontFamily: INTER_SEMI,
-    fontSize: 11,
-    color: Colors.muted,
-    letterSpacing: 0.4,
-    textTransform: 'uppercase',
-    marginTop: 16,
-    marginBottom: 6,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  rowIcon: { width: 36, height: 36, borderRadius: Radius.md, justifyContent: 'center', alignItems: 'center' },
-  rowMid: { flex: 1 },
-  rowName: { fontFamily: INTER_MEDIUM, fontSize: 13, color: Colors.text },
-  rowMeta: { fontFamily: INTER_REGULAR, fontSize: 11, color: Colors.muted, marginTop: 2 },
-  rowRight: { alignItems: 'flex-end', gap: 2 },
-  rowAmount: { fontFamily: INTER_BOLD, fontSize: 14 },
-  rowStatus: { fontFamily: INTER_MEDIUM, fontSize: 10 },
+  list: { paddingHorizontal: Spacing.page, paddingTop: 8 },
 
-  // Calendar picker
-  pickerNav: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    width: '100%',
-    paddingHorizontal: 4,
-    marginBottom: 10,
+  dateHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 20, marginBottom: 8 },
+  dateHeaderText: { fontFamily: IS, fontSize: 11, color: Colors.muted, letterSpacing: 0.2 },
+  dateHeaderLine: { flex: 1, height: 1, backgroundColor: Colors.border },
+
+  row: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingVertical: 11,
+    borderBottomWidth: 1, borderBottomColor: Colors.border,
   },
-  pickerMonthLabel: { fontFamily: INTER_SEMI, fontSize: 15, color: Colors.text },
-  pickerHint: { fontFamily: INTER_REGULAR, fontSize: 10, color: Colors.cyan, marginBottom: 8 },
-  calWeekday: { flex: 1, textAlign: 'center', fontFamily: INTER_MEDIUM, fontSize: 10, color: Colors.faint },
-  calCell: { width: '14.28%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center', borderRadius: Radius.pill },
+  rowIconWrap: { width: 38, height: 38, borderRadius: Radius.md, justifyContent: 'center', alignItems: 'center' },
+  rowMid:   { flex: 1, gap: 2 },
+  rowName:  { fontFamily: IM, fontSize: 13, color: Colors.text },
+  rowSpace: { fontFamily: I,  fontSize: 11, color: Colors.muted },
+  rowRight: { alignItems: 'flex-end', gap: 3 },
+  rowAmount: { fontFamily: IB, fontSize: 14 },
+  rowStatus: { fontFamily: IM, fontSize: 10 },
+
+  // Calendar
+  pickerNav: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    width: '100%', paddingHorizontal: 4, marginBottom: 10,
+  },
+  pickerMonthText: { fontFamily: IS, fontSize: 14, color: Colors.text },
+  pickerHint:      { fontFamily: I,  fontSize: 10, color: Colors.cyan, marginBottom: 8 },
+  calDay:     { flex: 1, textAlign: 'center', fontFamily: IM, fontSize: 10, color: Colors.faint },
+  calCell:    { width: '14.28%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center', borderRadius: Radius.pill },
   calCellRange: { backgroundColor: Colors.cyan + '22', borderRadius: 0 },
   calCellEdge:  { backgroundColor: Colors.cyan },
   calCellToday: { backgroundColor: Colors.border },
-  calCellText:  { fontFamily: INTER_REGULAR, fontSize: 13, color: Colors.text },
-  calCellTextActive: { fontFamily: INTER_SEMI, color: Colors.white },
+  calCellText:  { fontFamily: I,  fontSize: 13, color: Colors.text },
+  calCellTextActive: { fontFamily: IS, color: Colors.white },
 });
