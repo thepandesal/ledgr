@@ -11,12 +11,12 @@ import BottomSheet from '@/components/ui/BottomSheet';
 import { Colors, Radius } from '@/components/ui/theme';
 import { useRouter } from 'expo-router';
 
-const I   = 'Inter_400Regular';
-const IM  = 'Inter_500Medium';
-const IS  = 'Inter_600SemiBold';
-const IB  = 'Inter_700Bold';
-const FB  = 'Inter_600SemiBold';
-const FBK = 'Inter_700Bold';
+const I   = 'PlusJakartaSans_400Regular';
+const IM  = 'PlusJakartaSans_500Medium';
+const IS  = 'PlusJakartaSans_600SemiBold';
+const IB  = 'PlusJakartaSans_700Bold';
+const FB  = 'PlusJakartaSans_600SemiBold';
+const FBK = 'PlusJakartaSans_700Bold';
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
@@ -34,6 +34,8 @@ const P = {
   teal:      '#4ECDC4',
   tealLight: '#E0F5F4',
   tealDark:  '#38B2AC',
+  peach:     '#FFAB91',
+  peachDark: '#FF7043',
 } as const;
 
 const ACTIVITY_TABS = [
@@ -321,17 +323,17 @@ export default function DashboardScreen() {
   const typeLabel = (r: any) => {
     if (r.type === 'income')     return { label: 'money in',                color: P.tealDark };
     if (r.type === 'savings')    return { label: 'savings',                 color: P.tealDark };
-    if (r.type === 'expense')    return { label: 'money out',               color: P.text     };
+    if (r.type === 'expense')    return { label: 'money out',               color: P.peach    };
     if (r.type === 'payable')    return r.status === 'paid'
       ? { label: 'loan · paid',    color: P.tealDark }
       : r.status === 'partial'
-      ? { label: 'loan · partial', color: P.tealDark }
-      : { label: 'loan',           color: P.text     };
+      ? { label: 'loan · partial', color: P.peach    }
+      : { label: 'loan',           color: P.peach    };
     if (r.type === 'receivable') return r.status === 'received'
       ? { label: 'receivable · received', color: P.tealDark }
       : r.status === 'partial'
       ? { label: 'receivable · partial',  color: P.tealDark }
-      : { label: 'receivable',            color: P.text     };
+      : { label: 'receivable',            color: P.tealDark };
     return null;
   };
 
