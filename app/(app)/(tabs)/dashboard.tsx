@@ -454,6 +454,9 @@ export default function DashboardScreen() {
                     />
                   </View>
                   <View style={s.rowMid}>
+                    {item.categories?.name && (
+                      <Text style={s.rowCategory} numberOfLines={1}>{item.categories.name}</Text>
+                    )}
                     <Text style={s.rowName} numberOfLines={1}>{item.name}</Text>
                     {item.space?.name && (
                       <Text style={s.rowSpace} numberOfLines={1}>{item.space.name}</Text>
@@ -658,9 +661,10 @@ const s = StyleSheet.create({
     borderBottomWidth: 1, borderBottomColor: Colors.border,
   },
   rowIconWrap: { width: 38, height: 38, borderRadius: Radius.md, justifyContent: 'center', alignItems: 'center' },
-  rowMid:   { flex: 1, gap: 2 },
-  rowName:  { fontFamily: IM, fontSize: 13, color: Colors.text },
-  rowSpace: { fontFamily: IM,  fontSize: 11, color: Colors.muted },
+  rowMid:     { flex: 1, gap: 1 },
+  rowCategory: { fontFamily: IM, fontSize: 10, color: Colors.muted, textTransform: 'uppercase', letterSpacing: 0.4 },
+  rowName:     { fontFamily: IB, fontSize: 13, color: Colors.text },
+  rowSpace:    { fontFamily: IM, fontSize: 11, color: Colors.muted },
   rowRight: { alignItems: 'flex-end', gap: 4 },
   rowAmount: { fontFamily: IB, fontSize: 14 },
   typeBadge: { borderRadius: Radius.pill, paddingHorizontal: 8, paddingVertical: 3 },
