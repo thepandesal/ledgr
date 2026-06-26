@@ -363,7 +363,11 @@ export default function DashboardScreen() {
                     <Text style={[s.rowAmount, { color: tl?.color ?? activeTabData.color }]}>
                       {Number(item.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </Text>
-                    {tl && <Text style={[s.rowStatus, { color: tl.color }]}>{tl.label}</Text>}
+                    {tl && (
+                      <View style={[s.typeBadge, { backgroundColor: tl.color + '18' }]}>
+                        <Text style={[s.typeBadgeText, { color: tl.color }]}>{tl.label}</Text>
+                      </View>
+                    )}
                   </View>
                 </TouchableOpacity>
               </View>
@@ -545,9 +549,10 @@ const s = StyleSheet.create({
   rowMid:   { flex: 1, gap: 2 },
   rowName:  { fontFamily: IM, fontSize: 13, color: Colors.text },
   rowSpace: { fontFamily: I,  fontSize: 11, color: Colors.muted },
-  rowRight: { alignItems: 'flex-end', gap: 3 },
+  rowRight: { alignItems: 'flex-end', gap: 4 },
   rowAmount: { fontFamily: IB, fontSize: 14 },
-  rowStatus: { fontFamily: IM, fontSize: 10 },
+  typeBadge: { borderRadius: Radius.pill, paddingHorizontal: 8, paddingVertical: 3 },
+  typeBadgeText: { fontFamily: IM, fontSize: 10 },
 
   // Cutoff modal
   cutoffRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, width: '100%', marginBottom: 12 },
