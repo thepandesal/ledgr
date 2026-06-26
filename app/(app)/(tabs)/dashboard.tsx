@@ -98,6 +98,7 @@ export default function DashboardScreen() {
 
   const [activePreset, setActivePreset] = useState<Preset>('this-month');
   const [selectedTabs, setSelectedTabs] = useState<Set<ActivityTab>>(new Set(['all']));
+  const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [cutoffDay,    setCutoffDay]    = useState(25);
   const [showCutoff,   setShowCutoff]   = useState(false);
   const [cutoffInput,  setCutoffInput]  = useState('25');
@@ -178,6 +179,11 @@ export default function DashboardScreen() {
     if (date < range.from) return false;
     const to = new Date(range.to); to.setHours(23, 59, 59);
     if (date > to) return false;
+    // status filter (loans / receivables only)
+    if (statusFilter === 'active'   && r.type === 'payable'    && r.status === 'paid')     return false;
+    if (statusFilter === 'paid'     && r.type === 'payable'    && r.status !== 'paid')     return false;
+    if (statusFilter === 'pending'  && r.type === 'receivable' && r.status === 'received') return false;
+    if (statusFilter === 'received' && r.type === 'receivable' && r.status !== 'received') return false;
     return true;
   });
 
@@ -233,6 +239,7 @@ export default function DashboardScreen() {
   };
 
   const handleTabToggle = (key: ActivityTab) => {
+    setStatusFilter(null);
     if (key === 'all') {
       setSelectedTabs(new Set(['all']));
       return;
@@ -362,14 +369,18 @@ export default function DashboardScreen() {
             <View style={[s.summaryIcon, { backgroundColor: P.goldLight }]}>
               <Ionicons name="cash-outline" size={18} color={P.gold} />
             </View>
-            <View style={{ flex: 1, gap: 4 }}>
-              <View style={s.summaryStatRow}>
-                <Text style={s.summaryStatLabel}>active loans</Text>
-                <Text style={[s.summaryStatValue, { color: P.gold }]}>{loansActive}</Text>
-              </View>
-              <View style={s.summaryStatRow}>
-                <Text style={s.summaryStatLabel}>paid loans</Text>
-                <Text style={[s.summaryStatValue, { color: P.green }]}>{loansPaid}</Text>
+            <View style={{ flex: 1, gap: 8 }}>
+              <View style={s.statusFilterRow}>
+                {([{ key: 'active', label: `${loansActive} active`, color: P.gold }, { key: 'paid', label: `${loansPaid} paid`, color: P.green }] as const).map(f => (
+                  <TouchableOpacity
+                    key={f.key}
+                    style={[s.statusChip, statusFilter === f.key && { backgroundColor: f.color, borderColor: f.color }]}
+                    onPress={() => setStatusFilter(prev => prev === f.key ? null : f.key)}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={[s.statusChipText, statusFilter === f.key && s.statusChipTextActive]}>{f.label}</Text>
+                  </TouchableOpacity>
+                ))}
               </View>
             </View>
           </View>
@@ -380,14 +391,18 @@ export default function DashboardScreen() {
             <View style={[s.summaryIcon, { backgroundColor: P.blueLight }]}>
               <Ionicons name="arrow-undo-outline" size={18} color={P.blue} />
             </View>
-            <View style={{ flex: 1, gap: 4 }}>
-              <View style={s.summaryStatRow}>
-                <Text style={s.summaryStatLabel}>pending</Text>
-                <Text style={[s.summaryStatValue, { color: P.gold }]}>{receivablesPending}</Text>
-              </View>
-              <View style={s.summaryStatRow}>
-                <Text style={s.summaryStatLabel}>received</Text>
-                <Text style={[s.summaryStatValue, { color: P.green }]}>{receivablesReceived}</Text>
+            <View style={{ flex: 1, gap: 8 }}>
+              <View style={s.statusFilterRow}>
+                {([{ key: 'pending', label: `${receivablesPending} pending`, color: P.gold }, { key: 'received', label: `${receivablesReceived} received`, color: P.green }] as const).map(f => (
+                  <TouchableOpacity
+                    key={f.key}
+                    style={[s.statusChip, statusFilter === f.key && { backgroundColor: f.color, borderColor: f.color }]}
+                    onPress={() => setStatusFilter(prev => prev === f.key ? null : f.key)}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={[s.statusChipText, statusFilter === f.key && s.statusChipTextActive]}>{f.label}</Text>
+                  </TouchableOpacity>
+                ))}
               </View>
             </View>
           </View>
@@ -688,6 +703,12 @@ const s = StyleSheet.create({
   rowSpace:    { fontFamily: I,  fontSize: 11, color: P.muted },
   rowRight:    { alignItems: 'flex-end', gap: 4 },
   rowAmount:   { fontFamily: IB, fontSize: 15 },
+
+  // Status filter chips (loans / receivables)
+  statusFilterRow:      { flexDirection: 'row', gap: 8 },
+  statusChip:           { flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: Radius.lg, borderWidth: 1, borderColor: P.border, backgroundColor: P.surface },
+  statusChipText:       { fontFamily: IS, fontSize: 13, color: P.secondary },
+  statusChipTextActive: { color: '#fff' },
 
   // Cutoff modal
   cutoffRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, width: '100%', marginBottom: 12 },
