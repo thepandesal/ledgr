@@ -318,19 +318,19 @@ export default function DashboardScreen() {
   };
 
   const typeLabel = (r: any) => {
-    if (r.type === 'income')     return { label: 'money in',                color: P.mint };
-    if (r.type === 'savings')    return { label: 'savings',                 color: P.mint };
-    if (r.type === 'expense')    return { label: 'money out',               color: '#FFFFFF' };
+    if (r.type === 'income')     return { label: 'money in',                color: P.mintDark };
+    if (r.type === 'savings')    return { label: 'savings',                 color: P.mintDark };
+    if (r.type === 'expense')    return { label: 'money out',               color: P.text     };
     if (r.type === 'payable')    return r.status === 'paid'
-      ? { label: 'loan · paid',    color: P.mint }
+      ? { label: 'loan · paid',    color: P.mintDark }
       : r.status === 'partial'
-      ? { label: 'loan · partial', color: P.mint }
-      : { label: 'loan',           color: '#FFFFFF' };
+      ? { label: 'loan · partial', color: P.mintDark }
+      : { label: 'loan',           color: P.text     };
     if (r.type === 'receivable') return r.status === 'received'
-      ? { label: 'receivable · received', color: P.mint }
+      ? { label: 'receivable · received', color: P.mintDark }
       : r.status === 'partial'
-      ? { label: 'receivable · partial',  color: P.mint }
-      : { label: 'receivable',            color: '#FFFFFF' };
+      ? { label: 'receivable · partial',  color: P.mintDark }
+      : { label: 'receivable',            color: P.text     };
     return null;
   };
 
@@ -365,7 +365,7 @@ export default function DashboardScreen() {
           </View>
         </View>
 
-        {/* Stats + tabs — dark floating card */}
+        {/* Stats + tabs — white floating card */}
         <View style={s.statsCard}>
         {(() => {
           const hasIn   = selectedTabs.has('money-in');
@@ -387,12 +387,12 @@ export default function DashboardScreen() {
               </View>
               <View style={s.statDivider} />
               <View style={s.statItem}>
-                <Text style={[s.statValue, { color: P.mint }]}>{loansActive}</Text>
+                <Text style={[s.statValue, { color: P.mintDark }]}>{loansActive}</Text>
                 <Text style={s.statLabel}>Loans</Text>
               </View>
               <View style={s.statDivider} />
               <View style={s.statItem}>
-                <Text style={[s.statValue, { color: P.mint }]}>{receivablesPending}</Text>
+                <Text style={[s.statValue, { color: P.mintDark }]}>{receivablesPending}</Text>
                 <Text style={s.statLabel}>Receivables</Text>
               </View>
             </View>
@@ -402,7 +402,7 @@ export default function DashboardScreen() {
           if (hasLoan && !hasIn && !hasOut && !hasRec) return (
             <View style={s.statsRow}>
               <View style={s.statItem}>
-                <Text style={[s.statValue, { color: P.mint }]}>{loansActive}</Text>
+                <Text style={[s.statValue, { color: P.mintDark }]}>{loansActive}</Text>
                 <Text style={s.statLabel}>Active</Text>
               </View>
               <View style={s.statDivider} />
@@ -412,7 +412,7 @@ export default function DashboardScreen() {
               </View>
               <View style={s.statDivider} />
               <View style={s.statItem}>
-                <Text style={[s.statValue, { color: P.mint }]}>{fmtAbbr(filteredTotal)}</Text>
+                <Text style={[s.statValue, { color: P.mintDark }]}>{fmtAbbr(filteredTotal)}</Text>
                 <Text style={s.statLabel}>Total</Text>
               </View>
             </View>
@@ -422,7 +422,7 @@ export default function DashboardScreen() {
           if (hasRec && !hasIn && !hasOut && !hasLoan) return (
             <View style={s.statsRow}>
               <View style={s.statItem}>
-                <Text style={[s.statValue, { color: P.mint }]}>{receivablesPending}</Text>
+                <Text style={[s.statValue, { color: P.mintDark }]}>{receivablesPending}</Text>
                 <Text style={s.statLabel}>Pending</Text>
               </View>
               <View style={s.statDivider} />
@@ -432,7 +432,7 @@ export default function DashboardScreen() {
               </View>
               <View style={s.statDivider} />
               <View style={s.statItem}>
-                <Text style={[s.statValue, { color: P.mint }]}>{fmtAbbr(filteredTotal)}</Text>
+                <Text style={[s.statValue, { color: P.mintDark }]}>{fmtAbbr(filteredTotal)}</Text>
                 <Text style={s.statLabel}>Total</Text>
               </View>
             </View>
@@ -442,12 +442,12 @@ export default function DashboardScreen() {
           if (hasLoan && hasRec && !hasIn && !hasOut) return (
             <View style={s.statsRow}>
               <View style={s.statItem}>
-                <Text style={[s.statValue, { color: P.mint }]}>{loansActive}</Text>
+                <Text style={[s.statValue, { color: P.mintDark }]}>{loansActive}</Text>
                 <Text style={s.statLabel}>Loans</Text>
               </View>
               <View style={s.statDivider} />
               <View style={s.statItem}>
-                <Text style={[s.statValue, { color: P.mint }]}>{receivablesPending}</Text>
+                <Text style={[s.statValue, { color: P.mintDark }]}>{receivablesPending}</Text>
                 <Text style={s.statLabel}>Pending</Text>
               </View>
               <View style={s.statDivider} />
@@ -462,7 +462,7 @@ export default function DashboardScreen() {
           if (hasIn && hasOut) return (
             <View style={s.statsRow}>
               <View style={s.statItem}>
-                <Text style={[s.statValue, { color: P.mint }]}>{fmtAbbr(moneyInTotal)}</Text>
+                <Text style={[s.statValue, { color: P.mintDark }]}>{fmtAbbr(moneyInTotal)}</Text>
                 <Text style={s.statLabel}>Total In</Text>
               </View>
               <View style={s.statDivider} />
@@ -473,13 +473,13 @@ export default function DashboardScreen() {
               {(hasLoan || hasRec) && <View style={s.statDivider} />}
               {hasLoan && (
                 <View style={s.statItem}>
-                  <Text style={[s.statValue, { color: P.mint }]}>{loansActive}</Text>
+                  <Text style={[s.statValue, { color: P.mintDark }]}>{loansActive}</Text>
                   <Text style={s.statLabel}>Loans</Text>
                 </View>
               )}
               {hasRec && (
                 <View style={s.statItem}>
-                  <Text style={[s.statValue, { color: P.mint }]}>{receivablesPending}</Text>
+                  <Text style={[s.statValue, { color: P.mintDark }]}>{receivablesPending}</Text>
                   <Text style={s.statLabel}>Pending</Text>
                 </View>
               )}
@@ -490,7 +490,7 @@ export default function DashboardScreen() {
           if (hasIn) return (
             <View style={s.statsRow}>
               <View style={s.statItem}>
-                <Text style={[s.statValue, { color: P.mint }]}>{fmtAbbr(moneyInTotal)}</Text>
+                <Text style={[s.statValue, { color: P.mintDark }]}>{fmtAbbr(moneyInTotal)}</Text>
                 <Text style={s.statLabel}>Total In</Text>
               </View>
               <View style={s.statDivider} />
@@ -519,7 +519,7 @@ export default function DashboardScreen() {
           return (
             <View style={s.statsRow}>
               <View style={s.statItem}>
-                <Text style={[s.statValue, { color: P.mint }]}>{fmtAbbr(filteredTotal)}</Text>
+                <Text style={[s.statValue, { color: P.mintDark }]}>{fmtAbbr(filteredTotal)}</Text>
                 <Text style={s.statLabel}>Total</Text>
               </View>
               <View style={s.statDivider} />
@@ -537,8 +537,8 @@ export default function DashboardScreen() {
             const isActive = selectedTabs.has(tab.key);
             return (
               <TouchableOpacity key={tab.key} style={s.tabWrap} onPress={() => handleTabToggle(tab.key)} activeOpacity={0.75}>
-                <View style={[s.tabCircle, { backgroundColor: isActive ? P.mint : '#2A2A2A' }]}>
-                  <Ionicons name={tab.icon as any} size={16} color={isActive ? P.textDark : '#666666'} />
+                <View style={[s.tabCircle, { backgroundColor: isActive ? P.mint : '#EFEFEF' }]}>
+                  <Ionicons name={tab.icon as any} size={16} color={isActive ? P.textDark : P.secondary} />
                 </View>
               </TouchableOpacity>
             );
@@ -553,8 +553,8 @@ export default function DashboardScreen() {
           <ActivityIndicator color={P.mint} style={{ marginTop: 48 }} />
         ) : filtered.length === 0 ? (
           <View style={s.emptyWrap}>
-            <View style={[s.emptyIconWrap, { backgroundColor: P.cardDark }]}>
-              <Ionicons name={activeTabData.icon as any} size={28} color={P.mint} />
+            <View style={[s.emptyIconWrap, { backgroundColor: P.mint }]}>
+              <Ionicons name={activeTabData.icon as any} size={28} color={P.textDark} />
             </View>
             <Text style={s.emptyTitle}>nothing here</Text>
             <Text style={s.emptyText}>no {activeTabData.label.toLowerCase()} found{`\n`}for this period</Text>
@@ -576,13 +576,13 @@ export default function DashboardScreen() {
                   )}
                   <TouchableOpacity style={s.row} activeOpacity={0.7} onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: item.id } } as any)}>
                     <View style={s.rowIconWrap}>
-                      <Ionicons name={(item.categories?.icon ?? activeTabData.icon) as any} size={16} color="#FFFFFF" />
+                      <Ionicons name={(item.categories?.icon ?? activeTabData.icon) as any} size={16} color={P.textDark} />
                     </View>
                     <View style={s.rowMid}>
                       <Text style={s.rowName} numberOfLines={1}>{item.name}</Text>
                       <Text style={s.rowCategory}>{tl?.label ?? activeTabData.label}{item.space?.name ? ` · ${item.space.name}` : ''}</Text>
                     </View>
-                    <Text style={[s.rowAmount, { color: tl?.color ?? '#FFFFFF' }]}>
+                    <Text style={[s.rowAmount, { color: tl?.color ?? P.mintDark }]}>
                       {Number(item.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </Text>
                   </TouchableOpacity>
@@ -725,31 +725,31 @@ const s = StyleSheet.create({
 
   // Header floating white card
   headerCard: {
-    backgroundColor: P.card,
-    borderRadius: 24,
-    paddingHorizontal: 20, paddingVertical: 18,
+    backgroundColor: 'transparent',
+    borderRadius: 0,
+    paddingHorizontal: 4, paddingVertical: 8,
     flexDirection: 'row', alignItems: 'flex-start', gap: 12,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
   },
   title:    { fontFamily: FBK, fontSize: 24, color: P.text, letterSpacing: -0.5 },
   subtitle: { fontFamily: I,   fontSize: 12, color: P.secondary, marginTop: 3, lineHeight: 18 },
 
   // Stats + tabs dark floating card
   statsCard: {
-    backgroundColor: P.cardDark,
+    backgroundColor: P.card,
     borderRadius: 28,
     paddingTop: 20, paddingBottom: 16,
     marginBottom: 8,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 6,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 12, elevation: 3,
   },
 
   // Date + Spaces filter buttons
   filterBtns: { gap: 6, alignItems: 'flex-end', paddingTop: 4 },
   filterBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
-    backgroundColor: P.bg,
-    paddingHorizontal: 10, paddingVertical: 6,
+    backgroundColor: P.card,
+    paddingHorizontal: 12, paddingVertical: 7,
     borderRadius: Radius.pill,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 1,
   },
   filterBtnActive:     { backgroundColor: P.mint },
   filterBtnText:       { fontFamily: IM, fontSize: 11, color: P.secondary },
@@ -761,9 +761,9 @@ const s = StyleSheet.create({
     paddingHorizontal: 20, marginBottom: 14,
   },
   statItem:    { flex: 1, alignItems: 'center', gap: 5 },
-  statValue:   { fontFamily: FBK, fontSize: 15, color: '#FFFFFF', letterSpacing: -0.3 },
-  statLabel:   { fontFamily: IM,  fontSize: 10, color: '#8A8D9F', letterSpacing: 0.3 },
-  statDivider: { width: 1, height: 28, backgroundColor: '#2A2A2A' },
+  statValue:   { fontFamily: FBK, fontSize: 15, color: P.text, letterSpacing: -0.3 },
+  statLabel:   { fontFamily: IM,  fontSize: 10, color: P.secondary, letterSpacing: 0.3 },
+  statDivider: { width: 1, height: 28, backgroundColor: P.border },
 
   // Tab filter row
   tabRow:  { flexDirection: 'row', justifyContent: 'space-around', paddingHorizontal: 20, paddingBottom: 4, paddingTop: 6 },
@@ -793,15 +793,15 @@ const s = StyleSheet.create({
 
   row: {
     flexDirection: 'row', alignItems: 'center', gap: 16,
-    backgroundColor: '#1A1A1A',
+    backgroundColor: P.card,
     borderRadius: 24,
     padding: 18,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 2,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 10, elevation: 2,
   },
-  rowIconWrap: { width: 44, height: 44, borderRadius: 14, justifyContent: 'center', alignItems: 'center', backgroundColor: '#2A2A2A' },
+  rowIconWrap: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center', backgroundColor: P.mint },
   rowMid:      { flex: 1, gap: 4 },
-  rowName:     { fontFamily: FB,  fontSize: 14, color: '#FFFFFF', letterSpacing: 0.1, lineHeight: 20 },
-  rowCategory: { fontFamily: IM,  fontSize: 11, color: '#888888', letterSpacing: 0.3, lineHeight: 16 },
+  rowName:     { fontFamily: FB,  fontSize: 14, color: P.text, letterSpacing: 0.1, lineHeight: 20 },
+  rowCategory: { fontFamily: IM,  fontSize: 11, color: P.secondary, letterSpacing: 0.3, lineHeight: 16 },
   rowAmount:   { fontFamily: FBK, fontSize: 15, letterSpacing: -0.4 },
 
   modalPresetRow:        { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 },

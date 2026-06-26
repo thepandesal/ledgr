@@ -176,7 +176,9 @@ export default function TabsLayout() {
             const isActive = tab.key === 'others' ? isOthersActive : activeTab === tab.key;
             return (
               <TouchableOpacity key={tab.key} style={s.navItem} onPress={() => handleNavPress(tab.key)} activeOpacity={0.7}>
-                <Ionicons name={tab.icon as any} size={20} color={isActive ? '#D0E5DF' : '#555555'} />
+                <View style={[s.navIconWrap, isActive && s.navIconWrapActive]}>
+                  <Ionicons name={tab.icon as any} size={20} color={isActive ? '#1A1A1A' : '#8E9399'} />
+                </View>
               </TouchableOpacity>
             );
           })}
@@ -215,11 +217,10 @@ function BubbleContent({ items, activeTab, onPress }: {
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F2F4F6' },
+  container: { flex: 1, backgroundColor: '#F4F4F6' },
   content: { flex: 1, position: 'relative' },
-  screen: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#F2F4F6' },
+  screen: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#F4F4F6' },
 
-  // Floating pill nav
   navFloatWrap: {
     position: 'absolute',
     bottom: 28,
@@ -230,18 +231,25 @@ const s = StyleSheet.create({
   },
   navPill: {
     flexDirection: 'row',
-    backgroundColor: '#1A1A1A',
+    backgroundColor: '#FFFFFF',
     borderRadius: 50,
-    paddingVertical: 14,
-    paddingHorizontal: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
     gap: 4,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2,
-    shadowRadius: 24,
-    elevation: 16,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 20,
+    elevation: 8,
   },
-  navItem: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 18 },
+  navItem: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
+  navIconWrap: {
+    width: 44, height: 44, borderRadius: 22,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  navIconWrapActive: {
+    backgroundColor: '#D1E6E0',
+  },
 
   // Bubble
   bubbleWrap: {
@@ -285,9 +293,7 @@ const s = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  bubbleIconWrapActive: {
-    backgroundColor: '#D0E5DF',
-  },
+  bubbleIconWrapActive: { backgroundColor: '#D1E6E0' },
   bubbleItemLabel: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 14, color: Colors.text },
   bubbleItemLabelActive: { color: '#1A1A1A' },
 });
