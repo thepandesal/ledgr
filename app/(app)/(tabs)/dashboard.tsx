@@ -239,6 +239,7 @@ export default function DashboardScreen() {
   const activeTabData = ACTIVITY_TABS.find(t => t.key === (isAll ? 'all' : [...selectedTabs][0])) ?? ACTIVITY_TABS[0];
   const allRecordings = (types: string[]) => recordings.filter(r => {
     if (!types.includes(r.type)) return false;
+    if (!isAllSpaces && !selectedSpaces.has(r.space_id)) return false;
     const [y, m, d] = r.transaction_date.split('-').map(Number);
     const date = new Date(y, m - 1, d);
     if (date < range.from) return false;
