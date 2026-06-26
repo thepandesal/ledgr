@@ -75,7 +75,7 @@ export default function DashboardScreen() {
   const queryClient = useQueryClient();
 
   const [activePreset, setActivePreset] = useState<Preset>('this-month');
-  const [activeTab,    setActiveTab]    = useState<ActivityTab>('all');
+  const [selectedTabs, setSelectedTabs] = useState<Set<ActivityTab>>(new Set(['all']));
   const [cutoffDay,    setCutoffDay]    = useState(25);
   const [showCutoff,   setShowCutoff]   = useState(false);
   const [cutoffInput,  setCutoffInput]  = useState('25');
@@ -144,7 +144,10 @@ export default function DashboardScreen() {
     enabled: !!userId,
   });
 
-  const currentTypes = ACTIVITY_TABS.find(t => t.key === activeTab)!.types as string[];
+  const isAll = selectedTabs.has('all');
+  const currentTypes = isAll
+    ? ['income','savings','expense','payable','receivable']
+    : ACTIVITY_TABS.filter(t => t.key !== 'all' && selectedTabs.has(t.key)).flatMap(t => t.types as string[]);
 
   const filtered = recordings.filter(r => {
     if (!currentTypes.includes(r.type)) return false;
@@ -157,7 +160,7 @@ export default function DashboardScreen() {
   });
 
   const total = filtered.reduce((s, r) => s + Number(r.amount), 0);
-  const activeTabData = ACTIVITY_TABS.find(t => t.key === activeTab)!;
+  const activeTabData = ACTIVITY_TABS.find(t => t.key === (isAll ? 'all' : [...selectedTabs][0])) ?? ACTIVITY_TABS[0];
 
   // ── summary stats per tab ──
   const allRecordings = (types: string[]) => recordings.filter(r => {
@@ -205,6 +208,25 @@ export default function DashboardScreen() {
       if (d < customFrom) { setCustomFrom(d); setPickingDate('to'); }
       else { setCustomTo(d); setShowPicker(false); setPickingDate('from'); }
     }
+  };
+
+  const handleTabToggle = (key: ActivityTab) => {
+    if (key === 'all') {
+      setSelectedTabs(new Set(['all']));
+      return;
+    }
+    setSelectedTabs(prev => {
+      const next = new Set(prev);
+      next.delete('all');
+      if (next.has(key)) {
+        next.delete(key);
+        if (next.size === 0) return new Set(['all']);
+      } else {
+        next.add(key);
+        if (next.size === 4) return new Set(['all']);
+      }
+      return next;
+    });
   };
 
   const handlePreset = (key: Preset) => {
@@ -289,7 +311,7 @@ export default function DashboardScreen() {
       </View>
 
       {/* ── Summary card ── */}
-      {activeTab === 'all' ? (
+      {isAll ? (
         <View style={s.summaryCard}>
           <View style={s.summaryGrid}>
             <View style={[s.summaryGridItem, { borderLeftColor: Colors.income }]}>
@@ -312,7 +334,7 @@ export default function DashboardScreen() {
             </View>
           </View>
         </View>
-      ) : activeTab === 'loans' ? (
+      ) : selectedTabs.has('loans') && selectedTabs.size === 1 ? (
         <View style={[s.summaryCard, { borderLeftColor: Colors.pending }]}>
           <View style={s.summaryTop}>
             <View style={[s.summaryIcon, { backgroundColor: Colors.pending + '18' }]}>
@@ -330,7 +352,7 @@ export default function DashboardScreen() {
             </View>
           </View>
         </View>
-      ) : activeTab === 'receivables' ? (
+      ) : selectedTabs.has('receivables') && selectedTabs.size === 1 ? (
         <View style={[s.summaryCard, { borderLeftColor: Colors.paid }]}>
           <View style={s.summaryTop}>
             <View style={[s.summaryIcon, { backgroundColor: Colors.paid + '18' }]}>
@@ -355,7 +377,7 @@ export default function DashboardScreen() {
               <Ionicons name={activeTabData.icon as any} size={18} color={activeTabData.color} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={s.summaryTabLabel}>{activeTabData.label}</Text>
+              <Text style={s.summaryTabLabel}>{[...selectedTabs].map(k => ACTIVITY_TABS.find(t => t.key === k)?.label).join(', ')}</Text>
               <Text style={s.summaryEntries}>{filtered.length} {filtered.length === 1 ? 'entry' : 'entries'}</Text>
             </View>
             <Text style={[s.summaryTotal, { color: activeTabData.color }]}>
@@ -373,15 +395,15 @@ export default function DashboardScreen() {
         style={s.tabScroll}
       >
         {ACTIVITY_TABS.map(tab => {
-          const isActive = tab.key === activeTab;
+          const isActive = selectedTabs.has(tab.key);
           return (
             <TouchableOpacity
               key={tab.key}
               style={[s.tabChip, isActive && { backgroundColor: tab.color, borderColor: tab.color }]}
-              onPress={() => setActiveTab(tab.key)}
+              onPress={() => handleTabToggle(tab.key)}
               activeOpacity={0.75}
             >
-              <Ionicons name={tab.icon as any} size={12} color={isActive ? '#fff' : Colors.muted} />
+              <Ionicons name={tab.icon as any} size={12} color={isActive ? '#fff' : Colors.text} />
               <Text style={[s.tabChipText, isActive && s.tabChipTextActive]}>{tab.label}</Text>
             </TouchableOpacity>
           );
