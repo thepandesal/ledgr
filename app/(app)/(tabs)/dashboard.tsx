@@ -454,8 +454,8 @@ export default function DashboardScreen() {
                     />
                   </View>
                   <View style={s.rowMid}>
-                    {item.categories?.name && (
-                      <Text style={s.rowCategory} numberOfLines={1}>{item.categories.name}</Text>
+                    {tl && (
+                      <Text style={[s.rowCategory, { color: tl.color }]}>{tl.label}</Text>
                     )}
                     <Text style={s.rowName} numberOfLines={1}>{item.name}</Text>
                     {item.space?.name && (
@@ -466,11 +466,6 @@ export default function DashboardScreen() {
                     <Text style={[s.rowAmount, { color: tl?.color ?? activeTabData.color }]}>
                       {Number(item.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </Text>
-                    {tl && (
-                      <View style={[s.typeBadge, { backgroundColor: tl.color + '18' }]}>
-                        <Text style={[s.typeBadgeText, { color: tl.color }]}>{tl.label}</Text>
-                      </View>
-                    )}
                   </View>
                 </TouchableOpacity>
               </View>
@@ -662,13 +657,11 @@ const s = StyleSheet.create({
   },
   rowIconWrap: { width: 38, height: 38, borderRadius: Radius.md, justifyContent: 'center', alignItems: 'center' },
   rowMid:     { flex: 1, gap: 1 },
-  rowCategory: { fontFamily: IM, fontSize: 10, color: Colors.muted, textTransform: 'uppercase', letterSpacing: 0.4 },
+  rowCategory: { fontFamily: IM, fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.4 },
   rowName:     { fontFamily: IB, fontSize: 13, color: Colors.text },
   rowSpace:    { fontFamily: IM, fontSize: 11, color: Colors.muted },
   rowRight: { alignItems: 'flex-end', gap: 4 },
   rowAmount: { fontFamily: IB, fontSize: 14 },
-  typeBadge: { borderRadius: Radius.pill, paddingHorizontal: 8, paddingVertical: 3 },
-  typeBadgeText: { fontFamily: IM, fontSize: 10 },
 
   // Cutoff modal
   cutoffRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, width: '100%', marginBottom: 12 },
