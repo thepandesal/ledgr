@@ -177,7 +177,7 @@ export default function TabsLayout() {
             return (
               <TouchableOpacity key={tab.key} style={s.navItem} onPress={() => handleNavPress(tab.key)} activeOpacity={0.7}>
                 <View style={[s.navIconWrap, isActive && s.navIconWrapActive]}>
-                  <Ionicons name={tab.icon as any} size={20} color={isActive ? '#1A1A1A' : '#8E9399'} />
+                  <Ionicons name={tab.icon as any} size={20} color={isActive ? '#FFFFFF' : '#8E9399'} />
                 </View>
               </TouchableOpacity>
             );
@@ -236,11 +236,8 @@ const s = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 8,
     gap: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 20,
-    elevation: 8,
+    borderWidth: 1,
+    borderColor: '#1A1A1A',
   },
   navItem: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
   navIconWrap: {
@@ -248,7 +245,7 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   navIconWrapActive: {
-    backgroundColor: '#D1E6E0',
+    backgroundColor: '#1A1A1A',
   },
 
   // Bubble
@@ -260,11 +257,8 @@ const s = StyleSheet.create({
     borderRadius: 20,
     overflow: 'hidden',
     zIndex: 100,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.12,
-    shadowRadius: 20,
-    elevation: 12,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
   },
   bubbleInner: {
     paddingVertical: 6,

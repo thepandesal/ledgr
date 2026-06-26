@@ -537,8 +537,8 @@ export default function DashboardScreen() {
             const isActive = selectedTabs.has(tab.key);
             return (
               <TouchableOpacity key={tab.key} style={s.tabWrap} onPress={() => handleTabToggle(tab.key)} activeOpacity={0.75}>
-                <View style={[s.tabCircle, { backgroundColor: isActive ? P.mint : '#EFEFEF' }]}>
-                  <Ionicons name={tab.icon as any} size={16} color={isActive ? P.textDark : P.secondary} />
+                <View style={[s.tabCircle, isActive && s.tabCircleActive]}>
+                  <Ionicons name={tab.icon as any} size={16} color={isActive ? P.mint : P.secondary} />
                 </View>
               </TouchableOpacity>
             );
@@ -574,17 +574,21 @@ export default function DashboardScreen() {
                       <Text style={s.dateHeaderText}>{dateStr}</Text>
                     </View>
                   )}
-                  <TouchableOpacity style={s.row} activeOpacity={0.7} onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: item.id } } as any)}>
-                    <View style={s.rowIconWrap}>
-                      <Ionicons name={(item.categories?.icon ?? activeTabData.icon) as any} size={16} color={P.textDark} />
-                    </View>
-                    <View style={s.rowMid}>
+                  <TouchableOpacity style={s.row} activeOpacity={0.85} onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: item.id } } as any)}>
+                    {/* Top mint section */}
+                    <View style={s.rowTop}>
+                      <View style={s.rowIconWrap}>
+                        <Ionicons name={(item.categories?.icon ?? activeTabData.icon) as any} size={16} color={P.textDark} />
+                      </View>
                       <Text style={s.rowName} numberOfLines={1}>{item.name}</Text>
-                      <Text style={s.rowCategory}>{tl?.label ?? activeTabData.label}{item.space?.name ? ` · ${item.space.name}` : ''}</Text>
                     </View>
-                    <Text style={[s.rowAmount, { color: tl?.color ?? P.mintDark }]}>
-                      {Number(item.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                    </Text>
+                    {/* Bottom dark section */}
+                    <View style={s.rowBottom}>
+                      <Text style={s.rowCategory}>{tl?.label ?? activeTabData.label}{item.space?.name ? ` · ${item.space.name}` : ''}</Text>
+                      <Text style={s.rowAmount}>
+                        {Number(item.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      </Text>
+                    </View>
                   </TouchableOpacity>
                 </View>
               );
@@ -739,7 +743,8 @@ const s = StyleSheet.create({
     borderRadius: 28,
     paddingTop: 20, paddingBottom: 16,
     marginBottom: 8,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 12, elevation: 3,
+    borderWidth: 1,
+    borderColor: P.border,
   },
 
   // Date + Spaces filter buttons
@@ -749,7 +754,8 @@ const s = StyleSheet.create({
     backgroundColor: P.card,
     paddingHorizontal: 12, paddingVertical: 7,
     borderRadius: Radius.pill,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 1,
+    borderWidth: 1,
+    borderColor: P.border,
   },
   filterBtnActive:     { backgroundColor: P.mint },
   filterBtnText:       { fontFamily: IM, fontSize: 11, color: P.secondary },
@@ -771,6 +777,12 @@ const s = StyleSheet.create({
   tabCircle: {
     width: 44, height: 44, borderRadius: 22,
     justifyContent: 'center', alignItems: 'center',
+    borderWidth: 1, borderColor: P.border,
+    backgroundColor: 'transparent',
+  },
+  tabCircleActive: {
+    backgroundColor: P.cardDark,
+    borderColor: P.cardDark,
   },
 
   // Transaction list scroll area
@@ -792,17 +804,26 @@ const s = StyleSheet.create({
   dateHeaderText: { fontFamily: IS, fontSize: 10, color: P.secondary, letterSpacing: 1.4, textTransform: 'uppercase' },
 
   row: {
-    flexDirection: 'row', alignItems: 'center', gap: 16,
-    backgroundColor: P.card,
     borderRadius: 24,
-    padding: 18,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 10, elevation: 2,
+    borderWidth: 1,
+    borderColor: P.text,
+    overflow: 'hidden',
   },
-  rowIconWrap: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center', backgroundColor: P.mint },
+  rowTop: {
+    backgroundColor: P.mint,
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingHorizontal: 16, paddingVertical: 14,
+  },
+  rowBottom: {
+    backgroundColor: P.cardDark,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 16, paddingVertical: 12,
+  },
+  rowIconWrap: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.12)' },
   rowMid:      { flex: 1, gap: 4 },
-  rowName:     { fontFamily: FB,  fontSize: 14, color: P.text, letterSpacing: 0.1, lineHeight: 20 },
-  rowCategory: { fontFamily: IM,  fontSize: 11, color: P.secondary, letterSpacing: 0.3, lineHeight: 16 },
-  rowAmount:   { fontFamily: FBK, fontSize: 15, letterSpacing: -0.4 },
+  rowName:     { fontFamily: FB,  fontSize: 14, color: P.textDark, letterSpacing: 0.1, lineHeight: 20, flex: 1 },
+  rowCategory: { fontFamily: I,   fontSize: 11, color: '#AAAAAA', letterSpacing: 0.3 },
+  rowAmount:   { fontFamily: FBK, fontSize: 15, color: '#FFFFFF', letterSpacing: -0.4 },
 
   modalPresetRow:        { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 },
   modalPresetChip:       { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: P.bg },
