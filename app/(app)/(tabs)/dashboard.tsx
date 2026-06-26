@@ -234,7 +234,12 @@ export default function DashboardScreen() {
   const receivablesPending  = allRecordings(['receivable']).filter(r => r.status !== 'received').length;
   const receivablesReceived = allRecordings(['receivable']).filter(r => r.status === 'received').length;
 
-  const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2 });
+  const fmt     = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2 });
+  const fmtAbbr = (n: number) => {
+    if (n >= 1_000_000) return (n / 1_000_000).toLocaleString('en-US', { maximumFractionDigits: 2 }) + 'M';
+    if (n >= 1_000)     return (n / 1_000).toLocaleString('en-US', { maximumFractionDigits: 1 }) + 'K';
+    return n.toLocaleString('en-US', { minimumFractionDigits: 2 });
+  };
   const fmtShort = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   const fmtFull  = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   const rangeLabel = isSameDay(range.from, range.to)
@@ -361,16 +366,16 @@ export default function DashboardScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Summary stats row */}
+        {/* Summary stats — always visible, context-aware */}
         {isAll ? (
           <View style={s.statsRow}>
             <View style={s.statItem}>
-              <Text style={s.statValue}>{fmt(moneyInTotal)}</Text>
+              <Text style={s.statValue}>{fmtAbbr(moneyInTotal)}</Text>
               <Text style={s.statLabel}>Money In</Text>
             </View>
             <View style={s.statDivider} />
             <View style={s.statItem}>
-              <Text style={s.statValue}>{fmt(moneyOutTotal)}</Text>
+              <Text style={s.statValue}>{fmtAbbr(moneyOutTotal)}</Text>
               <Text style={s.statLabel}>Money Out</Text>
             </View>
             <View style={s.statDivider} />
@@ -384,18 +389,75 @@ export default function DashboardScreen() {
               <Text style={s.statLabel}>Receivables</Text>
             </View>
           </View>
+        ) : selectedTabs.has('money-in') && selectedTabs.size === 1 ? (
+          <View style={s.statsRow}>
+            <View style={s.statItem}>
+              <Text style={[s.statValue, { color: P.green }]}>{fmtAbbr(moneyInTotal)}</Text>
+              <Text style={s.statLabel}>Total In</Text>
+            </View>
+            <View style={s.statDivider} />
+            <View style={s.statItem}>
+              <Text style={s.statValue}>{filtered.length}</Text>
+              <Text style={s.statLabel}>Entries</Text>
+            </View>
+          </View>
+        ) : selectedTabs.has('money-out') && selectedTabs.size === 1 ? (
+          <View style={s.statsRow}>
+            <View style={s.statItem}>
+              <Text style={[s.statValue, { color: P.orange }]}>{fmtAbbr(moneyOutTotal)}</Text>
+              <Text style={s.statLabel}>Total Out</Text>
+            </View>
+            <View style={s.statDivider} />
+            <View style={s.statItem}>
+              <Text style={s.statValue}>{filtered.length}</Text>
+              <Text style={s.statLabel}>Entries</Text>
+            </View>
+          </View>
+        ) : selectedTabs.has('loans') && selectedTabs.size === 1 ? (
+          <View style={s.statsRow}>
+            <View style={s.statItem}>
+              <Text style={[s.statValue, { color: P.gold }]}>{loansActive}</Text>
+              <Text style={s.statLabel}>Active</Text>
+            </View>
+            <View style={s.statDivider} />
+            <View style={s.statItem}>
+              <Text style={[s.statValue, { color: P.green }]}>{loansPaid}</Text>
+              <Text style={s.statLabel}>Paid</Text>
+            </View>
+            <View style={s.statDivider} />
+            <View style={s.statItem}>
+              <Text style={[s.statValue, { color: P.gold }]}>{fmtAbbr(filtered.reduce((sum, r) => sum + Number(r.amount), 0))}</Text>
+              <Text style={s.statLabel}>Total</Text>
+            </View>
+          </View>
+        ) : selectedTabs.has('receivables') && selectedTabs.size === 1 ? (
+          <View style={s.statsRow}>
+            <View style={s.statItem}>
+              <Text style={[s.statValue, { color: P.blue }]}>{receivablesPending}</Text>
+              <Text style={s.statLabel}>Pending</Text>
+            </View>
+            <View style={s.statDivider} />
+            <View style={s.statItem}>
+              <Text style={[s.statValue, { color: P.green }]}>{receivablesReceived}</Text>
+              <Text style={s.statLabel}>Received</Text>
+            </View>
+            <View style={s.statDivider} />
+            <View style={s.statItem}>
+              <Text style={[s.statValue, { color: P.blue }]}>{fmtAbbr(filtered.reduce((sum, r) => sum + Number(r.amount), 0))}</Text>
+              <Text style={s.statLabel}>Total</Text>
+            </View>
+          </View>
         ) : (
-          <View style={s.focusCard}>
-            <View style={[s.focusIcon, { backgroundColor: activeTabData.color }]}>
-              <Ionicons name={activeTabData.icon as any} size={16} color={activeTabData.color === P.yellow ? P.textDark : '#fff'} />
+          <View style={s.statsRow}>
+            <View style={s.statItem}>
+              <Text style={[s.statValue, { color: activeTabData.color }]}>{fmtAbbr(filtered.reduce((sum, r) => sum + Number(r.amount), 0))}</Text>
+              <Text style={s.statLabel}>Total</Text>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={s.focusLabel}>{[...selectedTabs].map(k => ACTIVITY_TABS.find(t => t.key === k)?.label).join(', ')}</Text>
-              <Text style={s.focusEntries}>{filtered.length} {filtered.length === 1 ? 'entry' : 'entries'}</Text>
+            <View style={s.statDivider} />
+            <View style={s.statItem}>
+              <Text style={s.statValue}>{filtered.length}</Text>
+              <Text style={s.statLabel}>Entries</Text>
             </View>
-            <Text style={[s.focusTotal, { color: activeTabData.color }]}>
-              {fmt(filtered.reduce((s, r) => s + Number(r.amount), 0))}
-            </Text>
           </View>
         )}
 
@@ -450,7 +512,7 @@ export default function DashboardScreen() {
                       <Text style={s.rowCategory}>{tl?.label ?? activeTabData.label}{item.space?.name ? ` · ${item.space.name}` : ''}</Text>
                     </View>
                     <Text style={[s.rowAmount, { color: tl?.color ?? P.secondary }]}>
-                      {Number(item.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      {fmtAbbr(Number(item.amount))}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -586,19 +648,6 @@ const s = StyleSheet.create({
   statValue:   { fontFamily: FBK, fontSize: 15, color: P.text, letterSpacing: -0.3 },
   statLabel:   { fontFamily: IM,  fontSize: 10, color: '#8A8D9F', letterSpacing: 0.3 },
   statDivider: { width: 1, height: 28, backgroundColor: P.border },
-
-  // Focused summary card (non-all tabs)
-  focusCard: {
-    marginHorizontal: 24, marginBottom: 14,
-    backgroundColor: P.card,
-    borderRadius: 20,
-    paddingHorizontal: 20, paddingVertical: 16,
-    flexDirection: 'row', alignItems: 'center', gap: 14,
-  },
-  focusIcon:    { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
-  focusLabel:   { fontFamily: IS,  fontSize: 14, color: P.text },
-  focusEntries: { fontFamily: I,   fontSize: 11, color: P.secondary, marginTop: 2, lineHeight: 16 },
-  focusTotal:   { fontFamily: FBK, fontSize: 22, letterSpacing: -0.5 },
 
   // Tab filter row
   tabRow:  { flexDirection: 'row', justifyContent: 'space-around', paddingHorizontal: 24, paddingBottom: 16, paddingTop: 6 },
