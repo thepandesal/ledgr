@@ -1,4 +1,4 @@
-import { View, TouchableOpacity, Text, StyleSheet, Animated, Dimensions, SafeAreaView, Platform } from 'react-native';
+import { View, TouchableOpacity, Text, StyleSheet, Animated, Dimensions, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useRef, memo } from 'react';
 import { BlurView } from 'expo-blur';
@@ -169,20 +169,19 @@ export default function TabsLayout() {
         </>
       )}
 
-      {/* Nav pill */}
-      <SafeAreaView style={s.navSafeArea}>
+      {/* Floating nav pill */}
+      <View style={s.navFloatWrap} pointerEvents="box-none">
         <View style={s.navPill}>
           {MAIN_TABS.map(tab => {
             const isActive = tab.key === 'others' ? isOthersActive : activeTab === tab.key;
             return (
               <TouchableOpacity key={tab.key} style={s.navItem} onPress={() => handleNavPress(tab.key)} activeOpacity={0.7}>
-                <Ionicons name={tab.icon as any} size={18} color={isActive ? '#F5A623' : '#6B6F80'} />
-                <Text style={[s.navLabel, isActive && s.navLabelActive]}>{tab.label}</Text>
+                <Ionicons name={tab.icon as any} size={20} color={isActive ? '#F5A623' : '#6B6F80'} />
               </TouchableOpacity>
             );
           })}
         </View>
-      </SafeAreaView>
+      </View>
     </View>
   );
 }
@@ -216,26 +215,38 @@ function BubbleContent({ items, activeTab, onPress }: {
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#151E29' },
+  container: { flex: 1, backgroundColor: '#F2F4F6' },
   content: { flex: 1, position: 'relative' },
-  screen: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#1C2632' },
-  navSafeArea: { backgroundColor: '#151E29' },
+  screen: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#F2F4F6' },
+
+  // Floating pill nav
+  navFloatWrap: {
+    position: 'absolute',
+    bottom: 28,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 50,
+  },
   navPill: {
     flexDirection: 'row',
-    backgroundColor: '#151E29',
-    paddingVertical: 6,
-    paddingHorizontal: 4,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#2A3748',
+    backgroundColor: '#1A1A1A',
+    borderRadius: 50,
+    paddingVertical: 14,
+    paddingHorizontal: 10,
+    gap: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 24,
+    elevation: 16,
   },
-  navItem: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 3, paddingVertical: 4 },
-  navLabel: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 10, color: '#6B6F80', letterSpacing: 0.1 },
-  navLabelActive: { color: '#F5A623', fontFamily: 'PlusJakartaSans_500Medium' },
+  navItem: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 18 },
 
   // Bubble
   bubbleWrap: {
     position: 'absolute',
-    bottom: 110,
+    bottom: 100,
     left: 20,
     right: 20,
     borderRadius: 20,
