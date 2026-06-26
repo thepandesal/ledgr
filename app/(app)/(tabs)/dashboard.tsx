@@ -204,15 +204,21 @@ export default function DashboardScreen() {
     setActivePreset(key);
   };
 
-  const statusLabel = (r: any) => {
-    if (r.type === 'payable')    return r.status === 'paid'     ? 'paid'     : r.status === 'partial' ? 'partial' : 'unpaid';
-    if (r.type === 'receivable') return r.status === 'received' ? 'received' : r.status === 'partial' ? 'partial' : 'pending';
+  const typeLabel = (r: any) => {
+    if (r.type === 'income')     return { label: 'money in',         color: Colors.income };
+    if (r.type === 'savings')    return { label: 'savings',          color: Colors.income };
+    if (r.type === 'expense')    return { label: 'money out',        color: Colors.expense };
+    if (r.type === 'payable')    return r.status === 'paid'
+      ? { label: 'loan · paid',    color: Colors.income }
+      : r.status === 'partial'
+      ? { label: 'loan · partial', color: Colors.cyan }
+      : { label: 'loan',           color: Colors.pending };
+    if (r.type === 'receivable') return r.status === 'received'
+      ? { label: 'receivable · received', color: Colors.income }
+      : r.status === 'partial'
+      ? { label: 'receivable · partial',  color: Colors.cyan }
+      : { label: 'receivable',            color: Colors.pending };
     return null;
-  };
-  const statusColor = (r: any) => {
-    if (r.status === 'paid' || r.status === 'received') return Colors.income;
-    if (r.status === 'partial') return Colors.cyan;
-    return Colors.pending;
   };
 
   return (
@@ -325,8 +331,7 @@ export default function DashboardScreen() {
             const showDate  = item.transaction_date !== prevDate;
             const dateStr   = new Date(item.transaction_date + 'T00:00:00')
               .toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-            const sl = statusLabel(item);
-            const sc = statusColor(item);
+            const tl = typeLabel(item);
 
             return (
               <View key={item.id}>
@@ -341,11 +346,11 @@ export default function DashboardScreen() {
                   activeOpacity={0.7}
                   onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: item.id } } as any)}
                 >
-                  <View style={[s.rowIconWrap, { backgroundColor: activeTabData.color + '12' }]}>
+                  <View style={[s.rowIconWrap, { backgroundColor: (tl?.color ?? activeTabData.color) + '12' }]}>
                     <Ionicons
                       name={(item.categories?.icon ?? activeTabData.icon) as any}
                       size={15}
-                      color={activeTabData.color}
+                      color={tl?.color ?? activeTabData.color}
                     />
                   </View>
                   <View style={s.rowMid}>
@@ -355,10 +360,10 @@ export default function DashboardScreen() {
                     )}
                   </View>
                   <View style={s.rowRight}>
-                    <Text style={[s.rowAmount, { color: activeTabData.color }]}>
+                    <Text style={[s.rowAmount, { color: tl?.color ?? activeTabData.color }]}>
                       {Number(item.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </Text>
-                    {sl && <Text style={[s.rowStatus, { color: sc }]}>{sl}</Text>}
+                    {tl && <Text style={[s.rowStatus, { color: tl.color }]}>{tl.label}</Text>}
                   </View>
                 </TouchableOpacity>
               </View>
