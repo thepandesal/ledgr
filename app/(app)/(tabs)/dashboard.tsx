@@ -20,30 +20,27 @@ const FBK = 'Fraunces_900Black';
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
-// ── Warm luxury palette ──────────────────────────────────────────────────────
+// ── Monarch-inspired palette ────────────────────────────────────────────────
 const P = {
-  bg:         '#FAF8F4',
-  card:       '#FFFFFF',
-  surface:    '#F5F1EA',
-  border:     '#E8E2D9',
-  borderMid:  '#DDD6CA',
-  text:       '#1C1C1A',
-  secondary:  '#7A7468',
-  muted:      '#B0A99E',
-  green:      '#3D7A5F',
-  greenLight: '#EBF4EF',
-  orange:     '#C4713A',
-  orangeLight:'#FAF0E8',
-  red:        '#B94040',
-  redLight:   '#FAEDEB',
-  gold:       '#A07830',
-  goldLight:  '#FAF3E0',
-  blue:       '#3A6080',
-  blueLight:  '#EBF2F8',
+  bg:          '#FFFFFF',
+  card:        '#F7F6F3',
+  cardDeep:    '#F0EDE8',
+  border:      '#EEECE8',
+  text:        '#1A1A1A',
+  secondary:   '#9B9590',
+  muted:       '#C4C0BB',
+  green:       '#7CAE8E',
+  greenLight:  '#EEF5F1',
+  orange:      '#E8957A',
+  orangeLight: '#FDF2EE',
+  gold:        '#C9A96E',
+  goldLight:   '#FAF4E8',
+  blue:        '#89A8C4',
+  blueLight:   '#EEF3F8',
 } as const;
 
 const ACTIVITY_TABS = [
-  { key: 'all',         label: 'All',         icon: 'apps-outline',              types: ['income','savings','expense','payable','receivable'], color: P.text,   bg: P.surface    },
+  { key: 'all',         label: 'All',         icon: 'apps-outline',              types: ['income','savings','expense','payable','receivable'], color: P.text,   bg: P.card    },
   { key: 'money-in',    label: 'Money In',    icon: 'arrow-down-circle-outline', types: ['income','savings'], color: P.green,  bg: P.greenLight  },
   { key: 'money-out',   label: 'Money Out',   icon: 'arrow-up-circle-outline',   types: ['expense'],         color: P.orange, bg: P.orangeLight },
   { key: 'loans',       label: 'Loans',       icon: 'cash-outline',              types: ['payable'],         color: P.gold,   bg: P.goldLight   },
@@ -345,23 +342,27 @@ export default function DashboardScreen() {
       {isAll ? (
         <View style={s.summaryCard}>
           <View style={s.summaryGrid}>
-            <View style={[s.summaryGridItem, { borderLeftColor: P.green }]}>
+            <View style={[s.summaryGridItem]}>
+              <View style={[s.summaryGridDot, { backgroundColor: P.green }]} />
               <Text style={s.summaryGridLabel}>Money In</Text>
               <Text style={[s.summaryGridValue, { color: P.green }]}>{fmt(moneyInTotal)}</Text>
             </View>
-            <View style={[s.summaryGridItem, { borderLeftColor: P.orange }]}>
+            <View style={[s.summaryGridItem]}>
+              <View style={[s.summaryGridDot, { backgroundColor: P.orange }]} />
               <Text style={s.summaryGridLabel}>Money Out</Text>
               <Text style={[s.summaryGridValue, { color: P.orange }]}>{fmt(moneyOutTotal)}</Text>
             </View>
-            <View style={[s.summaryGridItem, { borderLeftColor: P.gold }]}>
+            <View style={[s.summaryGridItem]}>
+              <View style={[s.summaryGridDot, { backgroundColor: P.gold }]} />
               <Text style={s.summaryGridLabel}>Loans</Text>
               <Text style={[s.summaryGridValue, { color: P.gold }]}>{loansActive} active</Text>
-              <Text style={[s.summaryGridSub, { color: P.green }]}>{loansPaid} paid</Text>
+              <Text style={[s.summaryGridSub]}>{loansPaid} paid</Text>
             </View>
-            <View style={[s.summaryGridItem, { borderLeftColor: P.blue }]}>
+            <View style={[s.summaryGridItem]}>
+              <View style={[s.summaryGridDot, { backgroundColor: P.blue }]} />
               <Text style={s.summaryGridLabel}>Receivables</Text>
               <Text style={[s.summaryGridValue, { color: P.blue }]}>{receivablesPending} pending</Text>
-              <Text style={[s.summaryGridSub, { color: P.green }]}>{receivablesReceived} received</Text>
+              <Text style={[s.summaryGridSub]}>{receivablesReceived} received</Text>
             </View>
           </View>
         </View>
@@ -482,11 +483,11 @@ export default function DashboardScreen() {
                   activeOpacity={0.7}
                   onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: item.id } } as any)}
                 >
-                  <View style={[s.rowIconWrap, { backgroundColor: tl ? tl.color + '15' : P.surface }]}>
+                  <View style={[s.rowIconWrap, { backgroundColor: tl ? tl.color + '18' : P.card }]}>
                     <Ionicons
                       name={(item.categories?.icon ?? activeTabData.icon) as any}
                       size={15}
-                      color={tl?.color ?? activeTabData.color}
+                      color={tl?.color ?? P.secondary}
                     />
                   </View>
                   <View style={s.rowMid}>
@@ -599,120 +600,109 @@ const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: P.bg },
 
   // Header
-  header: { paddingHorizontal: Spacing.page, paddingTop: 32, paddingBottom: 20 },
-  title:    { fontFamily: FBK, fontSize: 34, color: P.text, letterSpacing: -1 },
-  subtitle: { fontFamily: I,   fontSize: 12, color: P.secondary, marginTop: 4, letterSpacing: 0.2 },
+  header: { paddingHorizontal: Spacing.page, paddingTop: 36, paddingBottom: 8 },
+  title:    { fontFamily: FBK, fontSize: 36, color: P.text, letterSpacing: -1.2 },
+  subtitle: { fontFamily: I,   fontSize: 12, color: P.secondary, marginTop: 3 },
 
   // Preset chips
   presetScroll: { flexGrow: 0, flexShrink: 0 },
   presetRow: { paddingHorizontal: Spacing.page, gap: 8, paddingBottom: 2 },
   presetChip: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
-    paddingHorizontal: 14, paddingVertical: 9,
-    borderRadius: Radius.pill, borderWidth: 1,
-    borderColor: P.border, backgroundColor: P.card,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 2, elevation: 1,
+    paddingHorizontal: 14, paddingVertical: 8,
+    borderRadius: Radius.pill,
+    backgroundColor: P.card,
   },
-  presetChipActive: { backgroundColor: P.text, borderColor: P.text },
+  presetChipActive: { backgroundColor: P.text },
   presetChipText:       { fontFamily: IM, fontSize: 12, color: P.secondary },
   presetChipTextActive: { color: '#fff' },
 
   // Range label
   rangeLabelRow: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
-    paddingHorizontal: Spacing.page, marginTop: 10, marginBottom: 18,
+    paddingHorizontal: Spacing.page, marginTop: 10, marginBottom: 20,
   },
-  rangeLabel:     { fontFamily: I, fontSize: 11, color: P.muted, flex: 1, letterSpacing: 0.1 },
+  rangeLabel:     { fontFamily: I, fontSize: 11, color: P.muted, flex: 1 },
   rangeLabelEdit: { fontFamily: IS, fontSize: 11, color: P.orange },
 
-  // Summary card
+  // Summary card — no border, no shadow, just greige bg
   summaryCard: {
-    marginHorizontal: Spacing.page, marginBottom: 20,
+    marginHorizontal: Spacing.page, marginBottom: 24,
     backgroundColor: P.card,
     borderRadius: Radius.xl,
-    borderWidth: 1, borderColor: P.border,
-    borderLeftWidth: 4,
-    paddingHorizontal: 18, paddingVertical: 16,
-    shadowColor: '#8B7355', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 8, elevation: 2,
+    paddingHorizontal: 20, paddingVertical: 18,
   },
-  summaryTop: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  summaryIcon: { width: 42, height: 42, borderRadius: Radius.lg, justifyContent: 'center', alignItems: 'center' },
-  summaryTabLabel: { fontFamily: FB,  fontSize: 15, color: P.text },
-  summaryEntries:  { fontFamily: I,   fontSize: 11, color: P.secondary, marginTop: 2 },
-  summaryTotal:    { fontFamily: FBK, fontSize: 26, letterSpacing: -1 },
-  summaryStatRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 2 },
-  summaryStatLabel: { fontFamily: IM, fontSize: 12, color: P.secondary },
+  summaryTop:      { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  summaryIcon:     { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
+  summaryTabLabel: { fontFamily: IS,  fontSize: 13, color: P.text },
+  summaryEntries:  { fontFamily: I,   fontSize: 11, color: P.secondary, marginTop: 1 },
+  summaryTotal:    { fontFamily: FBK, fontSize: 28, letterSpacing: -1, color: P.text },
+  summaryStatRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 3 },
+  summaryStatLabel: { fontFamily: I,  fontSize: 12, color: P.secondary },
   summaryStatValue: { fontFamily: FB, fontSize: 18 },
-  summaryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
-  summaryGridItem: { flex: 1, minWidth: '45%', borderLeftWidth: 3, paddingLeft: 10, gap: 3 },
-  summaryGridLabel: { fontFamily: IM, fontSize: 11, color: P.muted },
-  summaryGridValue: { fontFamily: FB, fontSize: 16 },
-  summaryGridSub:   { fontFamily: IM, fontSize: 11 },
+  summaryGrid:      { flexDirection: 'row', flexWrap: 'wrap', gap: 16 },
+  summaryGridItem:  { flex: 1, minWidth: '45%', gap: 4 },
+  summaryGridDot:   { width: 8, height: 8, borderRadius: 4, marginBottom: 2 },
+  summaryGridLabel: { fontFamily: I,  fontSize: 11, color: P.secondary },
+  summaryGridValue: { fontFamily: FB, fontSize: 17 },
+  summaryGridSub:   { fontFamily: I,  fontSize: 11, color: P.secondary },
 
-  tabCircleRow: {
-    flexDirection: 'row', justifyContent: 'space-between',
-    paddingHorizontal: Spacing.page, marginBottom: 6,
-  },
+  // Activity tab circles
+  tabCircleRow:  { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: Spacing.page, marginBottom: 8 },
   tabCircleWrap: { alignItems: 'center', gap: 6 },
   tabCircle: {
-    width: 52, height: 52, borderRadius: 26,
-    borderWidth: 1.5, borderColor: P.border,
-    backgroundColor: P.card, justifyContent: 'center', alignItems: 'center',
-    shadowColor: '#8B7355', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 3, elevation: 1,
+    width: 50, height: 50, borderRadius: 25,
+    backgroundColor: P.card,
+    justifyContent: 'center', alignItems: 'center',
   },
-  tabCircleLabel: { fontFamily: IM, fontSize: 9, color: P.muted, textAlign: 'center' },
+  tabCircleLabel: { fontFamily: I, fontSize: 9, color: P.muted, textAlign: 'center' },
 
   // Divider
-  divider: { height: 1, backgroundColor: P.border, marginHorizontal: Spacing.page, marginTop: 18, marginBottom: 6 },
+  divider: { height: 1, backgroundColor: P.border, marginHorizontal: Spacing.page, marginTop: 8, marginBottom: 4 },
 
   // Empty state
   emptyWrap:     { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 10, paddingBottom: 80 },
-  emptyIconWrap: { width: 60, height: 60, borderRadius: Radius.xl, backgroundColor: P.surface, justifyContent: 'center', alignItems: 'center', marginBottom: 4 },
-  emptyTitle:    { fontFamily: IS, fontSize: 14, color: P.text },
+  emptyIconWrap: { width: 56, height: 56, borderRadius: 28, backgroundColor: P.card, justifyContent: 'center', alignItems: 'center', marginBottom: 4 },
+  emptyTitle:    { fontFamily: FB, fontSize: 15, color: P.text },
   emptyText:     { fontFamily: I,  fontSize: 12, color: P.secondary, textAlign: 'center', lineHeight: 19 },
 
   // List
   list: { paddingHorizontal: Spacing.page, paddingTop: 8 },
-  dateHeaderRow:  { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 22, marginBottom: 10 },
-  dateHeaderText: { fontFamily: IS, fontSize: 11, color: P.muted, letterSpacing: 0.5, textTransform: 'uppercase' },
+  dateHeaderRow:  { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 24, marginBottom: 12 },
+  dateHeaderText: { fontFamily: IS, fontSize: 10, color: P.muted, letterSpacing: 1, textTransform: 'uppercase' },
   dateHeaderLine: { flex: 1, height: 1, backgroundColor: P.border },
 
   row: {
     flexDirection: 'row', alignItems: 'center', gap: 14,
-    paddingVertical: 13,
+    paddingVertical: 14,
     borderBottomWidth: 1, borderBottomColor: P.border,
   },
-  rowIconWrap: { width: 40, height: 40, borderRadius: Radius.lg, justifyContent: 'center', alignItems: 'center' },
-  rowMid:      { flex: 1, gap: 2 },
-  rowCategory: { fontFamily: IM, fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5 },
-  rowName:     { fontFamily: FB, fontSize: 13, color: P.text },
-  rowSpace:    { fontFamily: I,  fontSize: 11, color: P.muted },
-  rowRight:    { alignItems: 'flex-end', gap: 4 },
-  rowAmount:   { fontFamily: FB, fontSize: 15 },
+  rowIconWrap:  { width: 38, height: 38, borderRadius: 19, justifyContent: 'center', alignItems: 'center' },
+  rowMid:       { flex: 1, gap: 2 },
+  rowCategory:  { fontFamily: I, fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.8, color: P.muted },
+  rowName:      { fontFamily: FB,  fontSize: 14, color: P.text },
+  rowSpace:     { fontFamily: I,   fontSize: 11, color: P.muted },
+  rowRight:     { alignItems: 'flex-end', gap: 3 },
+  rowAmount:    { fontFamily: FBK, fontSize: 16, letterSpacing: -0.5 },
 
-  // Status filter chips (loans / receivables)
-  statusFilterRow:      { flexDirection: 'row', gap: 8 },
-  statusChip:           { flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: Radius.lg, borderWidth: 1, borderColor: P.border, backgroundColor: P.surface },
+  // Status filter chips
+  statusFilterRow:      { flexDirection: 'row', gap: 10 },
+  statusChip:           { flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: Radius.lg, backgroundColor: P.cardDeep },
   statusChipText:       { fontFamily: IS, fontSize: 13, color: P.secondary },
   statusChipTextActive: { color: '#fff' },
 
   // Cutoff modal
   cutoffRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, width: '100%', marginBottom: 12 },
-  cutoffChip: {
-    paddingHorizontal: 14, paddingVertical: 8,
-    borderRadius: Radius.pill, borderWidth: 1,
-    borderColor: P.border, backgroundColor: P.surface,
-  },
-  cutoffChipActive:     { backgroundColor: P.green, borderColor: P.green },
+  cutoffChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: P.card },
+  cutoffChipActive:     { backgroundColor: P.green },
   cutoffChipText:       { fontFamily: IM, fontSize: 12, color: P.secondary },
   cutoffChipTextActive: { color: '#fff' },
   cutoffInputRow:   { flexDirection: 'row', alignItems: 'center', gap: 10, width: '100%' },
-  cutoffInputLabel: { fontFamily: IM, fontSize: 12, color: P.secondary, flex: 1 },
+  cutoffInputLabel: { fontFamily: I, fontSize: 12, color: P.secondary, flex: 1 },
   cutoffInput: {
-    backgroundColor: P.surface, borderRadius: Radius.sm,
-    borderWidth: 1, borderColor: P.border,
+    backgroundColor: P.card, borderRadius: Radius.sm,
     paddingHorizontal: 12, paddingVertical: 8,
-    fontFamily: IB, fontSize: 16, color: P.text,
+    fontFamily: FB, fontSize: 16, color: P.text,
     width: 70, textAlign: 'center',
   },
 
@@ -721,13 +711,13 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     width: '100%', paddingHorizontal: 4, marginBottom: 10,
   },
-  pickerMonthText: { fontFamily: IS, fontSize: 14, color: P.text },
+  pickerMonthText: { fontFamily: FB, fontSize: 15, color: P.text },
   pickerHint:      { fontFamily: I,  fontSize: 10, color: P.orange, marginBottom: 8 },
-  calDay:       { flex: 1, textAlign: 'center', fontFamily: IM, fontSize: 10, color: P.muted },
-  calCell:      { width: '14.28%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center', borderRadius: Radius.pill },
-  calCellRange: { backgroundColor: P.orange + '22', borderRadius: 0 },
-  calCellEdge:  { backgroundColor: P.orange },
-  calCellToday: { backgroundColor: P.surface },
-  calCellText:  { fontFamily: I,  fontSize: 13, color: P.text },
+  calDay:          { flex: 1, textAlign: 'center', fontFamily: I, fontSize: 10, color: P.muted },
+  calCell:         { width: '14.28%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center', borderRadius: Radius.pill },
+  calCellRange:    { backgroundColor: P.orange + '22', borderRadius: 0 },
+  calCellEdge:     { backgroundColor: P.orange },
+  calCellToday:    { backgroundColor: P.card },
+  calCellText:     { fontFamily: I,  fontSize: 13, color: P.text },
   calCellTextActive: { fontFamily: IS, color: '#fff' },
 });
