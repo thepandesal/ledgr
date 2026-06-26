@@ -11,32 +11,32 @@ import ConfirmModal from '@/components/ui/ConfirmModal';
 import { Colors, Fonts, Radius, Spacing } from '@/components/ui/theme';
 import { useRouter } from 'expo-router';
 
-const I   = 'Inter_400Regular';
-const IM  = 'Inter_500Medium';
-const IS  = 'Inter_600SemiBold';
-const IB  = 'Inter_700Bold';
-const FB  = 'Fraunces_700Bold';
-const FBK = 'Fraunces_900Black';
+const I   = 'ChillaxRegular';
+const IM  = 'ChillaxMedium';
+const IS  = 'ChillaxSemibold';
+const IB  = 'ChillaxBold';
+const FB  = 'ChillaxSemibold';
+const FBK = 'ChillaxBold';
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
-// ── Monarch-inspired palette ────────────────────────────────────────────────
+// ── Pastel-fun palette ──────────────────────────────────────────────────────
 const P = {
-  bg:          '#FFFFFF',
-  card:        '#F7F6F3',
-  cardDeep:    '#F0EDE8',
-  border:      '#EEECE8',
-  text:        '#1A1A1A',
-  secondary:   '#9B9590',
-  muted:       '#C4C0BB',
-  green:       '#7CAE8E',
-  greenLight:  '#EEF5F1',
-  orange:      '#E8957A',
-  orangeLight: '#FDF2EE',
-  gold:        '#C9A96E',
-  goldLight:   '#FAF4E8',
-  blue:        '#89A8C4',
-  blueLight:   '#EEF3F8',
+  bg:          '#FAFAF7',
+  card:        '#F2F0EB',
+  cardDeep:    '#E8E5DE',
+  border:      '#E4E0D8',
+  text:        '#2C2C2C',
+  secondary:   '#888580',
+  muted:       '#B8B4AE',
+  green:       '#5BAD8A',
+  greenLight:  '#E6F5EE',
+  orange:      '#F07A5C',
+  orangeLight: '#FEEEE9',
+  gold:        '#E0A84A',
+  goldLight:   '#FDF4E0',
+  blue:        '#6FA3C8',
+  blueLight:   '#E5F0F8',
 } as const;
 
 const ACTIVITY_TABS = [
@@ -294,8 +294,8 @@ export default function DashboardScreen() {
       {/* ── Header ── */}
       <View style={s.header}>
         <View>
-          <Text style={s.title}>Activities</Text>
-          <Text style={s.subtitle}>your financial overview</Text>
+          <Text style={s.title}>Activities ✦</Text>
+          <Text style={s.subtitle}>here's how you're doing ↓</Text>
         </View>
       </View>
 
@@ -601,8 +601,8 @@ const s = StyleSheet.create({
 
   // Header
   header: { paddingHorizontal: Spacing.page, paddingTop: 36, paddingBottom: 8 },
-  title:    { fontFamily: FBK, fontSize: 36, color: P.text, letterSpacing: -1.2 },
-  subtitle: { fontFamily: I,   fontSize: 12, color: P.secondary, marginTop: 3 },
+  title:    { fontFamily: FBK, fontSize: 34, color: P.text, letterSpacing: -0.5 },
+  subtitle: { fontFamily: I,   fontSize: 12, color: P.secondary, marginTop: 2 },
 
   // Preset chips
   presetScroll: { flexGrow: 0, flexShrink: 0 },
@@ -612,8 +612,9 @@ const s = StyleSheet.create({
     paddingHorizontal: 14, paddingVertical: 8,
     borderRadius: Radius.pill,
     backgroundColor: P.card,
+    borderWidth: 1.5, borderColor: P.border,
   },
-  presetChipActive: { backgroundColor: P.text },
+  presetChipActive: { backgroundColor: P.orange, borderColor: P.orange },
   presetChipText:       { fontFamily: IM, fontSize: 12, color: P.secondary },
   presetChipTextActive: { color: '#fff' },
 
@@ -625,12 +626,13 @@ const s = StyleSheet.create({
   rangeLabel:     { fontFamily: I, fontSize: 11, color: P.muted, flex: 1 },
   rangeLabelEdit: { fontFamily: IS, fontSize: 11, color: P.orange },
 
-  // Summary card — no border, no shadow, just greige bg
+  // Summary card
   summaryCard: {
     marginHorizontal: Spacing.page, marginBottom: 24,
     backgroundColor: P.card,
     borderRadius: Radius.xl,
     paddingHorizontal: 20, paddingVertical: 18,
+    borderWidth: 1.5, borderColor: P.border,
   },
   summaryTop:      { flexDirection: 'row', alignItems: 'center', gap: 14 },
   summaryIcon:     { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
@@ -651,18 +653,19 @@ const s = StyleSheet.create({
   tabCircleRow:  { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: Spacing.page, marginBottom: 8 },
   tabCircleWrap: { alignItems: 'center', gap: 6 },
   tabCircle: {
-    width: 50, height: 50, borderRadius: 25,
+    width: 50, height: 50, borderRadius: 16,
     backgroundColor: P.card,
     justifyContent: 'center', alignItems: 'center',
+    borderWidth: 1.5, borderColor: P.border,
   },
-  tabCircleLabel: { fontFamily: I, fontSize: 9, color: P.muted, textAlign: 'center' },
+  tabCircleLabel: { fontFamily: IM, fontSize: 9, color: P.muted, textAlign: 'center' },
 
   // Divider
   divider: { height: 1, backgroundColor: P.border, marginHorizontal: Spacing.page, marginTop: 8, marginBottom: 4 },
 
   // Empty state
   emptyWrap:     { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 10, paddingBottom: 80 },
-  emptyIconWrap: { width: 56, height: 56, borderRadius: 28, backgroundColor: P.card, justifyContent: 'center', alignItems: 'center', marginBottom: 4 },
+  emptyIconWrap: { width: 56, height: 56, borderRadius: 18, backgroundColor: P.card, justifyContent: 'center', alignItems: 'center', marginBottom: 4, borderWidth: 1.5, borderColor: P.border },
   emptyTitle:    { fontFamily: FB, fontSize: 15, color: P.text },
   emptyText:     { fontFamily: I,  fontSize: 12, color: P.secondary, textAlign: 'center', lineHeight: 19 },
 
@@ -677,7 +680,7 @@ const s = StyleSheet.create({
     paddingVertical: 14,
     borderBottomWidth: 1, borderBottomColor: P.border,
   },
-  rowIconWrap:  { width: 38, height: 38, borderRadius: 19, justifyContent: 'center', alignItems: 'center' },
+  rowIconWrap:  { width: 38, height: 38, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
   rowMid:       { flex: 1, gap: 2 },
   rowCategory:  { fontFamily: I, fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.8, color: P.muted },
   rowName:      { fontFamily: FB,  fontSize: 14, color: P.text },
