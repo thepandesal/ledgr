@@ -374,99 +374,170 @@ export default function DashboardScreen() {
         </View>
 
         {/* Summary stats — always visible, context-aware */}
-        {isAll ? (
-          <View style={s.statsRow}>
-            <View style={s.statItem}>
-              <Text style={s.statValue}>{fmtAbbr(moneyInTotal)}</Text>
-              <Text style={s.statLabel}>Money In</Text>
+        {(() => {
+          const hasIn   = selectedTabs.has('money-in');
+          const hasOut  = selectedTabs.has('money-out');
+          const hasLoan = selectedTabs.has('loans');
+          const hasRec  = selectedTabs.has('receivables');
+          const filteredTotal = filtered.reduce((sum, r) => sum + Number(r.amount), 0);
+
+          if (isAll) return (
+            <View style={s.statsRow}>
+              <View style={s.statItem}>
+                <Text style={s.statValue}>{fmtAbbr(moneyInTotal)}</Text>
+                <Text style={s.statLabel}>Money In</Text>
+              </View>
+              <View style={s.statDivider} />
+              <View style={s.statItem}>
+                <Text style={s.statValue}>{fmtAbbr(moneyOutTotal)}</Text>
+                <Text style={s.statLabel}>Money Out</Text>
+              </View>
+              <View style={s.statDivider} />
+              <View style={s.statItem}>
+                <Text style={[s.statValue, { color: P.gold }]}>{loansActive}</Text>
+                <Text style={s.statLabel}>Loans</Text>
+              </View>
+              <View style={s.statDivider} />
+              <View style={s.statItem}>
+                <Text style={[s.statValue, { color: P.blue }]}>{receivablesPending}</Text>
+                <Text style={s.statLabel}>Receivables</Text>
+              </View>
             </View>
-            <View style={s.statDivider} />
-            <View style={s.statItem}>
-              <Text style={s.statValue}>{fmtAbbr(moneyOutTotal)}</Text>
-              <Text style={s.statLabel}>Money Out</Text>
+          );
+
+          // loans only
+          if (hasLoan && !hasIn && !hasOut && !hasRec) return (
+            <View style={s.statsRow}>
+              <View style={s.statItem}>
+                <Text style={[s.statValue, { color: P.gold }]}>{loansActive}</Text>
+                <Text style={s.statLabel}>Active</Text>
+              </View>
+              <View style={s.statDivider} />
+              <View style={s.statItem}>
+                <Text style={[s.statValue, { color: P.green }]}>{loansPaid}</Text>
+                <Text style={s.statLabel}>Paid</Text>
+              </View>
+              <View style={s.statDivider} />
+              <View style={s.statItem}>
+                <Text style={[s.statValue, { color: P.gold }]}>{fmtAbbr(filteredTotal)}</Text>
+                <Text style={s.statLabel}>Total</Text>
+              </View>
             </View>
-            <View style={s.statDivider} />
-            <View style={s.statItem}>
-              <Text style={[s.statValue, { color: P.gold }]}>{loansActive}</Text>
-              <Text style={s.statLabel}>Loans</Text>
+          );
+
+          // receivables only
+          if (hasRec && !hasIn && !hasOut && !hasLoan) return (
+            <View style={s.statsRow}>
+              <View style={s.statItem}>
+                <Text style={[s.statValue, { color: P.blue }]}>{receivablesPending}</Text>
+                <Text style={s.statLabel}>Pending</Text>
+              </View>
+              <View style={s.statDivider} />
+              <View style={s.statItem}>
+                <Text style={[s.statValue, { color: P.green }]}>{receivablesReceived}</Text>
+                <Text style={s.statLabel}>Received</Text>
+              </View>
+              <View style={s.statDivider} />
+              <View style={s.statItem}>
+                <Text style={[s.statValue, { color: P.blue }]}>{fmtAbbr(filteredTotal)}</Text>
+                <Text style={s.statLabel}>Total</Text>
+              </View>
             </View>
-            <View style={s.statDivider} />
-            <View style={s.statItem}>
-              <Text style={[s.statValue, { color: P.blue }]}>{receivablesPending}</Text>
-              <Text style={s.statLabel}>Receivables</Text>
+          );
+
+          // loans + receivables
+          if (hasLoan && hasRec && !hasIn && !hasOut) return (
+            <View style={s.statsRow}>
+              <View style={s.statItem}>
+                <Text style={[s.statValue, { color: P.gold }]}>{loansActive}</Text>
+                <Text style={s.statLabel}>Loans</Text>
+              </View>
+              <View style={s.statDivider} />
+              <View style={s.statItem}>
+                <Text style={[s.statValue, { color: P.blue }]}>{receivablesPending}</Text>
+                <Text style={s.statLabel}>Pending</Text>
+              </View>
+              <View style={s.statDivider} />
+              <View style={s.statItem}>
+                <Text style={s.statValue}>{filtered.length}</Text>
+                <Text style={s.statLabel}>Entries</Text>
+              </View>
             </View>
-          </View>
-        ) : selectedTabs.has('money-in') && selectedTabs.size === 1 ? (
-          <View style={s.statsRow}>
-            <View style={s.statItem}>
-              <Text style={[s.statValue, { color: P.green }]}>{fmtAbbr(moneyInTotal)}</Text>
-              <Text style={s.statLabel}>Total In</Text>
+          );
+
+          // any combo with both in + out (with or without loans/receivables)
+          if (hasIn && hasOut) return (
+            <View style={s.statsRow}>
+              <View style={s.statItem}>
+                <Text style={[s.statValue, { color: P.green }]}>{fmtAbbr(moneyInTotal)}</Text>
+                <Text style={s.statLabel}>Total In</Text>
+              </View>
+              <View style={s.statDivider} />
+              <View style={s.statItem}>
+                <Text style={[s.statValue, { color: P.orange }]}>{fmtAbbr(moneyOutTotal)}</Text>
+                <Text style={s.statLabel}>Total Out</Text>
+              </View>
+              {(hasLoan || hasRec) && <View style={s.statDivider} />}
+              {hasLoan && (
+                <View style={s.statItem}>
+                  <Text style={[s.statValue, { color: P.gold }]}>{loansActive}</Text>
+                  <Text style={s.statLabel}>Loans</Text>
+                </View>
+              )}
+              {hasRec && (
+                <View style={s.statItem}>
+                  <Text style={[s.statValue, { color: P.blue }]}>{receivablesPending}</Text>
+                  <Text style={s.statLabel}>Pending</Text>
+                </View>
+              )}
             </View>
-            <View style={s.statDivider} />
-            <View style={s.statItem}>
-              <Text style={s.statValue}>{filtered.length}</Text>
-              <Text style={s.statLabel}>Entries</Text>
+          );
+
+          // money-in only
+          if (hasIn) return (
+            <View style={s.statsRow}>
+              <View style={s.statItem}>
+                <Text style={[s.statValue, { color: P.green }]}>{fmtAbbr(moneyInTotal)}</Text>
+                <Text style={s.statLabel}>Total In</Text>
+              </View>
+              <View style={s.statDivider} />
+              <View style={s.statItem}>
+                <Text style={s.statValue}>{filtered.length}</Text>
+                <Text style={s.statLabel}>Entries</Text>
+              </View>
             </View>
-          </View>
-        ) : selectedTabs.has('money-out') && selectedTabs.size === 1 ? (
-          <View style={s.statsRow}>
-            <View style={s.statItem}>
-              <Text style={[s.statValue, { color: P.orange }]}>{fmtAbbr(moneyOutTotal)}</Text>
-              <Text style={s.statLabel}>Total Out</Text>
+          );
+
+          // money-out only
+          if (hasOut) return (
+            <View style={s.statsRow}>
+              <View style={s.statItem}>
+                <Text style={[s.statValue, { color: P.orange }]}>{fmtAbbr(moneyOutTotal)}</Text>
+                <Text style={s.statLabel}>Total Out</Text>
+              </View>
+              <View style={s.statDivider} />
+              <View style={s.statItem}>
+                <Text style={s.statValue}>{filtered.length}</Text>
+                <Text style={s.statLabel}>Entries</Text>
+              </View>
             </View>
-            <View style={s.statDivider} />
-            <View style={s.statItem}>
-              <Text style={s.statValue}>{filtered.length}</Text>
-              <Text style={s.statLabel}>Entries</Text>
+          );
+
+          // fallback
+          return (
+            <View style={s.statsRow}>
+              <View style={s.statItem}>
+                <Text style={[s.statValue, { color: activeTabData.color }]}>{fmtAbbr(filteredTotal)}</Text>
+                <Text style={s.statLabel}>Total</Text>
+              </View>
+              <View style={s.statDivider} />
+              <View style={s.statItem}>
+                <Text style={s.statValue}>{filtered.length}</Text>
+                <Text style={s.statLabel}>Entries</Text>
+              </View>
             </View>
-          </View>
-        ) : selectedTabs.has('loans') && selectedTabs.size === 1 ? (
-          <View style={s.statsRow}>
-            <View style={s.statItem}>
-              <Text style={[s.statValue, { color: P.gold }]}>{loansActive}</Text>
-              <Text style={s.statLabel}>Active</Text>
-            </View>
-            <View style={s.statDivider} />
-            <View style={s.statItem}>
-              <Text style={[s.statValue, { color: P.green }]}>{loansPaid}</Text>
-              <Text style={s.statLabel}>Paid</Text>
-            </View>
-            <View style={s.statDivider} />
-            <View style={s.statItem}>
-              <Text style={[s.statValue, { color: P.gold }]}>{fmtAbbr(filtered.reduce((sum, r) => sum + Number(r.amount), 0))}</Text>
-              <Text style={s.statLabel}>Total</Text>
-            </View>
-          </View>
-        ) : selectedTabs.has('receivables') && selectedTabs.size === 1 ? (
-          <View style={s.statsRow}>
-            <View style={s.statItem}>
-              <Text style={[s.statValue, { color: P.blue }]}>{receivablesPending}</Text>
-              <Text style={s.statLabel}>Pending</Text>
-            </View>
-            <View style={s.statDivider} />
-            <View style={s.statItem}>
-              <Text style={[s.statValue, { color: P.green }]}>{receivablesReceived}</Text>
-              <Text style={s.statLabel}>Received</Text>
-            </View>
-            <View style={s.statDivider} />
-            <View style={s.statItem}>
-              <Text style={[s.statValue, { color: P.blue }]}>{fmtAbbr(filtered.reduce((sum, r) => sum + Number(r.amount), 0))}</Text>
-              <Text style={s.statLabel}>Total</Text>
-            </View>
-          </View>
-        ) : (
-          <View style={s.statsRow}>
-            <View style={s.statItem}>
-              <Text style={[s.statValue, { color: activeTabData.color }]}>{fmtAbbr(filtered.reduce((sum, r) => sum + Number(r.amount), 0))}</Text>
-              <Text style={s.statLabel}>Total</Text>
-            </View>
-            <View style={s.statDivider} />
-            <View style={s.statItem}>
-              <Text style={s.statValue}>{filtered.length}</Text>
-              <Text style={s.statLabel}>Entries</Text>
-            </View>
-          </View>
-        )}
+          );
+        })()}
 
         {/* Tab filter buttons */}
         <View style={s.tabRow}>
@@ -519,7 +590,7 @@ export default function DashboardScreen() {
                       <Text style={s.rowCategory}>{tl?.label ?? activeTabData.label}{item.space?.name ? ` · ${item.space.name}` : ''}</Text>
                     </View>
                     <Text style={[s.rowAmount, { color: tl?.color ?? P.secondary }]}>
-                      {fmtAbbr(Number(item.amount))}
+                      {Number(item.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </Text>
                   </TouchableOpacity>
                 </View>
