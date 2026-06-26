@@ -775,7 +775,7 @@ const s = StyleSheet.create({
   },
 
   filterBtns: { gap: 6, alignItems: 'flex-end', paddingTop: 4 },
-  filterRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  filterRow:  { flexDirection: 'row', alignItems: 'center', gap: 10 },
   filterBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
     paddingHorizontal: 12, paddingVertical: 8,
