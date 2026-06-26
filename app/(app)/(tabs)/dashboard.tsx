@@ -63,10 +63,10 @@ function isSameDay(a: Date, b: Date) {
       && a.getDate()     === b.getDate();
 }
 
-function getRangeForPreset(preset: Preset, cutoffDay: number): { from: Date; to: Date } {
+function getRangeForPreset(preset: Preset, cutoffDay: number, offset = 0): { from: Date; to: Date } {
   const now = new Date();
   if (preset === 'this-month') {
-    return { from: new Date(now.getFullYear(), now.getMonth(), 1), to: now };
+    return { from: new Date(now.getFullYear(), now.getMonth() + offset, 1), to: new Date(now.getFullYear(), now.getMonth() + offset + 1, 0) };
   }
   if (preset === 'last-30') {
     const from = new Date(now); from.setDate(now.getDate() - 30);
@@ -99,6 +99,7 @@ export default function DashboardScreen() {
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [cutoffDay,    setCutoffDay]    = useState(25);
   const [cutoffInput,  setCutoffInput]  = useState('25');
+  const [rangeOffset,  setRangeOffset]  = useState(0);
   const [showDateModal,  setShowDateModal]  = useState(false);
   const [showSpaceModal, setShowSpaceModal] = useState(false);
   const [selectedSpaces, setSelectedSpaces] = useState<Set<string>>(new Set(['all']));
@@ -114,7 +115,7 @@ export default function DashboardScreen() {
 
   const range = activePreset === 'custom'
     ? { from: customFrom, to: customTo }
-    : getRangeForPreset(activePreset, cutoffDay);
+    : getRangeForPreset(activePreset, cutoffDay, rangeOffset);
 
   // ── load saved settings ──
   useQuery({
@@ -148,6 +149,7 @@ export default function DashboardScreen() {
   const applyPreset = (key: Preset, cutoff?: number) => {
     const day = cutoff ?? cutoffDay;
     if (key === 'cutoff' && cutoff) { setCutoffDay(cutoff); setCutoffInput(String(cutoff)); }
+    setRangeOffset(0);
     setActivePreset(key);
     const patch: Record<string, any> = { dashboard_preset: key };
     if (key === 'cutoff' && cutoff) patch.cutoff_day = cutoff;
@@ -156,6 +158,17 @@ export default function DashboardScreen() {
       patch.dashboard_custom_to   = customTo.toISOString();
     }
     saveSettings.mutate(patch);
+  };
+
+  const navigateRange = (dir: 1 | -1) => {
+    if (activePreset === 'custom') {
+      const days = Math.round((customTo.getTime() - customFrom.getTime()) / 86400000) + 1;
+      const newFrom = new Date(customFrom); newFrom.setDate(newFrom.getDate() + dir * days);
+      const newTo   = new Date(customTo);   newTo.setDate(newTo.getDate()   + dir * days);
+      applyCustomRange(newFrom, newTo);
+    } else {
+      setRangeOffset(o => o + dir);
+    }
   };
 
   const applyCustomRange = (from: Date, to: Date) => {
@@ -605,6 +618,17 @@ export default function DashboardScreen() {
 
       {/* ── Date modal ── */}
       <BottomSheet visible={showDateModal} onClose={() => setShowDateModal(false)} title="date range">
+        <View style={s.rangeNavRow}>
+          <TouchableOpacity style={s.rangeNavBtn} onPress={() => navigateRange(-1)} activeOpacity={0.7}>
+            <Ionicons name="chevron-back" size={16} color={P.tealDark} />
+            <Text style={s.rangeNavText}>prev</Text>
+          </TouchableOpacity>
+          <Text style={s.rangeNavCurrent}>{rangeLabel}</Text>
+          <TouchableOpacity style={s.rangeNavBtn} onPress={() => navigateRange(1)} activeOpacity={0.7}>
+            <Text style={s.rangeNavText}>next</Text>
+            <Ionicons name="chevron-forward" size={16} color={P.tealDark} />
+          </TouchableOpacity>
+        </View>
         {/* Preset options */}
         <View style={s.modalPresetRow}>
           {PRESETS.map(p => {
@@ -866,6 +890,10 @@ const s = StyleSheet.create({
   statusChip:           { flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: Radius.lg, backgroundColor: P.bg },
   statusChipText:       { fontFamily: IS, fontSize: 13, color: P.secondary },
   statusChipTextActive: { color: P.text },
+  rangeNavRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, paddingHorizontal: 4 },
+  rangeNavBtn:     { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 6, paddingHorizontal: 10, borderRadius: 20, backgroundColor: P.tealLight },
+  rangeNavText:    { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 12, color: P.tealDark },
+  rangeNavCurrent: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, color: P.text, flex: 1, textAlign: 'center' },
 });
 
 
