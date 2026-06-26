@@ -7,8 +7,8 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useUser } from '../../../src/hooks/useUser';
 import { supabase } from '../../../src/lib/supabase';
-import ConfirmModal from '@/components/ui/ConfirmModal';
-import { Colors, Fonts, Radius, Spacing } from '@/components/ui/theme';
+import BottomSheet from '@/components/ui/BottomSheet';
+import { Colors, Radius } from '@/components/ui/theme';
 import { useRouter } from 'expo-router';
 
 const I   = 'PlusJakartaSans_400Regular';
@@ -55,11 +55,11 @@ type ActivityTab = typeof ACTIVITY_TABS[number]['key'];
 
 type Preset = 'this-month' | 'last-30' | 'cutoff' | 'custom';
 
-const PRESETS: { key: Preset; label: string }[] = [
-  { key: 'this-month', label: 'This Month' },
-  { key: 'last-30',    label: 'Last 30d'   },
-  { key: 'cutoff',     label: 'Cutoff'     },
-  { key: 'custom',     label: 'Custom'     },
+const PRESETS: { key: Preset; label: string; icon: string }[] = [
+  { key: 'this-month', label: 'This Month', icon: 'calendar-outline'   },
+  { key: 'last-30',    label: 'Last 30d',   icon: 'time-outline'       },
+  { key: 'cutoff',     label: 'Cutoff',     icon: 'cut-outline'        },
+  { key: 'custom',     label: 'Custom',     icon: 'options-outline'    },
 ];
 
 function isSameDay(a: Date, b: Date) {
@@ -103,15 +103,16 @@ export default function DashboardScreen() {
   const [selectedTabs, setSelectedTabs] = useState<Set<ActivityTab>>(new Set(['all']));
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [cutoffDay,    setCutoffDay]    = useState(25);
-  const [showCutoff,   setShowCutoff]   = useState(false);
   const [cutoffInput,  setCutoffInput]  = useState('25');
+  const [showDateModal,  setShowDateModal]  = useState(false);
+  const [showSpaceModal, setShowSpaceModal] = useState(false);
+  const [selectedSpaces, setSelectedSpaces] = useState<Set<string>>(new Set(['all']));
 
   // custom range state
   const [customFrom, setCustomFrom] = useState<Date>(new Date());
   const [customTo,   setCustomTo]   = useState<Date>(new Date());
 
   // calendar picker state
-  const [showPicker,   setShowPicker]   = useState(false);
   const [pickingDate,  setPickingDate]  = useState<'from' | 'to'>('from');
   const [pickerMonth,  setPickerMonth]  = useState(new Date().getMonth());
   const [pickerYear,   setPickerYear]   = useState(new Date().getFullYear());
@@ -120,66 +121,70 @@ export default function DashboardScreen() {
     ? { from: customFrom, to: customTo }
     : getRangeForPreset(activePreset, cutoffDay);
 
-  // ── range navigation ──
-  const shiftRange = (dir: 1 | -1) => {
-    if (activePreset === 'this-month') {
-      const newFrom = new Date(range.from.getFullYear(), range.from.getMonth() + dir, 1);
-      setActivePreset('custom');
-      setCustomFrom(newFrom);
-      setCustomTo(new Date(newFrom.getFullYear(), newFrom.getMonth() + 1, 0));
-    } else if (activePreset === 'last-30') {
-      const days = 30 * dir;
-      const newFrom = new Date(range.from); newFrom.setDate(newFrom.getDate() + days);
-      const newTo   = new Date(range.to);   newTo.setDate(newTo.getDate() + days);
-      setActivePreset('custom'); setCustomFrom(newFrom); setCustomTo(newTo);
-    } else if (activePreset === 'cutoff') {
-      const newFrom = new Date(range.from); newFrom.setMonth(newFrom.getMonth() + dir);
-      const newTo   = new Date(range.to);   newTo.setMonth(newTo.getMonth() + dir);
-      setActivePreset('custom'); setCustomFrom(newFrom); setCustomTo(newTo);
-    } else {
-      const diff = range.to.getTime() - range.from.getTime();
-      const newFrom = new Date(range.from.getTime() + diff * dir + 86400000 * dir);
-      const newTo   = new Date(newFrom.getTime() + diff);
-      setCustomFrom(newFrom); setCustomTo(newTo);
-    }
-  };
-
-  // ── load saved cutoff day ──
+  // ── load saved settings ──
   useQuery({
     queryKey: ['user-settings', userId],
     queryFn: async () => {
       const { data } = await supabase
         .from('user_settings')
-        .select('cutoff_day')
+        .select('cutoff_day, dashboard_preset, dashboard_custom_from, dashboard_custom_to, dashboard_space_ids')
         .eq('user_id', userId)
         .maybeSingle();
-      if (data?.cutoff_day) {
-        setCutoffDay(data.cutoff_day);
-        setCutoffInput(String(data.cutoff_day));
+      if (!data) return data;
+      if (data.cutoff_day) { setCutoffDay(data.cutoff_day); setCutoffInput(String(data.cutoff_day)); }
+      if (data.dashboard_preset) setActivePreset(data.dashboard_preset as Preset);
+      if (data.dashboard_custom_from) setCustomFrom(new Date(data.dashboard_custom_from));
+      if (data.dashboard_custom_to)   setCustomTo(new Date(data.dashboard_custom_to));
+      if (data.dashboard_space_ids) {
+        const ids = (data.dashboard_space_ids as string).split(',').filter(Boolean);
+        setSelectedSpaces(new Set(ids.length ? ids : ['all']));
       }
       return data;
     },
     enabled: !!userId,
   });
 
-  const saveCutoff = useMutation({
-    mutationFn: async (day: number) => {
+  const saveSettings = useMutation({
+    mutationFn: async (patch: Record<string, any>) => {
       await supabase.from('user_settings').upsert(
-        { user_id: userId, cutoff_day: day, updated_at: new Date().toISOString() },
+        { user_id: userId, ...patch, updated_at: new Date().toISOString() },
         { onConflict: 'user_id' }
       );
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['user-settings', userId] }),
   });
 
-  const handleSaveCutoff = () => {
-    const day = parseInt(cutoffInput);
-    if (!day || day < 1 || day > 31) return;
-    setCutoffDay(day);
-    saveCutoff.mutate(day);
-    setShowCutoff(false);
-    setActivePreset('cutoff');
+  const applyPreset = (key: Preset, cutoff?: number) => {
+    const day = cutoff ?? cutoffDay;
+    if (key === 'cutoff' && cutoff) { setCutoffDay(cutoff); setCutoffInput(String(cutoff)); }
+    setActivePreset(key);
+    const patch: Record<string, any> = { dashboard_preset: key };
+    if (key === 'cutoff' && cutoff) patch.cutoff_day = cutoff;
+    if (key === 'custom') {
+      patch.dashboard_custom_from = customFrom.toISOString();
+      patch.dashboard_custom_to   = customTo.toISOString();
+    }
+    saveSettings.mutate(patch);
   };
+
+  const applyCustomRange = (from: Date, to: Date) => {
+    setCustomFrom(from); setCustomTo(to);
+    setActivePreset('custom');
+    saveSettings.mutate({
+      dashboard_preset: 'custom',
+      dashboard_custom_from: from.toISOString(),
+      dashboard_custom_to:   to.toISOString(),
+    });
+  };
+
+  const { data: spaces = [] } = useQuery({
+    queryKey: ['spaces-list', userId],
+    queryFn: async () => {
+      const { data } = await supabase.from('spaces').select('id,name').eq('user_id', userId).order('name');
+      return data ?? [];
+    },
+    enabled: !!userId,
+  });
 
   const { data: recordings = [], isLoading } = useQuery({
     queryKey: ['dashboard-activities', userId],
@@ -199,14 +204,16 @@ export default function DashboardScreen() {
     ? ['income','savings','expense','payable','receivable']
     : ACTIVITY_TABS.filter(t => t.key !== 'all' && selectedTabs.has(t.key)).flatMap(t => t.types as string[]);
 
+  const isAllSpaces = selectedSpaces.has('all');
+
   const filtered = recordings.filter(r => {
     if (!currentTypes.includes(r.type)) return false;
+    if (!isAllSpaces && !selectedSpaces.has(r.space_id)) return false;
     const [y, m, d] = r.transaction_date.split('-').map(Number);
     const date = new Date(y, m - 1, d);
     if (date < range.from) return false;
     const to = new Date(range.to); to.setHours(23, 59, 59);
     if (date > to) return false;
-    // status filter (loans / receivables only)
     if (statusFilter === 'active'   && r.type === 'payable'    && r.status === 'paid')     return false;
     if (statusFilter === 'paid'     && r.type === 'payable'    && r.status !== 'paid')     return false;
     if (statusFilter === 'pending'  && r.type === 'receivable' && r.status === 'received') return false;
@@ -214,10 +221,27 @@ export default function DashboardScreen() {
     return true;
   });
 
+  const toggleSpace = (id: string) => {
+    setSelectedSpaces(prev => {
+      const next = new Set(prev);
+      if (id === 'all') return new Set(['all']);
+      next.delete('all');
+      if (next.has(id)) { next.delete(id); if (next.size === 0) return new Set(['all']); }
+      else next.add(id);
+      return next;
+    });
+    // persist after state settles
+    setTimeout(() => {
+      setSelectedSpaces(prev => {
+        const ids = [...prev].filter(x => x !== 'all');
+        saveSettings.mutate({ dashboard_space_ids: ids.join(',') });
+        return prev;
+      });
+    }, 0);
+  };
+
   const total = filtered.reduce((s, r) => s + Number(r.amount), 0);
   const activeTabData = ACTIVITY_TABS.find(t => t.key === (isAll ? 'all' : [...selectedTabs][0])) ?? ACTIVITY_TABS[0];
-
-  // ── summary stats per tab ──
   const allRecordings = (types: string[]) => recordings.filter(r => {
     if (!types.includes(r.type)) return false;
     const [y, m, d] = r.transaction_date.split('-').map(Number);
@@ -266,7 +290,7 @@ export default function DashboardScreen() {
       setCustomFrom(d); setCustomTo(d); setPickingDate('to');
     } else {
       if (d < customFrom) { setCustomFrom(d); setPickingDate('to'); }
-      else { setCustomTo(d); setShowPicker(false); setPickingDate('from'); }
+      else { applyCustomRange(customFrom, d); setPickingDate('from'); }
     }
   };
 
@@ -290,18 +314,15 @@ export default function DashboardScreen() {
     });
   };
 
-  const handlePreset = (key: Preset) => {
-    if (key === 'cutoff') {
-      setCutoffInput(String(cutoffDay));
-      setShowCutoff(true);
-      return;
-    }
+  const handlePresetSelect = (key: Preset) => {
     if (key === 'custom') {
-      const r = getRangeForPreset('this-month', cutoffDay);
-      setCustomFrom(r.from); setCustomTo(r.to);
-      setPickingDate('from'); setShowPicker(true);
+      if (activePreset !== 'custom') {
+        const r = getRangeForPreset('this-month', cutoffDay);
+        setCustomFrom(r.from); setCustomTo(r.to);
+      }
+      setPickingDate('from');
     }
-    setActivePreset(key);
+    applyPreset(key);
   };
 
   const typeLabel = (r: any) => {
@@ -329,41 +350,27 @@ export default function DashboardScreen() {
 
         {/* Header */}
         <View style={s.header}>
-          <View>
+          <View style={{ flex: 1 }}>
             <Text style={s.title}>Activities ✦</Text>
             <Text style={s.subtitle}>here's how you're doing</Text>
           </View>
-        </View>
-
-        {/* Preset chips */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.presetRow} style={s.presetScroll}>
-          {PRESETS.map(p => {
-            const isActive = p.key === activePreset;
-            return (
-              <TouchableOpacity key={p.key} style={[s.presetChip, isActive && s.presetChipActive]} onPress={() => handlePreset(p.key)} activeOpacity={0.75}>
-                {p.key === 'cutoff' && <Ionicons name="cut-outline" size={12} color={isActive ? P.textDark : P.secondary} />}
-                {p.key === 'custom' && <Ionicons name="calendar-outline" size={12} color={isActive ? P.textDark : P.secondary} />}
-                <Text style={[s.presetChipText, isActive && s.presetChipTextActive]}>{p.label}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-
-        {/* Range label */}
-        <View style={s.rangeLabelRow}>
-          <TouchableOpacity onPress={() => shiftRange(-1)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="chevron-back" size={16} color={P.secondary} />
-          </TouchableOpacity>
-          <Ionicons name="time-outline" size={11} color={P.muted} style={{ marginHorizontal: 4 }} />
-          <Text style={s.rangeLabel}>{rangeLabel}</Text>
-          {activePreset === 'custom' && (
-            <TouchableOpacity onPress={() => { setPickingDate('from'); setShowPicker(true); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Text style={s.rangeLabelEdit}>edit</Text>
+          {/* Date + Spaces buttons */}
+          <View style={s.filterBtns}>
+            <TouchableOpacity style={s.filterBtn} onPress={() => setShowDateModal(true)} activeOpacity={0.75}>
+              <Ionicons name="calendar-outline" size={13} color={P.yellow} />
+              <Text style={s.filterBtnText}>{rangeLabel}</Text>
             </TouchableOpacity>
-          )}
-          <TouchableOpacity onPress={() => shiftRange(1)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="chevron-forward" size={16} color={P.secondary} />
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={[s.filterBtn, !isAllSpaces && s.filterBtnActive]}
+              onPress={() => setShowSpaceModal(true)}
+              activeOpacity={0.75}
+            >
+              <Ionicons name="layers-outline" size={13} color={!isAllSpaces ? P.textDark : P.secondary} />
+              <Text style={[s.filterBtnText, !isAllSpaces && s.filterBtnTextActive]}>
+                {isAllSpaces ? 'All Spaces' : `${selectedSpaces.size} space${selectedSpaces.size > 1 ? 's' : ''}`}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Summary stats — always visible, context-aware */}
@@ -523,85 +530,126 @@ export default function DashboardScreen() {
         )}
       </View>
 
-      {/* ── Cutoff day modal ── */}
-      <ConfirmModal
-        visible={showCutoff}
-        onClose={() => setShowCutoff(false)}
-        title="billing cutoff day"
-        message="which day of the month does your billing cycle start?"
-        actions={[
-          { label: 'cancel', onPress: () => setShowCutoff(false), muted: true },
-          { label: 'save',   onPress: handleSaveCutoff, disabled: saveCutoff.isPending },
-        ]}
-      >
-        <View style={s.cutoffRow}>
-          {[1,5,10,15,20,25,28].map(d => (
-            <TouchableOpacity
-              key={d}
-              style={[s.cutoffChip, parseInt(cutoffInput) === d && s.cutoffChipActive]}
-              onPress={() => setCutoffInput(String(d))}
-            >
-              <Text style={[s.cutoffChipText, parseInt(cutoffInput) === d && s.cutoffChipTextActive]}>{d}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-        <View style={s.cutoffInputRow}>
-          <Text style={s.cutoffInputLabel}>or enter a day</Text>
-          <TextInput
-            style={s.cutoffInput}
-            value={cutoffInput}
-            onChangeText={v => setCutoffInput(v.replace(/[^0-9]/g, ''))}
-            keyboardType="number-pad"
-            maxLength={2}
-            placeholder="1–31"
-            placeholderTextColor={Colors.faint}
-          />
-        </View>
-      </ConfirmModal>
-
-      {/* ── Custom date picker modal ── */}
-      <ConfirmModal
-        visible={showPicker}
-        onClose={() => { setShowPicker(false); setPickingDate('from'); }}
-        title={pickingDate === 'from' ? 'start date' : 'end date'}
-        actions={[
-          { label: 'cancel', onPress: () => { setShowPicker(false); setPickingDate('from'); }, muted: true },
-          { label: 'done',   onPress: () => { setShowPicker(false); setPickingDate('from'); } },
-        ]}
-      >
-        <View style={s.pickerNav}>
-          <TouchableOpacity onPress={() => { if (pickerMonth === 0) { setPickerMonth(11); setPickerYear(y => y - 1); } else setPickerMonth(m => m - 1); }}>
-            <Ionicons name="chevron-back" size={18} color={Colors.text} />
-          </TouchableOpacity>
-          <Text style={s.pickerMonthText}>{MONTHS[pickerMonth].toLowerCase()} {pickerYear}</Text>
-          <TouchableOpacity onPress={() => { if (pickerMonth === 11) { setPickerMonth(0); setPickerYear(y => y + 1); } else setPickerMonth(m => m + 1); }}>
-            <Ionicons name="chevron-forward" size={18} color={Colors.text} />
-          </TouchableOpacity>
-        </View>
-        <Text style={s.pickerHint}>{pickingDate === 'from' ? 'tap to set start date' : 'tap to set end date'}</Text>
-        <View style={{ flexDirection: 'row', marginBottom: 6 }}>
-          {['su','mo','tu','we','th','fr','sa'].map(d => (
-            <Text key={d} style={s.calDay}>{d}</Text>
-          ))}
-        </View>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', width: '100%' }}>
-          {cells.map((day, i) => {
-            if (!day) return <View key={`e${i}`} style={s.calCell} />;
-            const inRange = isInRange(day);
-            const edge    = isEdge(day);
-            const today   = isSameDay(new Date(pickerYear, pickerMonth, day), new Date());
+      {/* ── Date modal ── */}
+      <BottomSheet visible={showDateModal} onClose={() => setShowDateModal(false)} title="date range">
+        {/* Preset options */}
+        <View style={s.modalPresetRow}>
+          {PRESETS.map(p => {
+            const active = p.key === activePreset;
             return (
               <TouchableOpacity
-                key={day}
-                style={[s.calCell, inRange && s.calCellRange, edge && s.calCellEdge, !inRange && !edge && today && s.calCellToday]}
-                onPress={() => handleDayPress(day)}
+                key={p.key}
+                style={[s.modalPresetChip, active && s.modalPresetChipActive]}
+                onPress={() => handlePresetSelect(p.key)}
+                activeOpacity={0.75}
               >
-                <Text style={[s.calCellText, (edge || today) && s.calCellTextActive]}>{day}</Text>
+                <Ionicons name={p.icon as any} size={13} color={active ? P.textDark : P.secondary} />
+                <Text style={[s.modalPresetText, active && s.modalPresetTextActive]}>{p.label}</Text>
               </TouchableOpacity>
             );
           })}
         </View>
-      </ConfirmModal>
+
+        {/* Cutoff day input — shown when cutoff selected */}
+        {activePreset === 'cutoff' && (
+          <View style={s.cutoffRow}>
+            <Text style={s.cutoffLabel}>billing cycle starts on day</Text>
+            <View style={s.cutoffChips}>
+              {[1,5,10,15,20,25,28].map(d => (
+                <TouchableOpacity
+                  key={d}
+                  style={[s.cutoffChip, parseInt(cutoffInput) === d && s.cutoffChipActive]}
+                  onPress={() => { setCutoffInput(String(d)); applyPreset('cutoff', d); }}
+                >
+                  <Text style={[s.cutoffChipText, parseInt(cutoffInput) === d && s.cutoffChipTextActive]}>{d}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <View style={s.cutoffInputRow}>
+              <Text style={s.cutoffInputLabel}>or type a day</Text>
+              <TextInput
+                style={s.cutoffInput}
+                value={cutoffInput}
+                onChangeText={v => setCutoffInput(v.replace(/[^0-9]/g, ''))}
+                onEndEditing={() => {
+                  const d = parseInt(cutoffInput);
+                  if (d >= 1 && d <= 31) applyPreset('cutoff', d);
+                }}
+                keyboardType="number-pad"
+                maxLength={2}
+                placeholder="1–31"
+                placeholderTextColor={Colors.faint}
+              />
+            </View>
+          </View>
+        )}
+
+        {/* Calendar — shown when custom selected */}
+        {activePreset === 'custom' && (
+          <View style={s.calWrap}>
+            <Text style={s.calHint}>
+              {pickingDate === 'from' ? 'tap start date' : 'tap end date'}
+            </Text>
+            <View style={s.pickerNav}>
+              <TouchableOpacity onPress={() => { if (pickerMonth === 0) { setPickerMonth(11); setPickerYear(y => y - 1); } else setPickerMonth(m => m - 1); }}>
+                <Ionicons name="chevron-back" size={18} color={P.text} />
+              </TouchableOpacity>
+              <Text style={s.pickerMonthText}>{MONTHS[pickerMonth].toLowerCase()} {pickerYear}</Text>
+              <TouchableOpacity onPress={() => { if (pickerMonth === 11) { setPickerMonth(0); setPickerYear(y => y + 1); } else setPickerMonth(m => m + 1); }}>
+                <Ionicons name="chevron-forward" size={18} color={P.text} />
+              </TouchableOpacity>
+            </View>
+            <View style={{ flexDirection: 'row', marginBottom: 6 }}>
+              {['su','mo','tu','we','th','fr','sa'].map(d => (
+                <Text key={d} style={s.calDay}>{d}</Text>
+              ))}
+            </View>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', width: '100%' }}>
+              {cells.map((day, i) => {
+                if (!day) return <View key={`e${i}`} style={s.calCell} />;
+                const inRange = isInRange(day);
+                const edge    = isEdge(day);
+                const today   = isSameDay(new Date(pickerYear, pickerMonth, day), new Date());
+                return (
+                  <TouchableOpacity
+                    key={day}
+                    style={[s.calCell, inRange && s.calCellRange, edge && s.calCellEdge, !inRange && !edge && today && s.calCellToday]}
+                    onPress={() => handleDayPress(day)}
+                  >
+                    <Text style={[s.calCellText, (edge || today) && s.calCellTextActive]}>{day}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        )}
+      </BottomSheet>
+
+      {/* ── Spaces modal ── */}
+      <BottomSheet visible={showSpaceModal} onClose={() => setShowSpaceModal(false)} title="filter by space">
+        <View style={s.spaceChips}>
+          <TouchableOpacity
+            style={[s.spaceChip, isAllSpaces && s.spaceChipActive]}
+            onPress={() => toggleSpace('all')}
+            activeOpacity={0.75}
+          >
+            <Text style={[s.spaceChipText, isAllSpaces && s.spaceChipTextActive]}>All</Text>
+          </TouchableOpacity>
+          {spaces.map((sp: any) => {
+            const active = selectedSpaces.has(sp.id);
+            return (
+              <TouchableOpacity
+                key={sp.id}
+                style={[s.spaceChip, active && s.spaceChipActive]}
+                onPress={() => toggleSpace(sp.id)}
+                activeOpacity={0.75}
+              >
+                <Text style={[s.spaceChipText, active && s.spaceChipTextActive]}>{sp.name}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </BottomSheet>
 
     </SafeAreaView>
   );
@@ -609,35 +657,24 @@ export default function DashboardScreen() {
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: P.bg },
-
-  // Dark top
   darkTop: { backgroundColor: P.bg, paddingBottom: 0 },
 
   // Header
-  header:   { paddingHorizontal: 24, paddingTop: 28, paddingBottom: 8 },
+  header:   { paddingHorizontal: 24, paddingTop: 28, paddingBottom: 14, flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   title:    { fontFamily: FBK, fontSize: 26, color: P.text, letterSpacing: -0.5 },
   subtitle: { fontFamily: I,   fontSize: 12, color: P.secondary, marginTop: 3, lineHeight: 18 },
 
-  // Preset chips
-  presetScroll: { flexGrow: 0, flexShrink: 0 },
-  presetRow:    { paddingHorizontal: 24, gap: 8, paddingBottom: 0 },
-  presetChip: {
+  // Date + Spaces filter buttons
+  filterBtns: { gap: 6, alignItems: 'flex-end', paddingTop: 4 },
+  filterBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
-    paddingHorizontal: 14, paddingVertical: 7,
-    borderRadius: Radius.pill,
     backgroundColor: P.card,
+    paddingHorizontal: 10, paddingVertical: 6,
+    borderRadius: Radius.pill,
   },
-  presetChipActive:     { backgroundColor: P.yellow },
-  presetChipText:       { fontFamily: IM, fontSize: 11, color: P.secondary },
-  presetChipTextActive: { color: P.textDark, fontFamily: IS },
-
-  // Range label
-  rangeLabelRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingHorizontal: 24, marginTop: 10, marginBottom: 12,
-  },
-  rangeLabel:     { fontFamily: IM, fontSize: 11, color: '#8A8D9F', flex: 1, letterSpacing: 0.2 },
-  rangeLabelEdit: { fontFamily: IS, fontSize: 11, color: P.yellow },
+  filterBtnActive:     { backgroundColor: P.yellow },
+  filterBtnText:       { fontFamily: IM, fontSize: 11, color: P.secondary },
+  filterBtnTextActive: { fontFamily: IS, fontSize: 11, color: P.textDark },
 
   // Stats row
   statsRow: {
@@ -694,14 +731,23 @@ const s = StyleSheet.create({
   statusChipText:       { fontFamily: IS, fontSize: 13, color: P.secondary },
   statusChipTextActive: { color: '#fff' },
 
-  // Cutoff modal
-  cutoffRow:            { flexDirection: 'row', flexWrap: 'wrap', gap: 8, width: '100%', marginBottom: 12 },
-  cutoffChip:           { paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: P.card },
+  // Date modal — preset chips
+  modalPresetRow:        { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 },
+  modalPresetChip:       { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: P.card },
+  modalPresetChipActive: { backgroundColor: P.yellow },
+  modalPresetText:       { fontFamily: IM, fontSize: 12, color: P.secondary },
+  modalPresetTextActive: { fontFamily: IS, fontSize: 12, color: P.textDark },
+
+  // Cutoff
+  cutoffRow:       { marginBottom: 16, width: '100%' },
+  cutoffLabel:     { fontFamily: IM, fontSize: 12, color: P.secondary, marginBottom: 10 },
+  cutoffChips:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
+  cutoffChip:      { paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: P.card },
   cutoffChipActive:     { backgroundColor: P.green },
   cutoffChipText:       { fontFamily: IM, fontSize: 12, color: P.secondary },
   cutoffChipTextActive: { color: '#fff' },
-  cutoffInputRow:       { flexDirection: 'row', alignItems: 'center', gap: 10, width: '100%' },
-  cutoffInputLabel:     { fontFamily: I, fontSize: 12, color: P.secondary, flex: 1 },
+  cutoffInputRow:   { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  cutoffInputLabel: { fontFamily: I, fontSize: 12, color: P.secondary, flex: 1 },
   cutoffInput: {
     backgroundColor: P.card, borderRadius: Radius.sm,
     paddingHorizontal: 12, paddingVertical: 8,
@@ -710,12 +756,13 @@ const s = StyleSheet.create({
   },
 
   // Calendar
+  calWrap:    { width: '100%' },
+  calHint:    { fontFamily: I, fontSize: 11, color: P.yellow, marginBottom: 10 },
   pickerNav: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     width: '100%', paddingHorizontal: 4, marginBottom: 10,
   },
   pickerMonthText:   { fontFamily: FB, fontSize: 15, color: P.text },
-  pickerHint:        { fontFamily: I,  fontSize: 10, color: P.yellow, marginBottom: 8 },
   calDay:            { flex: 1, textAlign: 'center', fontFamily: I, fontSize: 10, color: P.muted },
   calCell:           { width: '14.28%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center', borderRadius: Radius.pill },
   calCellRange:      { backgroundColor: P.yellow + '22', borderRadius: 0 },
@@ -723,4 +770,11 @@ const s = StyleSheet.create({
   calCellToday:      { backgroundColor: P.card },
   calCellText:       { fontFamily: I,  fontSize: 13, color: P.text },
   calCellTextActive: { fontFamily: IS, color: P.textDark },
+
+  // Spaces modal
+  spaceChips:        { flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingBottom: 16 },
+  spaceChip:         { paddingHorizontal: 16, paddingVertical: 10, borderRadius: Radius.pill, backgroundColor: P.card },
+  spaceChipActive:   { backgroundColor: P.yellow },
+  spaceChipText:     { fontFamily: IM, fontSize: 13, color: P.secondary },
+  spaceChipTextActive: { fontFamily: IS, fontSize: 13, color: P.textDark },
 });
