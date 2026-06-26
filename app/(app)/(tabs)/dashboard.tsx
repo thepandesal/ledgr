@@ -378,8 +378,7 @@ export default function DashboardScreen() {
         {/* Header card */}
         <View style={s.headerCard}>
           <View style={{ flex: 1 }}>
-            <Text style={s.title}>Activities ✦</Text>
-            <Text style={s.subtitle}>here's how you're doing</Text>
+            <Text style={s.title}>Activities</Text>
           </View>
           {/* Date + Spaces buttons */}
           <View style={s.filterBtns}>
@@ -779,9 +778,8 @@ const s = StyleSheet.create({
 
   // Stats + tabs dark floating card
   statsCard: {
-    backgroundColor: P.cardDark,
-    borderRadius: 28,
-    paddingTop: 24, paddingBottom: 20,
+    backgroundColor: 'transparent',
+    paddingTop: 8, paddingBottom: 4,
     marginBottom: 8,
   },
 
@@ -789,15 +787,12 @@ const s = StyleSheet.create({
   filterBtns: { gap: 6, alignItems: 'flex-end', paddingTop: 4 },
   filterBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
-    backgroundColor: P.card,
-    paddingHorizontal: 14, paddingVertical: 8,
+    paddingHorizontal: 10, paddingVertical: 6,
     borderRadius: Radius.pill,
-    borderWidth: 1,
-    borderColor: P.border,
   },
-  filterBtnActive:     { backgroundColor: P.teal },
-  filterBtnText:       { fontFamily: IM, fontSize: 11, color: P.secondary },
-  filterBtnTextActive: { fontFamily: IS, fontSize: 11, color: P.textDark },
+  filterBtnActive:     { backgroundColor: 'transparent' },
+  filterBtnText:       { fontFamily: IM, fontSize: 11, color: P.text },
+  filterBtnTextActive: { fontFamily: IS, fontSize: 11, color: P.teal },
 
   // Stats row
   statsRow: {
