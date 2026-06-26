@@ -11,10 +11,12 @@ import ConfirmModal from '@/components/ui/ConfirmModal';
 import { Colors, Fonts, Radius, Spacing } from '@/components/ui/theme';
 import { useRouter } from 'expo-router';
 
-const I  = 'Inter_400Regular';
-const IM = 'Inter_500Medium';
-const IS = 'Inter_600SemiBold';
-const IB = 'Inter_700Bold';
+const I   = 'Inter_400Regular';
+const IM  = 'Inter_500Medium';
+const IS  = 'Inter_600SemiBold';
+const IB  = 'Inter_700Bold';
+const FB  = 'Fraunces_700Bold';
+const FBK = 'Fraunces_900Black';
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
@@ -424,40 +426,24 @@ export default function DashboardScreen() {
         </View>
       )}
 
-      {/* ── Activity tab nav 3-2 grid ── */}
-      <View style={s.tabGrid}>
-        <View style={s.tabRow}>
-          {ACTIVITY_TABS.slice(0, 3).map(tab => {
-            const isActive = selectedTabs.has(tab.key);
-            return (
-              <TouchableOpacity
-                key={tab.key}
-                style={[s.tabChip, isActive && { backgroundColor: tab.color, borderColor: tab.color }]}
-                onPress={() => handleTabToggle(tab.key)}
-                activeOpacity={0.75}
-              >
-                <Ionicons name={tab.icon as any} size={12} color={isActive ? '#fff' : P.secondary} />
-                <Text style={[s.tabChipText, isActive && s.tabChipTextActive]}>{tab.label}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-        <View style={[s.tabRow, { justifyContent: 'center' }]}>
-          {ACTIVITY_TABS.slice(3).map(tab => {
-            const isActive = selectedTabs.has(tab.key);
-            return (
-              <TouchableOpacity
-                key={tab.key}
-                style={[s.tabChip, { flex: 0, minWidth: '40%' }, isActive && { backgroundColor: tab.color, borderColor: tab.color }]}
-                onPress={() => handleTabToggle(tab.key)}
-                activeOpacity={0.75}
-              >
-                <Ionicons name={tab.icon as any} size={12} color={isActive ? '#fff' : P.secondary} />
-                <Text style={[s.tabChipText, isActive && s.tabChipTextActive]}>{tab.label}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+      {/* ── Activity tab circles ── */}
+      <View style={s.tabCircleRow}>
+        {ACTIVITY_TABS.map(tab => {
+          const isActive = selectedTabs.has(tab.key);
+          return (
+            <TouchableOpacity
+              key={tab.key}
+              style={s.tabCircleWrap}
+              onPress={() => handleTabToggle(tab.key)}
+              activeOpacity={0.75}
+            >
+              <View style={[s.tabCircle, isActive && { backgroundColor: tab.color, borderColor: tab.color }]}>
+                <Ionicons name={tab.icon as any} size={20} color={isActive ? '#fff' : P.secondary} />
+              </View>
+              <Text style={[s.tabCircleLabel, isActive && { color: tab.color, fontFamily: IS }]}>{tab.label}</Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
       {/* ── Divider ── */}
@@ -614,8 +600,8 @@ const s = StyleSheet.create({
 
   // Header
   header: { paddingHorizontal: Spacing.page, paddingTop: 32, paddingBottom: 20 },
-  title:    { fontFamily: IB, fontSize: 30, color: P.text, letterSpacing: -0.8 },
-  subtitle: { fontFamily: I,  fontSize: 12, color: P.secondary, marginTop: 4, letterSpacing: 0.2 },
+  title:    { fontFamily: FBK, fontSize: 34, color: P.text, letterSpacing: -1 },
+  subtitle: { fontFamily: I,   fontSize: 12, color: P.secondary, marginTop: 4, letterSpacing: 0.2 },
 
   // Preset chips
   presetScroll: { flexGrow: 0, flexShrink: 0 },
@@ -651,30 +637,30 @@ const s = StyleSheet.create({
   },
   summaryTop: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   summaryIcon: { width: 42, height: 42, borderRadius: Radius.lg, justifyContent: 'center', alignItems: 'center' },
-  summaryTabLabel: { fontFamily: IS, fontSize: 13, color: P.text },
-  summaryEntries:  { fontFamily: I,  fontSize: 11, color: P.secondary, marginTop: 2 },
-  summaryTotal:    { fontFamily: IB, fontSize: 24, letterSpacing: -0.5 },
+  summaryTabLabel: { fontFamily: FB,  fontSize: 15, color: P.text },
+  summaryEntries:  { fontFamily: I,   fontSize: 11, color: P.secondary, marginTop: 2 },
+  summaryTotal:    { fontFamily: FBK, fontSize: 26, letterSpacing: -1 },
   summaryStatRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 2 },
   summaryStatLabel: { fontFamily: IM, fontSize: 12, color: P.secondary },
-  summaryStatValue: { fontFamily: IB, fontSize: 17 },
+  summaryStatValue: { fontFamily: FB, fontSize: 18 },
   summaryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
   summaryGridItem: { flex: 1, minWidth: '45%', borderLeftWidth: 3, paddingLeft: 10, gap: 3 },
   summaryGridLabel: { fontFamily: IM, fontSize: 11, color: P.muted },
-  summaryGridValue: { fontFamily: IB, fontSize: 15 },
+  summaryGridValue: { fontFamily: FB, fontSize: 16 },
   summaryGridSub:   { fontFamily: IM, fontSize: 11 },
 
-  // Activity tabs 3-2 grid
-  tabGrid: { paddingHorizontal: Spacing.page, gap: 8, marginBottom: 6 },
-  tabRow:  { flexDirection: 'row', gap: 8 },
-  tabChip: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-    paddingHorizontal: 12, paddingVertical: 10,
-    borderRadius: Radius.lg, borderWidth: 1,
-    borderColor: P.border, backgroundColor: P.card,
-    shadowColor: '#8B7355', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 1,
+  tabCircleRow: {
+    flexDirection: 'row', justifyContent: 'space-between',
+    paddingHorizontal: Spacing.page, marginBottom: 6,
   },
-  tabChipText:       { fontFamily: IM, fontSize: 12, color: P.secondary },
-  tabChipTextActive: { color: '#fff', fontFamily: IS },
+  tabCircleWrap: { alignItems: 'center', gap: 6 },
+  tabCircle: {
+    width: 52, height: 52, borderRadius: 26,
+    borderWidth: 1.5, borderColor: P.border,
+    backgroundColor: P.card, justifyContent: 'center', alignItems: 'center',
+    shadowColor: '#8B7355', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 3, elevation: 1,
+  },
+  tabCircleLabel: { fontFamily: IM, fontSize: 9, color: P.muted, textAlign: 'center' },
 
   // Divider
   divider: { height: 1, backgroundColor: P.border, marginHorizontal: Spacing.page, marginTop: 18, marginBottom: 6 },
@@ -699,10 +685,10 @@ const s = StyleSheet.create({
   rowIconWrap: { width: 40, height: 40, borderRadius: Radius.lg, justifyContent: 'center', alignItems: 'center' },
   rowMid:      { flex: 1, gap: 2 },
   rowCategory: { fontFamily: IM, fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5 },
-  rowName:     { fontFamily: IB, fontSize: 13, color: P.text },
+  rowName:     { fontFamily: FB, fontSize: 13, color: P.text },
   rowSpace:    { fontFamily: I,  fontSize: 11, color: P.muted },
   rowRight:    { alignItems: 'flex-end', gap: 4 },
-  rowAmount:   { fontFamily: IB, fontSize: 15 },
+  rowAmount:   { fontFamily: FB, fontSize: 15 },
 
   // Status filter chips (loans / receivables)
   statusFilterRow:      { flexDirection: 'row', gap: 8 },
