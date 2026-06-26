@@ -159,7 +159,24 @@ export default function DashboardScreen() {
   const total = filtered.reduce((s, r) => s + Number(r.amount), 0);
   const activeTabData = ACTIVITY_TABS.find(t => t.key === activeTab)!;
 
-  // ── date label under preset chips ──
+  // ── summary stats per tab ──
+  const allRecordings = (types: string[]) => recordings.filter(r => {
+    if (!types.includes(r.type)) return false;
+    const [y, m, d] = r.transaction_date.split('-').map(Number);
+    const date = new Date(y, m - 1, d);
+    if (date < range.from) return false;
+    const to = new Date(range.to); to.setHours(23, 59, 59);
+    return date <= to;
+  });
+
+  const moneyInTotal    = allRecordings(['income','savings']).reduce((s, r) => s + Number(r.amount), 0);
+  const moneyOutTotal   = allRecordings(['expense']).reduce((s, r) => s + Number(r.amount), 0);
+  const loansActive     = allRecordings(['payable']).filter(r => r.status !== 'paid').length;
+  const loansPaid       = allRecordings(['payable']).filter(r => r.status === 'paid').length;
+  const receivablesPending  = allRecordings(['receivable']).filter(r => r.status !== 'received').length;
+  const receivablesReceived = allRecordings(['receivable']).filter(r => r.status === 'received').length;
+
+  const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2 });
   const fmtShort = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   const fmtFull  = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   const rangeLabel = isSameDay(range.from, range.to)
@@ -272,20 +289,81 @@ export default function DashboardScreen() {
       </View>
 
       {/* ── Summary card ── */}
-      <View style={[s.summaryCard, { borderLeftColor: activeTabData.color }]}>
-        <View style={s.summaryTop}>
-          <View style={[s.summaryIcon, { backgroundColor: activeTabData.color + '18' }]}>
-            <Ionicons name={activeTabData.icon as any} size={18} color={activeTabData.color} />
+      {activeTab === 'all' ? (
+        <View style={s.summaryCard}>
+          <View style={s.summaryGrid}>
+            <View style={[s.summaryGridItem, { borderLeftColor: Colors.income }]}>
+              <Text style={s.summaryGridLabel}>Money In</Text>
+              <Text style={[s.summaryGridValue, { color: Colors.income }]}>{fmt(moneyInTotal)}</Text>
+            </View>
+            <View style={[s.summaryGridItem, { borderLeftColor: Colors.expense }]}>
+              <Text style={s.summaryGridLabel}>Money Out</Text>
+              <Text style={[s.summaryGridValue, { color: Colors.expense }]}>{fmt(moneyOutTotal)}</Text>
+            </View>
+            <View style={[s.summaryGridItem, { borderLeftColor: Colors.pending }]}>
+              <Text style={s.summaryGridLabel}>Loans</Text>
+              <Text style={[s.summaryGridValue, { color: Colors.pending }]}>{loansActive} active</Text>
+              <Text style={[s.summaryGridSub, { color: Colors.income }]}>{loansPaid} paid</Text>
+            </View>
+            <View style={[s.summaryGridItem, { borderLeftColor: Colors.paid }]}>
+              <Text style={s.summaryGridLabel}>Receivables</Text>
+              <Text style={[s.summaryGridValue, { color: Colors.pending }]}>{receivablesPending} pending</Text>
+              <Text style={[s.summaryGridSub, { color: Colors.income }]}>{receivablesReceived} received</Text>
+            </View>
           </View>
-          <View style={{ flex: 1 }}>
-            <Text style={s.summaryTabLabel}>{activeTabData.label}</Text>
-            <Text style={s.summaryEntries}>{filtered.length} {filtered.length === 1 ? 'entry' : 'entries'}</Text>
-          </View>
-          <Text style={[s.summaryTotal, { color: activeTabData.color }]}>
-            {total.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-          </Text>
         </View>
-      </View>
+      ) : activeTab === 'loans' ? (
+        <View style={[s.summaryCard, { borderLeftColor: Colors.pending }]}>
+          <View style={s.summaryTop}>
+            <View style={[s.summaryIcon, { backgroundColor: Colors.pending + '18' }]}>
+              <Ionicons name="cash-outline" size={18} color={Colors.pending} />
+            </View>
+            <View style={{ flex: 1, gap: 4 }}>
+              <View style={s.summaryStatRow}>
+                <Text style={s.summaryStatLabel}>active loans</Text>
+                <Text style={[s.summaryStatValue, { color: Colors.pending }]}>{loansActive}</Text>
+              </View>
+              <View style={s.summaryStatRow}>
+                <Text style={s.summaryStatLabel}>paid loans</Text>
+                <Text style={[s.summaryStatValue, { color: Colors.income }]}>{loansPaid}</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+      ) : activeTab === 'receivables' ? (
+        <View style={[s.summaryCard, { borderLeftColor: Colors.paid }]}>
+          <View style={s.summaryTop}>
+            <View style={[s.summaryIcon, { backgroundColor: Colors.paid + '18' }]}>
+              <Ionicons name="arrow-undo-outline" size={18} color={Colors.paid} />
+            </View>
+            <View style={{ flex: 1, gap: 4 }}>
+              <View style={s.summaryStatRow}>
+                <Text style={s.summaryStatLabel}>pending</Text>
+                <Text style={[s.summaryStatValue, { color: Colors.pending }]}>{receivablesPending}</Text>
+              </View>
+              <View style={s.summaryStatRow}>
+                <Text style={s.summaryStatLabel}>received</Text>
+                <Text style={[s.summaryStatValue, { color: Colors.income }]}>{receivablesReceived}</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+      ) : (
+        <View style={[s.summaryCard, { borderLeftColor: activeTabData.color }]}>
+          <View style={s.summaryTop}>
+            <View style={[s.summaryIcon, { backgroundColor: activeTabData.color + '18' }]}>
+              <Ionicons name={activeTabData.icon as any} size={18} color={activeTabData.color} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={s.summaryTabLabel}>{activeTabData.label}</Text>
+              <Text style={s.summaryEntries}>{filtered.length} {filtered.length === 1 ? 'entry' : 'entries'}</Text>
+            </View>
+            <Text style={[s.summaryTotal, { color: activeTabData.color }]}>
+              {fmt(filtered.reduce((s, r) => s + Number(r.amount), 0))}
+            </Text>
+          </View>
+        </View>
+      )}
 
       {/* ── Activity tab nav ── */}
       <ScrollView
@@ -511,6 +589,18 @@ const s = StyleSheet.create({
   summaryTabLabel: { fontFamily: IS, fontSize: 13, color: Colors.text },
   summaryEntries:  { fontFamily: IM,  fontSize: 11, color: Colors.text, marginTop: 2 },
   summaryTotal:    { fontFamily: IB, fontSize: 22, letterSpacing: -0.5 },
+  summaryStatRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  summaryStatLabel: { fontFamily: IM, fontSize: 12, color: Colors.muted },
+  summaryStatValue: { fontFamily: IB, fontSize: 16 },
+  // All tab grid
+  summaryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  summaryGridItem: {
+    flex: 1, minWidth: '45%',
+    borderLeftWidth: 3, paddingLeft: 10, gap: 2,
+  },
+  summaryGridLabel: { fontFamily: IM, fontSize: 11, color: Colors.muted },
+  summaryGridValue: { fontFamily: IB, fontSize: 14 },
+  summaryGridSub:   { fontFamily: IM, fontSize: 11 },
 
   // Activity tabs
   tabScroll: { flexGrow: 0, flexShrink: 0 },
