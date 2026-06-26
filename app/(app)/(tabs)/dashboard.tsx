@@ -563,7 +563,7 @@ export default function DashboardScreen() {
             <Text style={s.emptyText}>no {activeTabData.label.toLowerCase()} found{`\n`}for this period</Text>
           </View>
         ) : (
-          <ScrollView contentContainerStyle={s.list} showsVerticalScrollIndicator={false}>
+          <ScrollView key={filtered.map(i => i.id).join()} contentContainerStyle={s.list} showsVerticalScrollIndicator={false}>
             {filtered.map((item, idx) => {
               const prevDate = filtered[idx - 1]?.transaction_date;
               const showDate = item.transaction_date !== prevDate;
@@ -585,7 +585,7 @@ export default function DashboardScreen() {
                       <Text style={s.rowName} numberOfLines={1}>{item.name}</Text>
                       <Text style={s.rowCategory}>{tl?.label ?? activeTabData.label}{item.space?.name ? ` · ${item.space.name}` : ''}</Text>
                     </View>
-                    <Text style={s.rowAmount}>
+                    <Text style={[s.rowAmount, { color: tl?.color ?? P.tealDark }]}>
                       {Number(item.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </Text>
                   </TouchableOpacity>
@@ -810,7 +810,7 @@ const s = StyleSheet.create({
   rowMid:      { flex: 1, gap: 4 },
   rowName:     { fontFamily: FB,  fontSize: 14, color: P.text, letterSpacing: 0.1, lineHeight: 20 },
   rowCategory: { fontFamily: I,   fontSize: 11, color: P.secondary, letterSpacing: 0.2 },
-  rowAmount:   { fontFamily: FBK, fontSize: 15, color: P.tealDark, letterSpacing: -0.4 },
+  rowAmount:   { fontFamily: FBK, fontSize: 15, letterSpacing: -0.4 },
 
   modalPresetRow:        { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 },
   modalPresetChip:       { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: P.bg },

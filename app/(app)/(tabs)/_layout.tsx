@@ -169,20 +169,19 @@ export default function TabsLayout() {
         </>
       )}
 
-      {/* Floating nav pill */}
-      <View style={s.navFloatWrap} pointerEvents="box-none">
-        <View style={s.navPill}>
-          {MAIN_TABS.map(tab => {
-            const isActive = tab.key === 'others' ? isOthersActive : activeTab === tab.key;
-            return (
-              <TouchableOpacity key={tab.key} style={s.navItem} onPress={() => handleNavPress(tab.key)} activeOpacity={0.7}>
-                <View style={[s.navIconWrap, isActive && s.navIconWrapActive]}>
-                  <Ionicons name={tab.icon as any} size={20} color={isActive ? '#FFFFFF' : '#9A9DB0'} />
-                </View>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+      {/* Bottom nav bar */}
+      <View style={s.navBar}>
+        {MAIN_TABS.map(tab => {
+          const isActive = tab.key === 'others' ? isOthersActive : activeTab === tab.key;
+          return (
+            <TouchableOpacity key={tab.key} style={s.navItem} onPress={() => handleNavPress(tab.key)} activeOpacity={0.7}>
+              <View style={[s.navIconWrap, isActive && s.navIconWrapActive]}>
+                <Ionicons name={tab.icon as any} size={20} color={isActive ? '#FFFFFF' : '#9A9DB0'} />
+              </View>
+              <Text style={[s.navLabel, isActive && s.navLabelActive]}>{tab.label}</Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
     </View>
   );
@@ -221,37 +220,28 @@ const s = StyleSheet.create({
   content: { flex: 1, position: 'relative' },
   screen: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#F7F8FA' },
 
-  navFloatWrap: {
-    position: 'absolute',
-    bottom: 28,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    zIndex: 50,
-  },
-  navPill: {
+  navBar: {
     flexDirection: 'row',
     backgroundColor: '#FFFFFF',
-    borderRadius: 50,
-    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#ECECEC',
+    paddingTop: 10,
+    paddingBottom: 16,
     paddingHorizontal: 8,
-    gap: 4,
-    borderWidth: 1,
-    borderColor: '#ECECEC',
   },
-  navItem: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
+  navItem: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 4 },
   navIconWrap: {
-    width: 44, height: 44, borderRadius: 22,
+    width: 40, height: 40, borderRadius: 20,
     alignItems: 'center', justifyContent: 'center',
   },
-  navIconWrapActive: {
-    backgroundColor: '#4ECDC4',
-  },
+  navIconWrapActive: { backgroundColor: '#4ECDC4' },
+  navLabel: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 10, color: '#9A9DB0', letterSpacing: 0.2 },
+  navLabelActive: { fontFamily: 'PlusJakartaSans_600SemiBold', color: '#4ECDC4' },
 
   // Bubble
   bubbleWrap: {
     position: 'absolute',
-    bottom: 100,
+    bottom: 80,
     left: 20,
     right: 20,
     borderRadius: 20,
