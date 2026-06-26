@@ -11,12 +11,12 @@ import BottomSheet from '@/components/ui/BottomSheet';
 import { Colors, Radius } from '@/components/ui/theme';
 import { useRouter } from 'expo-router';
 
-const I   = 'PlusJakartaSans_400Regular';
-const IM  = 'PlusJakartaSans_500Medium';
-const IS  = 'PlusJakartaSans_600SemiBold';
-const IB  = 'PlusJakartaSans_700Bold';
-const FB  = 'PlusJakartaSans_600SemiBold';
-const FBK = 'PlusJakartaSans_700Bold';
+const I   = 'Inter_400Regular';
+const IM  = 'Inter_500Medium';
+const IS  = 'Inter_600SemiBold';
+const IB  = 'Inter_700Bold';
+const FB  = 'Inter_600SemiBold';
+const FBK = 'Inter_700Bold';
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 

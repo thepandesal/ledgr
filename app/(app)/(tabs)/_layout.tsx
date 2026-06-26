@@ -294,6 +294,6 @@ const s = StyleSheet.create({
     alignItems: 'center',
   },
   bubbleIconWrapActive: { backgroundColor: '#D1E6E0' },
-  bubbleItemLabel: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 14, color: Colors.text },
+  bubbleItemLabel: { fontFamily: 'Inter_500Medium', fontSize: 14, color: Colors.text },
   bubbleItemLabelActive: { color: '#1A1A1A' },
 });
