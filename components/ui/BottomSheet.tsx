@@ -23,7 +23,6 @@ import {
   View, Text, StyleSheet, TouchableOpacity, Modal,
   ScrollView, KeyboardAvoidingView, Platform,
 } from 'react-native';
-import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import formStyles from './formStyles';
 
@@ -42,28 +41,20 @@ export default function BottomSheet({ visible, onClose, sub, title, children }: 
         style={[s.flex, s.justify]}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill} />
+        {/* Transparent dismiss area — no blur, no overlay tint */}
+        <TouchableOpacity style={s.flex} activeOpacity={1} onPress={onClose} />
 
-        {/* Tap outside to dismiss */}
-        <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
-
-        {/* Sheet — matches AddItemModal exactly */}
+        {/* Sheet */}
         <View style={formStyles.sheet}>
-          {/* Header */}
           <View style={formStyles.header}>
             <View>
               {sub ? <Text style={formStyles.headerSub}>{sub}</Text> : null}
               <Text style={formStyles.headerTitle}>{title}</Text>
             </View>
-            <TouchableOpacity
-              onPress={onClose}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
+            <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <Ionicons name="close" size={20} color="#929090" />
             </TouchableOpacity>
           </View>
-
-          {/* Scrollable content */}
           <ScrollView
             style={s.flex}
             showsVerticalScrollIndicator={false}

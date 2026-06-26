@@ -171,7 +171,6 @@ export default function TabsLayout() {
 
       {/* Nav pill */}
       <SafeAreaView style={s.navSafeArea}>
-        <View style={s.navGap} />
         <View style={s.navPill}>
           {MAIN_TABS.map(tab => {
             const isActive = tab.key === 'others' ? isOthersActive : activeTab === tab.key;
@@ -183,7 +182,6 @@ export default function TabsLayout() {
             );
           })}
         </View>
-        <View style={s.navGap} />
       </SafeAreaView>
     </View>
   );
@@ -222,16 +220,13 @@ const s = StyleSheet.create({
   content: { flex: 1, position: 'relative' },
   screen: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#1C2632' },
   navSafeArea: { backgroundColor: '#151E29' },
-  navGap: { height: 8 },
   navPill: {
     flexDirection: 'row',
     backgroundColor: '#151E29',
-    marginHorizontal: 0,
-    borderRadius: 0,
     paddingVertical: 6,
     paddingHorizontal: 4,
-    borderTopWidth: 1,
-    borderTopColor: '#232F3E',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#2A3748',
   },
   navItem: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 3, paddingVertical: 4 },
   navLabel: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 10, color: '#6B6F80', letterSpacing: 0.1 },
