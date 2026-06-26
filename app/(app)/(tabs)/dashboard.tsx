@@ -18,12 +18,34 @@ const IB = 'Inter_700Bold';
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
+// ── Warm luxury palette ──────────────────────────────────────────────────────
+const P = {
+  bg:         '#FAF8F4',
+  card:       '#FFFFFF',
+  surface:    '#F5F1EA',
+  border:     '#E8E2D9',
+  borderMid:  '#DDD6CA',
+  text:       '#1C1C1A',
+  secondary:  '#7A7468',
+  muted:      '#B0A99E',
+  green:      '#3D7A5F',
+  greenLight: '#EBF4EF',
+  orange:     '#C4713A',
+  orangeLight:'#FAF0E8',
+  red:        '#B94040',
+  redLight:   '#FAEDEB',
+  gold:       '#A07830',
+  goldLight:  '#FAF3E0',
+  blue:       '#3A6080',
+  blueLight:  '#EBF2F8',
+} as const;
+
 const ACTIVITY_TABS = [
-  { key: 'all',         label: 'All',         icon: 'apps-outline',              types: ['income','savings','expense','payable','receivable'], color: Colors.text },
-  { key: 'money-in',    label: 'Money In',    icon: 'arrow-down-circle-outline', types: ['income','savings'], color: Colors.income },
-  { key: 'money-out',   label: 'Money Out',   icon: 'arrow-up-circle-outline',   types: ['expense'],         color: Colors.expense },
-  { key: 'loans',       label: 'Loans',       icon: 'cash-outline',              types: ['payable'],         color: Colors.pending },
-  { key: 'receivables', label: 'Receivables', icon: 'arrow-undo-outline',        types: ['receivable'],      color: Colors.paid },
+  { key: 'all',         label: 'All',         icon: 'apps-outline',              types: ['income','savings','expense','payable','receivable'], color: P.text,   bg: P.surface    },
+  { key: 'money-in',    label: 'Money In',    icon: 'arrow-down-circle-outline', types: ['income','savings'], color: P.green,  bg: P.greenLight  },
+  { key: 'money-out',   label: 'Money Out',   icon: 'arrow-up-circle-outline',   types: ['expense'],         color: P.orange, bg: P.orangeLight },
+  { key: 'loans',       label: 'Loans',       icon: 'cash-outline',              types: ['payable'],         color: P.gold,   bg: P.goldLight   },
+  { key: 'receivables', label: 'Receivables', icon: 'arrow-undo-outline',        types: ['receivable'],      color: P.blue,   bg: P.blueLight   },
 ] as const;
 
 type ActivityTab = typeof ACTIVITY_TABS[number]['key'];
@@ -244,19 +266,19 @@ export default function DashboardScreen() {
   };
 
   const typeLabel = (r: any) => {
-    if (r.type === 'income')     return { label: 'money in',         color: Colors.income };
-    if (r.type === 'savings')    return { label: 'savings',          color: Colors.income };
-    if (r.type === 'expense')    return { label: 'money out',        color: Colors.expense };
+    if (r.type === 'income')     return { label: 'money in',                color: P.green  };
+    if (r.type === 'savings')    return { label: 'savings',                 color: P.green  };
+    if (r.type === 'expense')    return { label: 'money out',               color: P.orange };
     if (r.type === 'payable')    return r.status === 'paid'
-      ? { label: 'loan · paid',    color: Colors.income }
+      ? { label: 'loan · paid',    color: P.green  }
       : r.status === 'partial'
-      ? { label: 'loan · partial', color: Colors.cyan }
-      : { label: 'loan',           color: Colors.pending };
+      ? { label: 'loan · partial', color: P.gold   }
+      : { label: 'loan',           color: P.gold   };
     if (r.type === 'receivable') return r.status === 'received'
-      ? { label: 'receivable · received', color: Colors.income }
+      ? { label: 'receivable · received', color: P.green }
       : r.status === 'partial'
-      ? { label: 'receivable · partial',  color: Colors.cyan }
-      : { label: 'receivable',            color: Colors.pending };
+      ? { label: 'receivable · partial',  color: P.gold  }
+      : { label: 'receivable',            color: P.blue  };
     return null;
   };
 
@@ -288,10 +310,10 @@ export default function DashboardScreen() {
               activeOpacity={0.75}
             >
               {p.key === 'cutoff' && (
-                <Ionicons name="cut-outline" size={12} color={isActive ? Colors.white : Colors.muted} />
+                <Ionicons name="cut-outline" size={12} color={isActive ? '#fff' : P.secondary} />
               )}
               {p.key === 'custom' && (
-                <Ionicons name="calendar-outline" size={12} color={isActive ? Colors.white : Colors.muted} />
+                <Ionicons name="calendar-outline" size={12} color={isActive ? '#fff' : P.secondary} />
               )}
               <Text style={[s.presetChipText, isActive && s.presetChipTextActive]}>{p.label}</Text>
             </TouchableOpacity>
@@ -301,7 +323,7 @@ export default function DashboardScreen() {
 
       {/* ── Range label ── */}
       <View style={s.rangeLabelRow}>
-        <Ionicons name="time-outline" size={11} color={Colors.faint} />
+        <Ionicons name="time-outline" size={11} color={P.muted} />
         <Text style={s.rangeLabel}>{rangeLabel}</Text>
         {activePreset === 'custom' && (
           <TouchableOpacity onPress={() => { setPickingDate('from'); setShowPicker(true); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -314,58 +336,58 @@ export default function DashboardScreen() {
       {isAll ? (
         <View style={s.summaryCard}>
           <View style={s.summaryGrid}>
-            <View style={[s.summaryGridItem, { borderLeftColor: Colors.income }]}>
+            <View style={[s.summaryGridItem, { borderLeftColor: P.green }]}>
               <Text style={s.summaryGridLabel}>Money In</Text>
-              <Text style={[s.summaryGridValue, { color: Colors.income }]}>{fmt(moneyInTotal)}</Text>
+              <Text style={[s.summaryGridValue, { color: P.green }]}>{fmt(moneyInTotal)}</Text>
             </View>
-            <View style={[s.summaryGridItem, { borderLeftColor: Colors.expense }]}>
+            <View style={[s.summaryGridItem, { borderLeftColor: P.orange }]}>
               <Text style={s.summaryGridLabel}>Money Out</Text>
-              <Text style={[s.summaryGridValue, { color: Colors.expense }]}>{fmt(moneyOutTotal)}</Text>
+              <Text style={[s.summaryGridValue, { color: P.orange }]}>{fmt(moneyOutTotal)}</Text>
             </View>
-            <View style={[s.summaryGridItem, { borderLeftColor: Colors.pending }]}>
+            <View style={[s.summaryGridItem, { borderLeftColor: P.gold }]}>
               <Text style={s.summaryGridLabel}>Loans</Text>
-              <Text style={[s.summaryGridValue, { color: Colors.pending }]}>{loansActive} active</Text>
-              <Text style={[s.summaryGridSub, { color: Colors.income }]}>{loansPaid} paid</Text>
+              <Text style={[s.summaryGridValue, { color: P.gold }]}>{loansActive} active</Text>
+              <Text style={[s.summaryGridSub, { color: P.green }]}>{loansPaid} paid</Text>
             </View>
-            <View style={[s.summaryGridItem, { borderLeftColor: Colors.paid }]}>
+            <View style={[s.summaryGridItem, { borderLeftColor: P.blue }]}>
               <Text style={s.summaryGridLabel}>Receivables</Text>
-              <Text style={[s.summaryGridValue, { color: Colors.pending }]}>{receivablesPending} pending</Text>
-              <Text style={[s.summaryGridSub, { color: Colors.income }]}>{receivablesReceived} received</Text>
+              <Text style={[s.summaryGridValue, { color: P.blue }]}>{receivablesPending} pending</Text>
+              <Text style={[s.summaryGridSub, { color: P.green }]}>{receivablesReceived} received</Text>
             </View>
           </View>
         </View>
       ) : selectedTabs.has('loans') && selectedTabs.size === 1 ? (
-        <View style={[s.summaryCard, { borderLeftColor: Colors.pending }]}>
+        <View style={[s.summaryCard, { borderLeftColor: P.gold }]}>
           <View style={s.summaryTop}>
-            <View style={[s.summaryIcon, { backgroundColor: Colors.pending + '18' }]}>
-              <Ionicons name="cash-outline" size={18} color={Colors.pending} />
+            <View style={[s.summaryIcon, { backgroundColor: P.goldLight }]}>
+              <Ionicons name="cash-outline" size={18} color={P.gold} />
             </View>
             <View style={{ flex: 1, gap: 4 }}>
               <View style={s.summaryStatRow}>
                 <Text style={s.summaryStatLabel}>active loans</Text>
-                <Text style={[s.summaryStatValue, { color: Colors.pending }]}>{loansActive}</Text>
+                <Text style={[s.summaryStatValue, { color: P.gold }]}>{loansActive}</Text>
               </View>
               <View style={s.summaryStatRow}>
                 <Text style={s.summaryStatLabel}>paid loans</Text>
-                <Text style={[s.summaryStatValue, { color: Colors.income }]}>{loansPaid}</Text>
+                <Text style={[s.summaryStatValue, { color: P.green }]}>{loansPaid}</Text>
               </View>
             </View>
           </View>
         </View>
       ) : selectedTabs.has('receivables') && selectedTabs.size === 1 ? (
-        <View style={[s.summaryCard, { borderLeftColor: Colors.paid }]}>
+        <View style={[s.summaryCard, { borderLeftColor: P.blue }]}>
           <View style={s.summaryTop}>
-            <View style={[s.summaryIcon, { backgroundColor: Colors.paid + '18' }]}>
-              <Ionicons name="arrow-undo-outline" size={18} color={Colors.paid} />
+            <View style={[s.summaryIcon, { backgroundColor: P.blueLight }]}>
+              <Ionicons name="arrow-undo-outline" size={18} color={P.blue} />
             </View>
             <View style={{ flex: 1, gap: 4 }}>
               <View style={s.summaryStatRow}>
                 <Text style={s.summaryStatLabel}>pending</Text>
-                <Text style={[s.summaryStatValue, { color: Colors.pending }]}>{receivablesPending}</Text>
+                <Text style={[s.summaryStatValue, { color: P.gold }]}>{receivablesPending}</Text>
               </View>
               <View style={s.summaryStatRow}>
                 <Text style={s.summaryStatLabel}>received</Text>
-                <Text style={[s.summaryStatValue, { color: Colors.income }]}>{receivablesReceived}</Text>
+                <Text style={[s.summaryStatValue, { color: P.green }]}>{receivablesReceived}</Text>
               </View>
             </View>
           </View>
@@ -373,7 +395,7 @@ export default function DashboardScreen() {
       ) : (
         <View style={[s.summaryCard, { borderLeftColor: activeTabData.color }]}>
           <View style={s.summaryTop}>
-            <View style={[s.summaryIcon, { backgroundColor: activeTabData.color + '18' }]}>
+            <View style={[s.summaryIcon, { backgroundColor: activeTabData.bg }]}>
               <Ionicons name={activeTabData.icon as any} size={18} color={activeTabData.color} />
             </View>
             <View style={{ flex: 1 }}>
@@ -387,39 +409,52 @@ export default function DashboardScreen() {
         </View>
       )}
 
-      {/* ── Activity tab nav ── */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={s.tabRow}
-        style={s.tabScroll}
-      >
-        {ACTIVITY_TABS.map(tab => {
-          const isActive = selectedTabs.has(tab.key);
-          return (
-            <TouchableOpacity
-              key={tab.key}
-              style={[s.tabChip, isActive && { backgroundColor: tab.color, borderColor: tab.color }]}
-              onPress={() => handleTabToggle(tab.key)}
-              activeOpacity={0.75}
-            >
-              <Ionicons name={tab.icon as any} size={12} color={isActive ? '#fff' : Colors.text} />
-              <Text style={[s.tabChipText, isActive && s.tabChipTextActive]}>{tab.label}</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
+      {/* ── Activity tab nav 3-2 grid ── */}
+      <View style={s.tabGrid}>
+        <View style={s.tabRow}>
+          {ACTIVITY_TABS.slice(0, 3).map(tab => {
+            const isActive = selectedTabs.has(tab.key);
+            return (
+              <TouchableOpacity
+                key={tab.key}
+                style={[s.tabChip, isActive && { backgroundColor: tab.color, borderColor: tab.color }]}
+                onPress={() => handleTabToggle(tab.key)}
+                activeOpacity={0.75}
+              >
+                <Ionicons name={tab.icon as any} size={12} color={isActive ? '#fff' : P.secondary} />
+                <Text style={[s.tabChipText, isActive && s.tabChipTextActive]}>{tab.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+        <View style={[s.tabRow, { justifyContent: 'center' }]}>
+          {ACTIVITY_TABS.slice(3).map(tab => {
+            const isActive = selectedTabs.has(tab.key);
+            return (
+              <TouchableOpacity
+                key={tab.key}
+                style={[s.tabChip, { flex: 0, minWidth: '40%' }, isActive && { backgroundColor: tab.color, borderColor: tab.color }]}
+                onPress={() => handleTabToggle(tab.key)}
+                activeOpacity={0.75}
+              >
+                <Ionicons name={tab.icon as any} size={12} color={isActive ? '#fff' : P.secondary} />
+                <Text style={[s.tabChipText, isActive && s.tabChipTextActive]}>{tab.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </View>
 
       {/* ── Divider ── */}
       <View style={s.divider} />
 
       {/* ── List ── */}
       {isLoading ? (
-        <ActivityIndicator color={Colors.cyan} style={{ marginTop: 48 }} />
+        <ActivityIndicator color={P.orange} style={{ marginTop: 48 }} />
       ) : filtered.length === 0 ? (
         <View style={s.emptyWrap}>
           <View style={s.emptyIconWrap}>
-            <Ionicons name={activeTabData.icon as any} size={28} color={Colors.faint} />
+            <Ionicons name={activeTabData.icon as any} size={28} color={P.muted} />
           </View>
           <Text style={s.emptyTitle}>nothing here</Text>
           <Text style={s.emptyText}>no {activeTabData.label.toLowerCase()} found{'\n'}for this period</Text>
@@ -446,7 +481,7 @@ export default function DashboardScreen() {
                   activeOpacity={0.7}
                   onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: item.id } } as any)}
                 >
-                  <View style={[s.rowIconWrap, { backgroundColor: (tl?.color ?? activeTabData.color) + '12' }]}>
+                  <View style={[s.rowIconWrap, { backgroundColor: tl ? tl.color + '15' : P.surface }]}>
                     <Ionicons
                       name={(item.categories?.icon ?? activeTabData.icon) as any}
                       size={15}
@@ -560,126 +595,117 @@ export default function DashboardScreen() {
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.white },
+  container: { flex: 1, backgroundColor: P.bg },
 
   // Header
-  header: {
-    paddingHorizontal: Spacing.page,
-    paddingTop: 28,
-    paddingBottom: 20,
-  },
-  title:    { fontFamily: IB, fontSize: 28, color: Colors.text, letterSpacing: -0.6 },
-  subtitle: { fontFamily: I,  fontSize: 12, color: Colors.text, marginTop: 3 },
+  header: { paddingHorizontal: Spacing.page, paddingTop: 32, paddingBottom: 20 },
+  title:    { fontFamily: IB, fontSize: 30, color: P.text, letterSpacing: -0.8 },
+  subtitle: { fontFamily: I,  fontSize: 12, color: P.secondary, marginTop: 4, letterSpacing: 0.2 },
 
   // Preset chips
   presetScroll: { flexGrow: 0, flexShrink: 0 },
   presetRow: { paddingHorizontal: Spacing.page, gap: 8, paddingBottom: 2 },
   presetChip: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
-    paddingHorizontal: 14, paddingVertical: 8,
+    paddingHorizontal: 14, paddingVertical: 9,
     borderRadius: Radius.pill, borderWidth: 1,
-    borderColor: Colors.borderMid, backgroundColor: Colors.surface,
+    borderColor: P.border, backgroundColor: P.card,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 2, elevation: 1,
   },
-  presetChipActive: { backgroundColor: Colors.text, borderColor: Colors.text },
-  presetChipText: { fontFamily: IM, fontSize: 12, color: Colors.text },
-  presetChipTextActive: { color: Colors.white },
+  presetChipActive: { backgroundColor: P.text, borderColor: P.text },
+  presetChipText:       { fontFamily: IM, fontSize: 12, color: P.secondary },
+  presetChipTextActive: { color: '#fff' },
 
   // Range label
   rangeLabelRow: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
-    paddingHorizontal: Spacing.page, marginTop: 10, marginBottom: 16,
+    paddingHorizontal: Spacing.page, marginTop: 10, marginBottom: 18,
   },
-  rangeLabel:     { fontFamily: I, fontSize: 11, color: Colors.muted, flex: 1 },
-  rangeLabelEdit: { fontFamily: IM, fontSize: 11, color: Colors.cyan },
+  rangeLabel:     { fontFamily: I, fontSize: 11, color: P.muted, flex: 1, letterSpacing: 0.1 },
+  rangeLabelEdit: { fontFamily: IS, fontSize: 11, color: P.orange },
 
   // Summary card
   summaryCard: {
-    marginHorizontal: Spacing.page,
-    marginBottom: 18,
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.lg,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    marginHorizontal: Spacing.page, marginBottom: 20,
+    backgroundColor: P.card,
+    borderRadius: Radius.xl,
+    borderWidth: 1, borderColor: P.border,
     borderLeftWidth: 4,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingHorizontal: 18, paddingVertical: 16,
+    shadowColor: '#8B7355', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 8, elevation: 2,
   },
-  summaryTop: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  summaryIcon: { width: 38, height: 38, borderRadius: Radius.md, justifyContent: 'center', alignItems: 'center' },
-  summaryTabLabel: { fontFamily: IS, fontSize: 13, color: Colors.text },
-  summaryEntries:  { fontFamily: IM,  fontSize: 11, color: Colors.text, marginTop: 2 },
-  summaryTotal:    { fontFamily: IB, fontSize: 22, letterSpacing: -0.5 },
-  summaryStatRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  summaryStatLabel: { fontFamily: IM, fontSize: 12, color: Colors.muted },
-  summaryStatValue: { fontFamily: IB, fontSize: 16 },
-  // All tab grid
-  summaryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  summaryGridItem: {
-    flex: 1, minWidth: '45%',
-    borderLeftWidth: 3, paddingLeft: 10, gap: 2,
-  },
-  summaryGridLabel: { fontFamily: IM, fontSize: 11, color: Colors.muted },
-  summaryGridValue: { fontFamily: IB, fontSize: 14 },
+  summaryTop: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  summaryIcon: { width: 42, height: 42, borderRadius: Radius.lg, justifyContent: 'center', alignItems: 'center' },
+  summaryTabLabel: { fontFamily: IS, fontSize: 13, color: P.text },
+  summaryEntries:  { fontFamily: I,  fontSize: 11, color: P.secondary, marginTop: 2 },
+  summaryTotal:    { fontFamily: IB, fontSize: 24, letterSpacing: -0.5 },
+  summaryStatRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 2 },
+  summaryStatLabel: { fontFamily: IM, fontSize: 12, color: P.secondary },
+  summaryStatValue: { fontFamily: IB, fontSize: 17 },
+  summaryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
+  summaryGridItem: { flex: 1, minWidth: '45%', borderLeftWidth: 3, paddingLeft: 10, gap: 3 },
+  summaryGridLabel: { fontFamily: IM, fontSize: 11, color: P.muted },
+  summaryGridValue: { fontFamily: IB, fontSize: 15 },
   summaryGridSub:   { fontFamily: IM, fontSize: 11 },
 
-  // Activity tabs
-  tabScroll: { flexGrow: 0, flexShrink: 0 },
-  tabRow: { paddingHorizontal: Spacing.page, gap: 8, paddingVertical: 2 },
+  // Activity tabs 3-2 grid
+  tabGrid: { paddingHorizontal: Spacing.page, gap: 8, marginBottom: 6 },
+  tabRow:  { flexDirection: 'row', gap: 8 },
   tabChip: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    paddingHorizontal: 14, paddingVertical: 8,
-    borderRadius: Radius.pill, borderWidth: 1,
-    borderColor: Colors.borderMid, backgroundColor: Colors.surface,
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    paddingHorizontal: 12, paddingVertical: 10,
+    borderRadius: Radius.lg, borderWidth: 1,
+    borderColor: P.border, backgroundColor: P.card,
+    shadowColor: '#8B7355', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 1,
   },
-  tabChipText:       { fontFamily: IM, fontSize: 12, color: Colors.text },
-  tabChipTextActive: { color: '#fff' },
+  tabChipText:       { fontFamily: IM, fontSize: 12, color: P.secondary },
+  tabChipTextActive: { color: '#fff', fontFamily: IS },
 
   // Divider
-  divider: { height: 1, backgroundColor: Colors.border, marginHorizontal: Spacing.page, marginTop: 16, marginBottom: 4 },
+  divider: { height: 1, backgroundColor: P.border, marginHorizontal: Spacing.page, marginTop: 18, marginBottom: 6 },
 
   // Empty state
-  emptyWrap:     { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 8, paddingBottom: 80 },
-  emptyIconWrap: { width: 56, height: 56, borderRadius: Radius.xl, backgroundColor: Colors.surface, justifyContent: 'center', alignItems: 'center', marginBottom: 4 },
-  emptyTitle:    { fontFamily: IS, fontSize: 14, color: Colors.text },
-  emptyText:     { fontFamily: I,  fontSize: 12, color: Colors.muted, textAlign: 'center', lineHeight: 18 },
+  emptyWrap:     { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 10, paddingBottom: 80 },
+  emptyIconWrap: { width: 60, height: 60, borderRadius: Radius.xl, backgroundColor: P.surface, justifyContent: 'center', alignItems: 'center', marginBottom: 4 },
+  emptyTitle:    { fontFamily: IS, fontSize: 14, color: P.text },
+  emptyText:     { fontFamily: I,  fontSize: 12, color: P.secondary, textAlign: 'center', lineHeight: 19 },
 
   // List
   list: { paddingHorizontal: Spacing.page, paddingTop: 8 },
-
-  dateHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 20, marginBottom: 8 },
-  dateHeaderText: { fontFamily: IS, fontSize: 11, color: Colors.text, letterSpacing: 0.2 },
-  dateHeaderLine: { flex: 1, height: 1, backgroundColor: Colors.border },
+  dateHeaderRow:  { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 22, marginBottom: 10 },
+  dateHeaderText: { fontFamily: IS, fontSize: 11, color: P.muted, letterSpacing: 0.5, textTransform: 'uppercase' },
+  dateHeaderLine: { flex: 1, height: 1, backgroundColor: P.border },
 
   row: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    paddingVertical: 11,
-    borderBottomWidth: 1, borderBottomColor: Colors.border,
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    paddingVertical: 13,
+    borderBottomWidth: 1, borderBottomColor: P.border,
   },
-  rowIconWrap: { width: 38, height: 38, borderRadius: Radius.md, justifyContent: 'center', alignItems: 'center' },
-  rowMid:     { flex: 1, gap: 1 },
-  rowCategory: { fontFamily: IM, fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.4 },
-  rowName:     { fontFamily: IB, fontSize: 13, color: Colors.text },
-  rowSpace:    { fontFamily: IM, fontSize: 11, color: Colors.muted },
-  rowRight: { alignItems: 'flex-end', gap: 4 },
-  rowAmount: { fontFamily: IB, fontSize: 14 },
+  rowIconWrap: { width: 40, height: 40, borderRadius: Radius.lg, justifyContent: 'center', alignItems: 'center' },
+  rowMid:      { flex: 1, gap: 2 },
+  rowCategory: { fontFamily: IM, fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5 },
+  rowName:     { fontFamily: IB, fontSize: 13, color: P.text },
+  rowSpace:    { fontFamily: I,  fontSize: 11, color: P.muted },
+  rowRight:    { alignItems: 'flex-end', gap: 4 },
+  rowAmount:   { fontFamily: IB, fontSize: 15 },
 
   // Cutoff modal
   cutoffRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, width: '100%', marginBottom: 12 },
   cutoffChip: {
     paddingHorizontal: 14, paddingVertical: 8,
     borderRadius: Radius.pill, borderWidth: 1,
-    borderColor: Colors.borderMid, backgroundColor: Colors.surface,
+    borderColor: P.border, backgroundColor: P.surface,
   },
-  cutoffChipActive:     { backgroundColor: Colors.cyan, borderColor: Colors.cyan },
-  cutoffChipText:       { fontFamily: IM, fontSize: 12, color: Colors.text },
-  cutoffChipTextActive: { color: Colors.white },
-  cutoffInputRow:  { flexDirection: 'row', alignItems: 'center', gap: 10, width: '100%' },
-  cutoffInputLabel: { fontFamily: IM, fontSize: 12, color: Colors.text, flex: 1 },
+  cutoffChipActive:     { backgroundColor: P.green, borderColor: P.green },
+  cutoffChipText:       { fontFamily: IM, fontSize: 12, color: P.secondary },
+  cutoffChipTextActive: { color: '#fff' },
+  cutoffInputRow:   { flexDirection: 'row', alignItems: 'center', gap: 10, width: '100%' },
+  cutoffInputLabel: { fontFamily: IM, fontSize: 12, color: P.secondary, flex: 1 },
   cutoffInput: {
-    backgroundColor: Colors.input, borderRadius: Radius.sm,
-    borderWidth: 1, borderColor: Colors.border,
+    backgroundColor: P.surface, borderRadius: Radius.sm,
+    borderWidth: 1, borderColor: P.border,
     paddingHorizontal: 12, paddingVertical: 8,
-    fontFamily: IB, fontSize: 16, color: Colors.text,
+    fontFamily: IB, fontSize: 16, color: P.text,
     width: 70, textAlign: 'center',
   },
 
@@ -688,13 +714,13 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     width: '100%', paddingHorizontal: 4, marginBottom: 10,
   },
-  pickerMonthText: { fontFamily: IS, fontSize: 14, color: Colors.text },
-  pickerHint:      { fontFamily: I,  fontSize: 10, color: Colors.cyan, marginBottom: 8 },
-  calDay:     { flex: 1, textAlign: 'center', fontFamily: IM, fontSize: 10, color: Colors.faint },
-  calCell:    { width: '14.28%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center', borderRadius: Radius.pill },
-  calCellRange: { backgroundColor: Colors.cyan + '22', borderRadius: 0 },
-  calCellEdge:  { backgroundColor: Colors.cyan },
-  calCellToday: { backgroundColor: Colors.border },
-  calCellText:  { fontFamily: I,  fontSize: 13, color: Colors.text },
-  calCellTextActive: { fontFamily: IS, color: Colors.white },
+  pickerMonthText: { fontFamily: IS, fontSize: 14, color: P.text },
+  pickerHint:      { fontFamily: I,  fontSize: 10, color: P.orange, marginBottom: 8 },
+  calDay:       { flex: 1, textAlign: 'center', fontFamily: IM, fontSize: 10, color: P.muted },
+  calCell:      { width: '14.28%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center', borderRadius: Radius.pill },
+  calCellRange: { backgroundColor: P.orange + '22', borderRadius: 0 },
+  calCellEdge:  { backgroundColor: P.orange },
+  calCellToday: { backgroundColor: P.surface },
+  calCellText:  { fontFamily: I,  fontSize: 13, color: P.text },
+  calCellTextActive: { fontFamily: IS, color: '#fff' },
 });
