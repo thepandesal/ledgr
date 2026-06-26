@@ -437,7 +437,7 @@ export default function DashboardScreen() {
             return (
               <TouchableOpacity key={tab.key} style={s.tabWrap} onPress={() => handleTabToggle(tab.key)} activeOpacity={0.75}>
                 <View style={[s.tabCircle, { backgroundColor: isActive ? tab.color : P.card }]}>
-                  <Ionicons name={tab.icon as any} size={20} color={isActive ? (tab.color === P.yellow ? P.textDark : '#fff') : P.secondary} />
+                  <Ionicons name={tab.icon as any} size={16} color={isActive ? (tab.color === P.yellow ? P.textDark : '#fff') : P.secondary} />
                 </View>
               </TouchableOpacity>
             );
@@ -583,62 +583,62 @@ const s = StyleSheet.create({
   darkTop: { backgroundColor: P.bg, paddingBottom: 0 },
 
   // Header
-  header:   { paddingHorizontal: Spacing.page, paddingTop: 36, paddingBottom: 8 },
-  title:    { fontFamily: FBK, fontSize: 34, color: P.text, letterSpacing: -0.5 },
-  subtitle: { fontFamily: I,   fontSize: 12, color: P.secondary, marginTop: 2 },
+  header:   { paddingHorizontal: Spacing.page, paddingTop: 20, paddingBottom: 4 },
+  title:    { fontFamily: FBK, fontSize: 24, color: P.text, letterSpacing: -0.5 },
+  subtitle: { fontFamily: I,   fontSize: 11, color: P.secondary, marginTop: 1 },
 
   // Preset chips
   presetScroll: { flexGrow: 0, flexShrink: 0 },
-  presetRow:    { paddingHorizontal: Spacing.page, gap: 8, paddingBottom: 2 },
+  presetRow:    { paddingHorizontal: Spacing.page, gap: 6, paddingBottom: 0 },
   presetChip: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    paddingHorizontal: 14, paddingVertical: 8,
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 10, paddingVertical: 5,
     borderRadius: Radius.pill,
     backgroundColor: P.card,
   },
   presetChipActive:     { backgroundColor: P.yellow },
-  presetChipText:       { fontFamily: IM, fontSize: 12, color: P.secondary },
+  presetChipText:       { fontFamily: IM, fontSize: 11, color: P.secondary },
   presetChipTextActive: { color: P.textDark, fontFamily: IS },
 
   // Range label
   rangeLabelRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    paddingHorizontal: Spacing.page, marginTop: 10, marginBottom: 16,
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: Spacing.page, marginTop: 6, marginBottom: 8,
   },
-  rangeLabel:     { fontFamily: I,  fontSize: 11, color: P.muted, flex: 1 },
-  rangeLabelEdit: { fontFamily: IS, fontSize: 11, color: P.yellow },
+  rangeLabel:     { fontFamily: I,  fontSize: 10, color: P.muted, flex: 1 },
+  rangeLabelEdit: { fontFamily: IS, fontSize: 10, color: P.yellow },
 
   // Yellow summary card
   yellowCard: {
-    marginHorizontal: Spacing.page, marginBottom: 20,
+    marginHorizontal: Spacing.page, marginBottom: 8,
     backgroundColor: P.yellow,
-    borderRadius: 24,
-    paddingHorizontal: 20, paddingVertical: 16,
+    borderRadius: 16,
+    paddingHorizontal: 14, paddingVertical: 10,
   },
   yellowGrid:      { flexDirection: 'row', flexWrap: 'wrap' },
-  yellowGridItem:   { width: '50%', paddingVertical: 10, paddingRight: 8, gap: 2 },
-  yellowCardLabel:  { fontFamily: I,   fontSize: 11, color: '#000000' },
-  yellowCardValue:  { fontFamily: FBK, fontSize: 20, color: P.textDark, letterSpacing: -0.5 },
-  yellowCardSub:    { fontFamily: I,   fontSize: 11, color: P.yellowDark },
+  yellowGridItem:   { width: '50%', paddingVertical: 5, paddingRight: 8, gap: 1 },
+  yellowCardLabel:  { fontFamily: I,   fontSize: 10, color: '#000000' },
+  yellowCardValue:  { fontFamily: FBK, fontSize: 15, color: P.textDark, letterSpacing: -0.3 },
+  yellowCardSub:    { fontFamily: I,   fontSize: 10, color: P.yellowDark },
 
   // Focused summary card (non-all tabs)
   focusCard: {
-    marginHorizontal: Spacing.page, marginBottom: 20,
+    marginHorizontal: Spacing.page, marginBottom: 8,
     backgroundColor: P.card,
-    borderRadius: 24,
-    paddingHorizontal: 20, paddingVertical: 16,
-    flexDirection: 'row', alignItems: 'center', gap: 14,
+    borderRadius: 16,
+    paddingHorizontal: 14, paddingVertical: 10,
+    flexDirection: 'row', alignItems: 'center', gap: 10,
   },
-  focusIcon:    { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center' },
-  focusLabel:   { fontFamily: IS,  fontSize: 14, color: P.text },
-  focusEntries: { fontFamily: I,   fontSize: 11, color: P.secondary, marginTop: 2 },
-  focusTotal:   { fontFamily: FBK, fontSize: 26, letterSpacing: -1 },
+  focusIcon:    { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
+  focusLabel:   { fontFamily: IS,  fontSize: 13, color: P.text },
+  focusEntries: { fontFamily: I,   fontSize: 10, color: P.secondary, marginTop: 1 },
+  focusTotal:   { fontFamily: FBK, fontSize: 20, letterSpacing: -0.5 },
 
   // Tab filter row
-  tabRow:  { flexDirection: 'row', justifyContent: 'space-around', paddingHorizontal: Spacing.page, paddingBottom: 20 },
+  tabRow:  { flexDirection: 'row', justifyContent: 'space-around', paddingHorizontal: Spacing.page, paddingBottom: 10, paddingTop: 4 },
   tabWrap: { alignItems: 'center' },
   tabCircle: {
-    width: 52, height: 52, borderRadius: 26,
+    width: 38, height: 38, borderRadius: 19,
     justifyContent: 'center', alignItems: 'center',
   },
 
