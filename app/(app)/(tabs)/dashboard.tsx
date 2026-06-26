@@ -123,7 +123,7 @@ export default function DashboardScreen() {
     queryFn: async () => {
       const { data } = await supabase
         .from('user_settings')
-        .select('cutoff_day, dashboard_preset, dashboard_custom_from, dashboard_custom_to, dashboard_space_ids, dashboard_tab_ids')
+        .select('cutoff_day, dashboard_preset, dashboard_custom_from, dashboard_custom_to, dashboard_space_ids, dashboard_tab_ids, dashboard_range_offset')
         .eq('user_id', userId)
         .maybeSingle();
       if (!data) return data;
@@ -139,6 +139,7 @@ export default function DashboardScreen() {
         const tabs = (data.dashboard_tab_ids as string).split(',').filter(Boolean);
         setSelectedTabs(new Set(tabs.length ? tabs as ActivityTab[] : ['all']));
       }
+      if (data.dashboard_range_offset != null) setRangeOffset(Number(data.dashboard_range_offset));
       return data;
     },
     enabled: !!userId,
@@ -158,6 +159,7 @@ export default function DashboardScreen() {
     const day = cutoff ?? cutoffDay;
     if (key === 'cutoff' && cutoff) { setCutoffDay(cutoff); setCutoffInput(String(cutoff)); }
     setRangeOffset(0);
+    saveSettings.mutate({ dashboard_range_offset: 0 });
     setActivePreset(key);
     const patch: Record<string, any> = { dashboard_preset: key };
     if (key === 'cutoff' && cutoff) patch.cutoff_day = cutoff;
@@ -175,7 +177,11 @@ export default function DashboardScreen() {
       const newTo   = new Date(customTo);   newTo.setDate(newTo.getDate()   + dir * days);
       applyCustomRange(newFrom, newTo);
     } else {
-      setRangeOffset(o => o + dir);
+      setRangeOffset(o => {
+        const next = o + dir;
+        saveSettings.mutate({ dashboard_range_offset: next });
+        return next;
+      });
     }
   };
 
