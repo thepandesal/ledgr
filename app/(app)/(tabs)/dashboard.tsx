@@ -377,10 +377,18 @@ export default function DashboardScreen() {
           </View>
           {/* Date + Spaces buttons */}
           <View style={s.filterBtns}>
-            <TouchableOpacity style={s.filterBtn} onPress={() => setShowDateModal(true)} activeOpacity={0.75}>
-              <Ionicons name="calendar-outline" size={13} color={P.tealDark} />
-              <Text style={s.filterBtnText}>{rangeLabel}</Text>
-            </TouchableOpacity>
+            <View style={s.dateNavRow}>
+              <TouchableOpacity style={s.dateNavArrow} onPress={() => navigateRange(-1)} activeOpacity={0.7}>
+                <Ionicons name="chevron-back" size={14} color={P.tealDark} />
+              </TouchableOpacity>
+              <TouchableOpacity style={s.filterBtn} onPress={() => setShowDateModal(true)} activeOpacity={0.75}>
+                <Ionicons name="calendar-outline" size={13} color={P.tealDark} />
+                <Text style={s.filterBtnText}>{rangeLabel}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.dateNavArrow} onPress={() => navigateRange(1)} activeOpacity={0.7}>
+                <Ionicons name="chevron-forward" size={14} color={P.tealDark} />
+              </TouchableOpacity>
+            </View>
             <TouchableOpacity
               style={[s.filterBtn, !isAllSpaces && s.filterBtnActive]}
               onPress={() => setShowSpaceModal(true)}
@@ -626,17 +634,6 @@ export default function DashboardScreen() {
 
       {/* ── Date modal ── */}
       <BottomSheet visible={showDateModal} onClose={() => setShowDateModal(false)} title="date range">
-        <View style={s.rangeNavRow}>
-          <TouchableOpacity style={s.rangeNavBtn} onPress={() => navigateRange(-1)} activeOpacity={0.7}>
-            <Ionicons name="chevron-back" size={16} color={P.tealDark} />
-            <Text style={s.rangeNavText}>prev</Text>
-          </TouchableOpacity>
-          <Text style={s.rangeNavCurrent}>{rangeLabel}</Text>
-          <TouchableOpacity style={s.rangeNavBtn} onPress={() => navigateRange(1)} activeOpacity={0.7}>
-            <Text style={s.rangeNavText}>next</Text>
-            <Ionicons name="chevron-forward" size={16} color={P.tealDark} />
-          </TouchableOpacity>
-        </View>
         {/* Preset options */}
         <View style={s.modalPresetRow}>
           {PRESETS.map(p => {
@@ -898,10 +895,8 @@ const s = StyleSheet.create({
   statusChip:           { flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: Radius.lg, backgroundColor: P.bg },
   statusChipText:       { fontFamily: IS, fontSize: 13, color: P.secondary },
   statusChipTextActive: { color: P.text },
-  rangeNavRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, paddingHorizontal: 4 },
-  rangeNavBtn:     { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 6, paddingHorizontal: 10, borderRadius: 20, backgroundColor: P.tealLight },
-  rangeNavText:    { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 12, color: P.tealDark },
-  rangeNavCurrent: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, color: P.text, flex: 1, textAlign: 'center' },
+  dateNavRow:   { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  dateNavArrow: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: P.tealLight },
 });
 
 
