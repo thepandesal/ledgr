@@ -177,7 +177,7 @@ export default function TabsLayout() {
             const isActive = tab.key === 'others' ? isOthersActive : activeTab === tab.key;
             return (
               <TouchableOpacity key={tab.key} style={s.navItem} onPress={() => handleNavPress(tab.key)} activeOpacity={0.7}>
-                <Ionicons name={tab.icon as any} size={20} color={isActive ? '#00CEC9' : '#5A5D70'} />
+                <Ionicons name={tab.icon as any} size={22} color={isActive ? '#F5A623' : '#8A8D9F'} />
                 <Text style={[s.navLabel, isActive && s.navLabelActive]}>{tab.label}</Text>
               </TouchableOpacity>
             );
@@ -225,20 +225,20 @@ const s = StyleSheet.create({
   navGap: { height: 16 },
   navPill: {
     flexDirection: 'row',
-    backgroundColor: '#243041',
-    marginHorizontal: 20,
-    borderRadius: 24,
-    paddingVertical: 10,
-    paddingHorizontal: 8,
+    backgroundColor: '#1E2A38',
+    marginHorizontal: 16,
+    borderRadius: 28,
+    paddingVertical: 12,
+    paddingHorizontal: 6,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.30,
+    shadowRadius: 16,
+    elevation: 10,
   },
-  navItem: { flex: 1, alignItems: 'center', gap: 4 },
-  navLabel: { fontFamily: 'ChillaxRegular', fontSize: 9, color: '#5A5D70' },
-  navLabelActive: { color: '#00CEC9', fontFamily: 'ChillaxMedium' },
+  navItem: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 2 },
+  navLabel: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 10, color: '#8A8D9F', letterSpacing: 0.2 },
+  navLabelActive: { color: '#F5A623', fontFamily: 'PlusJakartaSans_600SemiBold' },
 
   // Bubble
   bubbleWrap: {
@@ -283,8 +283,8 @@ const s = StyleSheet.create({
     alignItems: 'center',
   },
   bubbleIconWrapActive: {
-    backgroundColor: '#00CEC9',
+    backgroundColor: '#F5A623',
   },
-  bubbleItemLabel: { fontFamily: 'ChillaxMedium', fontSize: 14, color: Colors.text },
-  bubbleItemLabelActive: { color: '#00CEC9' },
+  bubbleItemLabel: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 14, color: Colors.text },
+  bubbleItemLabelActive: { color: '#F5A623' },
 });

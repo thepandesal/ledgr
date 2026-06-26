@@ -3,6 +3,7 @@ import { useFonts, DMSans_400Regular, DMSans_500Medium, DMSans_600SemiBold, DMSa
 import { RobotoMono_400Regular, RobotoMono_700Bold } from '@expo-google-fonts/roboto-mono';
 import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
 import { Fraunces_400Regular, Fraunces_600SemiBold, Fraunces_700Bold, Fraunces_900Black } from '@expo-google-fonts/fraunces';
+import { PlusJakartaSans_400Regular, PlusJakartaSans_500Medium, PlusJakartaSans_600SemiBold, PlusJakartaSans_700Bold } from '@expo-google-fonts/plus-jakarta-sans';
 import { View, ActivityIndicator } from 'react-native';
 import { useEffect, useState } from 'react';
 import { supabase } from '../src/lib/supabase';
@@ -20,6 +21,10 @@ const queryClient = new QueryClient({
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
+    PlusJakartaSans_400Regular,
+    PlusJakartaSans_500Medium,
+    PlusJakartaSans_600SemiBold,
+    PlusJakartaSans_700Bold,
     DMSans_400Regular,
     DMSans_500Medium,
     DMSans_600SemiBold,

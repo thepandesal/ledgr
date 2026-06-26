@@ -11,12 +11,12 @@ import ConfirmModal from '@/components/ui/ConfirmModal';
 import { Colors, Fonts, Radius, Spacing } from '@/components/ui/theme';
 import { useRouter } from 'expo-router';
 
-const I   = 'ChillaxRegular';
-const IM  = 'ChillaxMedium';
-const IS  = 'ChillaxSemibold';
-const IB  = 'ChillaxBold';
-const FB  = 'ChillaxSemibold';
-const FBK = 'ChillaxBold';
+const I   = 'PlusJakartaSans_400Regular';
+const IM  = 'PlusJakartaSans_500Medium';
+const IS  = 'PlusJakartaSans_600SemiBold';
+const IB  = 'PlusJakartaSans_700Bold';
+const FB  = 'PlusJakartaSans_600SemiBold';
+const FBK = 'PlusJakartaSans_700Bold';
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
@@ -31,8 +31,8 @@ const P = {
   textDark:    '#1C2632',
   secondary:   '#8A8D9F',
   muted:       '#5A5D70',
-  yellow:      '#FFC400',
-  yellowDark:  '#CC9D00',
+  yellow:      '#F5A623',
+  yellowDark:  '#C47E00',
   green:       '#00B894',
   greenLight:  '#00B89422',
   orange:      '#FF7675',
@@ -574,8 +574,8 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 4,
     paddingHorizontal: Spacing.page, marginTop: 6, marginBottom: 8,
   },
-  rangeLabel:     { fontFamily: I,  fontSize: 10, color: P.muted, flex: 1 },
-  rangeLabelEdit: { fontFamily: IS, fontSize: 10, color: P.yellow },
+  rangeLabel:     { fontFamily: IM, fontSize: 11, color: '#8A8D9F', flex: 1, letterSpacing: 0.2 },
+  rangeLabelEdit: { fontFamily: IS, fontSize: 11, color: P.yellow },
 
   // Stats row (replaces yellow card)
   statsRow: {
@@ -584,7 +584,7 @@ const s = StyleSheet.create({
   },
   statItem:    { flex: 1, alignItems: 'center', gap: 2 },
   statValue:   { fontFamily: FBK, fontSize: 14, color: P.text, letterSpacing: -0.3 },
-  statLabel:   { fontFamily: I,   fontSize: 9,  color: P.secondary },
+  statLabel:   { fontFamily: IM,  fontSize: 10, color: '#8A8D9F', letterSpacing: 0.3 },
   statDivider: { width: 1, height: 24, backgroundColor: P.border },
 
   // Focused summary card (non-all tabs)
@@ -611,21 +611,21 @@ const s = StyleSheet.create({
   // White bottom sheet
   sheet: {
     flex: 1,
-    backgroundColor: P.sheet,
-    borderTopLeftRadius: 30, borderTopRightRadius: 30,
+    backgroundColor: '#F7F6F3',
+    borderTopLeftRadius: 32, borderTopRightRadius: 32,
     overflow: 'hidden',
   },
 
   // Empty state
   emptyWrap:     { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 10, paddingBottom: 80 },
   emptyIconWrap: { width: 60, height: 60, borderRadius: 30, justifyContent: 'center', alignItems: 'center', marginBottom: 4 },
-  emptyTitle:    { fontFamily: FB, fontSize: 15, color: P.textDark },
-  emptyText:     { fontFamily: I,  fontSize: 12, color: P.secondary, textAlign: 'center', lineHeight: 19 },
+  emptyTitle:    { fontFamily: FB, fontSize: 15, color: '#1C2632' },
+  emptyText:     { fontFamily: IM, fontSize: 12, color: '#5A5D70', textAlign: 'center', lineHeight: 20, letterSpacing: 0.2 },
 
   // Transaction list
   list:          { paddingHorizontal: Spacing.page, paddingTop: 20 },
   dateHeaderRow: { marginTop: 20, marginBottom: 10 },
-  dateHeaderText: { fontFamily: IS, fontSize: 10, color: P.secondary, letterSpacing: 1, textTransform: 'uppercase' },
+  dateHeaderText: { fontFamily: IS, fontSize: 10, color: '#5A5D70', letterSpacing: 1.2, textTransform: 'uppercase' },
 
   row: {
     flexDirection: 'row', alignItems: 'center', gap: 14,
@@ -633,8 +633,8 @@ const s = StyleSheet.create({
   },
   rowIconWrap: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center' },
   rowMid:      { flex: 1, gap: 3 },
-  rowName:     { fontFamily: FB,  fontSize: 14, color: P.textDark },
-  rowCategory: { fontFamily: I,   fontSize: 11, color: P.secondary },
+  rowName:     { fontFamily: FB,  fontSize: 14, color: '#1C2632', letterSpacing: 0.02 * 14 },
+  rowCategory: { fontFamily: IM,  fontSize: 11, color: '#5A5D70', letterSpacing: 0.3 },
   rowAmount:   { fontFamily: FBK, fontSize: 15, letterSpacing: -0.5 },
 
   // Status filter chips
