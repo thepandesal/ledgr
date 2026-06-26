@@ -471,7 +471,7 @@ const s = StyleSheet.create({
     paddingBottom: 20,
   },
   title:    { fontFamily: IB, fontSize: 28, color: Colors.text, letterSpacing: -0.6 },
-  subtitle: { fontFamily: I,  fontSize: 12, color: Colors.muted, marginTop: 3 },
+  subtitle: { fontFamily: I,  fontSize: 12, color: Colors.text, marginTop: 3 },
 
   // Preset chips
   presetScroll: { flexGrow: 0, flexShrink: 0 },
@@ -483,7 +483,7 @@ const s = StyleSheet.create({
     borderColor: Colors.borderMid, backgroundColor: Colors.surface,
   },
   presetChipActive: { backgroundColor: Colors.text, borderColor: Colors.text },
-  presetChipText: { fontFamily: IM, fontSize: 12, color: Colors.muted },
+  presetChipText: { fontFamily: IM, fontSize: 12, color: Colors.text },
   presetChipTextActive: { color: Colors.white },
 
   // Range label
@@ -491,7 +491,7 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 5,
     paddingHorizontal: Spacing.page, marginTop: 10, marginBottom: 16,
   },
-  rangeLabel:     { fontFamily: I, fontSize: 11, color: Colors.faint, flex: 1 },
+  rangeLabel:     { fontFamily: I, fontSize: 11, color: Colors.muted, flex: 1 },
   rangeLabelEdit: { fontFamily: IM, fontSize: 11, color: Colors.cyan },
 
   // Summary card
@@ -509,7 +509,7 @@ const s = StyleSheet.create({
   summaryTop: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   summaryIcon: { width: 38, height: 38, borderRadius: Radius.md, justifyContent: 'center', alignItems: 'center' },
   summaryTabLabel: { fontFamily: IS, fontSize: 13, color: Colors.text },
-  summaryEntries:  { fontFamily: I,  fontSize: 11, color: Colors.muted, marginTop: 2 },
+  summaryEntries:  { fontFamily: IM,  fontSize: 11, color: Colors.text, marginTop: 2 },
   summaryTotal:    { fontFamily: IB, fontSize: 22, letterSpacing: -0.5 },
 
   // Activity tabs
@@ -521,7 +521,7 @@ const s = StyleSheet.create({
     borderRadius: Radius.pill, borderWidth: 1,
     borderColor: Colors.borderMid, backgroundColor: Colors.surface,
   },
-  tabChipText:       { fontFamily: IM, fontSize: 12, color: Colors.muted },
+  tabChipText:       { fontFamily: IM, fontSize: 12, color: Colors.text },
   tabChipTextActive: { color: '#fff' },
 
   // Divider
@@ -537,7 +537,7 @@ const s = StyleSheet.create({
   list: { paddingHorizontal: Spacing.page, paddingTop: 8 },
 
   dateHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 20, marginBottom: 8 },
-  dateHeaderText: { fontFamily: IS, fontSize: 11, color: Colors.muted, letterSpacing: 0.2 },
+  dateHeaderText: { fontFamily: IS, fontSize: 11, color: Colors.text, letterSpacing: 0.2 },
   dateHeaderLine: { flex: 1, height: 1, backgroundColor: Colors.border },
 
   row: {
@@ -548,7 +548,7 @@ const s = StyleSheet.create({
   rowIconWrap: { width: 38, height: 38, borderRadius: Radius.md, justifyContent: 'center', alignItems: 'center' },
   rowMid:   { flex: 1, gap: 2 },
   rowName:  { fontFamily: IM, fontSize: 13, color: Colors.text },
-  rowSpace: { fontFamily: I,  fontSize: 11, color: Colors.muted },
+  rowSpace: { fontFamily: IM,  fontSize: 11, color: Colors.muted },
   rowRight: { alignItems: 'flex-end', gap: 4 },
   rowAmount: { fontFamily: IB, fontSize: 14 },
   typeBadge: { borderRadius: Radius.pill, paddingHorizontal: 8, paddingVertical: 3 },
@@ -562,10 +562,10 @@ const s = StyleSheet.create({
     borderColor: Colors.borderMid, backgroundColor: Colors.surface,
   },
   cutoffChipActive:     { backgroundColor: Colors.cyan, borderColor: Colors.cyan },
-  cutoffChipText:       { fontFamily: IM, fontSize: 12, color: Colors.muted },
+  cutoffChipText:       { fontFamily: IM, fontSize: 12, color: Colors.text },
   cutoffChipTextActive: { color: Colors.white },
   cutoffInputRow:  { flexDirection: 'row', alignItems: 'center', gap: 10, width: '100%' },
-  cutoffInputLabel: { fontFamily: I, fontSize: 12, color: Colors.muted, flex: 1 },
+  cutoffInputLabel: { fontFamily: IM, fontSize: 12, color: Colors.text, flex: 1 },
   cutoffInput: {
     backgroundColor: Colors.input, borderRadius: Radius.sm,
     borderWidth: 1, borderColor: Colors.border,
