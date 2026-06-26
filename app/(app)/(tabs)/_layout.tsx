@@ -177,7 +177,7 @@ export default function TabsLayout() {
             const isActive = tab.key === 'others' ? isOthersActive : activeTab === tab.key;
             return (
               <TouchableOpacity key={tab.key} style={s.navItem} onPress={() => handleNavPress(tab.key)} activeOpacity={0.7}>
-                <Ionicons name={tab.icon as any} size={20} color={isActive ? Colors.cyan : Colors.faint} />
+                <Ionicons name={tab.icon as any} size={20} color={isActive ? '#00CEC9' : '#5A5D70'} />
                 <Text style={[s.navLabel, isActive && s.navLabelActive]}>{tab.label}</Text>
               </TouchableOpacity>
             );
@@ -218,27 +218,27 @@ function BubbleContent({ items, activeTab, onPress }: {
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f5f5' },
+  container: { flex: 1, backgroundColor: '#1C2632' },
   content: { flex: 1, position: 'relative' },
-  screen: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#f5f5f5' },
-  navSafeArea: { backgroundColor: '#ffffff' },
-  navGap: { height: 20 },
+  screen: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#1C2632' },
+  navSafeArea: { backgroundColor: '#1C2632' },
+  navGap: { height: 16 },
   navPill: {
     flexDirection: 'row',
-    backgroundColor: '#223651',
+    backgroundColor: '#243041',
     marginHorizontal: 20,
-    borderRadius: 20,
+    borderRadius: 24,
     paddingVertical: 10,
     paddingHorizontal: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.25,
     shadowRadius: 12,
     elevation: 8,
   },
   navItem: { flex: 1, alignItems: 'center', gap: 4 },
-  navLabel: { fontFamily: 'ChillaxRegular', fontSize: 9, color: Colors.faint },
-  navLabelActive: { color: Colors.cyan, fontFamily: 'ChillaxMedium' },
+  navLabel: { fontFamily: 'ChillaxRegular', fontSize: 9, color: '#5A5D70' },
+  navLabelActive: { color: '#00CEC9', fontFamily: 'ChillaxMedium' },
 
   // Bubble
   bubbleWrap: {
@@ -283,8 +283,8 @@ const s = StyleSheet.create({
     alignItems: 'center',
   },
   bubbleIconWrapActive: {
-    backgroundColor: Colors.cyan,
+    backgroundColor: '#00CEC9',
   },
   bubbleItemLabel: { fontFamily: 'ChillaxMedium', fontSize: 14, color: Colors.text },
-  bubbleItemLabelActive: { color: Colors.cyan },
+  bubbleItemLabelActive: { color: '#00CEC9' },
 });
