@@ -361,64 +361,33 @@ export default function DashboardScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Summary yellow card (all) or focused card */}
+        {/* Summary stats row */}
         {isAll ? (
-          <View style={s.yellowCard}>
-            <View style={s.yellowGrid}>
-              <View style={s.yellowGridItem}>
-                <Text style={s.yellowCardLabel}>money in</Text>
-                <Text style={s.yellowCardValue}>{fmt(moneyInTotal)}</Text>
-              </View>
-              <View style={s.yellowGridItem}>
-                <Text style={s.yellowCardLabel}>money out</Text>
-                <Text style={s.yellowCardValue}>{fmt(moneyOutTotal)}</Text>
-              </View>
-              <View style={s.yellowGridItem}>
-                <Text style={s.yellowCardLabel}>loans</Text>
-                <Text style={s.yellowCardValue}>{loansActive} active</Text>
-                <Text style={s.yellowCardSub}>{loansPaid} paid</Text>
-              </View>
-              <View style={s.yellowGridItem}>
-                <Text style={s.yellowCardLabel}>receivables</Text>
-                <Text style={s.yellowCardValue}>{receivablesPending} pending</Text>
-                <Text style={s.yellowCardSub}>{receivablesReceived} received</Text>
-              </View>
+          <View style={s.statsRow}>
+            <View style={s.statItem}>
+              <Text style={s.statValue}>{fmt(moneyInTotal)}</Text>
+              <Text style={s.statLabel}>Money In</Text>
             </View>
-          </View>
-        ) : selectedTabs.has('loans') && selectedTabs.size === 1 ? (
-          <View style={s.focusCard}>
-            <View style={[s.focusIcon, { backgroundColor: P.gold }]}>
-              <Ionicons name="cash-outline" size={18} color="#fff" />
+            <View style={s.statDivider} />
+            <View style={s.statItem}>
+              <Text style={s.statValue}>{fmt(moneyOutTotal)}</Text>
+              <Text style={s.statLabel}>Money Out</Text>
             </View>
-            <View style={{ flex: 1, gap: 8 }}>
-              <View style={s.statusFilterRow}>
-                {([{ key: 'active', label: `${loansActive} active`, color: P.gold }, { key: 'paid', label: `${loansPaid} paid`, color: P.green }] as const).map(f => (
-                  <TouchableOpacity key={f.key} style={[s.statusChip, statusFilter === f.key && { backgroundColor: f.color }]} onPress={() => setStatusFilter(prev => prev === f.key ? null : f.key)} activeOpacity={0.75}>
-                    <Text style={[s.statusChipText, statusFilter === f.key && s.statusChipTextActive]}>{f.label}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+            <View style={s.statDivider} />
+            <View style={s.statItem}>
+              <Text style={[s.statValue, { color: P.gold }]}>{loansActive}</Text>
+              <Text style={s.statLabel}>Loans</Text>
             </View>
-          </View>
-        ) : selectedTabs.has('receivables') && selectedTabs.size === 1 ? (
-          <View style={s.focusCard}>
-            <View style={[s.focusIcon, { backgroundColor: P.blue }]}>
-              <Ionicons name="arrow-undo-outline" size={18} color="#fff" />
-            </View>
-            <View style={{ flex: 1, gap: 8 }}>
-              <View style={s.statusFilterRow}>
-                {([{ key: 'pending', label: `${receivablesPending} pending`, color: P.gold }, { key: 'received', label: `${receivablesReceived} received`, color: P.green }] as const).map(f => (
-                  <TouchableOpacity key={f.key} style={[s.statusChip, statusFilter === f.key && { backgroundColor: f.color }]} onPress={() => setStatusFilter(prev => prev === f.key ? null : f.key)} activeOpacity={0.75}>
-                    <Text style={[s.statusChipText, statusFilter === f.key && s.statusChipTextActive]}>{f.label}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+            <View style={s.statDivider} />
+            <View style={s.statItem}>
+              <Text style={[s.statValue, { color: P.blue }]}>{receivablesPending}</Text>
+              <Text style={s.statLabel}>Receivables</Text>
             </View>
           </View>
         ) : (
           <View style={s.focusCard}>
             <View style={[s.focusIcon, { backgroundColor: activeTabData.color }]}>
-              <Ionicons name={activeTabData.icon as any} size={18} color="#fff" />
+              <Ionicons name={activeTabData.icon as any} size={16} color={activeTabData.color === P.yellow ? P.textDark : '#fff'} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={s.focusLabel}>{[...selectedTabs].map(k => ACTIVITY_TABS.find(t => t.key === k)?.label).join(', ')}</Text>
@@ -608,18 +577,15 @@ const s = StyleSheet.create({
   rangeLabel:     { fontFamily: I,  fontSize: 10, color: P.muted, flex: 1 },
   rangeLabelEdit: { fontFamily: IS, fontSize: 10, color: P.yellow },
 
-  // Yellow summary card
-  yellowCard: {
-    marginHorizontal: Spacing.page, marginBottom: 8,
-    backgroundColor: P.yellow,
-    borderRadius: 16,
-    paddingHorizontal: 14, paddingVertical: 10,
+  // Stats row (replaces yellow card)
+  statsRow: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: Spacing.page, marginBottom: 10,
   },
-  yellowGrid:      { flexDirection: 'row', flexWrap: 'wrap' },
-  yellowGridItem:   { width: '50%', paddingVertical: 5, paddingRight: 8, gap: 1 },
-  yellowCardLabel:  { fontFamily: I,   fontSize: 10, color: '#000000' },
-  yellowCardValue:  { fontFamily: FBK, fontSize: 15, color: P.textDark, letterSpacing: -0.3 },
-  yellowCardSub:    { fontFamily: I,   fontSize: 10, color: P.yellowDark },
+  statItem:    { flex: 1, alignItems: 'center', gap: 2 },
+  statValue:   { fontFamily: FBK, fontSize: 14, color: P.text, letterSpacing: -0.3 },
+  statLabel:   { fontFamily: I,   fontSize: 9,  color: P.secondary },
+  statDivider: { width: 1, height: 24, backgroundColor: P.border },
 
   // Focused summary card (non-all tabs)
   focusCard: {
