@@ -22,13 +22,13 @@ const MONTHS = ['January','February','March','April','May','June','July','August
 
 // ── High-contrast dark palette ──────────────────────────────────────────────
 const P = {
-  bg:          '#1A1D27',
+  bg:          '#1C2632',
   sheet:       '#FFFFFF',
-  card:        '#23273A',
-  cardDeep:    '#2C3148',
-  border:      '#2E3247',
+  card:        '#243041',
+  cardDeep:    '#2D3A50',
+  border:      '#2D3A50',
   text:        '#FFFFFF',
-  textDark:    '#1A1D27',
+  textDark:    '#1C2632',
   secondary:   '#8A8D9F',
   muted:       '#5A5D70',
   yellow:      '#FFC400',
@@ -119,6 +119,30 @@ export default function DashboardScreen() {
   const range = activePreset === 'custom'
     ? { from: customFrom, to: customTo }
     : getRangeForPreset(activePreset, cutoffDay);
+
+  // ── range navigation ──
+  const shiftRange = (dir: 1 | -1) => {
+    if (activePreset === 'this-month') {
+      const newFrom = new Date(range.from.getFullYear(), range.from.getMonth() + dir, 1);
+      setActivePreset('custom');
+      setCustomFrom(newFrom);
+      setCustomTo(new Date(newFrom.getFullYear(), newFrom.getMonth() + 1, 0));
+    } else if (activePreset === 'last-30') {
+      const days = 30 * dir;
+      const newFrom = new Date(range.from); newFrom.setDate(newFrom.getDate() + days);
+      const newTo   = new Date(range.to);   newTo.setDate(newTo.getDate() + days);
+      setActivePreset('custom'); setCustomFrom(newFrom); setCustomTo(newTo);
+    } else if (activePreset === 'cutoff') {
+      const newFrom = new Date(range.from); newFrom.setMonth(newFrom.getMonth() + dir);
+      const newTo   = new Date(range.to);   newTo.setMonth(newTo.getMonth() + dir);
+      setActivePreset('custom'); setCustomFrom(newFrom); setCustomTo(newTo);
+    } else {
+      const diff = range.to.getTime() - range.from.getTime();
+      const newFrom = new Date(range.from.getTime() + diff * dir + 86400000 * dir);
+      const newTo   = new Date(newFrom.getTime() + diff);
+      setCustomFrom(newFrom); setCustomTo(newTo);
+    }
+  };
 
   // ── load saved cutoff day ──
   useQuery({
@@ -322,37 +346,42 @@ export default function DashboardScreen() {
 
         {/* Range label */}
         <View style={s.rangeLabelRow}>
-          <Ionicons name="time-outline" size={11} color={P.muted} />
+          <TouchableOpacity onPress={() => shiftRange(-1)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name="chevron-back" size={16} color={P.secondary} />
+          </TouchableOpacity>
+          <Ionicons name="time-outline" size={11} color={P.muted} style={{ marginHorizontal: 4 }} />
           <Text style={s.rangeLabel}>{rangeLabel}</Text>
           {activePreset === 'custom' && (
             <TouchableOpacity onPress={() => { setPickingDate('from'); setShowPicker(true); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <Text style={s.rangeLabelEdit}>edit</Text>
             </TouchableOpacity>
           )}
+          <TouchableOpacity onPress={() => shiftRange(1)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name="chevron-forward" size={16} color={P.secondary} />
+          </TouchableOpacity>
         </View>
 
         {/* Summary yellow card (all) or focused card */}
         {isAll ? (
           <View style={s.yellowCard}>
-            <View style={s.yellowCardRow}>
-              <View style={s.yellowCardItem}>
+            <View style={s.yellowGrid}>
+              <View style={s.yellowGridItem}>
                 <Text style={s.yellowCardLabel}>money in</Text>
                 <Text style={s.yellowCardValue}>{fmt(moneyInTotal)}</Text>
               </View>
-              <View style={s.yellowCardDivider} />
-              <View style={s.yellowCardItem}>
+              <View style={s.yellowGridItem}>
                 <Text style={s.yellowCardLabel}>money out</Text>
                 <Text style={s.yellowCardValue}>{fmt(moneyOutTotal)}</Text>
               </View>
-            </View>
-            <View style={s.yellowCardPillRow}>
-              <View style={s.yellowCardPill}>
-                <Ionicons name="cash-outline" size={11} color={P.textDark} />
-                <Text style={s.yellowCardPillText}>{loansActive} loans active</Text>
+              <View style={s.yellowGridItem}>
+                <Text style={s.yellowCardLabel}>loans</Text>
+                <Text style={s.yellowCardValue}>{loansActive} active</Text>
+                <Text style={s.yellowCardSub}>{loansPaid} paid</Text>
               </View>
-              <View style={s.yellowCardPill}>
-                <Ionicons name="arrow-undo-outline" size={11} color={P.textDark} />
-                <Text style={s.yellowCardPillText}>{receivablesPending} pending</Text>
+              <View style={s.yellowGridItem}>
+                <Text style={s.yellowCardLabel}>receivables</Text>
+                <Text style={s.yellowCardValue}>{receivablesPending} pending</Text>
+                <Text style={s.yellowCardSub}>{receivablesReceived} received</Text>
               </View>
             </View>
           </View>
@@ -586,19 +615,11 @@ const s = StyleSheet.create({
     borderRadius: 24,
     paddingHorizontal: 20, paddingVertical: 16,
   },
-  yellowCardRow:     { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-  yellowCardItem:    { flex: 1, gap: 2 },
-  yellowCardLabel:   { fontFamily: I,   fontSize: 11, color: P.yellowDark },
-  yellowCardValue:   { fontFamily: FBK, fontSize: 22, color: P.textDark, letterSpacing: -0.5 },
-  yellowCardDivider: { width: 1, height: 36, backgroundColor: P.yellowDark + '44', marginHorizontal: 16 },
-  yellowCardPillRow: { flexDirection: 'row', gap: 8 },
-  yellowCardPill: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    backgroundColor: P.yellowDark + '33',
-    paddingHorizontal: 10, paddingVertical: 5,
-    borderRadius: Radius.pill,
-  },
-  yellowCardPillText: { fontFamily: IM, fontSize: 11, color: P.textDark },
+  yellowGrid:      { flexDirection: 'row', flexWrap: 'wrap' },
+  yellowGridItem:   { width: '50%', paddingVertical: 10, paddingRight: 8, gap: 2 },
+  yellowCardLabel:  { fontFamily: I,   fontSize: 11, color: '#000000' },
+  yellowCardValue:  { fontFamily: FBK, fontSize: 20, color: P.textDark, letterSpacing: -0.5 },
+  yellowCardSub:    { fontFamily: I,   fontSize: 11, color: P.yellowDark },
 
   // Focused summary card (non-all tabs)
   focusCard: {
