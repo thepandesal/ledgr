@@ -177,7 +177,7 @@ export default function TabsLayout() {
             return (
               <TouchableOpacity key={tab.key} style={s.navItem} onPress={() => handleNavPress(tab.key)} activeOpacity={0.7}>
                 <View style={[s.navIconWrap, isActive && s.navIconWrapActive]}>
-                  <Ionicons name={tab.icon as any} size={20} color={isActive ? '#FFFFFF' : '#8E9399'} />
+                  <Ionicons name={tab.icon as any} size={20} color={isActive ? '#FFFFFF' : '#9A9DB0'} />
                 </View>
               </TouchableOpacity>
             );
@@ -217,9 +217,9 @@ function BubbleContent({ items, activeTab, onPress }: {
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F4F4F6' },
+  container: { flex: 1, backgroundColor: '#F7F8FA' },
   content: { flex: 1, position: 'relative' },
-  screen: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#F4F4F6' },
+  screen: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#F7F8FA' },
 
   navFloatWrap: {
     position: 'absolute',
@@ -237,7 +237,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 8,
     gap: 4,
     borderWidth: 1,
-    borderColor: '#1A1A1A',
+    borderColor: '#ECECEC',
   },
   navItem: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
   navIconWrap: {
@@ -245,7 +245,7 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   navIconWrapActive: {
-    backgroundColor: '#1A1A1A',
+    backgroundColor: '#4ECDC4',
   },
 
   // Bubble
