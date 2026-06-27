@@ -584,7 +584,15 @@ export default function DashboardScreen() {
         </View>{/* end statsCard */}
 
       </View>{/* end topSection */}
-        <View style={s.tabRow}>
+
+      {/* ── Recordings sheet ── */}
+      <View style={s.sheet}>
+        {/* Sticky card floats over list */}
+        <Animated.View style={[s.stickyCard, {
+          opacity: headerAnim,
+          transform: [{ translateY: headerAnim.interpolate({ inputRange: [0, 1], outputRange: [-headerHeight, 0] }) }],
+        }]}>
+<View style={s.tabRow}>
           {ACTIVITY_TABS.map(tab => {
             const isActive = selectedTabs.has(tab.key);
             return (
@@ -629,6 +637,368 @@ export default function DashboardScreen() {
           transform: [{ translateY: headerAnim.interpolate({ inputRange: [0, 1], outputRange: [-headerHeight, 0] }) }],
         }]}>
         </Animated.View>
+        {isLoading ? (
+          <ActivityIndicator color={P.teal} style={{ marginTop: 48 }} />
+        ) : filtered.length === 0 ? (
+          <View style={s.emptyWrap}>
+            <View style={[s.emptyIconWrap, { backgroundColor: P.teal }]}>
+              <Ionicons name={activeTabData.icon as any} size={28} color={P.textDark} />
+            </View>
+            <Text style={s.emptyTitle}>nothing here</Text>
+            <Text style={s.emptyText}>no {activeTabData.label.toLowerCase()} found{`\n`}for this period</Text>
+          </View>
+        ) : (
+          <ScrollView key={filtered.map(i => i.id).join() + amountSort} contentContainerStyle={s.list} showsVerticalScrollIndicator={false} onScroll={onScroll} scrollEventThrottle={16}>
+
+            {sortedFiltered(filtered).map((item, idx) => {
+              const prevDate = sortedFiltered(filtered)[idx - 1]?.transaction_date;
+              const showDate = item.transaction_date !== prevDate;
+              const dateStr  = new Date(item.transaction_date + 'T00:00:00')
+                .toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+              const tl = typeLabel(item);
+              return (
+                <View key={item.id}>
+                  {showDate && (
+                    <View style={s.dateHeaderRow}>
+                      <Text style={s.dateHeaderText}>{dateStr}</Text>
+                    </View>
+                  )}
+                  <TouchableOpacity style={s.row} activeOpacity={0.85} onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: item.id } } as any)}>
+                    <View style={s.rowIconWrap}>
+                      <Ionicons name={(item.categories?.icon ?? activeTabData.icon) as any} size={18} color={P.tealDark} />
+                    </View>
+                    <View style={s.rowMid}>
+                      <Text style={s.rowName} numberOfLines={1}>{item.name}</Text>
+                      <Text style={s.rowCategory}>{tl?.label ?? activeTabData.label}{item.space?.name ? ` · ${item.space.name}` : ''}</Text>
+                    </View>
+                    <Text style={[s.rowAmount, { color: tl?.color ?? P.tealDark }]}>
+                      {Number(item.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              );
+            })}
+            <View style={{ height: 40 }} />
+          </ScrollView>
+        )}
+      </View>
+
+      {/* ── Date modal ── */}
+      <BottomSheet visible={showDateModal} onClose={() => setShowDateModal(false)} title="date range">
+        {/* Preset options */}
+        <View style={s.modalPresetRow}>
+          {PRESETS.map(p => {
+            const active = p.key === activePreset;
+            return (
+              <TouchableOpacity
+                key={p.key}
+                style={[s.modalPresetChip, active && s.modalPresetChipActive]}
+                onPress={() => handlePresetSelect(p.key)}
+                activeOpacity={0.75}
+              >
+                <Ionicons name={p.icon as any} size={13} color={active ? P.textDark : P.secondary} />
+                <Text style={[s.modalPresetText, active && s.modalPresetTextActive]}>{p.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {/* Cutoff day input — shown when cutoff selected */}
+        {activePreset === 'cutoff' && (
+          <View style={s.cutoffRow}>
+            <Text style={s.cutoffLabel}>billing cycle starts on day</Text>
+            <View style={s.cutoffChips}>
+              {[1,5,10,15,20,25,28].map(d => (
+                <TouchableOpacity
+                  key={d}
+                  style={[s.cutoffChip, parseInt(cutoffInput) === d && s.cutoffChipActive]}
+                  onPress={() => { setCutoffInput(String(d)); applyPreset('cutoff', d); }}
+                >
+                  <Text style={[s.cutoffChipText, parseInt(cutoffInput) === d && s.cutoffChipTextActive]}>{d}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <View style={s.cutoffInputRow}>
+              <Text style={s.cutoffInputLabel}>or type a day</Text>
+              <TextInput
+                style={s.cutoffInput}
+                value={cutoffInput}
+                onChangeText={v => setCutoffInput(v.replace(/[^0-9]/g, ''))}
+                onEndEditing={() => {
+                  const d = parseInt(cutoffInput);
+                  if (d >= 1 && d <= 31) applyPreset('cutoff', d);
+                }}
+                keyboardType="number-pad"
+                maxLength={2}
+                placeholder="1–31"
+                placeholderTextColor={Colors.faint}
+              />
+            </View>
+          </View>
+        )}
+
+        {/* Calendar — shown when custom selected */}
+        {activePreset === 'custom' && (
+          <View style={s.calWrap}>
+            <Text style={s.calHint}>
+              {pickingDate === 'from' ? 'tap start date' : 'tap end date'}
+            </Text>
+            <View style={s.pickerNav}>
+              <TouchableOpacity onPress={() => { if (pickerMonth === 0) { setPickerMonth(11); setPickerYear(y => y - 1); } else setPickerMonth(m => m - 1); }}>
+                <Ionicons name="chevron-back" size={18} color={P.text} />
+              </TouchableOpacity>
+              <Text style={s.pickerMonthText}>{MONTHS[pickerMonth].toLowerCase()} {pickerYear}</Text>
+              <TouchableOpacity onPress={() => { if (pickerMonth === 11) { setPickerMonth(0); setPickerYear(y => y + 1); } else setPickerMonth(m => m + 1); }}>
+                <Ionicons name="chevron-forward" size={18} color={P.text} />
+              </TouchableOpacity>
+            </View>
+            <View style={{ flexDirection: 'row', marginBottom: 6 }}>
+              {['su','mo','tu','we','th','fr','sa'].map(d => (
+                <Text key={d} style={s.calDay}>{d}</Text>
+              ))}
+            </View>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', width: '100%' }}>
+              {cells.map((day, i) => {
+                if (!day) return <View key={`e${i}`} style={s.calCell} />;
+                const inRange = isInRange(day);
+                const edge    = isEdge(day);
+                const today   = isSameDay(new Date(pickerYear, pickerMonth, day), new Date());
+                return (
+                  <TouchableOpacity
+                    key={day}
+                    style={[s.calCell, inRange && s.calCellRange, edge && s.calCellEdge, !inRange && !edge && today && s.calCellToday]}
+                    onPress={() => handleDayPress(day)}
+                  >
+                    <Text style={[s.calCellText, (edge || today) && s.calCellTextActive]}>{day}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        )}
+      </BottomSheet>
+
+      {/* ── Filter modal ── */}
+      <BottomSheet visible={showFilterModal} onClose={() => setShowFilterModal(false)} title="filter">
+
+        {/* Spaces */}
+        <Text style={s.filterSectionLabel}>Spaces</Text>
+        <View style={s.spaceChips}>
+          <TouchableOpacity style={[s.spaceChip, isAllSpaces && s.spaceChipActive]} onPress={() => { setSelectedSpaces(new Set(['all'])); saveSettings.mutate({ dashboard_space_ids: '' }); }} activeOpacity={0.75}>
+            <Text style={[s.spaceChipText, isAllSpaces && s.spaceChipTextActive]}>All</Text>
+          </TouchableOpacity>
+          {spaces.map((sp: any) => {
+            const active = selectedSpaces.has(sp.id);
+            return (
+              <TouchableOpacity key={sp.id} style={[s.spaceChip, active && s.spaceChipActive]} onPress={() => toggleSpace(sp.id)} activeOpacity={0.75}>
+                <Text style={[s.spaceChipText, active && s.spaceChipTextActive]}>{sp.name}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+
+        {/* Accounts */}
+        <Text style={s.filterSectionLabel}>Accounts</Text>
+        <View style={s.spaceChips}>
+          <TouchableOpacity style={[s.spaceChip, isAllAccounts && s.spaceChipActive]} onPress={() => setSelectedAccounts(new Set(['all']))} activeOpacity={0.75}>
+            <Text style={[s.spaceChipText, isAllAccounts && s.spaceChipTextActive]}>All</Text>
+          </TouchableOpacity>
+          {accounts.map((ac: any) => {
+            const active = selectedAccounts.has(ac.id);
+            return (
+              <TouchableOpacity key={ac.id} style={[s.spaceChip, active && s.spaceChipActive]} onPress={() => {
+                setSelectedAccounts(prev => {
+                  const next = new Set(prev); next.delete('all');
+                  if (next.has(ac.id)) { next.delete(ac.id); if (next.size === 0) return new Set(['all']); }
+                  else next.add(ac.id);
+                  return next;
+                });
+              }} activeOpacity={0.75}>
+                <Text style={[s.spaceChipText, active && s.spaceChipTextActive]}>{ac.account_name}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {/* Amount sort */}
+        <Text style={s.filterSectionLabel}>Sort by Amount</Text>
+        <View style={s.spaceChips}>
+          {(['none', 'high', 'low'] as const).map(opt => (
+            <TouchableOpacity key={opt} style={[s.spaceChip, amountSort === opt && s.spaceChipActive]} onPress={() => setAmountSort(opt)} activeOpacity={0.75}>
+              <Text style={[s.spaceChipText, amountSort === opt && s.spaceChipTextActive]}>
+                {opt === 'none' ? 'Default' : opt === 'high' ? 'High → Low' : 'Low → High'}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </BottomSheet>
+
+      {/* ── Spaces modal ── */}
+      <BottomSheet visible={showSpaceModal} onClose={() => setShowSpaceModal(false)} title="filter by space">
+        <View style={s.spaceChips}>
+          <TouchableOpacity
+            style={[s.spaceChip, isAllSpaces && s.spaceChipActive]}
+            onPress={() => toggleSpace('all')}
+            activeOpacity={0.75}
+          >
+            <Text style={[s.spaceChipText, isAllSpaces && s.spaceChipTextActive]}>All</Text>
+          </TouchableOpacity>
+          {spaces.map((sp: any) => {
+            const active = selectedSpaces.has(sp.id);
+            return (
+              <TouchableOpacity
+                key={sp.id}
+                style={[s.spaceChip, active && s.spaceChipActive]}
+                onPress={() => toggleSpace(sp.id)}
+                activeOpacity={0.75}
+              >
+                <Text style={[s.spaceChipText, active && s.spaceChipTextActive]}>{sp.name}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </BottomSheet>
+
+    </SafeAreaView>
+  );
+}
+
+const s = StyleSheet.create({
+  container: { flex: 1, backgroundColor: P.bg },
+  topSection: { paddingHorizontal: 16, paddingTop: 20, gap: 10 },
+  headerCard: {},
+  title: { fontFamily: FBK, fontSize: 28, color: P.text, letterSpacing: -0.8 },
+  subtitle: { fontFamily: I, fontSize: 13, color: P.secondary },
+
+  statsCard: {
+    backgroundColor: P.card,
+    borderRadius: 24,
+    paddingVertical: 16,
+  },
+
+  filterBtns: { gap: 6, alignItems: 'flex-end', paddingTop: 4 },
+  filterRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
+  filterBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingHorizontal: 12, paddingVertical: 8,
+    borderRadius: Radius.pill,
+    backgroundColor: P.card,
+    borderWidth: 1, borderColor: P.border,
+  },
+  filterBtnActive:     { backgroundColor: P.tealLight, borderColor: P.teal },
+  filterBtnText:       { fontFamily: IM, fontSize: 11, color: P.text },
+  filterBtnTextActive: { fontFamily: IS, fontSize: 11, color: P.tealDark },
+
+  statsRow: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 20, marginBottom: 4,
+  },
+  statItem:    { flex: 1, alignItems: 'center', gap: 4 },
+  statValue:   { fontFamily: FBK, fontSize: 16, color: P.text, letterSpacing: -0.4 },
+  statLabel:   { fontFamily: I,   fontSize: 10, color: P.secondary, letterSpacing: 0.2 },
+  statDivider: { width: 1, height: 28, backgroundColor: P.border },
+
+  // Tab filter row
+  tabRow:  { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 4 },
+  tabWrap: { flex: 1, alignItems: 'center' },
+  tabCircle: {
+    width: 46, height: 46, borderRadius: 23,
+    justifyContent: 'center', alignItems: 'center',
+    backgroundColor: P.tealLight,
+  },
+  tabCircleActive: {
+    backgroundColor: P.teal,
+  },
+  tabLabel:       { fontFamily: I,  fontSize: 9,  color: P.secondary, marginTop: 5, letterSpacing: 0.2 },
+  tabLabelActive: { fontFamily: IS, fontSize: 9,  color: P.teal },
+
+  // Transaction list scroll area
+  sheet: {
+    flex: 1,
+    backgroundColor: P.bg,
+    overflow: 'hidden',
+  },
+
+  // Empty state
+  emptyWrap:     { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 14, paddingBottom: 80 },
+  emptyIconWrap: { width: 64, height: 64, borderRadius: 32, justifyContent: 'center', alignItems: 'center', marginBottom: 6 },
+  emptyTitle:    { fontFamily: FB, fontSize: 16, color: P.text },
+  emptyText:     { fontFamily: IM, fontSize: 13, color: P.secondary, textAlign: 'center', lineHeight: 21, letterSpacing: 0.2 },
+
+  // Transaction list
+  list:           { paddingHorizontal: 16, paddingTop: 132, paddingBottom: 20, gap: 12 },
+  dateHeaderRow:  { marginTop: 16, marginBottom: 8, paddingHorizontal: 4, borderTopWidth: 1, borderTopColor: P.border, paddingTop: 16 },
+  dateHeaderText: { fontFamily: IS, fontSize: 10, color: P.secondary, letterSpacing: 1.4, textTransform: 'uppercase' },
+
+  row: {
+    backgroundColor: P.card,
+    borderRadius: 20,
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    paddingHorizontal: 16, paddingVertical: 14,
+  },
+  rowIconWrap: { width: 46, height: 46, borderRadius: 23, justifyContent: 'center', alignItems: 'center', backgroundColor: P.tealLight },
+  rowMid:      { flex: 1, gap: 4 },
+  rowName:     { fontFamily: FB,  fontSize: 14, color: P.text, letterSpacing: 0.1, lineHeight: 20 },
+  rowCategory: { fontFamily: I,   fontSize: 11, color: P.secondary, letterSpacing: 0.2 },
+  rowAmount:   { fontFamily: FBK, fontSize: 15, letterSpacing: -0.4 },
+
+  modalPresetRow:        { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 },
+  modalPresetChip:       { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: P.bg },
+  modalPresetChipActive: { backgroundColor: P.teal },
+  modalPresetText:       { fontFamily: IM, fontSize: 12, color: P.secondary },
+  modalPresetTextActive: { fontFamily: IS, fontSize: 12, color: P.textDark },
+
+  cutoffRow:       { marginBottom: 16, width: '100%' },
+  cutoffLabel:     { fontFamily: IM, fontSize: 12, color: P.secondary, marginBottom: 10 },
+  cutoffChips:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
+  cutoffChip:      { paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: P.bg },
+  cutoffChipActive:     { backgroundColor: P.teal },
+  cutoffChipText:       { fontFamily: IM, fontSize: 12, color: P.secondary },
+  cutoffChipTextActive: { color: P.textDark },
+  cutoffInputRow:   { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  cutoffInputLabel: { fontFamily: I, fontSize: 12, color: P.secondary, flex: 1 },
+  cutoffInput: {
+    backgroundColor: P.bg, borderRadius: Radius.sm,
+    paddingHorizontal: 12, paddingVertical: 8,
+    fontFamily: FB, fontSize: 16, color: P.text,
+    width: 70, textAlign: 'center',
+  },
+
+  calWrap:    { width: '100%' },
+  calHint:    { fontFamily: I, fontSize: 11, color: P.tealDark, marginBottom: 10 },
+  pickerNav: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    width: '100%', paddingHorizontal: 4, marginBottom: 10,
+  },
+  pickerMonthText:   { fontFamily: FB, fontSize: 15, color: P.text },
+  calDay:            { flex: 1, textAlign: 'center', fontFamily: I, fontSize: 10, color: P.muted },
+  calCell:           { width: '14.28%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center', borderRadius: Radius.pill },
+  calCellRange:      { backgroundColor: P.teal + '55', borderRadius: 0 },
+  calCellEdge:       { backgroundColor: P.teal },
+  calCellToday:      { backgroundColor: P.bg },
+  calCellText:       { fontFamily: I,  fontSize: 13, color: P.text },
+  calCellTextActive: { fontFamily: IS, color: P.textDark },
+
+  spaceChips:        { flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingBottom: 16 },
+  spaceChip:         { paddingHorizontal: 16, paddingVertical: 10, borderRadius: Radius.pill, backgroundColor: P.bg },
+  spaceChipActive:   { backgroundColor: P.teal },
+  spaceChipText:     { fontFamily: IM, fontSize: 13, color: P.secondary },
+  spaceChipTextActive: { fontFamily: IS, fontSize: 13, color: P.textDark },
+
+  statusFilterRow:      { flexDirection: 'row', gap: 10 },
+  statusChip:           { flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: Radius.lg, backgroundColor: P.bg },
+  statusChipText:       { fontFamily: IS, fontSize: 13, color: P.secondary },
+  statusChipTextActive: { color: P.text },
+  collapsible: { gap: 10 },
+  tabFilterHeader: { gap: 10, marginBottom: 8 },
+  stickyCard: { position: 'absolute', top: 0, left: 16, right: 16, backgroundColor: P.card, borderRadius: 20, paddingTop: 12, paddingBottom: 8, gap: 8, zIndex: 10 },
+  filterSectionLabel: { fontFamily: IS, fontSize: 11, color: P.secondary, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8, marginTop: 4 },
+  dateNavRow:   { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  dateNavArrow: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: P.tealLight },
+});
+        </Animated.View>
+
         {isLoading ? (
           <ActivityIndicator color={P.teal} style={{ marginTop: 48 }} />
         ) : filtered.length === 0 ? (
