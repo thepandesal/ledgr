@@ -719,7 +719,7 @@ export default function DashboardScreen() {
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: P.bg },
-  topSection: { paddingHorizontal: 16, paddingTop: 20, gap: 10 },
+  topSection: { paddingHorizontal: 16, paddingTop: 20, gap: 10, paddingBottom: 12 },
   headerCard: {},
   title: { fontFamily: FBK, fontSize: 28, color: P.text, letterSpacing: -0.8 },
   subtitle: { fontFamily: I, fontSize: 13, color: P.secondary },
