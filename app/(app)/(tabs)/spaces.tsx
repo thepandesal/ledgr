@@ -192,24 +192,16 @@ export default function SpacesScreen() {
 
                 {/* Numbers row */}
                 <View style={s.cardNumbers}>
-                  <View style={s.numberItem}>
-                    <Text style={s.numberLabel}>{isExpense ? 'spent' : 'saved'}</Text>
-                    <Text style={[s.numberValue, overBudget && { color: '#FFAB91' }]}>{fmt(value)}</Text>
-                  </View>
+                  <Text style={s.numberLabel}>{isExpense ? 'spent' : 'saved'} </Text>
+                  <Text style={[s.numberValue, overBudget && { color: '#FFAB91' }]}>{fmt(value)}</Text>
                   {budget > 0 && (
                     <>
                       <View style={s.numberDivider} />
-                      <View style={s.numberItem}>
-                        <Text style={s.numberLabel}>{isExpense ? 'budget' : 'goal'}</Text>
-                        <Text style={s.numberValue}>{fmt(budget)}</Text>
-                      </View>
+                      <Text style={s.numberLabel}>{isExpense ? 'budget' : 'goal'} </Text>
+                      <Text style={s.numberValue}>{fmt(budget)}</Text>
                       <View style={s.numberDivider} />
-                      <View style={s.numberItem}>
-                        <Text style={s.numberLabel}>{isExpense ? 'left' : 'remaining'}</Text>
-                        <Text style={[s.numberValue, { color: overBudget ? '#FFAB91' : T }]}>
-                          {fmt(Math.abs(budget - value))}
-                        </Text>
-                      </View>
+                      <Text style={s.numberLabel}>{isExpense ? 'left' : 'to go'} </Text>
+                      <Text style={[s.numberValue, { color: overBudget ? '#FFAB91' : T }]}>{fmt(Math.abs(budget - value))}</Text>
                     </>
                   )}
                 </View>
@@ -309,29 +301,29 @@ const s = StyleSheet.create({
   },
   allCardText: { fontFamily: SB, fontSize: 14, color: T },
 
-  list: { gap: 12 },
+  list: { gap: 2 },
 
   emptyWrap: { alignItems: 'center', paddingVertical: 48, gap: 8 },
   emptyText: { fontFamily: SB, fontSize: 16, color: TEXT },
   emptyHint: { fontFamily: R, fontSize: 13, color: SEC },
 
   card: {
-    backgroundColor: CARD, borderRadius: 20,
-    padding: 18, gap: 14,
+    backgroundColor: CARD, borderRadius: 16,
+    paddingHorizontal: 14, paddingVertical: 12, gap: 8,
   },
-  cardTop:     { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  cardIconWrap: { width: 36, height: 36, borderRadius: 18, backgroundColor: TL, alignItems: 'center', justifyContent: 'center' },
-  cardName:    { fontFamily: B,  fontSize: 15, color: TEXT, letterSpacing: -0.3 },
-  cardType:    { fontFamily: R,  fontSize: 11, color: SEC,  marginTop: 2 },
+  cardTop:      { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  cardIconWrap: { width: 32, height: 32, borderRadius: 16, backgroundColor: TL, alignItems: 'center', justifyContent: 'center' },
+  cardName:     { fontFamily: SB, fontSize: 14, color: TEXT, letterSpacing: -0.2 },
+  cardType:     { fontFamily: R,  fontSize: 10, color: SEC, marginTop: 1 },
 
-  progressTrack: { height: 6, backgroundColor: BORDER, borderRadius: 3, overflow: 'hidden' },
-  progressFill:  { height: 6, borderRadius: 3 },
+  progressTrack: { height: 3, backgroundColor: BORDER, borderRadius: 2, overflow: 'hidden' },
+  progressFill:  { height: 3, borderRadius: 2 },
 
-  cardNumbers:  { flexDirection: 'row', alignItems: 'center' },
-  numberItem:   { flex: 1, alignItems: 'center', gap: 3 },
-  numberLabel:  { fontFamily: R,  fontSize: 10, color: SEC,  letterSpacing: 0.3, textTransform: 'uppercase' },
-  numberValue:  { fontFamily: B,  fontSize: 15, color: TEXT, letterSpacing: -0.4 },
-  numberDivider: { width: 1, height: 32, backgroundColor: BORDER },
+  cardNumbers:   { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  numberItem:    { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  numberLabel:   { fontFamily: R,  fontSize: 10, color: SEC },
+  numberValue:   { fontFamily: SB, fontSize: 12, color: TEXT },
+  numberDivider: { width: 3, height: 3, borderRadius: 2, backgroundColor: BORDER },
 
   typeBtn:         { paddingHorizontal: 16, paddingVertical: 9, borderRadius: 999, borderWidth: 1, borderColor: BORDER, backgroundColor: BG },
   typeBtnActive:   { backgroundColor: T, borderColor: T },
