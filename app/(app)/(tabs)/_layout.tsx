@@ -57,37 +57,23 @@ function ProfileScreen() {
     ? new Date(user.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
     : '';
 
-  const handleLogout = () => {
-    Alert.alert('Log Out', 'Are you sure you want to log out?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Log Out', style: 'destructive', onPress: async () => {
-        console.log('[logout] button pressed');
-        try {
-          const { error } = await supabase.auth.signOut();
-          console.log('[logout] signOut result:', error ? error.message : 'success');
-        } catch (e) {
-          console.log('[logout] signOut threw:', e);
-        }
-        console.log('[logout] navigating to /');
-        router.replace('/' as any);
-      }},
-    ]);
+  const handleLogout = async () => {
+    console.log('[logout] button pressed');
+    try {
+      const { error } = await supabase.auth.signOut();
+      console.log('[logout] signOut result:', error ? error.message : 'success');
+    } catch (e) {
+      console.log('[logout] signOut threw:', e);
+    }
+    console.log('[logout] navigating to /');
+    router.replace('/' as any);
   };
 
-  const handleDeleteAccount = () => {
-    Alert.alert(
-      'Delete Account',
-      'This will permanently delete your account and all your data. This cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: async () => {
-          try {
-            await supabase.auth.signOut();
-          } catch (e) {}
-          router.replace('/' as any);
-        }},
-      ]
-    );
+  const handleDeleteAccount = async () => {
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {}
+    router.replace('/' as any);
   };
 
   return (
