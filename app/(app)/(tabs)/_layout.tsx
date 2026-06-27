@@ -61,8 +61,10 @@ function ProfileScreen() {
     Alert.alert('Log Out', 'Are you sure you want to log out?', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Log Out', style: 'destructive', onPress: async () => {
-        await supabase.auth.signOut();
-        router.replace('/');
+        try {
+          await supabase.auth.signOut();
+        } catch (e) {}
+        router.replace('/' as any);
       }},
     ]);
   };
@@ -74,9 +76,10 @@ function ProfileScreen() {
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Delete', style: 'destructive', onPress: async () => {
-          await supabase.auth.admin?.deleteUser(user!.id).catch(() => null);
-          await supabase.auth.signOut();
-          router.replace('/');
+          try {
+            await supabase.auth.signOut();
+          } catch (e) {}
+          router.replace('/' as any);
         }},
       ]
     );
