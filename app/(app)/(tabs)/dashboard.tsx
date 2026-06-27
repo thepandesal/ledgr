@@ -88,6 +88,8 @@ function getRangeForPreset(preset: Preset, cutoffDay: number, offset = 0): { fro
   return { from: new Date(now.getFullYear(), now.getMonth(), 1), to: now };
 }
 
+const MODAL_HEIGHT = '50%';
+
 export default function DashboardScreen() {
   const router    = useRouter();
   const { userId } = useUser();
@@ -305,7 +307,13 @@ export default function DashboardScreen() {
   const total = filtered.reduce((s, r) => s + Number(r.amount), 0);
   const activeTabData = ACTIVITY_TABS.find(t => t.key === (isAll ? 'all' : [...selectedTabs][0])) ?? ACTIVITY_TABS[0];
   const allRecordings = (types: string[]) => recordings.filter(r => {
-    if (!effectiveTypes.includes(r.type)) return false;
+    if (!types.includes(r.type)) return false;
+    if (!isAllSpaces && !selectedSpaces.has(r.space_id)) return false;
+    const [y, m, d] = r.transaction_date.split('-').map(Number);
+    const date = new Date(y, m - 1, d);
+    if (date < range.from) return false;
+    const to = new Date(range.to); to.setHours(23, 59, 59);
+    return date <= to;
   });
 
   const moneyInTotal    = allRecordings(['income','savings','return']).reduce((s, r) => s + Number(r.amount), 0);
@@ -518,7 +526,7 @@ export default function DashboardScreen() {
       </View>
 
       {/* ── Date modal ── */}
-      <BottomSheet visible={showDateModal} onClose={() => setShowDateModal(false)} title="date range">
+      <BottomSheet visible={showDateModal} onClose={() => setShowDateModal(false)} title="date range" height={MODAL_HEIGHT}>
         {/* Preset options */}
         <View style={s.modalPresetRow}>
           {PRESETS.map(p => {
@@ -613,7 +621,7 @@ export default function DashboardScreen() {
       </BottomSheet>
 
       {/* ── Filter modal ── */}
-      <BottomSheet visible={showFilterModal} onClose={() => setShowFilterModal(false)} title="filter" height='45%'>
+      <BottomSheet visible={showFilterModal} onClose={() => setShowFilterModal(false)} title="filter" height={MODAL_HEIGHT}>
 
         {/* Clear all + section labels */}
         <TouchableOpacity
@@ -688,7 +696,7 @@ export default function DashboardScreen() {
       </BottomSheet>
 
       {/* ── Spaces modal ── */}
-      <BottomSheet visible={showSpaceModal} onClose={() => setShowSpaceModal(false)} title="filter by space">
+      <BottomSheet visible={showSpaceModal} onClose={() => setShowSpaceModal(false)} title="filter by space" height={MODAL_HEIGHT}>
         <View style={s.spaceChips}>
           <TouchableOpacity
             style={[s.spaceChip, isAllSpaces && s.spaceChipActive]}
