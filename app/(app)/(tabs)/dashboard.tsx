@@ -205,7 +205,17 @@ export default function DashboardScreen() {
   });
 
 
+  const { data: accounts = [] } = useQuery({
+    queryKey: ['accounts', userId],
+    queryFn: async () => {
+      const { data } = await supabase.from('accounts').select().eq('user_id', userId).order('created_at');
+      return data ?? [];
+    },
+    enabled: !!userId,
+  });
+
   const [showFilterModal, setShowFilterModal] = useState(false);
+  const [selectedAccounts, setSelectedAccounts] = useState<Set<string>>(new Set(['all']));
   const [amountSort, setAmountSort] = useState<'none' | 'high' | 'low'>('none');
 
   const { data: recordings = [], isLoading } = useQuery({
@@ -226,7 +236,8 @@ export default function DashboardScreen() {
     ? ['income','savings','expense','payable','receivable']
     : ACTIVITY_TABS.filter(t => t.key !== 'all' && selectedTabs.has(t.key)).flatMap(t => t.types as string[]);
 
-  const isAllSpaces     = selectedSpaces.has('all');
+  const isAllSpaces    = selectedSpaces.has('all');
+  const isAllAccounts  = selectedAccounts.has('all');
 
 
   const filtered = recordings.filter(r => {
@@ -761,6 +772,29 @@ export default function DashboardScreen() {
           })}
         </View>
 
+
+        {/* Accounts */}
+        <Text style={s.filterSectionLabel}>Accounts</Text>
+        <View style={s.spaceChips}>
+          <TouchableOpacity style={[s.spaceChip, isAllAccounts && s.spaceChipActive]} onPress={() => setSelectedAccounts(new Set(['all']))} activeOpacity={0.75}>
+            <Text style={[s.spaceChipText, isAllAccounts && s.spaceChipTextActive]}>All</Text>
+          </TouchableOpacity>
+          {accounts.map((ac: any) => {
+            const active = selectedAccounts.has(ac.id);
+            return (
+              <TouchableOpacity key={ac.id} style={[s.spaceChip, active && s.spaceChipActive]} onPress={() => {
+                setSelectedAccounts(prev => {
+                  const next = new Set(prev); next.delete('all');
+                  if (next.has(ac.id)) { next.delete(ac.id); if (next.size === 0) return new Set(['all']); }
+                  else next.add(ac.id);
+                  return next;
+                });
+              }} activeOpacity={0.75}>
+                <Text style={[s.spaceChipText, active && s.spaceChipTextActive]}>{ac.account_name}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
 
         {/* Amount sort */}
         <Text style={s.filterSectionLabel}>Sort by Amount</Text>
