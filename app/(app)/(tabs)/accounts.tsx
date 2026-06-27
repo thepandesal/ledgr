@@ -49,7 +49,7 @@ const { data: accounts = [] } = useQuery<Account[]>({
   };
 
   return (
-    <SafeAreaView style={ flex: 1, backgroundColor: '#F7F8FA' }>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#F7F8FA' }}>
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
         <Text style={s.pageTitle}>accounts</Text>
         <Text style={s.pageSubtitle}>your saved payment methods.</Text>
