@@ -31,10 +31,11 @@ interface Props {
   onClose: () => void;
   sub?: string;
   title: string;
+  height?: string | number;
   children: React.ReactNode;
 }
 
-export default function BottomSheet({ visible, onClose, sub, title, children }: Props) {
+export default function BottomSheet({ visible, onClose, sub, title, height, children }: Props) {
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <KeyboardAvoidingView
@@ -45,7 +46,7 @@ export default function BottomSheet({ visible, onClose, sub, title, children }: 
         <TouchableOpacity style={s.flex} activeOpacity={1} onPress={onClose} />
 
         {/* Sheet */}
-        <View style={formStyles.sheet}>
+        <View style={[formStyles.sheet, height ? { height } : undefined]}>
           <View style={formStyles.header}>
             <View>
               {sub ? <Text style={formStyles.headerSub}>{sub}</Text> : null}

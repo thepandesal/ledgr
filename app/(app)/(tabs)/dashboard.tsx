@@ -123,7 +123,7 @@ export default function DashboardScreen() {
     queryFn: async () => {
       const { data } = await supabase
         .from('user_settings')
-        .select('cutoff_day, dashboard_preset, dashboard_custom_from, dashboard_custom_to, dashboard_space_ids, dashboard_tab_ids, dashboard_range_offset')
+        .select('cutoff_day, dashboard_preset, dashboard_custom_from, dashboard_custom_to, dashboard_space_ids, dashboard_tab_ids, dashboard_range_offset, dashboard_amount_sort, dashboard_account_ids')
         .eq('user_id', userId)
         .maybeSingle();
       if (!data) return data;
@@ -140,6 +140,11 @@ export default function DashboardScreen() {
         setSelectedTabs(new Set(tabs.length ? tabs as ActivityTab[] : ['all']));
       }
       if (data.dashboard_range_offset != null) setRangeOffset(Number(data.dashboard_range_offset));
+      if (data.dashboard_amount_sort)  setAmountSort(data.dashboard_amount_sort as any);
+      if (data.dashboard_account_ids) {
+        const ids = (data.dashboard_account_ids as string).split(',').filter(Boolean);
+        setSelectedAccounts(new Set(ids.length ? ids : ['all']));
+      }
       return data;
     },
     enabled: !!userId,
@@ -606,9 +611,23 @@ export default function DashboardScreen() {
       </BottomSheet>
 
       {/* ── Filter modal ── */}
-      <BottomSheet visible={showFilterModal} onClose={() => setShowFilterModal(false)} title="filter">
+      <BottomSheet visible={showFilterModal} onClose={() => setShowFilterModal(false)} title="filter" height='45%'>
 
-        {/* Spaces */}
+        {/* Clear all + section labels */}
+        <TouchableOpacity
+          style={s.clearBtn}
+          onPress={() => {
+            setSelectedSpaces(new Set(['all']));
+            setSelectedAccounts(new Set(['all']));
+            setAmountSort('none');
+            saveSettings.mutate({ dashboard_space_ids: '', dashboard_account_ids: '', dashboard_amount_sort: 'none' });
+          }}
+          activeOpacity={0.75}
+        >
+          <Text style={s.clearBtnText}>Clear All Filters</Text>
+        </TouchableOpacity>
+
+        {/* Spaces */}}
         <Text style={s.filterSectionLabel}>Spaces</Text>
         <View style={s.spaceChips}>
           <TouchableOpacity style={[s.spaceChip, isAllSpaces && s.spaceChipActive]} onPress={() => { setSelectedSpaces(new Set(['all'])); saveSettings.mutate({ dashboard_space_ids: '' }); }} activeOpacity={0.75}>
@@ -639,6 +658,8 @@ export default function DashboardScreen() {
                   const next = new Set(prev); next.delete('all');
                   if (next.has(ac.id)) { next.delete(ac.id); if (next.size === 0) return new Set(['all']); }
                   else next.add(ac.id);
+                  const ids = [...next].join(',');
+                  saveSettings.mutate({ dashboard_account_ids: ids });
                   return next;
                 });
               }} activeOpacity={0.75}>
@@ -652,7 +673,10 @@ export default function DashboardScreen() {
         <Text style={s.filterSectionLabel}>Sort by Amount</Text>
         <View style={s.spaceChips}>
           {(['none', 'high', 'low'] as const).map(opt => (
-            <TouchableOpacity key={opt} style={[s.spaceChip, amountSort === opt && s.spaceChipActive]} onPress={() => setAmountSort(opt)} activeOpacity={0.75}>
+            <TouchableOpacity key={opt} style={[s.spaceChip, amountSort === opt && s.spaceChipActive]} onPress={() => {
+              setAmountSort(opt);
+              saveSettings.mutate({ dashboard_amount_sort: opt });
+            }} activeOpacity={0.75}>
               <Text style={[s.spaceChipText, amountSort === opt && s.spaceChipTextActive]}>
                 {opt === 'none' ? 'Default' : opt === 'high' ? 'High → Low' : 'Low → High'}
               </Text>
@@ -820,6 +844,8 @@ const s = StyleSheet.create({
   collapsible: { gap: 10 },
   tabFilterHeader: { gap: 10, marginBottom: 8 },
   filterSectionLabel: { fontFamily: IS, fontSize: 11, color: P.secondary, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8, marginTop: 4 },
+  clearBtn: { alignSelf: 'flex-end', marginBottom: 12, paddingHorizontal: 14, paddingVertical: 7, borderRadius: Radius.pill, backgroundColor: P.tealLight },
+  clearBtnText: { fontFamily: IS, fontSize: 12, color: P.tealDark },
   dateNavRow:   { flexDirection: 'row', alignItems: 'center', gap: 4 },
   dateNavArrow: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: P.tealLight },
 });
