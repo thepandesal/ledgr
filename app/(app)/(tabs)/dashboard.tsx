@@ -67,19 +67,20 @@ function getRangeForPreset(preset: Preset, cutoffDay: number, offset = 0): { fro
   const now = new Date();
   if (preset === 'this-month') {
     return { from: new Date(now.getFullYear(), now.getMonth() + offset, 1), to: new Date(now.getFullYear(), now.getMonth() + offset + 1, 0) };
+  }
   if (preset === 'last-30') {
-    const from = new Date(now); from.setDate(now.getDate() - 30);
-    return { from, to: now };
+    const base = new Date(now); base.setDate(now.getDate() + offset * 30);
+    const from = new Date(base); from.setDate(base.getDate() - 30);
+    return { from, to: base };
+  }
   if (preset === 'cutoff') {
     const day = cutoffDay;
     let from: Date, to: Date;
-    if (now.getDate() >= day) {
-      from = new Date(now.getFullYear(), now.getMonth(), day);
-      to   = new Date(now.getFullYear(), now.getMonth() + 1, day - 1);
-    } else {
-      from = new Date(now.getFullYear(), now.getMonth() - 1, day);
-      to   = new Date(now.getFullYear(), now.getMonth(), day - 1);
+    const baseMonth = now.getDate() >= day ? now.getMonth() : now.getMonth() - 1;
+    from = new Date(now.getFullYear(), baseMonth + offset, day);
+    to   = new Date(now.getFullYear(), baseMonth + offset + 1, day - 1);
     return { from, to };
+  }
   // custom — caller manages dates
   return { from: new Date(now.getFullYear(), now.getMonth(), 1), to: now };
 }
