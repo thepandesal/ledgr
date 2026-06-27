@@ -1,6 +1,6 @@
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  SafeAreaView, ActivityIndicator, TextInput, Animated,
+  SafeAreaView, ActivityIndicator, TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useRef } from 'react';
@@ -215,8 +215,7 @@ export default function DashboardScreen() {
   });
 
   const [showFilterModal, setShowFilterModal] = useState(false);
-  const [controlsVisible, setControlsVisible] = useState(true);
-  const collapseAnim = useRef(new Animated.Value(1)).current;
+
 
   const lastScrollY = useRef(0);
 
@@ -642,7 +641,7 @@ export default function DashboardScreen() {
             <Text style={s.emptyText}>no {activeTabData.label.toLowerCase()} found{`\n`}for this period</Text>
           </View>
         ) : (
-          <ScrollView key={filtered.map(i => i.id).join() + amountSort} contentContainerStyle={s.list} showsVerticalScrollIndicator={false} onScroll={onScroll} scrollEventThrottle={16}>
+          <ScrollView key={filtered.map(i => i.id).join() + amountSort} contentContainerStyle={s.list} showsVerticalScrollIndicator={false}>
             {sortedFiltered(filtered).map((item, idx) => {
               const prevDate = sortedFiltered(filtered)[idx - 1]?.transaction_date;
               const showDate = item.transaction_date !== prevDate;
