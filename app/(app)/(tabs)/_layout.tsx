@@ -1,4 +1,4 @@
-import { View, TouchableOpacity, Text, StyleSheet, Animated, Dimensions, Platform } from 'react-native';
+import { View, TouchableOpacity, Text, StyleSheet, Animated, Dimensions, Platform, Alert, SafeAreaView, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useRef, memo } from 'react';
 import { BlurView } from 'expo-blur';
@@ -10,6 +10,8 @@ import CategoriesScreen from './categories';
 import DashboardScreen from './dashboard';
 import { Colors, Fonts, Radius, Spacing } from '@/components/ui/theme';
 import { useRouter } from 'expo-router';
+import { supabase } from '../../../src/lib/supabase';
+import { useUser } from '../../../src/hooks/useUser';
 
 const { width } = Dimensions.get('window');
 
@@ -17,7 +19,7 @@ const MAIN_TABS = [
   { key: 'spaces',        label: 'Spaces',     icon: 'grid' },
   { key: 'accounts',      label: 'Accounts',   icon: 'wallet-outline' },
   { key: 'dashboard',     label: 'Dashboard',  icon: 'pulse-outline' },
-  { key: 'notifications', label: 'Notifs',     icon: 'notifications-outline' },
+  { key: 'notifications', label: 'Profile',   icon: 'person-outline' },
   { key: 'others',        label: 'Others',     icon: 'apps-outline' },
 ];
 
@@ -47,16 +49,103 @@ const SCREENS: Record<string, React.ReactNode> = {
   receipts:     <MemoReceipts />,
 };
 
-function NotificationsScreen() {
+function ProfileScreen() {
+  const router = useRouter();
+  const { user, userName } = useUser();
+  const email = user?.email ?? '';
+  const joinedDate = user?.created_at
+    ? new Date(user.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+    : '';
+
+  const handleLogout = () => {
+    Alert.alert('Log Out', 'Are you sure you want to log out?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Log Out', style: 'destructive', onPress: async () => {
+        await supabase.auth.signOut();
+        router.replace('/');
+      }},
+    ]);
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete Account',
+      'This will permanently delete your account and all your data. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: async () => {
+          await supabase.auth.admin?.deleteUser(user!.id).catch(() => null);
+          await supabase.auth.signOut();
+          router.replace('/');
+        }},
+      ]
+    );
+  };
+
   return (
-    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#ffffff', gap: 12 }}>
-      <Text style={{ fontSize: 40 }}>🍳</Text>
-      <Text style={{ fontFamily: 'ChillaxMedium', fontSize: 18, color: Colors.text }}>notifications</Text>
-      <Text style={{ fontFamily: 'ChillaxRegular', fontSize: 13, color: Colors.muted }}>we're cooking something</Text>
-    </View>
+    <SafeAreaView style={p.container}>
+      <ScrollView contentContainerStyle={p.scroll} showsVerticalScrollIndicator={false}>
+
+        {/* Avatar + name */}
+        <View style={p.avatarSection}>
+          <View style={p.avatar}>
+            <Text style={p.avatarText}>{userName ? userName.charAt(0).toUpperCase() : '?'}</Text>
+          </View>
+          <Text style={p.name}>{userName || 'My Account'}</Text>
+          <Text style={p.email}>{email}</Text>
+        </View>
+
+        {/* Info card */}
+        <View style={p.card}>
+          <View style={p.row}>
+            <View style={p.rowIcon}><Ionicons name="person-outline" size={16} color='#4ECDC4' /></View>
+            <View style={p.rowBody}>
+              <Text style={p.rowLabel}>Full Name</Text>
+              <Text style={p.rowValue}>{userName || '—'}</Text>
+            </View>
+          </View>
+          <View style={p.divider} />
+          <View style={p.row}>
+            <View style={p.rowIcon}><Ionicons name="mail-outline" size={16} color='#4ECDC4' /></View>
+            <View style={p.rowBody}>
+              <Text style={p.rowLabel}>Email</Text>
+              <Text style={p.rowValue}>{email || '—'}</Text>
+            </View>
+          </View>
+          <View style={p.divider} />
+          <View style={p.row}>
+            <View style={p.rowIcon}><Ionicons name="calendar-outline" size={16} color='#4ECDC4' /></View>
+            <View style={p.rowBody}>
+              <Text style={p.rowLabel}>Member Since</Text>
+              <Text style={p.rowValue}>{joinedDate || '—'}</Text>
+            </View>
+          </View>
+          <View style={p.divider} />
+          <View style={p.row}>
+            <View style={p.rowIcon}><Ionicons name="shield-checkmark-outline" size={16} color='#4ECDC4' /></View>
+            <View style={p.rowBody}>
+              <Text style={p.rowLabel}>Account Status</Text>
+              <Text style={[p.rowValue, { color: '#4ECDC4' }]}>Active</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Actions */}
+        <TouchableOpacity style={p.logoutBtn} onPress={handleLogout} activeOpacity={0.8}>
+          <Ionicons name="log-out-outline" size={18} color='#1A1A2E' />
+          <Text style={p.logoutText}>Log Out</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={p.deleteBtn} onPress={handleDeleteAccount} activeOpacity={0.8}>
+          <Ionicons name="trash-outline" size={18} color='#FFAB91' />
+          <Text style={p.deleteText}>Delete Account</Text>
+        </TouchableOpacity>
+
+      </ScrollView>
+    </SafeAreaView>
   );
 }
-const MemoNotifications = memo(NotificationsScreen);
+const MemoProfile = memo(ProfileScreen);
 
 export default function TabsLayout() {
   const router = useRouter();
@@ -136,12 +225,12 @@ export default function TabsLayout() {
           </Animated.View>
         ))}
 
-        {/* Notifications — animated like other tabs */}
+        {/* Profile screen */}
         <Animated.View
           style={[s.screen, { transform: [{ translateX: notifAnim }], zIndex: activeTab === 'notifications' ? 10 : 0 }]}
           pointerEvents={activeTab === 'notifications' ? 'auto' : 'none'}
         >
-          <MemoNotifications />
+          <MemoProfile />
         </Animated.View>
       </View>
 
@@ -280,4 +369,48 @@ const s = StyleSheet.create({
   bubbleIconWrapActive: { backgroundColor: '#D1E6E0' },
   bubbleItemLabel: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 14, color: Colors.text },
   bubbleItemLabelActive: { color: '#1A1A1A' },
+});
+
+const p = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#F7F8FA' },
+  scroll:    { paddingHorizontal: 20, paddingTop: 32, paddingBottom: 60, gap: 16 },
+
+  avatarSection: { alignItems: 'center', gap: 8, marginBottom: 8 },
+  avatar: {
+    width: 80, height: 80, borderRadius: 40,
+    backgroundColor: '#4ECDC4',
+    justifyContent: 'center', alignItems: 'center',
+    marginBottom: 4,
+  },
+  avatarText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 32, color: '#FFFFFF' },
+  name:  { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 22, color: '#1A1A2E', letterSpacing: -0.5 },
+  email: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 13, color: '#9A9DB0' },
+
+  card: {
+    backgroundColor: '#FFFFFF', borderRadius: 20,
+    borderWidth: 1, borderColor: '#ECECEC',
+    paddingHorizontal: 16,
+  },
+  row:     { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 16 },
+  rowIcon: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#E0F5F4', justifyContent: 'center', alignItems: 'center' },
+  rowBody: { flex: 1, gap: 2 },
+  rowLabel: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 11, color: '#9A9DB0', letterSpacing: 0.3 },
+  rowValue: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 14, color: '#1A1A2E' },
+  divider:  { height: 1, backgroundColor: '#ECECEC', marginLeft: 46 },
+
+  logoutBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    backgroundColor: '#FFFFFF', borderRadius: 16,
+    borderWidth: 1, borderColor: '#ECECEC',
+    paddingVertical: 16,
+  },
+  logoutText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 14, color: '#1A1A2E' },
+
+  deleteBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    backgroundColor: '#FFF5F2', borderRadius: 16,
+    borderWidth: 1, borderColor: '#FFAB91',
+    paddingVertical: 16,
+  },
+  deleteText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 14, color: '#FFAB91' },
 });
