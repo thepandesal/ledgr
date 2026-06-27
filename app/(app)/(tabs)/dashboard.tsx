@@ -256,9 +256,9 @@ export default function DashboardScreen() {
     const y = e.nativeEvent.contentOffset.y;
     const diff = y - lastScrollY.current;
     if (diff > 6 && y > 30)
-      Animated.timing(headerAnim, { toValue: 0, duration: 180, useNativeDriver: true }).start();
+      Animated.timing(headerAnim, { toValue: 0, duration: 180, useNativeDriver: false }).start();
     else if (diff < -6)
-      Animated.timing(headerAnim, { toValue: 1, duration: 180, useNativeDriver: true }).start();
+      Animated.timing(headerAnim, { toValue: 1, duration: 180, useNativeDriver: false }).start();
     lastScrollY.current = y;
   };
 

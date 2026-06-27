@@ -182,15 +182,15 @@ export default function TabsLayout() {
   const openOthers = () => {
     setOthersOpen(true);
     Animated.parallel([
-      Animated.spring(bubbleAnim,  { toValue: 1, useNativeDriver: true, tension: 70, friction: 10 }),
-      Animated.spring(bubbleScale, { toValue: 1, useNativeDriver: true, tension: 70, friction: 10 }),
+      Animated.spring(bubbleAnim,  { toValue: 1, useNativeDriver: false, tension: 70, friction: 10 }),
+      Animated.spring(bubbleScale, { toValue: 1, useNativeDriver: false, tension: 70, friction: 10 }),
     ]).start();
   };
 
   const closeOthers = () => {
     Animated.parallel([
-      Animated.timing(bubbleAnim,  { toValue: 0, duration: 180, useNativeDriver: true }),
-      Animated.timing(bubbleScale, { toValue: 0.92, duration: 180, useNativeDriver: true }),
+      Animated.timing(bubbleAnim,  { toValue: 0, duration: 180, useNativeDriver: false }),
+      Animated.timing(bubbleScale, { toValue: 0.92, duration: 180, useNativeDriver: false }),
     ]).start(() => setOthersOpen(false));
   };
 
@@ -414,3 +414,4 @@ const p = StyleSheet.create({
   },
   deleteText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 14, color: '#FFAB91' },
 });
+
