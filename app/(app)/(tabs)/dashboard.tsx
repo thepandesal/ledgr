@@ -584,12 +584,6 @@ export default function DashboardScreen() {
         </View>{/* end statsCard */}
 
       </View>{/* end topSection */}
-
-      {/* ── Sticky animated tabs + filter card ── */}
-      <Animated.View style={[s.stickyCard, {
-        opacity: headerAnim,
-        transform: [{ translateY: headerAnim.interpolate({ inputRange: [0, 1], outputRange: [-headerHeight, 0] }) }],
-      }]}>
         <View style={s.tabRow}>
           {ACTIVITY_TABS.map(tab => {
             const isActive = selectedTabs.has(tab.key);
@@ -627,8 +621,14 @@ export default function DashboardScreen() {
         </View>
       </Animated.View>
 
-      {/* ── Recordings sheet ── */}
+      {/* ── Recordings sheet — menu floats on top ── */}
       <View style={s.sheet}>
+        {/* Floating sticky card — absolutely positioned over the list */}
+        <Animated.View style={[s.stickyCard, {
+          opacity: headerAnim,
+          transform: [{ translateY: headerAnim.interpolate({ inputRange: [0, 1], outputRange: [-headerHeight, 0] }) }],
+        }]}>
+        </Animated.View>
         {isLoading ? (
           <ActivityIndicator color={P.teal} style={{ marginTop: 48 }} />
         ) : filtered.length === 0 ? (
@@ -919,7 +919,7 @@ const s = StyleSheet.create({
   emptyText:     { fontFamily: IM, fontSize: 13, color: P.secondary, textAlign: 'center', lineHeight: 21, letterSpacing: 0.2 },
 
   // Transaction list
-  list:           { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 20, gap: 12 },
+  list:           { paddingHorizontal: 16, paddingTop: 132, paddingBottom: 20, gap: 12 },
   dateHeaderRow:  { marginTop: 16, marginBottom: 8, paddingHorizontal: 4, borderTopWidth: 1, borderTopColor: P.border, paddingTop: 16 },
   dateHeaderText: { fontFamily: IS, fontSize: 10, color: P.secondary, letterSpacing: 1.4, textTransform: 'uppercase' },
 
@@ -984,7 +984,7 @@ const s = StyleSheet.create({
   statusChipTextActive: { color: P.text },
   collapsible: { gap: 10 },
   tabFilterHeader: { gap: 10, marginBottom: 8 },
-  stickyCard: { marginHorizontal: 16, marginBottom: 8, backgroundColor: P.card, borderRadius: 20, paddingTop: 12, paddingBottom: 8, gap: 8, zIndex: 10 },
+  stickyCard: { position: 'absolute', top: 0, left: 16, right: 16, backgroundColor: P.card, borderRadius: 20, paddingTop: 12, paddingBottom: 8, gap: 8, zIndex: 10 },
   filterSectionLabel: { fontFamily: IS, fontSize: 11, color: P.secondary, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8, marginTop: 4 },
   dateNavRow:   { flexDirection: 'row', alignItems: 'center', gap: 4 },
   dateNavArrow: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: P.tealLight },
