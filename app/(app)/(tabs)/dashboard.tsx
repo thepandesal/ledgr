@@ -954,4 +954,26 @@ const s = StyleSheet.create({
   dateNavArrow: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: P.tealLight },
 });
 
-
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('user_settings')
+        .select('cutoff_day, dashboard_preset, dashboard_custom_from, dashboard_custom_to, dashboard_space_ids, dashboard_tab_ids, dashboard_range_offset')
+        .eq('user_id', userId)
+        .maybeSingle();
+      if (!data) return data;
+      if (data.cutoff_day) { setCutoffDay(data.cutoff_day); setCutoffInput(String(data.cutoff_day)); }
+      if (data.dashboard_preset) setActivePreset(data.dashboard_preset as Preset);
+      if (data.dashboard_custom_from) setCustomFrom(new Date(data.dashboard_custom_from));
+      if (data.dashboard_custom_to)   setCustomTo(new Date(data.dashboard_custom_to));
+      if (data.dashboard_space_ids) {
+        const ids = (data.dashboard_space_ids as string).split(',').filter(Boolean);
+        setSelectedSpaces(new Set(ids.length ? ids : ['all']));
+      }
+      if (data.dashboard_tab_ids) {
+        const tabs = (data.dashboard_tab_ids as string).split(',').filter(Boolean);
+        setSelectedTabs(new Set(tabs.length ? tabs as ActivityTab[] : ['all']));
+      }
+      if (data.dashboard_range_offset != null) setRangeOffset(Number(data.dashboard_range_offset));
+      return data;
+    },
+    
