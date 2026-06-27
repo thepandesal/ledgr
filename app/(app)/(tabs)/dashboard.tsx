@@ -1,6 +1,6 @@
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  SafeAreaView, ActivityIndicator, TextInput,
+  SafeAreaView, ActivityIndicator, TextInput, Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useRef } from 'react';
@@ -215,6 +215,20 @@ export default function DashboardScreen() {
   });
 
   const [showFilterModal, setShowFilterModal] = useState(false);
+  const headerAnim   = useRef(new Animated.Value(1)).current;
+  const lastScrollY  = useRef(0);
+  const headerHeight = 120; // approx height of tab+filter card
+
+  const onScroll = (e: any) => {
+    const y    = e.nativeEvent.contentOffset.y;
+    const diff = y - lastScrollY.current;
+    if (diff > 6 && y > 40) {
+      Animated.timing(headerAnim, { toValue: 0, duration: 200, useNativeDriver: true }).start();
+    } else if (diff < -6) {
+      Animated.timing(headerAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start();
+    }
+    lastScrollY.current = y;
+  };
 
   const [selectedAccounts, setSelectedAccounts] = useState<Set<string>>(new Set(['all']));
   const [amountSort, setAmountSort] = useState<'none' | 'high' | 'low'>('none');
@@ -571,7 +585,49 @@ export default function DashboardScreen() {
 
       </View>{/* end topSection */}
 
-      {/* ── White bottom sheet ── */}
+      {/* ── Sticky animated tabs + filter card ── */}
+      <Animated.View style={[s.stickyCard, {
+        opacity: headerAnim,
+        transform: [{ translateY: headerAnim.interpolate({ inputRange: [0, 1], outputRange: [-headerHeight, 0] }) }],
+      }]}>
+        <View style={s.tabRow}>
+          {ACTIVITY_TABS.map(tab => {
+            const isActive = selectedTabs.has(tab.key);
+            return (
+              <TouchableOpacity key={tab.key} style={s.tabWrap} onPress={() => handleTabToggle(tab.key)} activeOpacity={0.75}>
+                <View style={[s.tabCircle, isActive && s.tabCircleActive]}>
+                  <Ionicons name={tab.icon as any} size={16} color={isActive ? '#FFFFFF' : P.secondary} />
+                </View>
+                <Text style={[s.tabLabel, isActive && s.tabLabelActive]}>{tab.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+        <View style={s.filterRow}>
+          <View style={s.dateNavRow}>
+            <TouchableOpacity style={s.dateNavArrow} onPress={() => navigateRange(-1)} activeOpacity={0.7}>
+              <Ionicons name="chevron-back" size={14} color={P.tealDark} />
+            </TouchableOpacity>
+            <TouchableOpacity style={s.filterBtn} onPress={() => setShowDateModal(true)} activeOpacity={0.75}>
+              <Ionicons name="calendar-outline" size={13} color={P.tealDark} />
+              <Text style={s.filterBtnText}>{rangeLabel}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.dateNavArrow} onPress={() => navigateRange(1)} activeOpacity={0.7}>
+              <Ionicons name="chevron-forward" size={14} color={P.tealDark} />
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity
+            style={[s.filterBtn, (!isAllSpaces || !isAllAccounts || amountSort !== 'none') && s.filterBtnActive]}
+            onPress={() => setShowFilterModal(true)}
+            activeOpacity={0.75}
+          >
+            <Ionicons name="options-outline" size={13} color={(!isAllSpaces || !isAllAccounts || amountSort !== 'none') ? P.teal : P.secondary} />
+            <Text style={[s.filterBtnText, (!isAllSpaces || !isAllAccounts || amountSort !== 'none') && s.filterBtnTextActive]}>Filter</Text>
+          </TouchableOpacity>
+        </View>
+      </Animated.View>
+
+      {/* ── Recordings sheet ── */}
       <View style={s.sheet}>
         {isLoading ? (
           <ActivityIndicator color={P.teal} style={{ marginTop: 48 }} />
@@ -584,45 +640,8 @@ export default function DashboardScreen() {
             <Text style={s.emptyText}>no {activeTabData.label.toLowerCase()} found{`\n`}for this period</Text>
           </View>
         ) : (
-          <ScrollView key={filtered.map(i => i.id).join() + amountSort} contentContainerStyle={s.list} showsVerticalScrollIndicator={false}>
-            {/* ── Tabs + filters scroll away with content ── */}
-            <View style={s.tabFilterHeader}>
-              <View style={s.tabRow}>
-                {ACTIVITY_TABS.map(tab => {
-                  const isActive = selectedTabs.has(tab.key);
-                  return (
-                    <TouchableOpacity key={tab.key} style={s.tabWrap} onPress={() => handleTabToggle(tab.key)} activeOpacity={0.75}>
-                      <View style={[s.tabCircle, isActive && s.tabCircleActive]}>
-                        <Ionicons name={tab.icon as any} size={16} color={isActive ? '#FFFFFF' : P.secondary} />
-                      </View>
-                      <Text style={[s.tabLabel, isActive && s.tabLabelActive]}>{tab.label}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-              <View style={s.filterRow}>
-                <View style={s.dateNavRow}>
-                  <TouchableOpacity style={s.dateNavArrow} onPress={() => navigateRange(-1)} activeOpacity={0.7}>
-                    <Ionicons name="chevron-back" size={14} color={P.tealDark} />
-                  </TouchableOpacity>
-                  <TouchableOpacity style={s.filterBtn} onPress={() => setShowDateModal(true)} activeOpacity={0.75}>
-                    <Ionicons name="calendar-outline" size={13} color={P.tealDark} />
-                    <Text style={s.filterBtnText}>{rangeLabel}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={s.dateNavArrow} onPress={() => navigateRange(1)} activeOpacity={0.7}>
-                    <Ionicons name="chevron-forward" size={14} color={P.tealDark} />
-                  </TouchableOpacity>
-                </View>
-                <TouchableOpacity
-                  style={[s.filterBtn, (!isAllSpaces || !isAllAccounts || amountSort !== 'none') && s.filterBtnActive]}
-                  onPress={() => setShowFilterModal(true)}
-                  activeOpacity={0.75}
-                >
-                  <Ionicons name="options-outline" size={13} color={(!isAllSpaces || !isAllAccounts || amountSort !== 'none') ? P.teal : P.secondary} />
-                  <Text style={[s.filterBtnText, (!isAllSpaces || !isAllAccounts || amountSort !== 'none') && s.filterBtnTextActive]}>Filter</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
+          <ScrollView key={filtered.map(i => i.id).join() + amountSort} contentContainerStyle={s.list} showsVerticalScrollIndicator={false} onScroll={onScroll} scrollEventThrottle={16}>
+
             {sortedFiltered(filtered).map((item, idx) => {
               const prevDate = sortedFiltered(filtered)[idx - 1]?.transaction_date;
               const showDate = item.transaction_date !== prevDate;
@@ -900,7 +919,7 @@ const s = StyleSheet.create({
   emptyText:     { fontFamily: IM, fontSize: 13, color: P.secondary, textAlign: 'center', lineHeight: 21, letterSpacing: 0.2 },
 
   // Transaction list
-  list:           { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 20, gap: 12 },
+  list:           { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 20, gap: 12 },
   dateHeaderRow:  { marginTop: 16, marginBottom: 8, paddingHorizontal: 4, borderTopWidth: 1, borderTopColor: P.border, paddingTop: 16 },
   dateHeaderText: { fontFamily: IS, fontSize: 10, color: P.secondary, letterSpacing: 1.4, textTransform: 'uppercase' },
 
@@ -965,6 +984,7 @@ const s = StyleSheet.create({
   statusChipTextActive: { color: P.text },
   collapsible: { gap: 10 },
   tabFilterHeader: { gap: 10, marginBottom: 8 },
+  stickyCard: { marginHorizontal: 16, marginBottom: 8, backgroundColor: P.card, borderRadius: 20, paddingTop: 12, paddingBottom: 8, gap: 8, zIndex: 10 },
   filterSectionLabel: { fontFamily: IS, fontSize: 11, color: P.secondary, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8, marginTop: 4 },
   dateNavRow:   { flexDirection: 'row', alignItems: 'center', gap: 4 },
   dateNavArrow: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: P.tealLight },
