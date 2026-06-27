@@ -69,16 +69,19 @@ function getRangeForPreset(preset: Preset, cutoffDay: number, offset = 0): { fro
     return { from: new Date(now.getFullYear(), now.getMonth() + offset, 1), to: new Date(now.getFullYear(), now.getMonth() + offset + 1, 0) };
   }
   if (preset === 'last-30') {
-    const base = new Date(now); base.setDate(now.getDate() + offset * 30);
-    const from = new Date(base); from.setDate(base.getDate() - 30);
-    return { from, to: base };
+    const from = new Date(now); from.setDate(now.getDate() - 30);
+    return { from, to: now };
   }
   if (preset === 'cutoff') {
     const day = cutoffDay;
     let from: Date, to: Date;
-    const baseMonth = now.getDate() >= day ? now.getMonth() : now.getMonth() - 1;
-    from = new Date(now.getFullYear(), baseMonth + offset, day);
-    to   = new Date(now.getFullYear(), baseMonth + offset + 1, day - 1);
+    if (now.getDate() >= day) {
+      from = new Date(now.getFullYear(), now.getMonth(), day);
+      to   = new Date(now.getFullYear(), now.getMonth() + 1, day - 1);
+    } else {
+      from = new Date(now.getFullYear(), now.getMonth() - 1, day);
+      to   = new Date(now.getFullYear(), now.getMonth(), day - 1);
+    }
     return { from, to };
   }
   // custom — caller manages dates
@@ -163,7 +166,9 @@ export default function DashboardScreen() {
     if (key === 'custom') {
       patch.dashboard_custom_from = customFrom.toISOString();
       patch.dashboard_custom_to   = customTo.toISOString();
+    }
     saveSettings.mutate(patch);
+  };
 
   const navigateRange = (dir: 1 | -1) => {
     if (activePreset === 'custom') {
@@ -177,6 +182,8 @@ export default function DashboardScreen() {
         saveSettings.mutate({ dashboard_range_offset: next });
         return next;
       });
+    }
+  };
 
   const applyCustomRange = (from: Date, to: Date) => {
     setCustomFrom(from); setCustomTo(to);
@@ -186,6 +193,7 @@ export default function DashboardScreen() {
       dashboard_custom_from: from.toISOString(),
       dashboard_custom_to:   to.toISOString(),
     });
+  };
 
   const { data: spaces = [] } = useQuery({
     queryKey: ['spaces-list', userId],
@@ -209,7 +217,21 @@ export default function DashboardScreen() {
   const [showFilterModal, setShowFilterModal] = useState(false);
 
 
+  const lastScrollY = useRef(0);
 
+  const onScroll = (e: any) => {
+    const y = e.nativeEvent.contentOffset.y;
+    const diff = y - lastScrollY.current;
+    // hide when scrolling down past 60px, show when scrolling up
+    if (diff > 8 && y > 60 && controlsVisible) {
+      setControlsVisible(false);
+      Animated.timing(collapseAnim, { toValue: 0, duration: 200, useNativeDriver: false }).start();
+    } else if (diff < -8 && !controlsVisible) {
+      setControlsVisible(true);
+      Animated.timing(collapseAnim, { toValue: 1, duration: 200, useNativeDriver: false }).start();
+    }
+    lastScrollY.current = y;
+  };
   const [selectedAccounts, setSelectedAccounts] = useState<Set<string>>(new Set(['all']));
   const [amountSort, setAmountSort] = useState<'none' | 'high' | 'low'>('none');
 
@@ -254,6 +276,7 @@ export default function DashboardScreen() {
     if (amountSort === 'high') return [...arr].sort((a, b) => Number(b.amount) - Number(a.amount));
     if (amountSort === 'low')  return [...arr].sort((a, b) => Number(a.amount) - Number(b.amount));
     return arr;
+  };
 
   const toggleSpace = (id: string) => {
     setSelectedSpaces(prev => {
@@ -272,6 +295,7 @@ export default function DashboardScreen() {
         return prev;
       });
     }, 0);
+  };
 
   const total = filtered.reduce((s, r) => s + Number(r.amount), 0);
   const activeTabData = ACTIVITY_TABS.find(t => t.key === (isAll ? 'all' : [...selectedTabs][0])) ?? ACTIVITY_TABS[0];
@@ -297,6 +321,7 @@ export default function DashboardScreen() {
     if (n >= 1_000_000) return (n / 1_000_000).toLocaleString('en-US', { maximumFractionDigits: 2 }) + 'M';
     if (n >= 1_000)     return (n / 1_000).toLocaleString('en-US', { maximumFractionDigits: 1 }) + 'K';
     return n.toLocaleString('en-US', { minimumFractionDigits: 2 });
+  };
   const fmtShort = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   const fmtFull  = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   const rangeLabel = isSameDay(range.from, range.to)
@@ -311,9 +336,11 @@ export default function DashboardScreen() {
   const isInRange = (day: number) => {
     const d = new Date(pickerYear, pickerMonth, day);
     return d > customFrom && d < customTo;
+  };
   const isEdge = (day: number) => {
     const d = new Date(pickerYear, pickerMonth, day);
     return isSameDay(d, customFrom) || isSameDay(d, customTo);
+  };
 
   const handleDayPress = (day: number) => {
     const d = new Date(pickerYear, pickerMonth, day);
@@ -322,6 +349,8 @@ export default function DashboardScreen() {
     } else {
       if (d < customFrom) { setCustomFrom(d); setPickingDate('to'); }
       else { applyCustomRange(customFrom, d); setPickingDate('from'); }
+    }
+  };
 
   const handleTabToggle = (key: ActivityTab) => {
     setStatusFilter(null);
@@ -329,6 +358,7 @@ export default function DashboardScreen() {
       setSelectedTabs(new Set(['all']));
       saveSettings.mutate({ dashboard_tab_ids: '' });
       return;
+    }
     setSelectedTabs(prev => {
       const next = new Set(prev);
       next.delete('all');
@@ -337,22 +367,29 @@ export default function DashboardScreen() {
         if (next.size === 0) {
           saveSettings.mutate({ dashboard_tab_ids: '' });
           return new Set(['all']);
+        }
       } else {
         next.add(key);
         if (next.size === 4) {
           saveSettings.mutate({ dashboard_tab_ids: '' });
           return new Set(['all']);
+        }
+      }
       saveSettings.mutate({ dashboard_tab_ids: [...next].join(',') });
       return next;
     });
+  };
 
   const handlePresetSelect = (key: Preset) => {
     if (key === 'custom') {
       if (activePreset !== 'custom') {
         const r = getRangeForPreset('this-month', cutoffDay);
         setCustomFrom(r.from); setCustomTo(r.to);
+      }
       setPickingDate('from');
+    }
     applyPreset(key);
+  };
 
   const typeLabel = (r: any) => {
     if (r.type === 'income')     return { label: 'money in',                color: P.tealDark };
@@ -369,6 +406,7 @@ export default function DashboardScreen() {
       ? { label: 'receivable · partial',  color: P.tealDark }
       : { label: 'receivable',            color: P.tealDark };
     return null;
+  };
 
   return (
     <SafeAreaView style={s.container}>
@@ -545,9 +583,50 @@ export default function DashboardScreen() {
           );
         })()}
 
-        </View>{/* end statsCard */
+        </View>{/* end statsCard */}
 
-      </View>{/* end topSection */}}
+        {/* Tab filter buttons */}
+        <View style={s.tabRow}>
+          {ACTIVITY_TABS.map(tab => {
+            const isActive = selectedTabs.has(tab.key);
+            return (
+              <TouchableOpacity key={tab.key} style={s.tabWrap} onPress={() => handleTabToggle(tab.key)} activeOpacity={0.75}>
+                <View style={[s.tabCircle, isActive && s.tabCircleActive]}>
+                  <Ionicons name={tab.icon as any} size={16} color={isActive ? '#FFFFFF' : P.secondary} />
+                </View>
+                <Text style={[s.tabLabel, isActive && s.tabLabelActive]}>{tab.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {/* Filter row: date nav + spaces */}
+        <View style={s.filterRow}>
+          <View style={s.dateNavRow}>
+            <TouchableOpacity style={s.dateNavArrow} onPress={() => navigateRange(-1)} activeOpacity={0.7}>
+              <Ionicons name="chevron-back" size={14} color={P.tealDark} />
+            </TouchableOpacity>
+            <TouchableOpacity style={s.filterBtn} onPress={() => setShowDateModal(true)} activeOpacity={0.75}>
+              <Ionicons name="calendar-outline" size={13} color={P.tealDark} />
+              <Text style={s.filterBtnText}>{rangeLabel}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.dateNavArrow} onPress={() => navigateRange(1)} activeOpacity={0.7}>
+              <Ionicons name="chevron-forward" size={14} color={P.tealDark} />
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity
+            style={[s.filterBtn, !isAllSpaces && s.filterBtnActive]}
+            onPress={() => setShowSpaceModal(true)}
+            activeOpacity={0.75}
+          >
+            <Ionicons name="layers-outline" size={13} color={!isAllSpaces ? P.teal : P.secondary} />
+            <Text style={[s.filterBtnText, !isAllSpaces && s.filterBtnTextActive]}>
+              {isAllSpaces ? 'All Spaces' : `${selectedSpaces.size} space${selectedSpaces.size > 1 ? 's' : ''}`}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+      </View>{/* end topSection */}
 
       {/* ── White bottom sheet ── */}
       <View style={s.sheet}>
@@ -563,53 +642,6 @@ export default function DashboardScreen() {
           </View>
         ) : (
           <ScrollView key={filtered.map(i => i.id).join() + amountSort} contentContainerStyle={s.list} showsVerticalScrollIndicator={false}>
-
-            {/* Tabs + filters — scrolls away naturally */}
-            <View style={s.collapsible}>
-}
-  
-          {/* Tab filter buttons */}
-          <View style={s.tabRow}>
-            {ACTIVITY_TABS.map(tab => {
-              const isActive = selectedTabs.has(tab.key);
-              return (
-                <TouchableOpacity key={tab.key} style={s.tabWrap} onPress={() => handleTabToggle(tab.key)} activeOpacity={0.75}>
-                  <View style={[s.tabCircle, isActive && s.tabCircleActive]}>
-                    <Ionicons name={tab.icon as any} size={16} color={isActive ? '#FFFFFF' : P.secondary} />
-                  </View>
-                  <Text style={[s.tabLabel, isActive && s.tabLabelActive]}>{tab.label}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-  
-          {/* Filter row: date nav + spaces */}
-          <View style={s.filterRow}>
-            <View style={s.dateNavRow}>
-              <TouchableOpacity style={s.dateNavArrow} onPress={() => navigateRange(-1)} activeOpacity={0.7}>
-                <Ionicons name="chevron-back" size={14} color={P.tealDark} />
-              </TouchableOpacity>
-              <TouchableOpacity style={s.filterBtn} onPress={() => setShowDateModal(true)} activeOpacity={0.75}>
-                <Ionicons name="calendar-outline" size={13} color={P.tealDark} />
-                <Text style={s.filterBtnText}>{rangeLabel}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={s.dateNavArrow} onPress={() => navigateRange(1)} activeOpacity={0.7}>
-                <Ionicons name="chevron-forward" size={14} color={P.tealDark} />
-              </TouchableOpacity>
-            </View>
-            <TouchableOpacity
-              style={[s.filterBtn, !isAllSpaces && s.filterBtnActive]}
-              onPress={() => setShowSpaceModal(true)}
-              activeOpacity={0.75}
-            >
-              <Ionicons name="layers-outline" size={13} color={!isAllSpaces ? P.teal : P.secondary} />
-              <Text style={[s.filterBtnText, !isAllSpaces && s.filterBtnTextActive]}>
-                {isAllSpaces ? 'All Spaces' : `${selectedSpaces.size} space${selectedSpaces.size > 1 ? 's' : ''}`}
-              </Text>
-            </TouchableOpacity>
-          </View>
-            </View>
-
             {sortedFiltered(filtered).map((item, idx) => {
               const prevDate = sortedFiltered(filtered)[idx - 1]?.transaction_date;
               const showDate = item.transaction_date !== prevDate;
@@ -956,26 +988,4 @@ const s = StyleSheet.create({
   dateNavArrow: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: P.tealLight },
 });
 
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('user_settings')
-        .select('cutoff_day, dashboard_preset, dashboard_custom_from, dashboard_custom_to, dashboard_space_ids, dashboard_tab_ids, dashboard_range_offset')
-        .eq('user_id', userId)
-        .maybeSingle();
-      if (!data) return data;
-      if (data.cutoff_day) { setCutoffDay(data.cutoff_day); setCutoffInput(String(data.cutoff_day)); }
-      if (data.dashboard_preset) setActivePreset(data.dashboard_preset as Preset);
-      if (data.dashboard_custom_from) setCustomFrom(new Date(data.dashboard_custom_from));
-      if (data.dashboard_custom_to)   setCustomTo(new Date(data.dashboard_custom_to));
-      if (data.dashboard_space_ids) {
-        const ids = (data.dashboard_space_ids as string).split(',').filter(Boolean);
-        setSelectedSpaces(new Set(ids.length ? ids : ['all']));
-      }
-      if (data.dashboard_tab_ids) {
-        const tabs = (data.dashboard_tab_ids as string).split(',').filter(Boolean);
-        setSelectedTabs(new Set(tabs.length ? tabs as ActivityTab[] : ['all']));
-      }
-      if (data.dashboard_range_offset != null) setRangeOffset(Number(data.dashboard_range_offset));
-      return data;
-    },
-    
+
