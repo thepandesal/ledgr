@@ -218,14 +218,20 @@ export default function DashboardScreen() {
   const [controlsVisible, setControlsVisible] = useState(true);
   const collapseAnim = useRef(new Animated.Value(1)).current;
 
-  const toggleControls = () => {
-    const toValue = controlsVisible ? 0 : 1;
-    setControlsVisible(!controlsVisible);
-    Animated.timing(collapseAnim, {
-      toValue,
-      duration: 220,
-      useNativeDriver: false,
-    }).start();
+  const lastScrollY = useRef(0);
+
+  const onScroll = (e: any) => {
+    const y = e.nativeEvent.contentOffset.y;
+    const diff = y - lastScrollY.current;
+    // hide when scrolling down past 60px, show when scrolling up
+    if (diff > 8 && y > 60 && controlsVisible) {
+      setControlsVisible(false);
+      Animated.timing(collapseAnim, { toValue: 0, duration: 200, useNativeDriver: false }).start();
+    } else if (diff < -8 && !controlsVisible) {
+      setControlsVisible(true);
+      Animated.timing(collapseAnim, { toValue: 1, duration: 200, useNativeDriver: false }).start();
+    }
+    lastScrollY.current = y;
   };
   const [selectedAccounts, setSelectedAccounts] = useState<Set<string>>(new Set(['all']));
   const [amountSort, setAmountSort] = useState<'none' | 'high' | 'low'>('none');
@@ -636,7 +642,7 @@ export default function DashboardScreen() {
             <Text style={s.emptyText}>no {activeTabData.label.toLowerCase()} found{`\n`}for this period</Text>
           </View>
         ) : (
-          <ScrollView key={filtered.map(i => i.id).join() + amountSort} contentContainerStyle={s.list} showsVerticalScrollIndicator={false}>
+          <ScrollView key={filtered.map(i => i.id).join() + amountSort} contentContainerStyle={s.list} showsVerticalScrollIndicator={false} onScroll={onScroll} scrollEventThrottle={16}>
             {sortedFiltered(filtered).map((item, idx) => {
               const prevDate = sortedFiltered(filtered)[idx - 1]?.transaction_date;
               const showDate = item.transaction_date !== prevDate;
@@ -978,7 +984,6 @@ const s = StyleSheet.create({
   statusChipText:       { fontFamily: IS, fontSize: 13, color: P.secondary },
   statusChipTextActive: { color: P.text },
   collapsible: { gap: 10 },
-  collapseBtn: { alignSelf: 'center', backgroundColor: P.card, borderRadius: 20, borderWidth: 1, borderColor: P.border, width: 32, height: 20, alignItems: 'center', justifyContent: 'center' },
   filterSectionLabel: { fontFamily: IS, fontSize: 11, color: P.secondary, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8, marginTop: 4 },
   dateNavRow:   { flexDirection: 'row', alignItems: 'center', gap: 4 },
   dateNavArrow: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: P.tealLight },
