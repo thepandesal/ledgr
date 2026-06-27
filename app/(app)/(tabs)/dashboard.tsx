@@ -40,7 +40,7 @@ const P = {
 
 const ACTIVITY_TABS = [
   { key: 'all',         label: 'All',         icon: 'apps-outline',              types: ['income','savings','expense','payable','receivable'], color: P.teal, bg: P.tealLight },
-  { key: 'money-in',    label: 'Money In',    icon: 'arrow-down-circle-outline', types: ['income','savings'], color: P.teal, bg: P.tealLight },
+  { key: 'money-in',    label: 'Money In',    icon: 'arrow-down-circle-outline', types: ['income','savings','return'], color: P.teal, bg: P.tealLight },
   { key: 'money-out',   label: 'Money Out',   icon: 'arrow-up-circle-outline',   types: ['expense'],         color: P.teal, bg: P.tealLight },
   { key: 'loans',       label: 'Loans',       icon: 'cash-outline',              types: ['payable'],         color: P.teal, bg: P.tealLight },
   { key: 'receivables', label: 'Receivables', icon: 'arrow-undo-outline',        types: ['receivable'],      color: P.teal, bg: P.tealLight },
@@ -253,12 +253,17 @@ export default function DashboardScreen() {
     ? ['income','savings','expense','payable','receivable']
     : ACTIVITY_TABS.filter(t => t.key !== 'all' && selectedTabs.has(t.key)).flatMap(t => t.types as string[]);
 
+  // treat 'return' same as 'income' for filtering
+  const effectiveTypes = currentTypes.includes('income')
+    ? [...new Set([...currentTypes, 'return'])]
+    : currentTypes;
+
   const isAllSpaces    = selectedSpaces.has('all');
   const isAllAccounts  = selectedAccounts.has('all');
 
 
   const filtered = recordings.filter(r => {
-    if (!currentTypes.includes(r.type)) return false;
+    if (!effectiveTypes.includes(r.type)) return false;
     if (!isAllSpaces     && !selectedSpaces.has(r.space_id))                    return false;
     const [y, m, d] = r.transaction_date.split('-').map(Number);
     const date = new Date(y, m - 1, d);
@@ -300,17 +305,11 @@ export default function DashboardScreen() {
   const total = filtered.reduce((s, r) => s + Number(r.amount), 0);
   const activeTabData = ACTIVITY_TABS.find(t => t.key === (isAll ? 'all' : [...selectedTabs][0])) ?? ACTIVITY_TABS[0];
   const allRecordings = (types: string[]) => recordings.filter(r => {
-    if (!types.includes(r.type)) return false;
-    if (!isAllSpaces     && !selectedSpaces.has(r.space_id))                    return false;
-    const [y, m, d] = r.transaction_date.split('-').map(Number);
-    const date = new Date(y, m - 1, d);
-    if (date < range.from) return false;
-    const to = new Date(range.to); to.setHours(23, 59, 59);
-    return date <= to;
+    if (!effectiveTypes.includes(r.type)) return false;
   });
 
-  const moneyInTotal    = allRecordings(['income','savings']).reduce((s, r) => s + Number(r.amount), 0);
-  const moneyOutTotal   = allRecordings(['expense']).reduce((s, r) => s + Number(r.amount), 0);
+  const moneyInTotal    = allRecordings(['income','savings','return']).reduce((s, r) => s + Number(r.amount), 0);
+  const moneyOutTotal   = allRecordings(['expense','payment']).reduce((s, r) => s + Number(r.amount), 0);
   const loansActive     = allRecordings(['payable']).filter(r => r.status !== 'paid').length;
   const loansPaid       = allRecordings(['payable']).filter(r => r.status === 'paid').length;
   const receivablesPending  = allRecordings(['receivable']).filter(r => r.status !== 'received').length;
@@ -401,8 +400,9 @@ export default function DashboardScreen() {
   };
 
   const typeLabel = (r: any) => {
-    if (r.type === 'income')     return { label: 'money in',                color: P.tealDark };
-    if (r.type === 'savings')    return { label: 'savings',                 color: P.tealDark };
+    if (r.type === 'income')     return { label: 'money in',   color: P.tealDark };
+    if (r.type === 'savings')    return { label: 'money in',   color: P.tealDark };
+    if (r.type === 'return')     return { label: 'collection', color: P.tealDark };
     if (r.type === 'expense')    return { label: 'money out',               color: P.peach    };
     if (r.type === 'payable')    return r.status === 'paid'
       ? { label: 'loan · paid',    color: P.tealDark }
