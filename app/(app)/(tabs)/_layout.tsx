@@ -66,7 +66,11 @@ function ProfileScreen() {
       console.log('[logout] signOut threw:', e);
     }
     console.log('[logout] navigating to /');
-    router.replace('/' as any);
+    if (typeof window !== 'undefined') {
+      window.location.href = '/';
+    } else {
+      router.replace('/' as any);
+    }
   };
 
   const handleDeleteAccount = async () => {
