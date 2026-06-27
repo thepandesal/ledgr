@@ -67,11 +67,9 @@ function getRangeForPreset(preset: Preset, cutoffDay: number, offset = 0): { fro
   const now = new Date();
   if (preset === 'this-month') {
     return { from: new Date(now.getFullYear(), now.getMonth() + offset, 1), to: new Date(now.getFullYear(), now.getMonth() + offset + 1, 0) };
-  }
   if (preset === 'last-30') {
     const from = new Date(now); from.setDate(now.getDate() - 30);
     return { from, to: now };
-  }
   if (preset === 'cutoff') {
     const day = cutoffDay;
     let from: Date, to: Date;
@@ -81,9 +79,7 @@ function getRangeForPreset(preset: Preset, cutoffDay: number, offset = 0): { fro
     } else {
       from = new Date(now.getFullYear(), now.getMonth() - 1, day);
       to   = new Date(now.getFullYear(), now.getMonth(), day - 1);
-    }
     return { from, to };
-  }
   // custom — caller manages dates
   return { from: new Date(now.getFullYear(), now.getMonth(), 1), to: now };
 }
@@ -134,11 +130,9 @@ export default function DashboardScreen() {
       if (data.dashboard_space_ids) {
         const ids = (data.dashboard_space_ids as string).split(',').filter(Boolean);
         setSelectedSpaces(new Set(ids.length ? ids : ['all']));
-      }
       if (data.dashboard_tab_ids) {
         const tabs = (data.dashboard_tab_ids as string).split(',').filter(Boolean);
         setSelectedTabs(new Set(tabs.length ? tabs as ActivityTab[] : ['all']));
-      }
       if (data.dashboard_range_offset != null) setRangeOffset(Number(data.dashboard_range_offset));
       return data;
     },
@@ -166,9 +160,7 @@ export default function DashboardScreen() {
     if (key === 'custom') {
       patch.dashboard_custom_from = customFrom.toISOString();
       patch.dashboard_custom_to   = customTo.toISOString();
-    }
     saveSettings.mutate(patch);
-  };
 
   const navigateRange = (dir: 1 | -1) => {
     if (activePreset === 'custom') {
@@ -182,8 +174,6 @@ export default function DashboardScreen() {
         saveSettings.mutate({ dashboard_range_offset: next });
         return next;
       });
-    }
-  };
 
   const applyCustomRange = (from: Date, to: Date) => {
     setCustomFrom(from); setCustomTo(to);
@@ -193,7 +183,6 @@ export default function DashboardScreen() {
       dashboard_custom_from: from.toISOString(),
       dashboard_custom_to:   to.toISOString(),
     });
-  };
 
   const { data: spaces = [] } = useQuery({
     queryKey: ['spaces-list', userId],
@@ -218,10 +207,6 @@ export default function DashboardScreen() {
 
 
 
-    const y = e.nativeEvent.contentOffset.y;
-    // hide when scrolling down past 60px, show when scrolling up
-    }
-  };
   const [selectedAccounts, setSelectedAccounts] = useState<Set<string>>(new Set(['all']));
   const [amountSort, setAmountSort] = useState<'none' | 'high' | 'low'>('none');
 
@@ -266,7 +251,6 @@ export default function DashboardScreen() {
     if (amountSort === 'high') return [...arr].sort((a, b) => Number(b.amount) - Number(a.amount));
     if (amountSort === 'low')  return [...arr].sort((a, b) => Number(a.amount) - Number(b.amount));
     return arr;
-  };
 
   const toggleSpace = (id: string) => {
     setSelectedSpaces(prev => {
@@ -285,7 +269,6 @@ export default function DashboardScreen() {
         return prev;
       });
     }, 0);
-  };
 
   const total = filtered.reduce((s, r) => s + Number(r.amount), 0);
   const activeTabData = ACTIVITY_TABS.find(t => t.key === (isAll ? 'all' : [...selectedTabs][0])) ?? ACTIVITY_TABS[0];
@@ -311,7 +294,6 @@ export default function DashboardScreen() {
     if (n >= 1_000_000) return (n / 1_000_000).toLocaleString('en-US', { maximumFractionDigits: 2 }) + 'M';
     if (n >= 1_000)     return (n / 1_000).toLocaleString('en-US', { maximumFractionDigits: 1 }) + 'K';
     return n.toLocaleString('en-US', { minimumFractionDigits: 2 });
-  };
   const fmtShort = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   const fmtFull  = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   const rangeLabel = isSameDay(range.from, range.to)
@@ -326,11 +308,9 @@ export default function DashboardScreen() {
   const isInRange = (day: number) => {
     const d = new Date(pickerYear, pickerMonth, day);
     return d > customFrom && d < customTo;
-  };
   const isEdge = (day: number) => {
     const d = new Date(pickerYear, pickerMonth, day);
     return isSameDay(d, customFrom) || isSameDay(d, customTo);
-  };
 
   const handleDayPress = (day: number) => {
     const d = new Date(pickerYear, pickerMonth, day);
@@ -339,8 +319,6 @@ export default function DashboardScreen() {
     } else {
       if (d < customFrom) { setCustomFrom(d); setPickingDate('to'); }
       else { applyCustomRange(customFrom, d); setPickingDate('from'); }
-    }
-  };
 
   const handleTabToggle = (key: ActivityTab) => {
     setStatusFilter(null);
@@ -348,7 +326,6 @@ export default function DashboardScreen() {
       setSelectedTabs(new Set(['all']));
       saveSettings.mutate({ dashboard_tab_ids: '' });
       return;
-    }
     setSelectedTabs(prev => {
       const next = new Set(prev);
       next.delete('all');
@@ -357,29 +334,22 @@ export default function DashboardScreen() {
         if (next.size === 0) {
           saveSettings.mutate({ dashboard_tab_ids: '' });
           return new Set(['all']);
-        }
       } else {
         next.add(key);
         if (next.size === 4) {
           saveSettings.mutate({ dashboard_tab_ids: '' });
           return new Set(['all']);
-        }
-      }
       saveSettings.mutate({ dashboard_tab_ids: [...next].join(',') });
       return next;
     });
-  };
 
   const handlePresetSelect = (key: Preset) => {
     if (key === 'custom') {
       if (activePreset !== 'custom') {
         const r = getRangeForPreset('this-month', cutoffDay);
         setCustomFrom(r.from); setCustomTo(r.to);
-      }
       setPickingDate('from');
-    }
     applyPreset(key);
-  };
 
   const typeLabel = (r: any) => {
     if (r.type === 'income')     return { label: 'money in',                color: P.tealDark };
@@ -396,7 +366,6 @@ export default function DashboardScreen() {
       ? { label: 'receivable · partial',  color: P.tealDark }
       : { label: 'receivable',            color: P.tealDark };
     return null;
-  };
 
   return (
     <SafeAreaView style={s.container}>
