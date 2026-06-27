@@ -11,7 +11,6 @@ import { useUser } from '../../../src/hooks/useUser';
 import type { Category } from '../../../src/types';
 import BottomSheet from '@/components/ui/BottomSheet';
 import ConfirmModal from '@/components/ui/ConfirmModal';
-import formStyles from '@/components/ui/formStyles';
 import { Colors, Radius } from '@/components/ui/theme';
 
 const T = '#4ECDC4';
@@ -222,36 +221,36 @@ export default function SpacesScreen() {
 
       {/* Create/edit modal */}
       <BottomSheet visible={createModal} onClose={() => { setCreateModal(false); setEditMode(false); }} title={editMode ? 'edit space' : 'new space'}>
-        {error ? <Text style={formStyles.errorText}>{error}</Text> : null}
+        {error ? <Text style={s.qaError}>{error}</Text> : null}
 
-        <Text style={formStyles.sectionLabel}>type</Text>
-        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 4 }}>
+        <Text style={s.qaLabel}>type</Text>
+        <View style={s.typeRow}>
           {(['expense', 'savings'] as const).map(t => (
-            <TouchableOpacity key={t} style={[s.typeBtn, spaceType === t && s.typeBtnActive]} onPress={() => setSpaceType(t)}>
+            <TouchableOpacity key={t} style={[s.typeBtn, spaceType === t && s.typeBtnActive]} onPress={() => setSpaceType(t)} activeOpacity={0.75}>
               <Text style={[s.typeBtnText, spaceType === t && s.typeBtnTextActive]}>{t} tracker</Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        <Text style={formStyles.sectionLabel}>name</Text>
+        <Text style={s.qaLabel}>name</Text>
         <TextInput
-          style={[formStyles.input, error ? { borderColor: Colors.danger } : null]}
+          style={s.qaInput}
           placeholder="e.g. Household"
-          placeholderTextColor={Colors.faint}
+          placeholderTextColor={SEC}
           value={spaceName}
           onChangeText={v => { setSpaceName(v.slice(0, 20)); setError(''); }}
           maxLength={20}
           autoFocus
         />
 
-        <Text style={formStyles.sectionLabel}>
+        <Text style={s.qaLabel}>
           {spaceType === 'expense' ? 'budget' : 'target goal'}{' '}
-          <Text style={{ textTransform: 'none', color: Colors.faint }}>(optional)</Text>
+          <Text style={{ textTransform: 'none', color: SEC }}>(optional)</Text>
         </Text>
         <TextInput
-          style={formStyles.input}
+          style={s.qaInput}
           placeholder="e.g. 10000"
-          placeholderTextColor={Colors.faint}
+          placeholderTextColor={SEC}
           value={spaceBudget}
           onChangeText={setSpaceBudget}
           keyboardType="decimal-pad"
@@ -259,30 +258,25 @@ export default function SpacesScreen() {
 
         {spaceType === 'savings' && (
           <>
-            <Text style={formStyles.sectionLabel}>target date <Text style={{ textTransform: 'none', color: Colors.faint }}>(optional)</Text></Text>
+            <Text style={s.qaLabel}>target date <Text style={{ textTransform: 'none', color: SEC }}>(optional)</Text></Text>
             <TextInput
-              style={formStyles.input}
+              style={s.qaInput}
               placeholder="YYYY-MM-DD"
-              placeholderTextColor={Colors.faint}
+              placeholderTextColor={SEC}
               value={spaceTargetDate}
               onChangeText={setSpaceTargetDate}
             />
           </>
         )}
 
-        <View style={formStyles.actions}>
-          <TouchableOpacity style={formStyles.cancelBtn} onPress={() => setCreateModal(false)}>
-            <Text style={formStyles.cancelBtnText}>cancel</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[formStyles.primaryBtn, (!spaceName.trim() || loading) && { opacity: 0.4 }]}
-            onPress={handleCreate}
-            disabled={loading || !spaceName.trim()}
-            activeOpacity={0.8}
-          >
-            {loading ? <ActivityIndicator color={Colors.white} /> : <Text style={formStyles.primaryBtnText}>{editMode ? 'save changes' : 'create space'}</Text>}
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity
+          style={[s.saveBtn, (!spaceName.trim() || loading) && { opacity: 0.4 }]}
+          onPress={handleCreate}
+          disabled={loading || !spaceName.trim()}
+          activeOpacity={0.8}
+        >
+          {loading ? <ActivityIndicator color="#fff" /> : <Text style={s.saveBtnText}>{editMode ? 'save changes' : 'create space'}</Text>}
+        </TouchableOpacity>
       </BottomSheet>
 
       <ConfirmModal
@@ -339,8 +333,14 @@ const s = StyleSheet.create({
   numberValue:  { fontFamily: B,  fontSize: 15, color: TEXT, letterSpacing: -0.4 },
   numberDivider: { width: 1, height: 32, backgroundColor: BORDER },
 
-  typeBtn:         { flex: 1, paddingVertical: 10, borderRadius: Radius.pill, borderWidth: 1, borderColor: BORDER, backgroundColor: BG, alignItems: 'center' },
+  typeBtn:         { paddingHorizontal: 16, paddingVertical: 9, borderRadius: 999, borderWidth: 1, borderColor: BORDER, backgroundColor: BG },
   typeBtnActive:   { backgroundColor: T, borderColor: T },
   typeBtnText:     { fontFamily: M,  fontSize: 12, color: SEC },
   typeBtnTextActive: { fontFamily: SB, color: '#fff' },
+  typeRow:   { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  qaLabel:   { fontFamily: SB, fontSize: 11, color: SEC, marginBottom: 6, marginTop: 14, letterSpacing: 0.4, textTransform: 'uppercase' },
+  qaInput:   { fontFamily: B, fontSize: 15, color: TEXT, backgroundColor: CARD, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1, borderColor: BORDER },
+  qaError:   { fontFamily: M, fontSize: 12, color: '#FFAB91', marginBottom: 8 },
+  saveBtn:   { backgroundColor: T, borderRadius: 999, paddingVertical: 14, alignItems: 'center', marginTop: 20 },
+  saveBtnText: { fontFamily: SB, fontSize: 14, color: '#FFFFFF' },
 });
