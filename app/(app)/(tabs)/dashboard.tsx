@@ -235,6 +235,17 @@ export default function DashboardScreen() {
   });
 
   const [showFilterModal, setShowFilterModal] = useState(false);
+  const [showAddModal,    setShowAddModal]    = useState(false);
+
+  // ── quick-add form state ──
+  const [qaName,     setQaName]     = useState('');
+  const [qaType,     setQaType]     = useState('expense');
+  const [qaAmount,   setQaAmount]   = useState('');
+  const [qaDate,     setQaDate]     = useState(new Date().toISOString().split('T')[0]);
+  const [qaSpaceId,  setQaSpaceId]  = useState<string | null>(null);
+  const [qaCatId,    setQaCatId]    = useState<string | null>(null);
+  const [qaLoading,  setQaLoading]  = useState(false);
+  const [qaError,    setQaError]    = useState('');
   const headerAnim  = useRef(new Animated.Value(1)).current;
   const lastScrollY = useRef(0);
   const onScroll = (e: any) => {
@@ -423,6 +434,31 @@ export default function DashboardScreen() {
     return '';
   };
 
+  const saveQuickAdd = async () => {
+    if (!qaName.trim() || !qaAmount) { setQaError('name and amount are required.'); return; }
+    setQaLoading(true); setQaError('');
+    try {
+      const statusMap: Record<string, string> = {
+        expense: 'paid', income: 'received', savings: 'saved', return: 'received',
+        payment: 'paid', transfer: 'paid', payable: 'unpaid', receivable: 'pending',
+      };
+      await supabase.from('recordings').insert({
+        user_id: userId,
+        space_id: qaSpaceId || null,
+        name: qaName.trim(),
+        type: qaType,
+        amount: parseFloat(qaAmount),
+        transaction_date: qaDate,
+        category_id: qaCatId || null,
+        status: statusMap[qaType] ?? 'paid',
+      });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-activities', userId] });
+      setShowAddModal(false);
+      setQaName(''); setQaAmount(''); setQaType('expense'); setQaSpaceId(null); setQaCatId(null); setQaError('');
+    } catch (e: any) { setQaError(e.message); }
+    setQaLoading(false);
+  };
+
   const typeLabel = (r: any) => {
     if (r.type === 'income')     return { label: 'income',  color: P.tealDark };
     if (r.type === 'savings')    return { label: 'savings',  color: P.tealDark };
@@ -540,6 +576,69 @@ export default function DashboardScreen() {
           </ScrollView>
         )}
       </View>
+
+      {/* ── Quick Add Recording Modal ── */}
+      <BottomSheet visible={showAddModal} onClose={() => setShowAddModal(false)} title="add recording" height={MODAL_HEIGHT}>
+        {qaError ? <Text style={s.qaError}>{qaError}</Text> : null}
+
+        {/* Type */}
+        <Text style={s.qaLabel}>type</Text>
+        <View style={s.qaTypeRow}>
+          {['income','return','expense','payment','transfer','payable','receivable'].map(t => (
+            <TouchableOpacity key={t} style={[s.qaTypeBtn, qaType === t && s.qaTypeBtnActive]} onPress={() => setQaType(t)} activeOpacity={0.75}>
+              <Text style={[s.qaTypeBtnText, qaType === t && s.qaTypeBtnTextActive]}>{t}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Name */}
+        <Text style={s.qaLabel}>name</Text>
+        <TextInput style={s.qaInput} placeholder="e.g. grocery run" placeholderTextColor={P.muted} value={qaName} onChangeText={setQaName} autoFocus />
+
+        {/* Amount */}
+        <Text style={s.qaLabel}>amount</Text>
+        <TextInput style={s.qaInput} placeholder="0.00" placeholderTextColor={P.muted} value={qaAmount} onChangeText={setQaAmount} keyboardType="decimal-pad" />
+
+        {/* Date */}
+        <Text style={s.qaLabel}>date</Text>
+        <TextInput style={s.qaInput} value={qaDate} onChangeText={setQaDate} placeholder="YYYY-MM-DD" placeholderTextColor={P.muted} />
+
+        {/* Space */}
+        <Text style={s.qaLabel}>space <Text style={s.qaOptional}>(optional)</Text></Text>
+        <View style={s.qaChips}>
+          <TouchableOpacity style={[s.qaChip, !qaSpaceId && s.qaChipActive]} onPress={() => setQaSpaceId(null)} activeOpacity={0.75}>
+            <Text style={[s.qaChipText, !qaSpaceId && s.qaChipTextActive]}>none</Text>
+          </TouchableOpacity>
+          {spaces.map((sp: any) => (
+            <TouchableOpacity key={sp.id} style={[s.qaChip, qaSpaceId === sp.id && s.qaChipActive]} onPress={() => setQaSpaceId(sp.id)} activeOpacity={0.75}>
+              <Text style={[s.qaChipText, qaSpaceId === sp.id && s.qaChipTextActive]}>{sp.name}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Category */}
+        <Text style={s.qaLabel}>category <Text style={s.qaOptional}>(optional)</Text></Text>
+        <View style={s.qaChips}>
+          <TouchableOpacity style={[s.qaChip, !qaCatId && s.qaChipActive]} onPress={() => setQaCatId(null)} activeOpacity={0.75}>
+            <Text style={[s.qaChipText, !qaCatId && s.qaChipTextActive]}>none</Text>
+          </TouchableOpacity>
+          {categories.map((cat: any) => (
+            <TouchableOpacity key={cat.id} style={[s.qaChip, qaCatId === cat.id && s.qaChipActive]} onPress={() => setQaCatId(cat.id)} activeOpacity={0.75}>
+              <Text style={[s.qaChipText, qaCatId === cat.id && s.qaChipTextActive]}>{cat.name}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Save */}
+        <TouchableOpacity
+          style={[s.qaSaveBtn, (!qaName.trim() || !qaAmount || qaLoading) && { opacity: 0.4 }]}
+          onPress={saveQuickAdd}
+          disabled={!qaName.trim() || !qaAmount || qaLoading}
+          activeOpacity={0.8}
+        >
+          {qaLoading ? <ActivityIndicator color="#fff" /> : <Text style={s.qaSaveBtnText}>save</Text>}
+        </TouchableOpacity>
+      </BottomSheet>
 
       {/* ── Date modal ── */}
       <BottomSheet visible={showDateModal} onClose={() => setShowDateModal(false)} title="date range" height={MODAL_HEIGHT}>
@@ -894,6 +993,24 @@ const s = StyleSheet.create({
   statusChip:           { flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: Radius.lg, backgroundColor: P.bg },
   statusChipText:       { fontFamily: IS, fontSize: 13, color: P.secondary },
   statusChipTextActive: { color: P.text },
+  titleRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  addRecBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: P.teal, alignItems: 'center', justifyContent: 'center' },
+  qaError:   { fontFamily: IM, fontSize: 12, color: P.peach, marginBottom: 8 },
+  qaLabel:   { fontFamily: IS, fontSize: 11, color: P.secondary, marginBottom: 6, marginTop: 12, letterSpacing: 0.4, textTransform: 'uppercase' },
+  qaOptional: { fontFamily: I, fontSize: 10, color: P.muted, textTransform: 'none' },
+  qaInput:   { fontFamily: FB, fontSize: 15, color: P.text, backgroundColor: P.card, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1, borderColor: P.border },
+  qaTypeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  qaTypeBtn: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: Radius.pill, backgroundColor: P.card, borderWidth: 1, borderColor: P.border },
+  qaTypeBtnActive: { backgroundColor: P.teal, borderColor: P.teal },
+  qaTypeBtnText: { fontFamily: IM, fontSize: 11, color: P.secondary },
+  qaTypeBtnTextActive: { fontFamily: IS, fontSize: 11, color: '#FFFFFF' },
+  qaChips:   { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  qaChip:    { paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: P.card, borderWidth: 1, borderColor: P.border },
+  qaChipActive: { backgroundColor: P.teal, borderColor: P.teal },
+  qaChipText: { fontFamily: IM, fontSize: 12, color: P.secondary },
+  qaChipTextActive: { fontFamily: IS, fontSize: 12, color: '#FFFFFF' },
+  qaSaveBtn: { backgroundColor: P.teal, borderRadius: Radius.pill, paddingVertical: 14, alignItems: 'center', marginTop: 20 },
+  qaSaveBtnText: { fontFamily: IS, fontSize: 14, color: '#FFFFFF' },
   collapsible: { gap: 10 },
   tabFilterHeader: { gap: 10, marginBottom: 8 },
   filterSectionLabel: { fontFamily: IS, fontSize: 11, color: P.secondary, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8, marginTop: 4 },
