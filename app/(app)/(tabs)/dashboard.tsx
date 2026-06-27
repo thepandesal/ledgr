@@ -204,12 +204,26 @@ export default function DashboardScreen() {
     enabled: !!userId,
   });
 
+  const { data: accounts = [] } = useQuery({
+    queryKey: ['accounts-list', userId],
+    queryFn: async () => {
+      const { data } = await supabase.from('accounts').select('id,name').eq('user_id', userId).order('name');
+      return data ?? [];
+    },
+    enabled: !!userId,
+  });
+
+  const [showFilterModal, setShowFilterModal] = useState(false);
+  const [selectedAccounts, setSelectedAccounts] = useState<Set<string>>(new Set(['all']));
+  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set(['all']));
+  const [amountSort, setAmountSort] = useState<'none' | 'high' | 'low'>('none');
+
   const { data: recordings = [], isLoading } = useQuery({
     queryKey: ['dashboard-activities', userId],
     queryFn: async () => {
       const { data } = await supabase
         .from('recordings')
-        .select('*, categories:category_id(name,color,icon), space:space_id(name)')
+        .select('*, categories:category_id(name,color,icon), space:space_id(name), account:account_id(name)')
         .eq('user_id', userId)
         .order('transaction_date', { ascending: false });
       return data ?? [];
@@ -222,11 +236,15 @@ export default function DashboardScreen() {
     ? ['income','savings','expense','payable','receivable']
     : ACTIVITY_TABS.filter(t => t.key !== 'all' && selectedTabs.has(t.key)).flatMap(t => t.types as string[]);
 
-  const isAllSpaces = selectedSpaces.has('all');
+  const isAllSpaces     = selectedSpaces.has('all');
+  const isAllAccounts   = selectedAccounts.has('all');
+  const isAllCategories = selectedCategories.has('all');
 
   const filtered = recordings.filter(r => {
     if (!currentTypes.includes(r.type)) return false;
-    if (!isAllSpaces && !selectedSpaces.has(r.space_id)) return false;
+    if (!isAllSpaces     && !selectedSpaces.has(r.space_id))                    return false;
+    if (!isAllAccounts   && !selectedAccounts.has(r.account_id))                 return false;
+    if (!isAllCategories && !selectedCategories.has(r.category_id))              return false;
     const [y, m, d] = r.transaction_date.split('-').map(Number);
     const date = new Date(y, m - 1, d);
     if (date < range.from) return false;
@@ -238,6 +256,12 @@ export default function DashboardScreen() {
     if (statusFilter === 'received' && r.type === 'receivable' && r.status !== 'received') return false;
     return true;
   });
+
+  const sortedFiltered = (arr: any[]) => {
+    if (amountSort === 'high') return [...arr].sort((a, b) => Number(b.amount) - Number(a.amount));
+    if (amountSort === 'low')  return [...arr].sort((a, b) => Number(a.amount) - Number(b.amount));
+    return arr;
+  };
 
   const toggleSpace = (id: string) => {
     setSelectedSpaces(prev => {
@@ -262,7 +286,9 @@ export default function DashboardScreen() {
   const activeTabData = ACTIVITY_TABS.find(t => t.key === (isAll ? 'all' : [...selectedTabs][0])) ?? ACTIVITY_TABS[0];
   const allRecordings = (types: string[]) => recordings.filter(r => {
     if (!types.includes(r.type)) return false;
-    if (!isAllSpaces && !selectedSpaces.has(r.space_id)) return false;
+    if (!isAllSpaces     && !selectedSpaces.has(r.space_id))                    return false;
+    if (!isAllAccounts   && !selectedAccounts.has(r.account_id))                 return false;
+    if (!isAllCategories && !selectedCategories.has(r.category_id))              return false;
     const [y, m, d] = r.transaction_date.split('-').map(Number);
     const date = new Date(y, m - 1, d);
     if (date < range.from) return false;
@@ -602,9 +628,9 @@ export default function DashboardScreen() {
             <Text style={s.emptyText}>no {activeTabData.label.toLowerCase()} found{`\n`}for this period</Text>
           </View>
         ) : (
-          <ScrollView key={filtered.map(i => i.id).join()} contentContainerStyle={s.list} showsVerticalScrollIndicator={false}>
-            {filtered.map((item, idx) => {
-              const prevDate = filtered[idx - 1]?.transaction_date;
+          <ScrollView key={filtered.map(i => i.id).join() + amountSort} contentContainerStyle={s.list} showsVerticalScrollIndicator={false}>
+            {sortedFiltered(filtered).map((item, idx) => {
+              const prevDate = sortedFiltered(filtered)[idx - 1]?.transaction_date;
               const showDate = item.transaction_date !== prevDate;
               const dateStr  = new Date(item.transaction_date + 'T00:00:00')
                 .toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
@@ -731,6 +757,61 @@ export default function DashboardScreen() {
         )}
       </BottomSheet>
 
+      {/* ── Filter modal ── */}
+      <BottomSheet visible={showFilterModal} onClose={() => setShowFilterModal(false)} title="filter">
+
+        {/* Spaces */}
+        <Text style={s.filterSectionLabel}>Spaces</Text>
+        <View style={s.spaceChips}>
+          <TouchableOpacity style={[s.spaceChip, isAllSpaces && s.spaceChipActive]} onPress={() => { setSelectedSpaces(new Set(['all'])); saveSettings.mutate({ dashboard_space_ids: '' }); }} activeOpacity={0.75}>
+            <Text style={[s.spaceChipText, isAllSpaces && s.spaceChipTextActive]}>All</Text>
+          </TouchableOpacity>
+          {spaces.map((sp: any) => {
+            const active = selectedSpaces.has(sp.id);
+            return (
+              <TouchableOpacity key={sp.id} style={[s.spaceChip, active && s.spaceChipActive]} onPress={() => toggleSpace(sp.id)} activeOpacity={0.75}>
+                <Text style={[s.spaceChipText, active && s.spaceChipTextActive]}>{sp.name}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {/* Accounts */}
+        <Text style={s.filterSectionLabel}>Accounts</Text>
+        <View style={s.spaceChips}>
+          <TouchableOpacity style={[s.spaceChip, isAllAccounts && s.spaceChipActive]} onPress={() => setSelectedAccounts(new Set(['all']))} activeOpacity={0.75}>
+            <Text style={[s.spaceChipText, isAllAccounts && s.spaceChipTextActive]}>All</Text>
+          </TouchableOpacity>
+          {accounts.map((ac: any) => {
+            const active = selectedAccounts.has(ac.id);
+            return (
+              <TouchableOpacity key={ac.id} style={[s.spaceChip, active && s.spaceChipActive]} onPress={() => {
+                setSelectedAccounts(prev => {
+                  const next = new Set(prev); next.delete('all');
+                  if (next.has(ac.id)) { next.delete(ac.id); if (next.size === 0) return new Set(['all']); }
+                  else next.add(ac.id);
+                  return next;
+                });
+              }} activeOpacity={0.75}>
+                <Text style={[s.spaceChipText, active && s.spaceChipTextActive]}>{ac.name}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {/* Amount sort */}
+        <Text style={s.filterSectionLabel}>Sort by Amount</Text>
+        <View style={s.spaceChips}>
+          {(['none', 'high', 'low'] as const).map(opt => (
+            <TouchableOpacity key={opt} style={[s.spaceChip, amountSort === opt && s.spaceChipActive]} onPress={() => setAmountSort(opt)} activeOpacity={0.75}>
+              <Text style={[s.spaceChipText, amountSort === opt && s.spaceChipTextActive]}>
+                {opt === 'none' ? 'Default' : opt === 'high' ? 'High → Low' : 'Low → High'}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </BottomSheet>
+
       {/* ── Spaces modal ── */}
       <BottomSheet visible={showSpaceModal} onClose={() => setShowSpaceModal(false)} title="filter by space">
         <View style={s.spaceChips}>
@@ -775,7 +856,7 @@ const s = StyleSheet.create({
   },
 
   filterBtns: { gap: 6, alignItems: 'flex-end', paddingTop: 4 },
-  filterRow:  { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  filterRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
   filterBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
     paddingHorizontal: 12, paddingVertical: 8,
@@ -824,7 +905,7 @@ const s = StyleSheet.create({
   emptyText:     { fontFamily: IM, fontSize: 13, color: P.secondary, textAlign: 'center', lineHeight: 21, letterSpacing: 0.2 },
 
   // Transaction list
-  list:           { paddingHorizontal: 16, paddingTop: 16, gap: 12 },
+  list:           { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 20, gap: 12 },
   dateHeaderRow:  { marginTop: 16, marginBottom: 8, paddingHorizontal: 4, borderTopWidth: 1, borderTopColor: P.border, paddingTop: 16 },
   dateHeaderText: { fontFamily: IS, fontSize: 10, color: P.secondary, letterSpacing: 1.4, textTransform: 'uppercase' },
 
@@ -887,6 +968,7 @@ const s = StyleSheet.create({
   statusChip:           { flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: Radius.lg, backgroundColor: P.bg },
   statusChipText:       { fontFamily: IS, fontSize: 13, color: P.secondary },
   statusChipTextActive: { color: P.text },
+  filterSectionLabel: { fontFamily: IS, fontSize: 11, color: P.secondary, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8, marginTop: 4 },
   dateNavRow:   { flexDirection: 'row', alignItems: 'center', gap: 4 },
   dateNavArrow: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: P.tealLight },
 });
