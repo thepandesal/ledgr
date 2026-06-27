@@ -241,7 +241,11 @@ export default function DashboardScreen() {
   const [qaName,     setQaName]     = useState('');
   const [qaType,     setQaType]     = useState('expense');
   const [qaAmount,   setQaAmount]   = useState('');
-  const [qaDate,     setQaDate]     = useState(new Date().toISOString().split('T')[0]);
+  const _today = new Date();
+  const _pad = (n: number) => String(n).padStart(2, '0');
+  const [qaDay,      setQaDay]      = useState(String(_today.getDate()));
+  const [qaMonth,    setQaMonth]    = useState(String(_today.getMonth() + 1));
+  const [qaYear,     setQaYear]     = useState(String(_today.getFullYear()));
   const [qaSpaceId,  setQaSpaceId]  = useState<string | null>(null);
   const [qaCatId,    setQaCatId]    = useState<string | null>(null);
   const [qaLoading,  setQaLoading]  = useState(false);
@@ -448,13 +452,15 @@ export default function DashboardScreen() {
         name: qaName.trim(),
         type: qaType,
         amount: parseFloat(qaAmount),
-        transaction_date: qaDate,
+        transaction_date: `${qaYear}-${_pad(parseInt(qaMonth))}-${_pad(parseInt(qaDay))}`,
+
         category_id: qaCatId || null,
         status: statusMap[qaType] ?? 'paid',
       });
       queryClient.invalidateQueries({ queryKey: ['dashboard-activities', userId] });
       setShowAddModal(false);
       setQaName(''); setQaAmount(''); setQaType('expense'); setQaSpaceId(null); setQaCatId(null); setQaError('');
+      setQaDay(String(new Date().getDate())); setQaMonth(String(new Date().getMonth()+1)); setQaYear(String(new Date().getFullYear()));
     } catch (e: any) { setQaError(e.message); }
     setQaLoading(false);
   };
@@ -606,7 +612,28 @@ export default function DashboardScreen() {
 
         {/* Date */}
         <Text style={s.qaLabel}>date</Text>
-        <TextInput style={s.qaInput} value={qaDate} onChangeText={setQaDate} placeholder="YYYY-MM-DD" placeholderTextColor={P.muted} />
+        <View style={s.qaDateRow}>
+          <View style={s.qaDatePicker}>
+            <Text style={s.qaDatePickerLabel}>Month</Text>
+            <View style={s.qaChips}>
+              {Array.from({length:12},(_,k)=>k+1).map(m=>(
+                <TouchableOpacity key={m} style={[s.qaDateChip, parseInt(qaMonth)===m && s.qaChipActive]} onPress={()=>setQaMonth(String(m))} activeOpacity={0.75}>
+                  <Text style={[s.qaChipText, parseInt(qaMonth)===m && s.qaChipTextActive]}>{["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][m-1]}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+          <View style={{flexDirection:'row', gap:8, marginTop:8}}>
+            <View style={{flex:1}}>
+              <Text style={s.qaDatePickerLabel}>Day</Text>
+              <TextInput style={s.qaInput} value={qaDay} onChangeText={setQaDay} keyboardType="number-pad" maxLength={2} placeholder="DD" placeholderTextColor={P.muted} />
+            </View>
+            <View style={{flex:1}}>
+              <Text style={s.qaDatePickerLabel}>Year</Text>
+              <TextInput style={s.qaInput} value={qaYear} onChangeText={setQaYear} keyboardType="number-pad" maxLength={4} placeholder="YYYY" placeholderTextColor={P.muted} />
+            </View>
+          </View>
+        </View>
 
         {/* Space */}
         <Text style={s.qaLabel}>space <Text style={s.qaOptional}>(optional)</Text></Text>
@@ -622,11 +649,8 @@ export default function DashboardScreen() {
         </View>
 
         {/* Category */}
-        <Text style={s.qaLabel}>category <Text style={s.qaOptional}>(optional)</Text></Text>
+        <Text style={s.qaLabel}>category</Text>
         <View style={s.qaChips}>
-          <TouchableOpacity style={[s.qaChip, !qaCatId && s.qaChipActive]} onPress={() => setQaCatId(null)} activeOpacity={0.75}>
-            <Text style={[s.qaChipText, !qaCatId && s.qaChipTextActive]}>none</Text>
-          </TouchableOpacity>
           {categories.map((cat: any) => (
             <TouchableOpacity key={cat.id} style={[s.qaChip, qaCatId === cat.id && s.qaChipActive]} onPress={() => setQaCatId(cat.id)} activeOpacity={0.75}>
               <Text style={[s.qaChipText, qaCatId === cat.id && s.qaChipTextActive]}>{cat.name}</Text>
@@ -636,9 +660,9 @@ export default function DashboardScreen() {
 
         {/* Save */}
         <TouchableOpacity
-          style={[s.qaSaveBtn, (!qaName.trim() || !qaAmount || qaLoading) && { opacity: 0.4 }]}
+          style={[s.qaSaveBtn, (!qaName.trim() || !qaAmount || !qaSpaceId || !qaCatId || qaLoading) && { opacity: 0.4 }]}
           onPress={saveQuickAdd}
-          disabled={!qaName.trim() || !qaAmount || qaLoading}
+          disabled={!qaName.trim() || !qaAmount || !qaSpaceId || !qaCatId || qaLoading}
           activeOpacity={0.8}
         >
           {qaLoading ? <ActivityIndicator color="#fff" /> : <Text style={s.qaSaveBtnText}>save</Text>}
@@ -1014,6 +1038,9 @@ const s = StyleSheet.create({
   qaChipActive: { backgroundColor: P.teal, borderColor: P.teal },
   qaChipText: { fontFamily: IM, fontSize: 12, color: P.secondary },
   qaChipTextActive: { fontFamily: IS, fontSize: 12, color: '#FFFFFF' },
+  qaDateRow: { gap: 8 },
+  qaDatePickerLabel: { fontFamily: IM, fontSize: 10, color: P.secondary, marginBottom: 6 },
+  qaDateChip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: Radius.pill, backgroundColor: P.card, borderWidth: 1, borderColor: P.border },
   qaSaveBtn: { backgroundColor: P.teal, borderRadius: Radius.pill, paddingVertical: 14, alignItems: 'center', marginTop: 20 },
   qaSaveBtnText: { fontFamily: IS, fontSize: 14, color: '#FFFFFF' },
   collapsible: { gap: 10 },
