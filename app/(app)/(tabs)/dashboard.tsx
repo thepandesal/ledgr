@@ -386,6 +386,15 @@ export default function DashboardScreen() {
     applyPreset(key);
   };
 
+  const tabValue = (key: string) => {
+    if (key === 'all')          return fmtAbbr(moneyInTotal + moneyOutTotal);
+    if (key === 'money-in')    return fmtAbbr(moneyInTotal);
+    if (key === 'money-out')   return fmtAbbr(moneyOutTotal);
+    if (key === 'loans')       return String(loansActive);
+    if (key === 'receivables') return String(receivablesPending);
+    return '';
+  };
+
   const typeLabel = (r: any) => {
     if (r.type === 'income')     return { label: 'money in',                color: P.tealDark };
     if (r.type === 'savings')    return { label: 'savings',                 color: P.tealDark };
@@ -408,178 +417,7 @@ export default function DashboardScreen() {
 
       {/* ── Top section ── */}
       <View style={s.topSection}>
-
-        {/* Title */}
         <Text style={s.title}>Activities</Text>
-
-        {/* Stats card */}
-        <View style={s.statsCard}>
-        {(() => {
-          const hasIn   = selectedTabs.has('money-in');
-          const hasOut  = selectedTabs.has('money-out');
-          const hasLoan = selectedTabs.has('loans');
-          const hasRec  = selectedTabs.has('receivables');
-          const filteredTotal = filtered.reduce((sum, r) => sum + Number(r.amount), 0);
-
-          if (isAll) return (
-            <View style={s.statsRow}>
-              <View style={s.statItem}>
-                <Text style={s.statValue}>{fmtAbbr(moneyInTotal)}</Text>
-                <Text style={s.statLabel}>Money In</Text>
-              </View>
-              <View style={s.statDivider} />
-              <View style={s.statItem}>
-                <Text style={s.statValue}>{fmtAbbr(moneyOutTotal)}</Text>
-                <Text style={s.statLabel}>Money Out</Text>
-              </View>
-              <View style={s.statDivider} />
-              <View style={s.statItem}>
-                <Text style={[s.statValue, { color: P.teal }]}>{loansActive}</Text>
-                <Text style={s.statLabel}>Loans</Text>
-              </View>
-              <View style={s.statDivider} />
-              <View style={s.statItem}>
-                <Text style={[s.statValue, { color: P.teal }]}>{receivablesPending}</Text>
-                <Text style={s.statLabel}>Receivables</Text>
-              </View>
-            </View>
-          );
-
-          // loans only
-          if (hasLoan && !hasIn && !hasOut && !hasRec) return (
-            <View style={s.statsRow}>
-              <View style={s.statItem}>
-                <Text style={[s.statValue, { color: P.teal }]}>{loansActive}</Text>
-                <Text style={s.statLabel}>Active</Text>
-              </View>
-              <View style={s.statDivider} />
-              <View style={s.statItem}>
-                <Text style={s.statValue}>{loansPaid}</Text>
-                <Text style={s.statLabel}>Paid</Text>
-              </View>
-              <View style={s.statDivider} />
-              <View style={s.statItem}>
-                <Text style={[s.statValue, { color: P.teal }]}>{fmtAbbr(filteredTotal)}</Text>
-                <Text style={s.statLabel}>Total</Text>
-              </View>
-            </View>
-          );
-
-          // receivables only
-          if (hasRec && !hasIn && !hasOut && !hasLoan) return (
-            <View style={s.statsRow}>
-              <View style={s.statItem}>
-                <Text style={[s.statValue, { color: P.teal }]}>{receivablesPending}</Text>
-                <Text style={s.statLabel}>Pending</Text>
-              </View>
-              <View style={s.statDivider} />
-              <View style={s.statItem}>
-                <Text style={s.statValue}>{receivablesReceived}</Text>
-                <Text style={s.statLabel}>Received</Text>
-              </View>
-              <View style={s.statDivider} />
-              <View style={s.statItem}>
-                <Text style={[s.statValue, { color: P.teal }]}>{fmtAbbr(filteredTotal)}</Text>
-                <Text style={s.statLabel}>Total</Text>
-              </View>
-            </View>
-          );
-
-          // loans + receivables
-          if (hasLoan && hasRec && !hasIn && !hasOut) return (
-            <View style={s.statsRow}>
-              <View style={s.statItem}>
-                <Text style={[s.statValue, { color: P.teal }]}>{loansActive}</Text>
-                <Text style={s.statLabel}>Loans</Text>
-              </View>
-              <View style={s.statDivider} />
-              <View style={s.statItem}>
-                <Text style={[s.statValue, { color: P.teal }]}>{receivablesPending}</Text>
-                <Text style={s.statLabel}>Pending</Text>
-              </View>
-              <View style={s.statDivider} />
-              <View style={s.statItem}>
-                <Text style={s.statValue}>{filtered.length}</Text>
-                <Text style={s.statLabel}>Entries</Text>
-              </View>
-            </View>
-          );
-
-          // any combo with both in + out (with or without loans/receivables)
-          if (hasIn && hasOut) return (
-            <View style={s.statsRow}>
-              <View style={s.statItem}>
-                <Text style={[s.statValue, { color: P.teal }]}>{fmtAbbr(moneyInTotal)}</Text>
-                <Text style={s.statLabel}>Total In</Text>
-              </View>
-              <View style={s.statDivider} />
-              <View style={s.statItem}>
-                <Text style={s.statValue}>{fmtAbbr(moneyOutTotal)}</Text>
-                <Text style={s.statLabel}>Total Out</Text>
-              </View>
-              {(hasLoan || hasRec) && <View style={s.statDivider} />}
-              {hasLoan && (
-                <View style={s.statItem}>
-                  <Text style={[s.statValue, { color: P.teal }]}>{loansActive}</Text>
-                  <Text style={s.statLabel}>Loans</Text>
-                </View>
-              )}
-              {hasRec && (
-                <View style={s.statItem}>
-                  <Text style={[s.statValue, { color: P.teal }]}>{receivablesPending}</Text>
-                  <Text style={s.statLabel}>Pending</Text>
-                </View>
-              )}
-            </View>
-          );
-
-          // money-in only
-          if (hasIn) return (
-            <View style={s.statsRow}>
-              <View style={s.statItem}>
-                <Text style={[s.statValue, { color: P.teal }]}>{fmtAbbr(moneyInTotal)}</Text>
-                <Text style={s.statLabel}>Total In</Text>
-              </View>
-              <View style={s.statDivider} />
-              <View style={s.statItem}>
-                <Text style={s.statValue}>{filtered.length}</Text>
-                <Text style={s.statLabel}>Entries</Text>
-              </View>
-            </View>
-          );
-
-          if (hasOut) return (
-            <View style={s.statsRow}>
-              <View style={s.statItem}>
-                <Text style={s.statValue}>{fmtAbbr(moneyOutTotal)}</Text>
-                <Text style={s.statLabel}>Total Out</Text>
-              </View>
-              <View style={s.statDivider} />
-              <View style={s.statItem}>
-                <Text style={s.statValue}>{filtered.length}</Text>
-                <Text style={s.statLabel}>Entries</Text>
-              </View>
-            </View>
-          );
-
-          // fallback
-          return (
-            <View style={s.statsRow}>
-              <View style={s.statItem}>
-                <Text style={[s.statValue, { color: P.teal }]}>{fmtAbbr(filteredTotal)}</Text>
-                <Text style={s.statLabel}>Total</Text>
-              </View>
-              <View style={s.statDivider} />
-              <View style={s.statItem}>
-                <Text style={s.statValue}>{filtered.length}</Text>
-                <Text style={s.statLabel}>Entries</Text>
-              </View>
-            </View>
-          );
-        })()}
-
-        </View>{/* end statsCard */}
-
       </View>{/* end topSection */}
 
       {/* ── Sheet: menu floats on top, list scrolls underneath ── */}
@@ -596,7 +434,8 @@ export default function DashboardScreen() {
               return (
                 <TouchableOpacity key={tab.key} style={s.tabWrap} onPress={() => handleTabToggle(tab.key)} activeOpacity={0.75}>
                   <View style={[s.tabCircle, isActive && s.tabCircleActive]}>
-                    <Ionicons name={tab.icon as any} size={16} color={isActive ? '#FFFFFF' : P.secondary} />
+                    <Ionicons name={tab.icon as any} size={14} color={isActive ? '#FFFFFF' : P.secondary} />
+                    <Text style={[s.tabCircleValue, isActive && s.tabCircleValueActive]}>{tabValue(tab.key)}</Text>
                   </View>
                   <Text style={[s.tabLabel, isActive && s.tabLabelActive]}>{tab.label}</Text>
                 </TouchableOpacity>
@@ -891,13 +730,13 @@ const s = StyleSheet.create({
   tabRow:  { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 4 },
   tabWrap: { flex: 1, alignItems: 'center' },
   tabCircle: {
-    width: 46, height: 46, borderRadius: 23,
+    width: 56, height: 56, borderRadius: 28,
     justifyContent: 'center', alignItems: 'center',
-    backgroundColor: P.tealLight,
+    backgroundColor: P.tealLight, gap: 2,
   },
-  tabCircleActive: {
-    backgroundColor: P.teal,
-  },
+  tabCircleActive:      { backgroundColor: P.teal },
+  tabCircleValue:       { fontFamily: FBK, fontSize: 9, color: P.secondary, letterSpacing: -0.3 },
+  tabCircleValueActive: { color: '#FFFFFF' },
   tabLabel:       { fontFamily: I,  fontSize: 9,  color: P.secondary, marginTop: 5, letterSpacing: 0.2 },
   tabLabelActive: { fontFamily: IS, fontSize: 9,  color: P.teal },
 
@@ -915,7 +754,7 @@ const s = StyleSheet.create({
   emptyText:     { fontFamily: IM, fontSize: 13, color: P.secondary, textAlign: 'center', lineHeight: 21, letterSpacing: 0.2 },
 
   // Transaction list
-  list: { paddingHorizontal: 16, paddingTop: 130, paddingBottom: 20, gap: 12 },
+  list: { paddingHorizontal: 16, paddingTop: 140, paddingBottom: 20, gap: 12 },
   dateHeaderRow:  { marginTop: 16, marginBottom: 8, paddingHorizontal: 4, borderTopWidth: 1, borderTopColor: P.border, paddingTop: 16 },
   dateHeaderText: { fontFamily: IS, fontSize: 10, color: P.secondary, letterSpacing: 1.4, textTransform: 'uppercase' },
 
