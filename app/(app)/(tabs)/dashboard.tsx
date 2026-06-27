@@ -216,22 +216,6 @@ export default function DashboardScreen() {
 
   const [showFilterModal, setShowFilterModal] = useState(false);
 
-
-  const lastScrollY = useRef(0);
-
-  const onScroll = (e: any) => {
-    const y = e.nativeEvent.contentOffset.y;
-    const diff = y - lastScrollY.current;
-    // hide when scrolling down past 60px, show when scrolling up
-    if (diff > 8 && y > 60 && controlsVisible) {
-      setControlsVisible(false);
-      Animated.timing(collapseAnim, { toValue: 0, duration: 200, useNativeDriver: false }).start();
-    } else if (diff < -8 && !controlsVisible) {
-      setControlsVisible(true);
-      Animated.timing(collapseAnim, { toValue: 1, duration: 200, useNativeDriver: false }).start();
-    }
-    lastScrollY.current = y;
-  };
   const [selectedAccounts, setSelectedAccounts] = useState<Set<string>>(new Set(['all']));
   const [amountSort, setAmountSort] = useState<'none' | 'high' | 'low'>('none');
 
@@ -585,47 +569,6 @@ export default function DashboardScreen() {
 
         </View>{/* end statsCard */}
 
-        {/* Tab filter buttons */}
-        <View style={s.tabRow}>
-          {ACTIVITY_TABS.map(tab => {
-            const isActive = selectedTabs.has(tab.key);
-            return (
-              <TouchableOpacity key={tab.key} style={s.tabWrap} onPress={() => handleTabToggle(tab.key)} activeOpacity={0.75}>
-                <View style={[s.tabCircle, isActive && s.tabCircleActive]}>
-                  <Ionicons name={tab.icon as any} size={16} color={isActive ? '#FFFFFF' : P.secondary} />
-                </View>
-                <Text style={[s.tabLabel, isActive && s.tabLabelActive]}>{tab.label}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        {/* Filter row: date nav + spaces */}
-        <View style={s.filterRow}>
-          <View style={s.dateNavRow}>
-            <TouchableOpacity style={s.dateNavArrow} onPress={() => navigateRange(-1)} activeOpacity={0.7}>
-              <Ionicons name="chevron-back" size={14} color={P.tealDark} />
-            </TouchableOpacity>
-            <TouchableOpacity style={s.filterBtn} onPress={() => setShowDateModal(true)} activeOpacity={0.75}>
-              <Ionicons name="calendar-outline" size={13} color={P.tealDark} />
-              <Text style={s.filterBtnText}>{rangeLabel}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={s.dateNavArrow} onPress={() => navigateRange(1)} activeOpacity={0.7}>
-              <Ionicons name="chevron-forward" size={14} color={P.tealDark} />
-            </TouchableOpacity>
-          </View>
-          <TouchableOpacity
-            style={[s.filterBtn, !isAllSpaces && s.filterBtnActive]}
-            onPress={() => setShowSpaceModal(true)}
-            activeOpacity={0.75}
-          >
-            <Ionicons name="layers-outline" size={13} color={!isAllSpaces ? P.teal : P.secondary} />
-            <Text style={[s.filterBtnText, !isAllSpaces && s.filterBtnTextActive]}>
-              {isAllSpaces ? 'All Spaces' : `${selectedSpaces.size} space${selectedSpaces.size > 1 ? 's' : ''}`}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
       </View>{/* end topSection */}
 
       {/* ── White bottom sheet ── */}
@@ -642,6 +585,44 @@ export default function DashboardScreen() {
           </View>
         ) : (
           <ScrollView key={filtered.map(i => i.id).join() + amountSort} contentContainerStyle={s.list} showsVerticalScrollIndicator={false}>
+            {/* ── Tabs + filters scroll away with content ── */}
+            <View style={s.tabFilterHeader}>
+              <View style={s.tabRow}>
+                {ACTIVITY_TABS.map(tab => {
+                  const isActive = selectedTabs.has(tab.key);
+                  return (
+                    <TouchableOpacity key={tab.key} style={s.tabWrap} onPress={() => handleTabToggle(tab.key)} activeOpacity={0.75}>
+                      <View style={[s.tabCircle, isActive && s.tabCircleActive]}>
+                        <Ionicons name={tab.icon as any} size={16} color={isActive ? '#FFFFFF' : P.secondary} />
+                      </View>
+                      <Text style={[s.tabLabel, isActive && s.tabLabelActive]}>{tab.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              <View style={s.filterRow}>
+                <View style={s.dateNavRow}>
+                  <TouchableOpacity style={s.dateNavArrow} onPress={() => navigateRange(-1)} activeOpacity={0.7}>
+                    <Ionicons name="chevron-back" size={14} color={P.tealDark} />
+                  </TouchableOpacity>
+                  <TouchableOpacity style={s.filterBtn} onPress={() => setShowDateModal(true)} activeOpacity={0.75}>
+                    <Ionicons name="calendar-outline" size={13} color={P.tealDark} />
+                    <Text style={s.filterBtnText}>{rangeLabel}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={s.dateNavArrow} onPress={() => navigateRange(1)} activeOpacity={0.7}>
+                    <Ionicons name="chevron-forward" size={14} color={P.tealDark} />
+                  </TouchableOpacity>
+                </View>
+                <TouchableOpacity
+                  style={[s.filterBtn, (!isAllSpaces || !isAllAccounts || amountSort !== 'none') && s.filterBtnActive]}
+                  onPress={() => setShowFilterModal(true)}
+                  activeOpacity={0.75}
+                >
+                  <Ionicons name="options-outline" size={13} color={(!isAllSpaces || !isAllAccounts || amountSort !== 'none') ? P.teal : P.secondary} />
+                  <Text style={[s.filterBtnText, (!isAllSpaces || !isAllAccounts || amountSort !== 'none') && s.filterBtnTextActive]}>Filter</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
             {sortedFiltered(filtered).map((item, idx) => {
               const prevDate = sortedFiltered(filtered)[idx - 1]?.transaction_date;
               const showDate = item.transaction_date !== prevDate;
@@ -983,6 +964,7 @@ const s = StyleSheet.create({
   statusChipText:       { fontFamily: IS, fontSize: 13, color: P.secondary },
   statusChipTextActive: { color: P.text },
   collapsible: { gap: 10 },
+  tabFilterHeader: { gap: 10, marginBottom: 8 },
   filterSectionLabel: { fontFamily: IS, fontSize: 11, color: P.secondary, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8, marginTop: 4 },
   dateNavRow:   { flexDirection: 'row', alignItems: 'center', gap: 4 },
   dateNavArrow: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: P.tealLight },
