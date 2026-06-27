@@ -499,8 +499,9 @@ export default function DashboardScreen() {
                       <Ionicons name={(item.categories?.icon ?? activeTabData.icon) as any} size={18} color={P.tealDark} />
                     </View>
                     <View style={s.rowMid}>
+                      <Text style={s.rowType}>{tl?.label ?? activeTabData.label}</Text>
                       <Text style={s.rowName} numberOfLines={1}>{item.name}</Text>
-                      <Text style={s.rowCategory}>{tl?.label ?? activeTabData.label}{item.space?.name ? ` · ${item.space.name}` : ''}</Text>
+                      {item.space?.name ? <Text style={s.rowSpace}>{item.space.name}</Text> : null}
                     </View>
                     <Text style={[s.rowAmount, { color: tl?.color ?? P.tealDark }]}>
                       {Number(item.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
@@ -788,8 +789,10 @@ const s = StyleSheet.create({
     paddingHorizontal: 16, paddingVertical: 14,
   },
   rowIconWrap: { width: 46, height: 46, borderRadius: 23, justifyContent: 'center', alignItems: 'center', backgroundColor: P.tealLight },
-  rowMid:      { flex: 1, gap: 4 },
+  rowMid:     { flex: 1, gap: 2 },
+  rowType:     { fontFamily: IM,  fontSize: 10, color: P.secondary, letterSpacing: 0.4, textTransform: 'uppercase' },
   rowName:     { fontFamily: FB,  fontSize: 14, color: P.text, letterSpacing: 0.1, lineHeight: 20 },
+  rowSpace:    { fontFamily: I,   fontSize: 11, color: P.muted, letterSpacing: 0.2 },
   rowCategory: { fontFamily: I,   fontSize: 11, color: P.secondary, letterSpacing: 0.2 },
   rowAmount:   { fontFamily: FBK, fontSize: 15, letterSpacing: -0.4 },
 
