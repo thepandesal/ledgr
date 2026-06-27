@@ -125,7 +125,7 @@ export default function DashboardScreen() {
     queryFn: async () => {
       const { data } = await supabase
         .from('user_settings')
-        .select('cutoff_day, dashboard_preset, dashboard_custom_from, dashboard_custom_to, dashboard_space_ids, dashboard_tab_ids, dashboard_range_offset, dashboard_amount_sort, dashboard_account_ids')
+        .select('cutoff_day, dashboard_preset, dashboard_custom_from, dashboard_custom_to, dashboard_space_ids, dashboard_tab_ids, dashboard_range_offset, dashboard_amount_sort, dashboard_account_ids, dashboard_category_ids')
         .eq('user_id', userId)
         .maybeSingle();
       if (!data) return data;
@@ -146,6 +146,10 @@ export default function DashboardScreen() {
       if (data.dashboard_account_ids) {
         const ids = (data.dashboard_account_ids as string).split(',').filter(Boolean);
         setSelectedAccounts(new Set(ids.length ? ids : ['all']));
+      }
+      if (data.dashboard_category_ids) {
+        const ids = (data.dashboard_category_ids as string).split(',').filter(Boolean);
+        setSelectedCategories(new Set(ids.length ? ids : ['all']));
       }
       return data;
     },
@@ -643,7 +647,7 @@ export default function DashboardScreen() {
             setSelectedAccounts(new Set(['all']));
             setSelectedCategories(new Set(['all']));
             setAmountSort('none');
-            saveSettings.mutate({ dashboard_space_ids: '', dashboard_account_ids: '', dashboard_amount_sort: 'none' });
+            saveSettings.mutate({ dashboard_space_ids: '', dashboard_account_ids: '', dashboard_category_ids: '', dashboard_amount_sort: 'none' });
           }}
           activeOpacity={0.75}
         >
@@ -707,6 +711,7 @@ export default function DashboardScreen() {
                   const next = new Set(prev); next.delete('all');
                   if (next.has(cat.id)) { next.delete(cat.id); if (next.size === 0) return new Set(['all']); }
                   else next.add(cat.id);
+                  saveSettings.mutate({ dashboard_category_ids: [...next].join(',') });
                   return next;
                 });
               }} activeOpacity={0.75}>
