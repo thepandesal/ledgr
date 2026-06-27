@@ -221,6 +221,15 @@ export default function DashboardScreen() {
     enabled: !!userId,
   });
 
+  const { data: categories = [] } = useQuery({
+    queryKey: ['categories', userId],
+    queryFn: async () => {
+      const { data } = await supabase.from('categories').select('id,name').eq('user_id', userId).order('created_at');
+      return data ?? [];
+    },
+    enabled: !!userId,
+  });
+
   const [showFilterModal, setShowFilterModal] = useState(false);
   const headerAnim  = useRef(new Animated.Value(1)).current;
   const lastScrollY = useRef(0);
@@ -235,6 +244,7 @@ export default function DashboardScreen() {
   };
 
   const [selectedAccounts, setSelectedAccounts] = useState<Set<string>>(new Set(['all']));
+  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set(['all']));
   const [amountSort, setAmountSort] = useState<'none' | 'high' | 'low'>('none');
 
   const { data: recordings = [], isLoading } = useQuery({
@@ -262,11 +272,13 @@ export default function DashboardScreen() {
 
   const isAllSpaces    = selectedSpaces.has('all');
   const isAllAccounts  = selectedAccounts.has('all');
+  const isAllCategories = selectedCategories.has('all');
 
 
   const filtered = recordings.filter(r => {
     if (!effectiveTypes.includes(r.type)) return false;
     if (!isAllSpaces     && !selectedSpaces.has(r.space_id))                    return false;
+    if (!isAllCategories && !selectedCategories.has(r.category_id)) return false;
     const [y, m, d] = r.transaction_date.split('-').map(Number);
     const date = new Date(y, m - 1, d);
     if (date < range.from) return false;
@@ -470,12 +482,12 @@ export default function DashboardScreen() {
               </TouchableOpacity>
             </View>
             <TouchableOpacity
-              style={[s.filterBtn, (!isAllSpaces || !isAllAccounts || amountSort !== 'none') && s.filterBtnActive]}
+              style={[s.filterBtn, (!isAllSpaces || !isAllAccounts || !isAllCategories || amountSort !== 'none') && s.filterBtnActive]}
               onPress={() => setShowFilterModal(true)}
               activeOpacity={0.75}
             >
-              <Ionicons name="options-outline" size={13} color={(!isAllSpaces || !isAllAccounts || amountSort !== 'none') ? P.teal : P.secondary} />
-              <Text style={[s.filterBtnText, (!isAllSpaces || !isAllAccounts || amountSort !== 'none') && s.filterBtnTextActive]}>Filter</Text>
+              <Ionicons name="options-outline" size={13} color={(!isAllSpaces || !isAllAccounts || !isAllCategories || amountSort !== 'none') ? P.teal : P.secondary} />
+              <Text style={[s.filterBtnText, (!isAllSpaces || !isAllAccounts || !isAllCategories || amountSort !== 'none') && s.filterBtnTextActive]}>Filter</Text>
             </TouchableOpacity>
           </View>
         </Animated.View>
@@ -629,6 +641,7 @@ export default function DashboardScreen() {
           onPress={() => {
             setSelectedSpaces(new Set(['all']));
             setSelectedAccounts(new Set(['all']));
+            setSelectedCategories(new Set(['all']));
             setAmountSort('none');
             saveSettings.mutate({ dashboard_space_ids: '', dashboard_account_ids: '', dashboard_amount_sort: 'none' });
           }}
@@ -680,6 +693,29 @@ export default function DashboardScreen() {
         </View>
 
         {/* Amount sort */}
+        {/* Categories */}
+        <Text style={s.filterSectionLabel}>Categories</Text>
+        <View style={s.spaceChips}>
+          <TouchableOpacity style={[s.spaceChip, isAllCategories && s.spaceChipActive]} onPress={() => setSelectedCategories(new Set(['all']))} activeOpacity={0.75}>
+            <Text style={[s.spaceChipText, isAllCategories && s.spaceChipTextActive]}>All</Text>
+          </TouchableOpacity>
+          {categories.map((cat: any) => {
+            const active = selectedCategories.has(cat.id);
+            return (
+              <TouchableOpacity key={cat.id} style={[s.spaceChip, active && s.spaceChipActive]} onPress={() => {
+                setSelectedCategories(prev => {
+                  const next = new Set(prev); next.delete('all');
+                  if (next.has(cat.id)) { next.delete(cat.id); if (next.size === 0) return new Set(['all']); }
+                  else next.add(cat.id);
+                  return next;
+                });
+              }} activeOpacity={0.75}>
+                <Text style={[s.spaceChipText, active && s.spaceChipTextActive]}>{cat.name}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
         <Text style={s.filterSectionLabel}>Sort by Amount</Text>
         <View style={s.spaceChips}>
           {(['none', 'high', 'low'] as const).map(opt => (
