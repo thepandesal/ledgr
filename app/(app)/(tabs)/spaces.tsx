@@ -301,15 +301,15 @@ const s = StyleSheet.create({
   },
   allCardText: { fontFamily: SB, fontSize: 14, color: T },
 
-  list: { gap: 2 },
+  list: { gap: 8 },
 
   emptyWrap: { alignItems: 'center', paddingVertical: 48, gap: 8 },
   emptyText: { fontFamily: SB, fontSize: 16, color: TEXT },
   emptyHint: { fontFamily: R, fontSize: 13, color: SEC },
 
   card: {
-    backgroundColor: CARD, borderRadius: 16,
-    paddingHorizontal: 14, paddingVertical: 12, gap: 8,
+    backgroundColor: CARD, borderRadius: 20,
+    paddingHorizontal: 16, paddingVertical: 14, gap: 10,
   },
   cardTop:      { flexDirection: 'row', alignItems: 'center', gap: 10 },
   cardIconWrap: { width: 32, height: 32, borderRadius: 16, backgroundColor: TL, alignItems: 'center', justifyContent: 'center' },
