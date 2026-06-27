@@ -61,9 +61,14 @@ function ProfileScreen() {
     Alert.alert('Log Out', 'Are you sure you want to log out?', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Log Out', style: 'destructive', onPress: async () => {
+        console.log('[logout] button pressed');
         try {
-          await supabase.auth.signOut();
-        } catch (e) {}
+          const { error } = await supabase.auth.signOut();
+          console.log('[logout] signOut result:', error ? error.message : 'success');
+        } catch (e) {
+          console.log('[logout] signOut threw:', e);
+        }
+        console.log('[logout] navigating to /');
         router.replace('/' as any);
       }},
     ]);
