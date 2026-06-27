@@ -39,9 +39,9 @@ const P = {
 } as const;
 
 const ACTIVITY_TABS = [
-  { key: 'all',         label: 'All',         icon: 'apps-outline',              types: ['income','savings','expense','payable','receivable'], color: P.teal, bg: P.tealLight },
-  { key: 'money-in',    label: 'Money In',    icon: 'arrow-down-circle-outline', types: ['income','savings','return'], color: P.teal, bg: P.tealLight },
-  { key: 'money-out',   label: 'Money Out',   icon: 'arrow-up-circle-outline',   types: ['expense'],         color: P.teal, bg: P.tealLight },
+  { key: 'all',         label: 'All',         icon: 'apps-outline',              types: ['income','return','expense','payment','payable','receivable'], color: P.teal, bg: P.tealLight },
+  { key: 'money-in',    label: 'Money In',    icon: 'arrow-down-circle-outline', types: ['income','return'],           color: P.teal, bg: P.tealLight },
+  { key: 'money-out',   label: 'Money Out',   icon: 'arrow-up-circle-outline',   types: ['expense','payment'],         color: P.teal, bg: P.tealLight },
   { key: 'loans',       label: 'Loans',       icon: 'cash-outline',              types: ['payable'],         color: P.teal, bg: P.tealLight },
   { key: 'receivables', label: 'Receivables', icon: 'arrow-undo-outline',        types: ['receivable'],      color: P.teal, bg: P.tealLight },
 ] as const;
@@ -400,10 +400,11 @@ export default function DashboardScreen() {
   };
 
   const typeLabel = (r: any) => {
-    if (r.type === 'income')     return { label: 'money in',   color: P.tealDark };
-    if (r.type === 'savings')    return { label: 'money in',   color: P.tealDark };
-    if (r.type === 'return')     return { label: 'collection', color: P.tealDark };
-    if (r.type === 'expense')    return { label: 'money out',               color: P.peach    };
+    if (r.type === 'income')     return { label: 'income',  color: P.tealDark };
+    if (r.type === 'savings')    return { label: 'income',  color: P.tealDark };
+    if (r.type === 'return')     return { label: 'return',  color: P.tealDark };
+    if (r.type === 'expense')    return { label: 'expense', color: P.peach    };
+    if (r.type === 'payment')    return { label: 'payment', color: P.peach    };
     if (r.type === 'payable')    return r.status === 'paid'
       ? { label: 'loan · paid',    color: P.tealDark }
       : r.status === 'partial'
