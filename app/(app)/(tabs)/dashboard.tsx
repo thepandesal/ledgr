@@ -204,18 +204,8 @@ export default function DashboardScreen() {
     enabled: !!userId,
   });
 
-  const { data: accounts = [] } = useQuery({
-    queryKey: ['accounts-list', userId],
-    queryFn: async () => {
-      const { data } = await supabase.from('accounts').select('id,name').eq('user_id', userId).order('name');
-      return data ?? [];
-    },
-    enabled: !!userId,
-  });
 
   const [showFilterModal, setShowFilterModal] = useState(false);
-  const [selectedAccounts, setSelectedAccounts] = useState<Set<string>>(new Set(['all']));
-  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set(['all']));
   const [amountSort, setAmountSort] = useState<'none' | 'high' | 'low'>('none');
 
   const { data: recordings = [], isLoading } = useQuery({
@@ -223,7 +213,7 @@ export default function DashboardScreen() {
     queryFn: async () => {
       const { data } = await supabase
         .from('recordings')
-        .select('*, categories:category_id(name,color,icon), space:space_id(name), account:account_id(name)')
+        .select('*, categories:category_id(name,color,icon), space:space_id(name)')
         .eq('user_id', userId)
         .order('transaction_date', { ascending: false });
       return data ?? [];
@@ -237,14 +227,11 @@ export default function DashboardScreen() {
     : ACTIVITY_TABS.filter(t => t.key !== 'all' && selectedTabs.has(t.key)).flatMap(t => t.types as string[]);
 
   const isAllSpaces     = selectedSpaces.has('all');
-  const isAllAccounts   = selectedAccounts.has('all');
-  const isAllCategories = selectedCategories.has('all');
+
 
   const filtered = recordings.filter(r => {
     if (!currentTypes.includes(r.type)) return false;
     if (!isAllSpaces     && !selectedSpaces.has(r.space_id))                    return false;
-    if (!isAllAccounts   && !selectedAccounts.has(r.account_id))                 return false;
-    if (!isAllCategories && !selectedCategories.has(r.category_id))              return false;
     const [y, m, d] = r.transaction_date.split('-').map(Number);
     const date = new Date(y, m - 1, d);
     if (date < range.from) return false;
@@ -287,8 +274,6 @@ export default function DashboardScreen() {
   const allRecordings = (types: string[]) => recordings.filter(r => {
     if (!types.includes(r.type)) return false;
     if (!isAllSpaces     && !selectedSpaces.has(r.space_id))                    return false;
-    if (!isAllAccounts   && !selectedAccounts.has(r.account_id))                 return false;
-    if (!isAllCategories && !selectedCategories.has(r.category_id))              return false;
     const [y, m, d] = r.transaction_date.split('-').map(Number);
     const date = new Date(y, m - 1, d);
     if (date < range.from) return false;
@@ -776,28 +761,6 @@ export default function DashboardScreen() {
           })}
         </View>
 
-        {/* Accounts */}
-        <Text style={s.filterSectionLabel}>Accounts</Text>
-        <View style={s.spaceChips}>
-          <TouchableOpacity style={[s.spaceChip, isAllAccounts && s.spaceChipActive]} onPress={() => setSelectedAccounts(new Set(['all']))} activeOpacity={0.75}>
-            <Text style={[s.spaceChipText, isAllAccounts && s.spaceChipTextActive]}>All</Text>
-          </TouchableOpacity>
-          {accounts.map((ac: any) => {
-            const active = selectedAccounts.has(ac.id);
-            return (
-              <TouchableOpacity key={ac.id} style={[s.spaceChip, active && s.spaceChipActive]} onPress={() => {
-                setSelectedAccounts(prev => {
-                  const next = new Set(prev); next.delete('all');
-                  if (next.has(ac.id)) { next.delete(ac.id); if (next.size === 0) return new Set(['all']); }
-                  else next.add(ac.id);
-                  return next;
-                });
-              }} activeOpacity={0.75}>
-                <Text style={[s.spaceChipText, active && s.spaceChipTextActive]}>{ac.name}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
 
         {/* Amount sort */}
         <Text style={s.filterSectionLabel}>Sort by Amount</Text>
