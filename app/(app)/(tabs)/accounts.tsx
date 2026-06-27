@@ -49,7 +49,7 @@ const { data: accounts = [] } = useQuery<Account[]>({
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white }}>
+    <SafeAreaView style={ flex: 1, backgroundColor: '#F7F8FA' }>
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
         <Text style={s.pageTitle}>accounts</Text>
         <Text style={s.pageSubtitle}>your saved payment methods.</Text>
@@ -330,28 +330,27 @@ function AccountForm({ visible, userId, initial, onClose, onSaved }: {
 
 const s = StyleSheet.create({
   scroll: { paddingHorizontal: Spacing.page, paddingBottom: 60, paddingTop: 32 },
-  pageTitle: { fontFamily: Fonts.calSans, fontSize: 36, color: '#425252', marginBottom: 4 },
-  pageSubtitle: { fontFamily: 'ChillaxRegular', fontSize: 13, color: Colors.muted, marginBottom: 24 },
+  pageTitle: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 28, color: '#1A1A2E', letterSpacing: -0.8, marginBottom: 4 },
+  pageSubtitle: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 13, color: '#9A9DB0', marginBottom: 24 },
   accountCard: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: Colors.white, borderRadius: Radius.pill,
+    backgroundColor: '#FFFFFF', borderRadius: 20,
     paddingVertical: 14, paddingHorizontal: 18,
-    borderWidth: 1, borderStyle: 'dashed', borderColor: Colors.borderMid,
+    borderWidth: 1, borderColor: '#ECECEC',
   },
   accountLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
-  accountName: { fontFamily: 'ChillaxMedium', fontSize: 15, color: Colors.text },
+  accountName: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, color: '#1A1A2E' },
   accountMeta: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted },
   qrThumb: { width: 36, height: 36, borderRadius: Radius.sm },
   qrEmpty: { width: 36, height: 36, borderRadius: Radius.sm, backgroundColor: Colors.input, justifyContent: 'center', alignItems: 'center' },
   emptyBox: { alignItems: 'center', gap: 8, paddingVertical: 32 },
-  emptyText: { fontFamily: 'ChillaxRegular', fontSize: 13, color: Colors.faint },
+  emptyText: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 13, color: '#9A9DB0' },
   addBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
     paddingVertical: 12, paddingHorizontal: 20,
-    borderRadius: Radius.pill, borderWidth: 2, borderStyle: 'dotted',
-    borderColor: Colors.cyan, backgroundColor: 'transparent', alignSelf: 'flex-start',
+    borderRadius: 999, borderWidth: 1, borderColor: '#4ECDC4', backgroundColor: '#E0F5F4', alignSelf: 'flex-start',
   },
-  addBtnText: { fontFamily: 'ChillaxMedium', fontSize: 13, color: Colors.muted },
+  addBtnText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, color: '#4ECDC4' },
   suggestionBox: { backgroundColor: Colors.white, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.border, marginBottom: 8, overflow: 'hidden' },
   qrUploadBtn: { borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface, overflow: 'hidden', marginBottom: 8 },
   qrPreview: { width: 160, height: 160, borderRadius: Radius.md },

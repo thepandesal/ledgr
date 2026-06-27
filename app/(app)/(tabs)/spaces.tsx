@@ -31,7 +31,7 @@ const PAGE_PAD = 24;
 interface SpaceData {
   id: string; name: string; color: string; icon: string;
   budget?: number | null; spent?: number; saved?: number;
-  upcomingTasks?: number; space_type?: string; savings_target_date?: string | null;
+  space_type?: string; savings_target_date?: string | null;
 }
 
 // ─── Circular progress ────────────────────────────────────────────────────────
@@ -78,7 +78,7 @@ function CircularProgress({ pct, size = 60 }: { pct: number; size?: number }) {
         </View>
       )}
 
-      <Text style={{ fontFamily: Fonts.monoBold, fontSize: 10, color: C.vividBlue }}>
+      <Text style={{ fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 10, color: '#4ECDC4' }}>
         {Math.round(pct * 100)}%
       </Text>
     </View>
@@ -104,10 +104,6 @@ export default function SpacesScreen() {
   const [selectedSpace, setSelectedSpace] = useState<SpaceData | null>(null);
   const [editMode, setEditMode] = useState(false);
 
-  const now = new Date();
-  const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
-  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
-
   const { data: spaces = [] } = useQuery<SpaceData[]>({
     queryKey: ['spaces', userId],
     queryFn: async () => {
@@ -122,15 +118,10 @@ export default function SpacesScreen() {
       const savedMap: Record<string, number> = {};
       (savRecs ?? []).forEach((r: any) => { savedMap[r.space_id] = (savedMap[r.space_id] || 0) + Number(r.amount); });
 
-      const { data: memoData } = await supabase.from('memos').select('space_id').eq('user_id', userId).eq('is_done', false).gte('due_date', monthStart).lte('due_date', monthEnd);
-      const memoMap: Record<string, number> = {};
-      (memoData ?? []).forEach((m: any) => { memoMap[m.space_id] = (memoMap[m.space_id] || 0) + 1; });
-
       return data.map((s: any) => ({
         ...s,
         spent: spentMap[s.id] ?? 0,
         saved: savedMap[s.id] ?? 0,
-        upcomingTasks: memoMap[s.id] ?? 0,
       })) as SpaceData[];
     },
     enabled: !!userId,
@@ -249,7 +240,6 @@ export default function SpacesScreen() {
             const budget = space.budget ?? 0;
             const pct = budget > 0 ? Math.min((isExpense ? spent : saved) / budget, 1) : 0;
             const remaining = Math.max(0, budget - spent);
-            const upcoming = space.upcomingTasks ?? 0;
             const name = space.name.charAt(0).toUpperCase() + space.name.slice(1);
 
             return (
@@ -288,11 +278,6 @@ export default function SpacesScreen() {
                           <View style={s.infoDots} />
                           <Text style={s.infoValue}>{budget > 0 ? fmt(remaining) : '—'}</Text>
                         </View>
-                        <View style={s.infoRow}>
-                          <Text style={s.infoLabel}>upcoming events</Text>
-                          <View style={s.infoDots} />
-                          <Text style={s.infoValue}>{upcoming}</Text>
-                        </View>
                       </View>
                     </View>
                   ) : (
@@ -328,11 +313,6 @@ export default function SpacesScreen() {
                           </Text>
                         </View>
                       )}
-                      <View style={s.infoRow}>
-                        <Text style={s.infoLabel}>upcoming events</Text>
-                        <View style={s.infoDots} />
-                        <Text style={s.infoValue}>{upcoming}</Text>
-                      </View>
                     </View>
                   )}
                 </TouchableOpacity>
@@ -440,17 +420,17 @@ export default function SpacesScreen() {
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#ffffff' },
+  container: { flex: 1, backgroundColor: '#F7F8FA' },
   scroll: { paddingHorizontal: 32, paddingBottom: 60 },
   topMargin: { height: 32 },
   bottomMargin: { height: 40 },
 
   // Header
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  sectionTitle: { fontFamily: Fonts.calSans, fontSize: 32, color: '#494a51', letterSpacing: -0.5 },
-  sectionSubtitle: { fontFamily: 'GlacialIndifference', fontSize: 13, color: C.gray, marginTop: 3 },
+  sectionTitle: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 28, color: '#1A1A2E', letterSpacing: -0.8 },
+  sectionSubtitle: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 13, color: '#9A9DB0', marginTop: 4 },
   addBtn: {
-    backgroundColor: C.darkVividBlue,
+    backgroundColor: '#4ECDC4',
     borderRadius: Radius.pill,
     paddingVertical: 10,
     paddingHorizontal: 16,
@@ -460,7 +440,7 @@ const s = StyleSheet.create({
     alignSelf: 'stretch',
     justifyContent: 'center',
   },
-  addBtnText: { fontFamily: 'GlacialIndifference', fontSize: 12, color: '#ffffff' },
+  addBtnText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 12, color: '#ffffff' },
 
   // All spaces
   allSpacesCard: {
@@ -469,15 +449,11 @@ const s = StyleSheet.create({
     paddingHorizontal: 20,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
+    backgroundColor: '#F7F8FA',
     marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
+    borderWidth: 1, borderColor: '#ECECEC',
   },
-  allSpacesText: { fontFamily: Fonts.calSans, fontSize: 15, color: C.vividBlue },
+  allSpacesText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, color: '#4ECDC4' },
 
   grid: { flexDirection: 'column', gap: 14 },
 
@@ -485,14 +461,10 @@ const s = StyleSheet.create({
   spaceCard: {
     borderRadius: Radius.lg,
     padding: 18,
-    backgroundColor: '#ffffff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.07,
-    shadowRadius: 10,
-    elevation: 3,
+    backgroundColor: '#F7F8FA',
+    borderWidth: 1, borderColor: '#ECECEC',
   },
-  spaceCardText: { fontFamily: Fonts.calSans, fontSize: 17, color: C.vividBlue, flexShrink: 1 },
+  spaceCardText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 16, color: '#1A1A2E', flexShrink: 1 },
 
   // Type badge
   typeBadge: { borderRadius: Radius.pill, paddingHorizontal: 8, paddingVertical: 3 },
@@ -500,9 +472,9 @@ const s = StyleSheet.create({
 
   // Info rows
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  infoLabel: { fontFamily: 'GlacialIndifference', fontSize: 11, color: C.gray, flexShrink: 0 },
+  infoLabel: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 11, color: '#9A9DB0', flexShrink: 0 },
   infoDots: { flex: 1, borderBottomWidth: 1, borderStyle: 'dotted', borderColor: C.pastelAzure },
-  infoValue: { fontFamily: 'GlacialIndifferenceBold', fontSize: 11, color: C.vividBlue, flexShrink: 0 },
+  infoValue: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11, color: '#4ECDC4', flexShrink: 0 },
 
   // Savings pill
   savingsPill: {
@@ -514,7 +486,7 @@ const s = StyleSheet.create({
     borderRadius: Radius.pill,
   },
   savingsConsumed: {
-    backgroundColor: C.darkVividBlue,
+    backgroundColor: '#4ECDC4',
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: Radius.pill,
