@@ -58,21 +58,20 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (!fontsLoaded) return;
-    let redirected = false;
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (redirected) return;
-      redirected = true;
       // Don't redirect if on split share page
       const path = typeof window !== 'undefined' ? window.location.pathname : '';
       if (path.startsWith('/split/')) { setReady(true); return; }
       if (!session) {
+        setReady(true);
         router.replace('/');
       } else if (!session.user.user_metadata?.full_name) {
+        setReady(true);
         router.replace('/onboarding');
       } else {
+        setReady(true);
         router.replace('/(app)/(tabs)');
       }
-      setReady(true);
     });
     return () => subscription.unsubscribe();
   }, [fontsLoaded]);
