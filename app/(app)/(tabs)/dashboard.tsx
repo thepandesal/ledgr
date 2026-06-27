@@ -439,7 +439,6 @@ export default function DashboardScreen() {
               return (
                 <TouchableOpacity key={tab.key} style={s.tabWrap} onPress={() => handleTabToggle(tab.key)} activeOpacity={0.75}>
                   <View style={[s.tabCircle, isActive && s.tabCircleActive]}>
-                    <Ionicons name={tab.icon as any} size={14} color={isActive ? '#FFFFFF' : P.secondary} />
                     <Text style={[s.tabCircleValue, isActive && s.tabCircleValueActive]}>{tabValue(tab.key)}</Text>
                   </View>
                   <Text style={[s.tabLabel, isActive && s.tabLabelActive]}>{tab.label}</Text>
@@ -759,7 +758,7 @@ const s = StyleSheet.create({
     backgroundColor: P.tealLight, gap: 2,
   },
   tabCircleActive:      { backgroundColor: P.teal },
-  tabCircleValue:       { fontFamily: FBK, fontSize: 9, color: P.secondary, letterSpacing: -0.3 },
+  tabCircleValue:       { fontFamily: FBK, fontSize: 11, color: P.secondary, letterSpacing: -0.3 },
   tabCircleValueActive: { color: '#FFFFFF' },
   tabLabel:       { fontFamily: I,  fontSize: 9,  color: P.secondary, marginTop: 5, letterSpacing: 0.2 },
   tabLabelActive: { fontFamily: IS, fontSize: 9,  color: P.teal },
