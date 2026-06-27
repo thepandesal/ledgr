@@ -484,7 +484,12 @@ export default function DashboardScreen() {
 
       {/* ── Top section ── */}
       <View style={s.topSection}>
-        <Text style={s.title}>Activities</Text>
+        <View style={s.titleRow}>
+          <Text style={s.title}>Activities</Text>
+          <TouchableOpacity style={s.addRecBtn} onPress={() => { setShowAddModal(true); setQaError(''); }} activeOpacity={0.75}>
+            <Ionicons name="add" size={18} color="#FFFFFF" />
+          </TouchableOpacity>
+        </View>
       </View>{/* end topSection */}
 
       {/* ── Sheet: menu floats on top, list scrolls underneath ── */}
