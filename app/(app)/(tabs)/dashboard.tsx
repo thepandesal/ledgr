@@ -131,9 +131,11 @@ export default function DashboardScreen() {
       if (data.dashboard_space_ids) {
         const ids = (data.dashboard_space_ids as string).split(',').filter(Boolean);
         setSelectedSpaces(new Set(ids.length ? ids : ['all']));
+      }
       if (data.dashboard_tab_ids) {
         const tabs = (data.dashboard_tab_ids as string).split(',').filter(Boolean);
         setSelectedTabs(new Set(tabs.length ? tabs as ActivityTab[] : ['all']));
+      }
       if (data.dashboard_range_offset != null) setRangeOffset(Number(data.dashboard_range_offset));
       return data;
     },
