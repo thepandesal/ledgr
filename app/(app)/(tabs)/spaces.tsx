@@ -220,7 +220,7 @@ export default function SpacesScreen() {
       </ScrollView>
 
       {/* Create/edit modal */}
-      <BottomSheet visible={createModal} onClose={() => { setCreateModal(false); setEditMode(false); }} title={editMode ? 'edit space' : 'new space'}>
+      <BottomSheet visible={createModal} onClose={() => { setCreateModal(false); setEditMode(false); }} title={editMode ? 'edit space' : 'new space'} height='50%'>
         {error ? <Text style={s.qaError}>{error}</Text> : null}
 
         <Text style={s.qaLabel}>type</Text>
