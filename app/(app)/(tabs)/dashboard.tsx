@@ -627,7 +627,7 @@ export default function DashboardScreen() {
           <Text style={s.clearBtnText}>Clear All Filters</Text>
         </TouchableOpacity>
 
-        {/* Spaces */}}
+        {/* Spaces */}
         <Text style={s.filterSectionLabel}>Spaces</Text>
         <View style={s.spaceChips}>
           <TouchableOpacity style={[s.spaceChip, isAllSpaces && s.spaceChipActive]} onPress={() => { setSelectedSpaces(new Set(['all'])); saveSettings.mutate({ dashboard_space_ids: '' }); }} activeOpacity={0.75}>
