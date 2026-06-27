@@ -1,9 +1,9 @@
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  SafeAreaView, ActivityIndicator, TextInput,
+  SafeAreaView, ActivityIndicator, TextInput, Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useUser } from '../../../src/hooks/useUser';
 import { supabase } from '../../../src/lib/supabase';
@@ -215,6 +215,18 @@ export default function DashboardScreen() {
   });
 
   const [showFilterModal, setShowFilterModal] = useState(false);
+  const [controlsVisible, setControlsVisible] = useState(true);
+  const collapseAnim = useRef(new Animated.Value(1)).current;
+
+  const toggleControls = () => {
+    const toValue = controlsVisible ? 0 : 1;
+    setControlsVisible(!controlsVisible);
+    Animated.timing(collapseAnim, {
+      toValue,
+      duration: 220,
+      useNativeDriver: false,
+    }).start();
+  };
   const [selectedAccounts, setSelectedAccounts] = useState<Set<string>>(new Set(['all']));
   const [amountSort, setAmountSort] = useState<'none' | 'high' | 'low'>('none');
 
@@ -965,6 +977,8 @@ const s = StyleSheet.create({
   statusChip:           { flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: Radius.lg, backgroundColor: P.bg },
   statusChipText:       { fontFamily: IS, fontSize: 13, color: P.secondary },
   statusChipTextActive: { color: P.text },
+  collapsible: { gap: 10 },
+  collapseBtn: { alignSelf: 'center', backgroundColor: P.card, borderRadius: 20, borderWidth: 1, borderColor: P.border, width: 32, height: 20, alignItems: 'center', justifyContent: 'center' },
   filterSectionLabel: { fontFamily: IS, fontSize: 11, color: P.secondary, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8, marginTop: 4 },
   dateNavRow:   { flexDirection: 'row', alignItems: 'center', gap: 4 },
   dateNavArrow: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: P.tealLight },
