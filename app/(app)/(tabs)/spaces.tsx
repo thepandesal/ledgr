@@ -311,7 +311,6 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 10,
     backgroundColor: CARD, borderRadius: 16,
     paddingHorizontal: 16, paddingVertical: 14,
-    borderWidth: 1, borderColor: BORDER,
     marginBottom: 16,
   },
   allCardText: { fontFamily: SB, fontSize: 14, color: T },
@@ -324,8 +323,7 @@ const s = StyleSheet.create({
 
   card: {
     backgroundColor: CARD, borderRadius: 20,
-    borderWidth: 1, borderColor: BORDER,
-    padding: 16, gap: 12,
+    padding: 18, gap: 14,
   },
   cardTop:     { flexDirection: 'row', alignItems: 'center', gap: 12 },
   cardIconWrap: { width: 36, height: 36, borderRadius: 18, backgroundColor: TL, alignItems: 'center', justifyContent: 'center' },
