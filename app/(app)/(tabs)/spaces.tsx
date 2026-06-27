@@ -154,7 +154,6 @@ export default function SpacesScreen() {
             const budget = space.budget ?? 0;
             const pct = budget > 0 ? Math.min(value / budget, 1) : 0;
             const overBudget = isExpense && budget > 0 && value > budget;
-
             return (
               <TouchableOpacity
                 key={space.id}
@@ -162,49 +161,28 @@ export default function SpacesScreen() {
                 activeOpacity={0.85}
                 onPress={() => router.push({ pathname: '/(app)/space-detail', params: { spaceId: space.id, name: space.name, color: space.color } })}
               >
-                {/* Top row */}
-                <View style={s.cardTop}>
-                  <View style={s.cardIconWrap}>
-                    <Ionicons name="grid-outline" size={16} color={T} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.cardName} numberOfLines={1}>{space.name}</Text>
-                    <Text style={s.cardType}>{isExpense ? 'expense tracker' : 'savings tracker'}</Text>
-                  </View>
-                  <TouchableOpacity
-                    onPress={() => { setSelectedSpace(space); setMenuModal(true); }}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    style={{ padding: 4 }}
-                  >
-                    <Ionicons name="ellipsis-horizontal" size={16} color={SEC} />
-                  </TouchableOpacity>
+                <View style={s.cardIconWrap}>
+                  <Ionicons name="grid-outline" size={16} color={T} />
                 </View>
-
-                {/* Progress bar */}
-                {budget > 0 && (
-                  <View style={s.progressTrack}>
-                    <View style={[s.progressFill, {
-                      width: `${pct * 100}%` as any,
-                      backgroundColor: overBudget ? '#FFAB91' : T,
-                    }]} />
-                  </View>
-                )}
-
-                {/* Numbers row */}
-                <View style={s.cardNumbers}>
-                  <Text style={s.numberLabel}>{isExpense ? 'spent' : 'saved'} </Text>
-                  <Text style={[s.numberValue, overBudget && { color: '#FFAB91' }]}>{fmt(value)}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.cardName} numberOfLines={1}>{space.name}</Text>
+                  <Text style={s.cardType}>{isExpense ? 'expense' : 'savings'}{budget > 0 ? ` · ${fmt(budget)} budget` : ''}</Text>
+                </View>
+                <View style={{ alignItems: 'flex-end', gap: 2 }}>
+                  <Text style={[s.cardAmount, overBudget && { color: '#FFAB91' }]}>{fmt(value)}</Text>
                   {budget > 0 && (
-                    <>
-                      <View style={s.numberDivider} />
-                      <Text style={s.numberLabel}>{isExpense ? 'budget' : 'goal'} </Text>
-                      <Text style={s.numberValue}>{fmt(budget)}</Text>
-                      <View style={s.numberDivider} />
-                      <Text style={s.numberLabel}>{isExpense ? 'left' : 'to go'} </Text>
-                      <Text style={[s.numberValue, { color: overBudget ? '#FFAB91' : T }]}>{fmt(Math.abs(budget - value))}</Text>
-                    </>
+                    <View style={s.miniBar}>
+                      <View style={[s.miniBarFill, { width: `${pct * 100}%` as any, backgroundColor: overBudget ? '#FFAB91' : T }]} />
+                    </View>
                   )}
                 </View>
+                <TouchableOpacity
+                  onPress={() => { setSelectedSpace(space); setMenuModal(true); }}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  style={{ padding: 4 }}
+                >
+                  <Ionicons name="ellipsis-horizontal" size={15} color={SEC} />
+                </TouchableOpacity>
               </TouchableOpacity>
             );
           })}
@@ -305,25 +283,19 @@ const s = StyleSheet.create({
 
   emptyWrap: { alignItems: 'center', paddingVertical: 48, gap: 8 },
   emptyText: { fontFamily: SB, fontSize: 16, color: TEXT },
-  emptyHint: { fontFamily: R, fontSize: 13, color: SEC },
+  emptyHint: { fontFamily: R,  fontSize: 13, color: SEC },
 
   card: {
     backgroundColor: CARD, borderRadius: 20,
-    paddingHorizontal: 16, paddingVertical: 14, gap: 10,
+    paddingHorizontal: 16, paddingVertical: 14,
+    flexDirection: 'row', alignItems: 'center', gap: 12,
   },
-  cardTop:      { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  cardIconWrap: { width: 32, height: 32, borderRadius: 16, backgroundColor: TL, alignItems: 'center', justifyContent: 'center' },
-  cardName:     { fontFamily: SB, fontSize: 14, color: TEXT, letterSpacing: -0.2 },
-  cardType:     { fontFamily: R,  fontSize: 10, color: SEC, marginTop: 1 },
-
-  progressTrack: { height: 3, backgroundColor: BORDER, borderRadius: 2, overflow: 'hidden' },
-  progressFill:  { height: 3, borderRadius: 2 },
-
-  cardNumbers:   { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  numberItem:    { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  numberLabel:   { fontFamily: R,  fontSize: 10, color: SEC },
-  numberValue:   { fontFamily: SB, fontSize: 12, color: TEXT },
-  numberDivider: { width: 3, height: 3, borderRadius: 2, backgroundColor: BORDER },
+  cardIconWrap: { width: 38, height: 38, borderRadius: 19, backgroundColor: TL, alignItems: 'center', justifyContent: 'center' },
+  cardName:     { fontFamily: SB, fontSize: 14, color: TEXT },
+  cardType:     { fontFamily: R,  fontSize: 11, color: SEC, marginTop: 2 },
+  cardAmount:   { fontFamily: B,  fontSize: 15, color: TEXT, letterSpacing: -0.3 },
+  miniBar:      { width: 48, height: 3, backgroundColor: BORDER, borderRadius: 2, overflow: 'hidden' },
+  miniBarFill:  { height: 3, borderRadius: 2 },
 
   typeBtn:         { paddingHorizontal: 16, paddingVertical: 9, borderRadius: 999, borderWidth: 1, borderColor: BORDER, backgroundColor: BG },
   typeBtnActive:   { backgroundColor: T, borderColor: T },
