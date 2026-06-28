@@ -297,9 +297,9 @@ const s = StyleSheet.create({
   card: {
     backgroundColor: Colors.white, borderRadius: Radius.xl,
     paddingHorizontal: 16, paddingVertical: 14,
-    flexDirection: 'row', alignItems: 'center', gap: 14,
+    flexDirection: 'row', alignItems: 'center', gap: 10,
   },
-  cardIconWrap: { width: 46, height: 46, borderRadius: 23, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.surface },
+  cardIconWrap: { justifyContent: 'center', alignItems: 'center' },
   cardMid:      { flex: 1, gap: 2 },
   cardName:     { fontFamily: Fonts.monoBold, fontSize: 14, color: Colors.text, letterSpacing: 0.1, lineHeight: 20 },
   cardCount:    { fontFamily: Fonts.mono,     fontSize: 11, color: Colors.muted, letterSpacing: 0.2 },
