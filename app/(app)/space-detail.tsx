@@ -186,6 +186,8 @@ export default function SpaceDetailScreen() {
     },
     enabled: !!spaceId && (spaceId !== 'all' || !!userId),
   });
+
+  const { data: spaceData } = useQuery({
     queryKey: ['space-budget', spaceId],
     queryFn: async () => {
       const { data } = await supabase
