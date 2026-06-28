@@ -184,7 +184,44 @@ export default function SpacesScreen() {
                 </TouchableOpacity>
               </TouchableOpacity>
             );
-          })}
+            </>
+          )}
+
+          {/* Savings spaces */}
+          {spaces.filter(sp => sp.space_type === 'savings').length > 0 && (
+            <>
+              <Text style={s.sectionLabel}>Savings Trackers</Text>
+              {spaces.filter(sp => sp.space_type === 'savings').map(space => {
+                const value = space.saved ?? 0;
+                const budget = space.budget ?? 0;
+                return (
+                  <TouchableOpacity
+                    key={space.id}
+                    style={s.card}
+                    activeOpacity={0.85}
+                    onPress={() => router.push({ pathname: '/(app)/space-detail', params: { spaceId: space.id, name: space.name, color: space.color } })}
+                  >
+                    <View style={s.cardIconWrap}>
+                      <Ionicons name="grid-outline" size={16} color={T} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.cardName} numberOfLines={1}>{space.name}</Text>
+                    </View>
+                    <Text style={s.cardAmount}>
+                      {budget > 0 ? `${fmt(value)} / ${fmt(budget)}` : fmt(value)}
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() => { setSelectedSpace(space); setMenuModal(true); }}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      style={{ padding: 4 }}
+                    >
+                      <Ionicons name="ellipsis-horizontal" size={15} color={SEC} />
+                    </TouchableOpacity>
+                  </TouchableOpacity>
+                );
+              })}
+            </>
+          )}
         </View>
       </ScrollView>
 
