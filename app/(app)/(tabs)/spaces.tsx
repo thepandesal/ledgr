@@ -152,7 +152,7 @@ export default function SpacesScreen() {
           {/* Expense spaces */}
           {spaces.filter(sp => (sp.space_type ?? 'expense') === 'expense').length > 0 && (
             <>
-              <View style={s.sectionRow}><Text style={s.sectionLabel}>Expense Trackers</Text></View>
+              <View style={s.dateHeaderRow}><Text style={s.dateHeaderText}>Expense Trackers</Text></View>
               {spaces.filter(sp => (sp.space_type ?? 'expense') === 'expense').map(space => {
             const isExpense = (space.space_type ?? 'expense') === 'expense';
             const value = isExpense ? (space.spent ?? 0) : (space.saved ?? 0);
@@ -191,7 +191,7 @@ export default function SpacesScreen() {
           {/* Savings spaces */}
           {spaces.filter(sp => sp.space_type === 'savings').length > 0 && (
             <>
-              <View style={s.sectionRow}><Text style={s.sectionLabel}>Savings Trackers</Text></View>
+              <View style={s.dateHeaderRow}><Text style={s.dateHeaderText}>Savings Trackers</Text></View>
               {spaces.filter(sp => sp.space_type === 'savings').map(space => {
                 const value = space.saved ?? 0;
                 const budget = space.budget ?? 0;
