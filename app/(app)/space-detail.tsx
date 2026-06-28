@@ -114,6 +114,26 @@ function getTypeLabel(type: string, status: string) {
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
+function smartDateLabel(dateStr: string): string {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const date  = new Date(y, m - 1, d);
+  const today = new Date();
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const diffDays = Math.floor((todayStart.getTime() - date.getTime()) / 86400000);
+
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Yesterday';
+
+  // Same week (Sun-Sat containing today)
+  const todayDay = todayStart.getDay(); // 0=Sun
+  const weekStart = new Date(todayStart); weekStart.setDate(todayStart.getDate() - todayDay);
+  const weekEnd   = new Date(weekStart);  weekEnd.setDate(weekStart.getDate() + 6);
+  if (date >= weekStart && date <= weekEnd)
+    return date.toLocaleDateString('en-US', { weekday: 'long' });
+
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
 export default function SpaceDetailScreen() {
   const { spaceId, name } = useLocalSearchParams<{ spaceId: string; name: string }>();
   const router = useRouter();
@@ -233,7 +253,7 @@ export default function SpaceDetailScreen() {
     if (existing) existing.items.push(r);
     else grouped.push({
       key:   k,
-      label: date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }),
+      label: smartDateLabel(r.transaction_date),
       date,
       items: [r],
     });

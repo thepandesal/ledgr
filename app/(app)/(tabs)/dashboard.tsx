@@ -90,6 +90,26 @@ function getRangeForPreset(preset: Preset, cutoffDay: number, offset = 0): { fro
 
 const MODAL_HEIGHT = '50%';
 
+function smartDateLabel(dateStr: string): string {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const date  = new Date(y, m - 1, d);
+  const today = new Date();
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const diffDays = Math.floor((todayStart.getTime() - date.getTime()) / 86400000);
+
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Yesterday';
+
+  // Same week (Sun-Sat containing today)
+  const todayDay = todayStart.getDay(); // 0=Sun
+  const weekStart = new Date(todayStart); weekStart.setDate(todayStart.getDate() - todayDay);
+  const weekEnd   = new Date(weekStart);  weekEnd.setDate(weekStart.getDate() + 6);
+  if (date >= weekStart && date <= weekEnd)
+    return date.toLocaleDateString('en-US', { weekday: 'long' });
+
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
 export default function DashboardScreen() {
   const router    = useRouter();
   const { userId } = useUser();
@@ -557,8 +577,7 @@ export default function DashboardScreen() {
             {sortedFiltered(filtered).map((item, idx) => {
               const prevDate = sortedFiltered(filtered)[idx - 1]?.transaction_date;
               const showDate = item.transaction_date !== prevDate;
-              const dateStr  = new Date(item.transaction_date + 'T00:00:00')
-                .toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+              const dateStr  = smartDateLabel(item.transaction_date);
               const tl = typeLabel(item);
               return (
                 <View key={item.id}>
