@@ -82,7 +82,8 @@ export default function SplitBillDetailScreen() {
   };
 
   // ── Items state ──────────────────────────────────────────────────────────
-  const [addItemModal, setAddItemModal] = useState(false);
+  const [addModal, setAddModal]         = useState(false);
+  const [addModalTab, setAddModalTab]   = useState<'item' | 'adjustment'>('item');
   const [itemForms, setItemForms] = useState([{ name: '', cost: '', people: [] as string[] }]);
 
   const { data: items = [], refetch: refetchItems } = useQuery({
@@ -107,7 +108,7 @@ export default function SplitBillDetailScreen() {
       valid.map(f => ({ split_bill_id: splitBillId, user_id: userId, name: f.name.trim(), cost: parseFloat(f.cost), people: f.people }))
     );
     setItemForms([{ name: '', cost: '', people: [] }]);
-    setAddItemModal(false);
+    setAddModal(false);
     refetchItems();
   };
 
@@ -128,7 +129,6 @@ export default function SplitBillDetailScreen() {
   };
 
   // ── Adjustments state ─────────────────────────────────────────────────
-  const [addAdjModal, setAddAdjModal] = useState(false);
   const [adjType, setAdjType]         = useState<'expense' | 'receivable'>('expense');
   const [adjName, setAdjName]         = useState('');
   const [adjAmount, setAdjAmount]     = useState('');
@@ -169,8 +169,9 @@ export default function SplitBillDetailScreen() {
       mode: adjMode,
       manual_amounts,
     });
-    setAddAdjModal(false);
+    setAddModal(false);
     setAdjName(''); setAdjAmount(''); setAdjMode('equal'); setAdjPeople([]); setAdjManual({}); setAdjError('');
+    refetchAdj();
     refetchAdj();
   };
 
@@ -318,7 +319,7 @@ export default function SplitBillDetailScreen() {
           <View style={s.sectionRow}>
             <Text style={s.sectionHeader}>items</Text>
             <TouchableOpacity
-              onPress={() => { setItemForms([{ name: '', cost: '', people: [] }]); setAddItemModal(true); }}
+              onPress={() => { setItemForms([{ name: '', cost: '', people: [] }]); setAddModalTab('item'); setAddModal(true); }}
               style={s.sectionAddBtn}
               disabled={filledPeople.length === 0}
             >
@@ -361,7 +362,7 @@ export default function SplitBillDetailScreen() {
           {/* Adjustments */}
           <View style={s.sectionRow}>
             <Text style={s.sectionHeader}>adjustments</Text>
-            <TouchableOpacity onPress={() => { setAdjName(''); setAdjAmount(''); setAdjMode('equal'); setAdjPeople([]); setAdjManual({}); setAdjError(''); setAddAdjModal(true); }} style={s.sectionAddBtn}>
+            <TouchableOpacity onPress={() => { setAdjName(''); setAdjAmount(''); setAdjMode('equal'); setAdjPeople([]); setAdjManual({}); setAdjError(''); setAddModalTab('adjustment'); setAddModal(true); }} style={s.sectionAddBtn}>
               <Ionicons name="add" size={14} color={Colors.cyan} />
               <Text style={s.sectionAddText}>add</Text>
             </TouchableOpacity>
@@ -467,128 +468,148 @@ export default function SplitBillDetailScreen() {
         </ScrollView>
       </SafeAreaView>
 
-      {/* Add item modal */}
-      <BottomSheet visible={addItemModal} onClose={() => setAddItemModal(false)} title="add items" height="60%">
-        {itemForms.map((form, idx) => (
-          <View key={idx} style={s.itemFormRow}>
-            <TextInput
-              style={[s.itemFormInput, { flex: 1 }]}
-              placeholder="item name"
-              placeholderTextColor={Colors.faint}
-              value={form.name}
-              onChangeText={v => setItemForms(prev => { const n = [...prev]; n[idx] = { ...n[idx], name: v }; return n; })}
-              autoFocus={idx === 0}
-            />
-            <TextInput
-              style={[s.itemFormInput, { width: 80, textAlign: 'right' }]}
-              placeholder="0.00"
-              placeholderTextColor={Colors.faint}
-              value={form.cost}
-              onChangeText={v => setItemForms(prev => { const n = [...prev]; n[idx] = { ...n[idx], cost: v }; return n; })}
-              keyboardType="decimal-pad"
-            />
-          </View>
-        ))}
-        {/* Who's included */}
-        {filledPeople.length > 0 && itemForms[0]?.cost ? (
-          <View style={{ marginTop: 10 }}>
-            <Text style={s.contactsLabel}>who's included</Text>
+      {/* Add item / adjustment modal */}
+      <BottomSheet visible={addModal} onClose={() => setAddModal(false)} title="add" height="65%">
+
+        {/* Tab switcher */}
+        <View style={s.modalTabRow}>
+          {(['item', 'adjustment'] as const).map(tab => (
+            <TouchableOpacity
+              key={tab}
+              style={[s.modalTab, addModalTab === tab && s.modalTabActive]}
+              onPress={() => setAddModalTab(tab)}
+            >
+              <Text style={[s.modalTabText, addModalTab === tab && s.modalTabTextActive]}>
+                {tab === 'item' ? 'item' : 'adjustment'}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {addModalTab === 'item' ? (
+          <>
+            {itemForms.map((form, idx) => (
+              <View key={idx} style={s.itemFormRow}>
+                <TextInput
+                  style={[s.itemFormInput, { flex: 1 }]}
+                  placeholder="item name"
+                  placeholderTextColor={Colors.faint}
+                  value={form.name}
+                  onChangeText={v => setItemForms(prev => { const n = [...prev]; n[idx] = { ...n[idx], name: v }; return n; })}
+                  autoFocus={idx === 0}
+                />
+                <TextInput
+                  style={[s.itemFormInput, { width: 80, textAlign: 'right' }]}
+                  placeholder="0.00"
+                  placeholderTextColor={Colors.faint}
+                  value={form.cost}
+                  onChangeText={v => setItemForms(prev => { const n = [...prev]; n[idx] = { ...n[idx], cost: v }; return n; })}
+                  keyboardType="decimal-pad"
+                />
+              </View>
+            ))}
+            {filledPeople.length > 0 && itemForms[0]?.cost ? (
+              <View style={{ marginTop: 10 }}>
+                <Text style={s.contactsLabel}>who's included</Text>
+                <View style={s.chipWrap}>
+                  {filledPeople.map((p, pi) => {
+                    const sel = itemForms[0].people.includes(p);
+                    return (
+                      <TouchableOpacity key={pi} style={[s.personChip, sel && { backgroundColor: Colors.cyan, borderColor: Colors.cyan }]} onPress={() => toggleItemPerson(0, p)}>
+                        <Text style={[s.personChipText, sel && { color: Colors.white }]}>{p}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+                {itemForms[0].people.length > 0 && itemForms[0].cost && (
+                  <Text style={{ fontFamily: Fonts.monoBold, fontSize: 11, color: Colors.cyan, marginTop: 6 }}>
+                    {(parseFloat(itemForms[0].cost) / itemForms[0].people.length).toLocaleString('en-US', { minimumFractionDigits: 2 })} each
+                  </Text>
+                )}
+              </View>
+            ) : null}
+            <TouchableOpacity
+              style={[s.doneBtn, { marginTop: 16 }, (!itemForms[0]?.name.trim() || !itemForms[0]?.cost) && { opacity: 0.4 }]}
+              onPress={saveItems}
+              disabled={!itemForms[0]?.name.trim() || !itemForms[0]?.cost}
+            >
+              <Text style={s.doneBtnText}>save item</Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <>
+            {adjError ? <Text style={{ fontFamily: Fonts.mono, fontSize: 12, color: Colors.expense, marginBottom: 8 }}>{adjError}</Text> : null}
+
+            <Text style={s.contactsLabel}>type</Text>
+            <View style={s.chipWrap}>
+              {([
+                { key: 'expense',    label: '↑ add expense',             sub: 'adds to what they owe' },
+                { key: 'receivable', label: '↓ add receivable / loan',   sub: 'deducts from what they owe' },
+              ] as const).map(t => (
+                <TouchableOpacity key={t.key} style={[s.adjTypeBtn, adjType === t.key && s.adjTypeBtnActive]} onPress={() => setAdjType(t.key)}>
+                  <Text style={[s.adjTypeBtnLabel, adjType === t.key && { color: Colors.white }]}>{t.label}</Text>
+                  <Text style={[s.adjTypeBtnSub, adjType === t.key && { color: Colors.white + 'cc' }]}>{t.sub}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={s.contactsLabel}>name</Text>
+            <TextInput style={s.itemFormInput} placeholder="e.g. shared loan" placeholderTextColor={Colors.faint} value={adjName} onChangeText={v => { setAdjName(v); setAdjError(''); }} />
+
+            <Text style={s.contactsLabel}>amount</Text>
+            <TextInput style={s.itemFormInput} placeholder="0.00" placeholderTextColor={Colors.faint} value={adjAmount} onChangeText={v => { setAdjAmount(v); setAdjError(''); }} keyboardType="decimal-pad" />
+
+            <Text style={s.contactsLabel}>split mode</Text>
+            <View style={s.chipWrap}>
+              {(['equal', 'manual'] as const).map(m => (
+                <TouchableOpacity key={m} style={[s.personChip, adjMode === m && { backgroundColor: Colors.cyan, borderColor: Colors.cyan }]} onPress={() => setAdjMode(m)}>
+                  <Text style={[s.personChipText, adjMode === m && { color: Colors.white }]}>{m}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={s.contactsLabel}>assign to</Text>
             <View style={s.chipWrap}>
               {filledPeople.map((p, pi) => {
-                const sel = itemForms[0].people.includes(p);
+                const sel = adjPeople.includes(p);
                 return (
-                  <TouchableOpacity key={pi} style={[s.personChip, sel && { backgroundColor: Colors.cyan, borderColor: Colors.cyan }]} onPress={() => toggleItemPerson(0, p)}>
+                  <TouchableOpacity key={pi} style={[s.personChip, sel && { backgroundColor: Colors.cyan, borderColor: Colors.cyan }]} onPress={() => {
+                    setAdjPeople(prev => prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p]);
+                  }}>
                     <Text style={[s.personChipText, sel && { color: Colors.white }]}>{p}</Text>
                   </TouchableOpacity>
                 );
               })}
             </View>
-            {itemForms[0].people.length > 0 && itemForms[0].cost && (
-              <Text style={{ fontFamily: Fonts.monoBold, fontSize: 11, color: Colors.cyan, marginTop: 6 }}>
-                {(parseFloat(itemForms[0].cost) / itemForms[0].people.length).toLocaleString('en-US', { minimumFractionDigits: 2 })} each
-              </Text>
-            )}
-          </View>
-        ) : null}
-        <TouchableOpacity
-          style={[s.doneBtn, { marginTop: 16 }, (!itemForms[0]?.name.trim() || !itemForms[0]?.cost) && { opacity: 0.4 }]}
-          onPress={saveItems}
-          disabled={!itemForms[0]?.name.trim() || !itemForms[0]?.cost}
-        >
-          <Text style={s.doneBtnText}>save</Text>
-        </TouchableOpacity>
-      </BottomSheet>
 
-      {/* Add adjustment modal */}
-      <BottomSheet visible={addAdjModal} onClose={() => setAddAdjModal(false)} title="add adjustment" height="60%">
-        {adjError ? <Text style={{ fontFamily: Fonts.mono, fontSize: 12, color: Colors.expense, marginBottom: 8 }}>{adjError}</Text> : null}
-
-        <Text style={s.contactsLabel}>type</Text>
-        <View style={s.chipWrap}>
-          {(['expense', 'receivable'] as const).map(t => (
-            <TouchableOpacity key={t} style={[s.personChip, adjType === t && { backgroundColor: Colors.cyan, borderColor: Colors.cyan }]} onPress={() => setAdjType(t)}>
-              <Text style={[s.personChipText, adjType === t && { color: Colors.white }]}>
-                {t === 'expense' ? '↑ expense (adds to bill)' : '↓ receivable (deducts)'}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        <Text style={s.contactsLabel}>name</Text>
-        <TextInput style={s.itemFormInput} placeholder="e.g. shared loan" placeholderTextColor={Colors.faint} value={adjName} onChangeText={v => { setAdjName(v); setAdjError(''); }} autoFocus />
-
-        <Text style={s.contactsLabel}>amount</Text>
-        <TextInput style={s.itemFormInput} placeholder="0.00" placeholderTextColor={Colors.faint} value={adjAmount} onChangeText={v => { setAdjAmount(v); setAdjError(''); }} keyboardType="decimal-pad" />
-
-        <Text style={s.contactsLabel}>split mode</Text>
-        <View style={s.chipWrap}>
-          {(['equal', 'manual'] as const).map(m => (
-            <TouchableOpacity key={m} style={[s.personChip, adjMode === m && { backgroundColor: Colors.cyan, borderColor: Colors.cyan }]} onPress={() => setAdjMode(m)}>
-              <Text style={[s.personChipText, adjMode === m && { color: Colors.white }]}>{m}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        <Text style={s.contactsLabel}>assign to</Text>
-        <View style={s.chipWrap}>
-          {filledPeople.map((p, pi) => {
-            const sel = adjPeople.includes(p);
-            return (
-              <TouchableOpacity key={pi} style={[s.personChip, sel && { backgroundColor: Colors.cyan, borderColor: Colors.cyan }]} onPress={() => {
-                setAdjPeople(prev => prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p]);
-              }}>
-                <Text style={[s.personChipText, sel && { color: Colors.white }]}>{p}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        {adjMode === 'manual' && adjPeople.length > 0 && adjAmount ? (
-          <View style={{ gap: 8, marginTop: 4 }}>
-            <Text style={s.contactsLabel}>manual amounts (must total {fmt(parseFloat(adjAmount || '0'))})</Text>
-            {adjPeople.map(p => (
-              <View key={p} style={s.itemFormRow}>
-                <Text style={[s.personChipText, { flex: 1 }]}>{p}</Text>
-                <TextInput
-                  style={[s.itemFormInput, { width: 100, textAlign: 'right' }]}
-                  placeholder="0.00"
-                  placeholderTextColor={Colors.faint}
-                  value={adjManual[p] ?? ''}
-                  onChangeText={v => setAdjManual(prev => ({ ...prev, [p]: v }))}
-                  keyboardType="decimal-pad"
-                />
+            {adjMode === 'manual' && adjPeople.length > 0 && adjAmount ? (
+              <View style={{ gap: 8, marginTop: 4 }}>
+                <Text style={s.contactsLabel}>manual amounts (must total {fmt(parseFloat(adjAmount || '0'))})</Text>
+                {adjPeople.map(p => (
+                  <View key={p} style={s.itemFormRow}>
+                    <Text style={[s.personChipText, { flex: 1 }]}>{p}</Text>
+                    <TextInput
+                      style={[s.itemFormInput, { width: 100, textAlign: 'right' }]}
+                      placeholder="0.00"
+                      placeholderTextColor={Colors.faint}
+                      value={adjManual[p] ?? ''}
+                      onChangeText={v => setAdjManual(prev => ({ ...prev, [p]: v }))}
+                      keyboardType="decimal-pad"
+                    />
+                  </View>
+                ))}
               </View>
-            ))}
-          </View>
-        ) : null}
+            ) : null}
 
-        <TouchableOpacity
-          style={[s.doneBtn, (!adjName.trim() || !adjAmount || adjPeople.length === 0) && { opacity: 0.4 }]}
-          onPress={saveAdjustment}
-          disabled={!adjName.trim() || !adjAmount || adjPeople.length === 0}
-        >
-          <Text style={s.doneBtnText}>save</Text>
-        </TouchableOpacity>
+            <TouchableOpacity
+              style={[s.doneBtn, { marginTop: 16 }, (!adjName.trim() || !adjAmount || adjPeople.length === 0) && { opacity: 0.4 }]}
+              onPress={saveAdjustment}
+              disabled={!adjName.trim() || !adjAmount || adjPeople.length === 0}
+            >
+              <Text style={s.doneBtnText}>save adjustment</Text>
+            </TouchableOpacity>
+          </>
+        )}
       </BottomSheet>
 
       {/* Add person modal */}
@@ -701,6 +722,17 @@ const s = StyleSheet.create({
 
   shareBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: Radius.pill, paddingVertical: 12, paddingHorizontal: 24, borderWidth: 1, borderColor: Colors.borderMid, backgroundColor: Colors.surface, marginTop: 24, marginBottom: 8 },
   shareBtnText:  { fontFamily: Fonts.monoBold, fontSize: 13, color: Colors.muted },
+
+  modalTabRow:       { flexDirection: 'row', gap: 8, marginBottom: 16 },
+  modalTab:          { flex: 1, paddingVertical: 10, borderRadius: Radius.pill, backgroundColor: Colors.surface, alignItems: 'center', borderWidth: 1, borderColor: Colors.borderMid },
+  modalTabActive:    { backgroundColor: Colors.cyan, borderColor: Colors.cyan },
+  modalTabText:      { fontFamily: Fonts.mono,     fontSize: 12, color: Colors.muted },
+  modalTabTextActive:{ fontFamily: Fonts.monoBold, fontSize: 12, color: Colors.white },
+
+  adjTypeBtn:        { flex: 1, paddingVertical: 10, paddingHorizontal: 12, borderRadius: Radius.lg, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.borderMid, gap: 2 },
+  adjTypeBtnActive:  { backgroundColor: Colors.cyan, borderColor: Colors.cyan },
+  adjTypeBtnLabel:   { fontFamily: Fonts.monoBold, fontSize: 12, color: Colors.text },
+  adjTypeBtnSub:     { fontFamily: Fonts.mono,     fontSize: 10, color: Colors.muted },
 
   doneBtn:       { backgroundColor: Colors.cyan, borderRadius: Radius.pill, paddingVertical: 14, alignItems: 'center', marginTop: 16 },
   doneBtnText:   { fontFamily: Fonts.monoBold, fontSize: 14, color: Colors.white },
