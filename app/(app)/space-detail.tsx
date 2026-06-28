@@ -180,11 +180,7 @@ export default function SpaceDetailScreen() {
   useFocusEffect(useCallback(() => {
     if (!spaceId) return;
     queryClient.invalidateQueries({ queryKey: ['recordings', spaceId] });
-    if (pendingFocusDate) {
-      const parts = pendingFocusDate.split('-');
-      setSelectedDate(new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2])));
-      setPendingFocusDate(null);
-    }
+    setPendingFocusDate(null);
   }, [spaceId]));
 
   const handleBack = () => {
@@ -233,6 +229,8 @@ export default function SpaceDetailScreen() {
   const fmtShort = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   const fmtFull  = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   const rangeLabel = isSameDay(range.from, range.to)
+    ? fmtFull(range.from)
+    : `${fmtShort(range.from)} – ${fmtFull(range.to)}`;
 
   // Calendar helpers
   const firstDay    = new Date(pickerYear, pickerMonth, 1).getDay();
@@ -277,7 +275,6 @@ export default function SpaceDetailScreen() {
 
 
   // Calendar helpers
-  const handleDayPress = (day: number) => {
     const d = new Date(pickerYear, pickerMonth, day);
     if (pickingDate === 'from') { setCustomFrom(d); setCustomTo(d); setPickingDate('to'); }
     else { if (d < customFrom) { setCustomFrom(d); } else { setCustomTo(d); setActivePreset('custom'); } setPickingDate('from'); }
@@ -321,7 +318,7 @@ export default function SpaceDetailScreen() {
           {spaceId !== 'all' && (
             <TouchableOpacity
               style={s.addBtn}
-              onPress={() => router.push({ pathname: '/(app)/add-recording', params: { spaceId, spaceName: name, defaultDate: selectedDate.toISOString().split('T')[0] } } as any)}
+              onPress={() => router.push({ pathname: '/(app)/add-recording', params: { spaceId, spaceName: name, defaultDate: new Date().toISOString().split('T')[0] } } as any)}
               activeOpacity={0.8}
             >
               <Ionicons name="add" size={18} color="#fff" />
@@ -628,14 +625,6 @@ const s = StyleSheet.create({
     backgroundColor: CARD, borderRadius: 20,
     paddingTop: 12, paddingBottom: 10, gap: 8,
   },
-  modeRow:  { flexDirection: 'row', gap: 8 },
-  modeBtn:  { flex: 1, paddingVertical: 8, borderRadius: 999, backgroundColor: CARD, alignItems: 'center' },
-  modeBtnActive:    { backgroundColor: TEAL },
-  modeBtnText:      { fontFamily: M,  fontSize: 12, color: SEC  },
-  modeBtnTextActive: { fontFamily: SB, fontSize: 12, color: '#fff' },
-  dateNav:      { flexDirection: 'row', alignItems: 'center', backgroundColor: CARD, borderRadius: 16, paddingVertical: 10 },
-  navArrow:     { paddingHorizontal: 14 },
-  dateNavLabel: { flex: 1, textAlign: 'center', fontFamily: SB, fontSize: 13, color: TEXT },
 
   emptyWrap:     { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 14, paddingBottom: 80 },
   emptyIconWrap: { width: 64, height: 64, borderRadius: 32, backgroundColor: TEAL, justifyContent: 'center', alignItems: 'center', marginBottom: 6 },
