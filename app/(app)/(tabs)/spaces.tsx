@@ -184,6 +184,7 @@ export default function SpacesScreen() {
                 </TouchableOpacity>
               </TouchableOpacity>
             );
+          })}
             </>
           )}
 
