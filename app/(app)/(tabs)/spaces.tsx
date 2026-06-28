@@ -167,16 +167,9 @@ export default function SpacesScreen() {
                 <View style={{ flex: 1 }}>
                   <Text style={s.cardName} numberOfLines={1}>{space.name}</Text>
                 </View>
-                <View style={{ alignItems: 'flex-end', gap: 4 }}>
-                  <Text style={[s.cardAmount, overBudget && { color: '#FFAB91' }]}>
-                    {budget > 0 ? `${fmt(value)} / ${fmt(budget)}` : fmt(value)}
-                  </Text>
-                  {budget > 0 && (
-                    <View style={s.miniBar}>
-                      <View style={[s.miniBarFill, { width: `${pct * 100}%` as any, backgroundColor: overBudget ? '#FFAB91' : T }]} />
-                    </View>
-                  )}
-                </View>
+                <Text style={[s.cardAmount, overBudget && { color: '#FFAB91' }]}>
+                  {budget > 0 ? `${fmt(value)} / ${fmt(budget)}` : fmt(value)}
+                </Text>
                 <TouchableOpacity
                   onPress={() => { setSelectedSpace(space); setMenuModal(true); }}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -288,14 +281,12 @@ const s = StyleSheet.create({
 
   card: {
     backgroundColor: CARD, borderRadius: 20,
-    paddingHorizontal: 16, paddingVertical: 14,
-    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingHorizontal: 16, paddingVertical: 16,
+    flexDirection: 'row', alignItems: 'center', gap: 14,
   },
-  cardIconWrap: { width: 38, height: 38, borderRadius: 19, backgroundColor: TL, alignItems: 'center', justifyContent: 'center' },
-  cardName:     { fontFamily: SB, fontSize: 14, color: TEXT },
-  cardAmount:   { fontFamily: SB, fontSize: 13, color: TEXT, letterSpacing: -0.2 },
-  miniBar:      { width: 48, height: 3, backgroundColor: BORDER, borderRadius: 2, overflow: 'hidden' },
-  miniBarFill:  { height: 3, borderRadius: 2 },
+  cardIconWrap: { width: 46, height: 46, borderRadius: 23, backgroundColor: TL, alignItems: 'center', justifyContent: 'center' },
+  cardName:     { fontFamily: SB, fontSize: 14, color: TEXT, letterSpacing: 0.1, lineHeight: 20 },
+  cardAmount:   { fontFamily: B,  fontSize: 15, color: TEXT, letterSpacing: -0.4 },
 
   typeBtn:         { paddingHorizontal: 16, paddingVertical: 9, borderRadius: 999, borderWidth: 1, borderColor: BORDER, backgroundColor: BG },
   typeBtnActive:   { backgroundColor: T, borderColor: T },
@@ -308,3 +299,4 @@ const s = StyleSheet.create({
   saveBtn:   { backgroundColor: T, borderRadius: 999, paddingVertical: 14, alignItems: 'center', marginTop: 20 },
   saveBtnText: { fontFamily: SB, fontSize: 14, color: '#FFFFFF' },
 });
+

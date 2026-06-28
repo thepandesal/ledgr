@@ -70,6 +70,19 @@ export default function SpaceDetailScreen() {
   const [confirmModal, setConfirmModal] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState('');
   const [pendingDeleteName, setPendingDeleteName] = useState('');
+  const menuAnim   = useRef(new Animated.Value(1)).current;
+  const lastScrollY = useRef(0);
+  const MENU_HEIGHT = 110;
+
+  const onScroll = (e: any) => {
+    const y    = e.nativeEvent.contentOffset.y;
+    const diff = y - lastScrollY.current;
+    if (diff > 6 && y > 30)
+      Animated.timing(menuAnim, { toValue: 0, duration: 180, useNativeDriver: false }).start();
+    else if (diff < -6)
+      Animated.timing(menuAnim, { toValue: 1, duration: 180, useNativeDriver: false }).start();
+    lastScrollY.current = y;
+  };
 
   const { data: recordings = [], isLoading } = useQuery({
     queryKey: ['recordings', spaceId, userId],
@@ -224,70 +237,83 @@ export default function SpaceDetailScreen() {
           )}
         </View>
 
-        {/* View mode tabs + date nav */}
-        <View style={s.controls}>
-          <View style={s.modeRow}>
-            {MODES.map(m => (
-              <TouchableOpacity key={m} style={[s.modeBtn, viewMode === m && s.modeBtnActive]} onPress={() => setViewMode(m)} activeOpacity={0.75}>
-                <Text style={[s.modeBtnText, viewMode === m && s.modeBtnTextActive]}>{m}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          <View style={s.dateNav}>
-            <TouchableOpacity onPress={() => navigate(-1)} style={s.navArrow}>
-              <Ionicons name="chevron-back" size={16} color={SEC} />
-            </TouchableOpacity>
-            <Text style={s.dateNavLabel}>{navLabel()}</Text>
-            <TouchableOpacity onPress={() => navigate(1)} style={s.navArrow}>
-              <Ionicons name="chevron-forward" size={16} color={SEC} />
-            </TouchableOpacity>
-          </View>
-        </View>
+        {/* Sheet: sticky menu floats over list */}
+        <View style={{ flex: 1 }}>
 
-        {/* Recordings */}
-        {isLoading ? (
-          <ActivityIndicator color={TEAL} style={{ marginTop: 48 }} />
-        ) : filtered.length === 0 ? (
-          <View style={s.emptyWrap}>
-            <Ionicons name="receipt-outline" size={32} color={SEC} />
-            <Text style={s.emptyText}>no recordings</Text>
-            <Text style={s.emptyHint}>for this {viewMode} period</Text>
-          </View>
-        ) : (
-          <ScrollView contentContainerStyle={s.list} showsVerticalScrollIndicator={false}>
-            {grouped.map(group => (
-              <View key={group.key}>
-                <View style={s.dateHeaderRow}>
-                  <Text style={s.dateHeaderText}>{group.label}</Text>
+          {/* Sticky floating menu */}
+          <Animated.View style={[s.menuCard, {
+            opacity: menuAnim,
+            transform: [{ translateY: menuAnim.interpolate({ inputRange: [0,1], outputRange: [-MENU_HEIGHT, 0] }) }],
+          }]}>
+            <View style={s.modeRow}>
+              {MODES.map(m => (
+                <TouchableOpacity key={m} style={[s.modeBtn, viewMode === m && s.modeBtnActive]} onPress={() => setViewMode(m)} activeOpacity={0.75}>
+                  <Text style={[s.modeBtnText, viewMode === m && s.modeBtnTextActive]}>{m}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <View style={s.dateNav}>
+              <TouchableOpacity onPress={() => navigate(-1)} style={s.navArrow}>
+                <Ionicons name="chevron-back" size={16} color={SEC} />
+              </TouchableOpacity>
+              <Text style={s.dateNavLabel}>{navLabel()}</Text>
+              <TouchableOpacity onPress={() => navigate(1)} style={s.navArrow}>
+                <Ionicons name="chevron-forward" size={16} color={SEC} />
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+
+          {/* Recordings */}
+          {isLoading ? (
+            <ActivityIndicator color={TEAL} style={{ marginTop: 48 }} />
+          ) : filtered.length === 0 ? (
+            <View style={s.emptyWrap}>
+              <Ionicons name="receipt-outline" size={32} color={SEC} />
+              <Text style={s.emptyText}>no recordings</Text>
+              <Text style={s.emptyHint}>for this {viewMode} period</Text>
+            </View>
+          ) : (
+            <ScrollView
+              contentContainerStyle={s.list}
+              showsVerticalScrollIndicator={false}
+              onScroll={onScroll}
+              scrollEventThrottle={16}
+            >
+              {grouped.map(group => (
+                <View key={group.key}>
+                  <View style={s.dateHeaderRow}>
+                    <Text style={s.dateHeaderText}>{group.label}</Text>
+                  </View>
+                  {group.items.map(item => {
+                    const tl = typeLabel(item.type, item.status);
+                    return (
+                      <TouchableOpacity
+                        key={item.id}
+                        style={s.row}
+                        activeOpacity={0.85}
+                        onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: item.id } } as any)}
+                        onLongPress={() => { setPendingDeleteId(item.id); setPendingDeleteName(item.name); setConfirmModal(true); }}
+                      >
+                        <View style={s.rowIcon}>
+                          <Ionicons name={(item.categories?.icon ?? 'ellipse-outline') as any} size={16} color={TEXT} />
+                        </View>
+                        <View style={s.rowMid}>
+                          <Text style={s.rowType}>{tl.label}</Text>
+                          <Text style={s.rowName} numberOfLines={1}>{item.name}</Text>
+                          {item.space?.name ? <Text style={s.rowSpace}>{item.space.name}</Text> : null}
+                        </View>
+                        <Text style={[s.rowAmount, { color: tl.color }]}>
+                          {Number(item.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
-                {group.items.map(item => {
-                  const tl = typeLabel(item.type, item.status);
-                  return (
-                    <TouchableOpacity
-                      key={item.id}
-                      style={s.row}
-                      activeOpacity={0.85}
-                      onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: item.id } } as any)}
-                      onLongPress={() => { setPendingDeleteId(item.id); setPendingDeleteName(item.name); setConfirmModal(true); }}
-                    >
-                      <View style={s.rowIcon}>
-                        <Ionicons name={(item.categories?.icon ?? 'ellipse-outline') as any} size={16} color={TEXT} />
-                      </View>
-                      <View style={s.rowMid}>
-                        <Text style={s.rowType}>{tl.label}</Text>
-                        <Text style={s.rowName} numberOfLines={1}>{item.name}</Text>
-                      </View>
-                      <Text style={[s.rowAmount, { color: tl.color }]}>
-                        {Number(item.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            ))}
-            <View style={{ height: 80 }} />
-          </ScrollView>
-        )}
+              ))}
+              <View style={{ height: 80 }} />
+            </ScrollView>
+          )}
+        </View>
       </SafeAreaView>
 
       <ConfirmModal
@@ -319,7 +345,11 @@ const s = StyleSheet.create({
   budgetTrack: { height: 4, backgroundColor: BOR, borderRadius: 2, overflow: 'hidden' },
   budgetFill:  { height: 4, borderRadius: 2 },
 
-  controls: { marginHorizontal: 16, marginBottom: 8, gap: 8 },
+  menuCard: {
+    position: 'absolute', top: 0, left: 16, right: 16, zIndex: 10,
+    backgroundColor: CARD, borderRadius: 20,
+    paddingTop: 12, paddingBottom: 10, gap: 8,
+  },
   modeRow:  { flexDirection: 'row', gap: 8 },
   modeBtn:  { flex: 1, paddingVertical: 8, borderRadius: 999, backgroundColor: CARD, alignItems: 'center' },
   modeBtnActive:    { backgroundColor: TEAL },
@@ -333,7 +363,7 @@ const s = StyleSheet.create({
   emptyText: { fontFamily: SB, fontSize: 16, color: TEXT },
   emptyHint: { fontFamily: R,  fontSize: 13, color: SEC  },
 
-  list: { paddingHorizontal: 16, paddingTop: 8, gap: 8 },
+  list: { paddingHorizontal: 16, paddingTop: 120, gap: 8 },
   dateHeaderRow:  { paddingTop: 16, paddingBottom: 8, borderTopWidth: 1, borderTopColor: BOR, marginTop: 8 },
   dateHeaderText: { fontFamily: SB, fontSize: 10, color: SEC, letterSpacing: 1.2, textTransform: 'uppercase' },
 
@@ -342,5 +372,6 @@ const s = StyleSheet.create({
   rowMid:   { flex: 1, gap: 2 },
   rowType:  { fontFamily: M,  fontSize: 10, color: SEC,  letterSpacing: 0.3, textTransform: 'uppercase' },
   rowName:  { fontFamily: SB, fontSize: 14, color: TEXT, lineHeight: 20 },
+  rowSpace: { fontFamily: R,  fontSize: 11, color: SEC },
   rowAmount: { fontFamily: B, fontSize: 15, letterSpacing: -0.4 },
 });
