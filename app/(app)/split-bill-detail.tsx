@@ -116,7 +116,6 @@ export default function SplitBillDetailScreen() {
   });
 
   const totalItemsCost = items.reduce((s: number, i: any) => s + Number(i.cost), 0);
-  const remainingAmount = Math.max(0, totalAmount - totalItemsCost);
 
   // ── Add Recordings functions ─────────────────────────────────────────────
   const openAddRecModal = async (tab: 'receivable' | 'loan') => {
@@ -215,6 +214,7 @@ export default function SplitBillDetailScreen() {
   };
 
   const saveItems = async () => {
+    const valid = itemForms.filter(f => f.name.trim() && f.cost);
     if (!valid.length) return;
     await supabase.from('split_items').insert(
       valid.map(f => ({ split_bill_id: splitBillId, user_id: userId, name: f.name.trim(), cost: parseFloat(f.cost), people: f.people }))
@@ -342,6 +342,7 @@ export default function SplitBillDetailScreen() {
   });
 
   const totalAmount = linkedRecordings.reduce((s: number, r: any) => s + Number(r.amount_contributed), 0);
+  const remainingAmount = Math.max(0, totalAmount - totalItemsCost);
   const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   const typeColor = (type: string) => {
