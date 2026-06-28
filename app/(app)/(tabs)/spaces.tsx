@@ -326,8 +326,9 @@ const s = StyleSheet.create({
     paddingHorizontal: 16, paddingVertical: 14,
     flexDirection: 'row', alignItems: 'center', gap: 14,
   },
-  cardName:     { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 14, color: '#1A1A2E', letterSpacing: 0.1, lineHeight: 20 },
-  cardAmount:   { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 15, color: '#1A1A2E', letterSpacing: -0.4 },
+  cardName:     { fontFamily: SB, fontSize: 14, color: TEXT, letterSpacing: 0.1, lineHeight: 20 },
+  cardCount:    { fontFamily: M,  fontSize: 10, color: SEC,  letterSpacing: 0.4, textTransform: 'uppercase' },
+  cardAmount:   { fontFamily: B,  fontSize: 15, color: TEXT, letterSpacing: -0.4 },
 
   typeBtn:         { paddingHorizontal: 16, paddingVertical: 9, borderRadius: 999, borderWidth: 1, borderColor: BORDER, backgroundColor: BG },
   typeBtnActive:   { backgroundColor: T, borderColor: T },
