@@ -220,7 +220,10 @@ export default function SplitBillDetailScreen() {
         .select('id, amount_contributed, recording:recording_id(id, name, amount, type, transaction_date)')
         .eq('split_bill_id', splitBillId)
         .order('created_at');
-      return data ?? [];
+      return (data ?? []).map((r: any) => ({
+        ...r,
+        recording: Array.isArray(r.recording) ? r.recording[0] : r.recording,
+      }));
     },
     enabled: !!splitBillId,
   });

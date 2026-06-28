@@ -56,7 +56,7 @@ export default function SplitSharePage() {
       if (!billRes.data) { setNotFound(true); setLoading(false); return; }
 
       // Use first recording as display recording
-      const firstRec = (recsRes.data ?? [])[0]?.recording;
+      const firstRec = (recsRes.data ?? []).map((r: any) => ({ ...r, recording: Array.isArray(r.recording) ? r.recording[0] : r.recording }))[0]?.recording;
       setRecording(firstRec ? { ...firstRec, name: billRes.data.name } : { name: billRes.data.name, amount: 0, type: 'expense', transaction_date: '' });
 
       if (accountIds.length > 0) {
