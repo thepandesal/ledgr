@@ -1431,7 +1431,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
         ]}
       />
 
-      {/* Copied toast */}
+      <CollectModal
         visible={collectModal}
         onClose={() => setCollectModal(false)}
         recording={recording}
