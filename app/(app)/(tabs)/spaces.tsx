@@ -148,7 +148,12 @@ export default function SpacesScreen() {
               <Text style={s.emptyHint}>Tap + to create your first space</Text>
             </View>
           )}
-          {spaces.map(space => {
+
+          {/* Expense spaces */}
+          {spaces.filter(sp => (sp.space_type ?? 'expense') === 'expense').length > 0 && (
+            <>
+              <Text style={s.sectionLabel}>Expense Trackers</Text>
+              {spaces.filter(sp => (sp.space_type ?? 'expense') === 'expense').map(space => {
             const isExpense = (space.space_type ?? 'expense') === 'expense';
             const value = isExpense ? (space.spent ?? 0) : (space.saved ?? 0);
             const budget = space.budget ?? 0;
