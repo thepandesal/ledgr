@@ -171,9 +171,12 @@ export default function SpacesScreen() {
                   <Text style={s.cardName} numberOfLines={1}>{space.name}</Text>
                   <Text style={s.cardCount}>{space.count ?? 0} transaction{(space.count ?? 0) !== 1 ? 's' : ''}</Text>
                 </View>
-                <Text style={[s.cardAmount, overBudget && { color: '#FFAB91' }]}>
-                  {budget > 0 ? `${fmt(value)} / ${fmt(budget)}` : fmt(value)}
-                </Text>
+                <View style={s.cardRight}>
+                  <Text style={[s.cardAmount, overBudget && { color: '#FFAB91' }]}>{fmt(value)}</Text>
+                  {budget > 0 && (
+                    <Text style={s.cardSub}>budget: {fmt(budget - value)} left</Text>
+                  )}
+                </View>
                 <TouchableOpacity
                   onPress={() => { setSelectedSpace(space); setMenuModal(true); }}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -205,9 +208,12 @@ export default function SpacesScreen() {
                       <Text style={s.cardName} numberOfLines={1}>{space.name}</Text>
                       <Text style={s.cardCount}>{space.count ?? 0} transaction{(space.count ?? 0) !== 1 ? 's' : ''}</Text>
                     </View>
-                    <Text style={s.cardAmount}>
-                      {budget > 0 ? `${fmt(value)} / ${fmt(budget)}` : fmt(value)}
-                    </Text>
+                    <View style={s.cardRight}>
+                      <Text style={s.cardAmount}>{fmt(value)}</Text>
+                      {budget > 0 && (
+                        <Text style={s.cardSub}>goal: {fmt(budget)}</Text>
+                      )}
+                    </View>
                     <TouchableOpacity
                       onPress={() => { setSelectedSpace(space); setMenuModal(true); }}
                       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -328,7 +334,9 @@ const s = StyleSheet.create({
   },
   cardName:     { fontFamily: SB, fontSize: 14, color: TEXT, letterSpacing: 0.1, lineHeight: 20 },
   cardCount:    { fontFamily: R,  fontSize: 11, color: SEC,  letterSpacing: 0.2 },
+  cardRight:    { alignItems: 'flex-end', gap: 2 },
   cardAmount:   { fontFamily: B,  fontSize: 15, color: TEXT, letterSpacing: -0.4 },
+  cardSub:      { fontFamily: R,  fontSize: 11, color: SEC,  letterSpacing: 0.2 },
 
   typeBtn:         { paddingHorizontal: 16, paddingVertical: 9, borderRadius: 999, borderWidth: 1, borderColor: BORDER, backgroundColor: BG },
   typeBtnActive:   { backgroundColor: T, borderColor: T },
