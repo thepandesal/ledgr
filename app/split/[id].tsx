@@ -35,10 +35,74 @@ export default function SplitSharePage() {
   useEffect(() => { if (!id) return; loadAll(); }, [id]);
 
   const loadAll = async () => {
-    const { data: share, error } = await supabase.from('split_shares').select('recording_id, data').eq('id', id).single();
+    const { data: share, error } = await supabase.from('split_shares').select('recording_id, split_bill_id, data').eq('id', id).single();
     if (error || !share) { setNotFound(true); setLoading(false); return; }
-    const rid = share.recording_id;
     const accountIds: string[] = share.data?.account_ids ?? [];
+
+    // Support both old (recording_id) and new (split_bill_id) share rows
+    const splitBillId = share.split_bill_id;
+    const rid = share.recording_id;
+
+    if (splitBillId) {
+      // New flow: load from split_bill
+      const [billRes, splitsRes, itemsRes, recsRes, adjRes] = await Promise.all([
+        supabase.from('split_bills').select('id, name').eq('id', splitBillId).single(),
+        supabase.from('bill_splits').select('person_name').eq('split_bill_id', splitBillId).order('created_at'),
+        supabase.from('split_items').select('*, split_subitems(*)').eq('split_bill_id', splitBillId).order('created_at'),
+        supabase.from('split_bill_recordings').select('amount_contributed, recording:recording_id(name, amount, type, transaction_date)').eq('split_bill_id', splitBillId),
+        supabase.from('split_adjustments').select('*').eq('split_bill_id', splitBillId),
+      ]);
+
+      if (!billRes.data) { setNotFound(true); setLoading(false); return; }
+
+      // Use first recording as display recording
+      const firstRec = (recsRes.data ?? [])[0]?.recording;
+      setRecording(firstRec ? { ...firstRec, name: billRes.data.name } : { name: billRes.data.name, amount: 0, type: 'expense', transaction_date: '' });
+
+      if (accountIds.length > 0) {
+        const { data: accs } = await supabase.from('accounts').select('account_name, holder_name, bank, account_number, qr_code').in('id', accountIds);
+        if (accs) setPayments(accs);
+      }
+
+      const loadedItems = (itemsRes.data ?? []).map((item: any) => ({ ...item, subitems: item.split_subitems ?? [] }));
+      setItems(loadedItems);
+
+      const people = (splitsRes.data ?? []).map((r: any) => r.person_name);
+      const adjs = adjRes.data ?? [];
+
+      // Build per-person totals
+      const perPersonMap: Record<string, number> = {};
+      people.forEach(p => { perPersonMap[p] = 0; });
+      loadedItems.forEach((item: any) => {
+        const subs = item.subitems ?? [];
+        if (subs.length === 0) {
+          const pp = (item.people ?? []).length > 0 ? Number(item.cost) / item.people.length : 0;
+          (item.people ?? []).forEach((p: string) => { if (perPersonMap[p] !== undefined) perPersonMap[p] += pp; });
+        } else {
+          subs.forEach((sub: any) => {
+            const pp = (sub.people ?? []).length > 0 ? Number(sub.cost) / sub.people.length : 0;
+            (sub.people ?? []).forEach((p: string) => { if (perPersonMap[p] !== undefined) perPersonMap[p] += pp; });
+          });
+        }
+      });
+      // Apply adjustments
+      adjs.forEach((adj: any) => {
+        const adjPeople: string[] = adj.people ?? [];
+        if (adj.mode === 'manual') {
+          const manual = adj.manual_amounts ?? {};
+          adjPeople.forEach(p => { if (perPersonMap[p] !== undefined) perPersonMap[p] += adj.type === 'receivable' ? -(manual[p] ?? 0) : (manual[p] ?? 0); });
+        } else {
+          const pp = adjPeople.length > 0 ? Number(adj.amount) / adjPeople.length : 0;
+          adjPeople.forEach(p => { if (perPersonMap[p] !== undefined) perPersonMap[p] += adj.type === 'receivable' ? -pp : pp; });
+        }
+      });
+      setPerPerson(Object.entries(perPersonMap).map(([name, total]) => ({ name, total })));
+      setLoading(false);
+      return;
+    }
+
+    // Legacy flow: load from recording_id
+    if (!rid) { setNotFound(true); setLoading(false); return; }
 
     const [recRes, splitsRes, itemsRes, receiptRes] = await Promise.all([
       supabase.from('recordings').select('*').eq('id', rid).single(),
