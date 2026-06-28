@@ -166,10 +166,11 @@ export default function SpacesScreen() {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={s.cardName} numberOfLines={1}>{space.name}</Text>
-                  <Text style={s.cardType}>{isExpense ? 'expense' : 'savings'}{budget > 0 ? ` · ${fmt(budget)} budget` : ''}</Text>
                 </View>
-                <View style={{ alignItems: 'flex-end', gap: 2 }}>
-                  <Text style={[s.cardAmount, overBudget && { color: '#FFAB91' }]}>{fmt(value)}</Text>
+                <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                  <Text style={[s.cardAmount, overBudget && { color: '#FFAB91' }]}>
+                    {budget > 0 ? `${fmt(value)} / ${fmt(budget)}` : fmt(value)}
+                  </Text>
                   {budget > 0 && (
                     <View style={s.miniBar}>
                       <View style={[s.miniBarFill, { width: `${pct * 100}%` as any, backgroundColor: overBudget ? '#FFAB91' : T }]} />
@@ -292,8 +293,7 @@ const s = StyleSheet.create({
   },
   cardIconWrap: { width: 38, height: 38, borderRadius: 19, backgroundColor: TL, alignItems: 'center', justifyContent: 'center' },
   cardName:     { fontFamily: SB, fontSize: 14, color: TEXT },
-  cardType:     { fontFamily: R,  fontSize: 11, color: SEC, marginTop: 2 },
-  cardAmount:   { fontFamily: B,  fontSize: 15, color: TEXT, letterSpacing: -0.3 },
+  cardAmount:   { fontFamily: SB, fontSize: 13, color: TEXT, letterSpacing: -0.2 },
   miniBar:      { width: 48, height: 3, backgroundColor: BORDER, borderRadius: 2, overflow: 'hidden' },
   miniBarFill:  { height: 3, borderRadius: 2 },
 
