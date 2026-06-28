@@ -982,7 +982,7 @@ const s = StyleSheet.create({
   // Quick add modal
   qaError:          { fontFamily: Fonts.mono, fontSize: 12, color: PEACH, marginBottom: 8 },
   qaLabel:          { fontFamily: Fonts.monoBold, fontSize: 11, color: Colors.muted, marginBottom: 6, marginTop: 12, letterSpacing: 0.4, textTransform: 'uppercase' },
-  qaInput:          { fontFamily: Fonts.monoBold, fontSize: 15, color: Colors.text, backgroundColor: Colors.white, borderRadius: Radius.lg, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1, borderColor: Colors.borderMid },
+  qaInput:          { fontFamily: Fonts.monoBold, fontSize: 16, color: Colors.text, backgroundColor: Colors.white, borderRadius: Radius.lg, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1, borderColor: Colors.borderMid },
   qaTypeRow:        { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   qaTypeBtn:        { paddingHorizontal: 12, paddingVertical: 7, borderRadius: Radius.pill, backgroundColor: Colors.white, borderWidth: 1, borderColor: Colors.borderMid },
   qaTypeBtnActive:  { backgroundColor: Colors.cyan, borderColor: Colors.cyan },

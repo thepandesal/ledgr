@@ -447,7 +447,7 @@ export default function SplitBillDetailScreen() {
           <View style={s.sectionRow}>
             <Text style={s.sectionHeader}>items</Text>
             <TouchableOpacity
-              onPress={() => { setItemForms([{ name: '', cost: remainingAmount > 0 ? remainingAmount.toFixed(2) : '', people: [] }]); setAddModalTab('item'); setAddModal(true); }}
+              onPress={() => { setItemForms([{ name: '', cost: '', people: [] }]); setAddModalTab('item'); setAddModal(true); }}
               style={s.sectionAddBtn}
               disabled={filledPeople.length === 0}
             >
@@ -1024,7 +1024,7 @@ const s = StyleSheet.create({
   tagInputWrap:  { flexDirection: 'row', flexWrap: 'wrap', gap: 6, borderWidth: 1, borderColor: Colors.borderMid, borderRadius: Radius.md, padding: 8, minHeight: 44, marginBottom: 12 },
   tagChip:       { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: Colors.cyan, borderRadius: Radius.pill, paddingVertical: 4, paddingLeft: 10, paddingRight: 6 },
   tagChipText:   { fontFamily: Fonts.monoBold, fontSize: 11, color: Colors.white },
-  tagInput:      { fontFamily: Fonts.mono, fontSize: 14, color: Colors.text, minWidth: 120, flex: 1, padding: 2 },
+  tagInput:      { fontFamily: Fonts.mono, fontSize: 16, color: Colors.text, minWidth: 120, flex: 1, padding: 2 },
   contactsLabel: { fontFamily: Fonts.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 6 },
   contactRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.border },
   contactName:   { fontFamily: Fonts.mono, fontSize: 13, color: Colors.text },
@@ -1038,7 +1038,7 @@ const s = StyleSheet.create({
   itemsTotalDots: { flex: 1, borderBottomWidth: 1, borderStyle: 'dotted', borderColor: Colors.faint, marginHorizontal: 8 },
   itemsTotalValue:{ fontFamily: Fonts.monoBold, fontSize: 10, color: Colors.text },
   itemFormRow:    { flexDirection: 'row', gap: 8, marginBottom: 10 },
-  itemFormInput:  { fontFamily: Fonts.mono, fontSize: 14, color: Colors.text, backgroundColor: Colors.white, borderRadius: Radius.md, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: Colors.borderMid },
+  itemFormInput:  { fontFamily: Fonts.mono, fontSize: 16, color: Colors.text, backgroundColor: Colors.white, borderRadius: Radius.md, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: Colors.borderMid },
 
   summaryRow:    { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surface, borderRadius: Radius.pill, paddingVertical: 12, paddingHorizontal: 16, borderWidth: 1, borderColor: Colors.border },
   summaryName:   { fontFamily: Fonts.mono, fontSize: 13, color: Colors.text, flexShrink: 0 },
