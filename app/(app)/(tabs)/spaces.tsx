@@ -326,7 +326,6 @@ const s = StyleSheet.create({
     paddingHorizontal: 16, paddingVertical: 14,
     flexDirection: 'row', alignItems: 'center', gap: 14,
   },
-  cardIconWrap: { width: 46, height: 46, borderRadius: 23, backgroundColor: TL, alignItems: 'center', justifyContent: 'center' },
   cardName:     { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 14, color: '#1A1A2E', letterSpacing: 0.1, lineHeight: 20 },
   cardAmount:   { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 15, color: '#1A1A2E', letterSpacing: -0.4 },
 
