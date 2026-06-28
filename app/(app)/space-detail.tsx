@@ -277,21 +277,16 @@ export default function SpaceDetailScreen() {
     return n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
   };
 
-  const rangeLabel = isSameDay(range.from, range.to)
     ? fmtFull(range.from)
     : `${fmtShort(range.from)} – ${fmtFull(range.to)}`;
 
   // Calendar helpers
-  const isInRange = (day: number) => { const d = new Date(pickerYear, pickerMonth, day); return d > customFrom && d < customTo; };
-  const isEdge = (day: number) => { const d = new Date(pickerYear, pickerMonth, day); return isSameDay(d, customFrom) || isSameDay(d, customTo); };
   const handleDayPress = (day: number) => {
     const d = new Date(pickerYear, pickerMonth, day);
     if (pickingDate === 'from') { setCustomFrom(d); setCustomTo(d); setPickingDate('to'); }
     else { if (d < customFrom) { setCustomFrom(d); } else { setCustomTo(d); setActivePreset('custom'); } setPickingDate('from'); }
   };
 
-  const moneyIn  = recordings.filter(r => ['income','savings','return'].includes(r.type)).reduce((s, r) => s + Number(r.amount), 0);
-  const moneyOut = recordings.filter(r => ['expense','payment','transfer'].includes(r.type)).reduce((s, r) => s + Number(r.amount), 0);
   const loansActive = recordings.filter(r => r.type === 'payable' && r.status !== 'paid').length;
   const receivablesPending = recordings.filter(r => r.type === 'receivable' && r.status !== 'received').length;
 
