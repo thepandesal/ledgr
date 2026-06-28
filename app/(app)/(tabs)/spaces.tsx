@@ -327,7 +327,7 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 14,
   },
   cardName:     { fontFamily: SB, fontSize: 14, color: TEXT, letterSpacing: 0.1, lineHeight: 20 },
-  cardCount:    { fontFamily: M,  fontSize: 10, color: SEC,  letterSpacing: 0.4, textTransform: 'uppercase' },
+  cardCount:    { fontFamily: R,  fontSize: 11, color: SEC,  letterSpacing: 0.2 },
   cardAmount:   { fontFamily: B,  fontSize: 15, color: TEXT, letterSpacing: -0.4 },
 
   typeBtn:         { paddingHorizontal: 16, paddingVertical: 9, borderRadius: 999, borderWidth: 1, borderColor: BORDER, backgroundColor: BG },
