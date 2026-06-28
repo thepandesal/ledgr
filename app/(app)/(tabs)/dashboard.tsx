@@ -8,35 +8,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useUser } from '../../../src/hooks/useUser';
 import { supabase } from '../../../src/lib/supabase';
 import BottomSheet from '@/components/ui/BottomSheet';
-import { Colors, Radius } from '@/components/ui/theme';
+import { Colors, Fonts, Radius } from '@/components/ui/theme';
+import pageStyles from '@/components/ui/pageStyles';
 import { useRouter } from 'expo-router';
 
-const I   = 'PlusJakartaSans_400Regular';
-const IM  = 'PlusJakartaSans_500Medium';
-const IS  = 'PlusJakartaSans_600SemiBold';
-const IB  = 'PlusJakartaSans_700Bold';
-const FB  = 'PlusJakartaSans_600SemiBold';
-const FBK = 'PlusJakartaSans_700Bold';
+const PEACH = '#FFAB91';
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-
-// ── Soft teal / dirty-white wellness palette ───────────────────────
-const P = {
-  bg:        '#F7F8FA',
-  card:      '#FFFFFF',
-  cardDark:  '#1A1A2E',
-  border:    '#ECECEC',
-  text:      '#1A1A2E',
-  textLight: '#FFFFFF',
-  textDark:  '#1A1A2E',
-  secondary: '#9A9DB0',
-  muted:     '#C4C6D0',
-  teal:      '#4ECDC4',
-  tealLight: '#E0F5F4',
-  tealDark:  '#38B2AC',
-  peach:     '#FFAB91',
-  peachDark: '#FF7043',
-} as const;
 
 const ACTIVITY_TABS = [
   { key: 'all',         label: 'All',         icon: 'apps-outline',              types: ['income','return','savings','expense','payment','transfer','payable','receivable'], color: P.teal, bg: P.tealLight },
@@ -486,22 +464,22 @@ export default function DashboardScreen() {
   };
 
   const typeLabel = (r: any) => {
-    if (r.type === 'income')     return { label: 'income',  color: P.tealDark };
-    if (r.type === 'savings')    return { label: 'savings',  color: P.tealDark };
-    if (r.type === 'return')     return { label: 'return',  color: P.tealDark };
-    if (r.type === 'expense')    return { label: 'expense', color: P.peach    };
-    if (r.type === 'payment')    return { label: 'payment',  color: P.peach    };
-    if (r.type === 'transfer')   return { label: 'transfer', color: P.peach    };
+    if (r.type === 'income')     return { label: 'income',   color: Colors.cyan };
+    if (r.type === 'savings')    return { label: 'savings',  color: Colors.cyan };
+    if (r.type === 'return')     return { label: 'return',   color: Colors.cyan };
+    if (r.type === 'expense')    return { label: 'expense',  color: PEACH };
+    if (r.type === 'payment')    return { label: 'payment',  color: PEACH };
+    if (r.type === 'transfer')   return { label: 'transfer', color: PEACH };
     if (r.type === 'payable')    return r.status === 'paid'
-      ? { label: 'loan · paid',    color: P.tealDark }
+      ? { label: 'loan · paid',    color: Colors.cyan }
       : r.status === 'partial'
-      ? { label: 'loan · partial', color: P.peach    }
-      : { label: 'loan',           color: P.peach    };
+      ? { label: 'loan · partial', color: PEACH }
+      : { label: 'loan',           color: PEACH };
     if (r.type === 'receivable') return r.status === 'received'
-      ? { label: 'receivable · received', color: P.tealDark }
+      ? { label: 'receivable · received', color: Colors.cyan }
       : r.status === 'partial'
-      ? { label: 'receivable · partial',  color: P.tealDark }
-      : { label: 'receivable',            color: P.tealDark };
+      ? { label: 'receivable · partial',  color: Colors.cyan }
+      : { label: 'receivable',            color: Colors.cyan };
     return null;
   };
 
@@ -513,10 +491,10 @@ export default function DashboardScreen() {
         <View style={s.titleRow}>
           <Text style={s.title}>Activities</Text>
           <TouchableOpacity style={s.addRecBtn} onPress={() => { setShowAddModal(true); setQaError(''); }} activeOpacity={0.75}>
-            <Ionicons name="add" size={18} color="#FFFFFF" />
+            <Ionicons name="add" size={18} color={Colors.white} />
           </TouchableOpacity>
         </View>
-      </View>{/* end topSection */}
+      </View>
 
       {/* ── Sheet: menu floats on top, list scrolls underneath ── */}
       <View style={s.sheet}>
@@ -542,14 +520,14 @@ export default function DashboardScreen() {
           <View style={s.filterRow}>
             <View style={s.dateNavRow}>
               <TouchableOpacity style={s.dateNavArrow} onPress={() => navigateRange(-1)} activeOpacity={0.7}>
-                <Ionicons name="chevron-back" size={14} color={P.tealDark} />
+                <Ionicons name="chevron-back" size={14} color={Colors.cyan} />
               </TouchableOpacity>
               <TouchableOpacity style={s.filterBtn} onPress={() => setShowDateModal(true)} activeOpacity={0.75}>
-                <Ionicons name="calendar-outline" size={13} color={P.tealDark} />
+                <Ionicons name="calendar-outline" size={13} color={Colors.cyan} />
                 <Text style={s.filterBtnText}>{rangeLabel}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={s.dateNavArrow} onPress={() => navigateRange(1)} activeOpacity={0.7}>
-                <Ionicons name="chevron-forward" size={14} color={P.tealDark} />
+                <Ionicons name="chevron-forward" size={14} color={Colors.cyan} />
               </TouchableOpacity>
             </View>
             <TouchableOpacity
@@ -557,20 +535,16 @@ export default function DashboardScreen() {
               onPress={() => setShowFilterModal(true)}
               activeOpacity={0.75}
             >
-              <Ionicons name="options-outline" size={13} color={(!isAllSpaces || !isAllAccounts || !isAllCategories || amountSort !== 'none') ? P.teal : P.secondary} />
+              <Ionicons name="options-outline" size={13} color={(!isAllSpaces || !isAllAccounts || !isAllCategories || amountSort !== 'none') ? Colors.cyan : Colors.muted} />
               <Text style={[s.filterBtnText, (!isAllSpaces || !isAllAccounts || !isAllCategories || amountSort !== 'none') && s.filterBtnTextActive]}>Filter</Text>
             </TouchableOpacity>
           </View>
         </Animated.View>
         {isLoading ? (
-          <ActivityIndicator color={P.teal} style={{ marginTop: 48 }} />
+          <ActivityIndicator color={Colors.cyan} style={{ marginTop: 48 }} />
         ) : filtered.length === 0 ? (
-          <View style={s.emptyWrap}>
-            <View style={[s.emptyIconWrap, { backgroundColor: P.teal }]}>
-              <Ionicons name={activeTabData.icon as any} size={28} color={P.textDark} />
-            </View>
-            <Text style={s.emptyTitle}>nothing here</Text>
-            <Text style={s.emptyText}>no {activeTabData.label.toLowerCase()} found{`\n`}for this period</Text>
+          <View style={pageStyles.emptyBox}>
+            <Text style={pageStyles.emptyText}>no {activeTabData.label.toLowerCase()} found for this period</Text>
           </View>
         ) : (
           <ScrollView key={filtered.map(i => i.id).join() + amountSort} contentContainerStyle={s.list} showsVerticalScrollIndicator={false} onScroll={onScroll} scrollEventThrottle={16}>
@@ -588,7 +562,7 @@ export default function DashboardScreen() {
                   )}
                   <TouchableOpacity style={s.row} activeOpacity={0.85} onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: item.id } } as any)}>
                     <View style={s.rowIconWrap}>
-                      <Ionicons name={(item.categories?.icon ?? activeTabData.icon) as any} size={18} color={P.tealDark} />
+                      <Ionicons name={(item.categories?.icon ?? activeTabData.icon) as any} size={18} color={Colors.cyan} />
                     </View>
                     <View style={s.rowMid}>
                       <Text style={s.rowType}>{tl?.label ?? activeTabData.label}</Text>
@@ -623,11 +597,11 @@ export default function DashboardScreen() {
 
         {/* Name */}
         <Text style={s.qaLabel}>name</Text>
-        <TextInput style={s.qaInput} placeholder="e.g. grocery run" placeholderTextColor={P.muted} value={qaName} onChangeText={setQaName} autoFocus />
+        <TextInput style={s.qaInput} placeholder="e.g. grocery run" placeholderTextColor={Colors.faint} value={qaName} onChangeText={setQaName} autoFocus />
 
         {/* Amount */}
         <Text style={s.qaLabel}>amount</Text>
-        <TextInput style={s.qaInput} placeholder="0.00" placeholderTextColor={P.muted} value={qaAmount} onChangeText={setQaAmount} keyboardType="decimal-pad" />
+        <TextInput style={s.qaInput} placeholder="0.00" placeholderTextColor={Colors.faint} value={qaAmount} onChangeText={setQaAmount} keyboardType="decimal-pad" />
 
         {/* Date */}
         <Text style={s.qaLabel}>date</Text>
@@ -645,17 +619,17 @@ export default function DashboardScreen() {
           <View style={{flexDirection:'row', gap:8, marginTop:8}}>
             <View style={{flex:1}}>
               <Text style={s.qaDatePickerLabel}>Day</Text>
-              <TextInput style={s.qaInput} value={qaDay} onChangeText={setQaDay} keyboardType="number-pad" maxLength={2} placeholder="DD" placeholderTextColor={P.muted} />
+              <TextInput style={s.qaInput} value={qaDay} onChangeText={setQaDay} keyboardType="number-pad" maxLength={2} placeholder="DD" placeholderTextColor={Colors.faint} />
             </View>
             <View style={{flex:1}}>
               <Text style={s.qaDatePickerLabel}>Year</Text>
-              <TextInput style={s.qaInput} value={qaYear} onChangeText={setQaYear} keyboardType="number-pad" maxLength={4} placeholder="YYYY" placeholderTextColor={P.muted} />
+              <TextInput style={s.qaInput} value={qaYear} onChangeText={setQaYear} keyboardType="number-pad" maxLength={4} placeholder="YYYY" placeholderTextColor={Colors.faint} />
             </View>
           </View>
         </View>
 
         {/* Space */}
-        <Text style={s.qaLabel}>space <Text style={s.qaOptional}>(optional)</Text></Text>
+        <Text style={s.qaLabel}>space <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted, textTransform: 'none' }}>(optional)</Text></Text>
         <View style={s.qaChips}>
           <TouchableOpacity style={[s.qaChip, !qaSpaceId && s.qaChipActive]} onPress={() => setQaSpaceId(null)} activeOpacity={0.75}>
             <Text style={[s.qaChipText, !qaSpaceId && s.qaChipTextActive]}>none</Text>
@@ -684,7 +658,7 @@ export default function DashboardScreen() {
           disabled={!qaName.trim() || !qaAmount || !qaSpaceId || !qaCatId || qaLoading}
           activeOpacity={0.8}
         >
-          {qaLoading ? <ActivityIndicator color="#fff" /> : <Text style={s.qaSaveBtnText}>save</Text>}
+          {qaLoading ? <ActivityIndicator color={Colors.white} /> : <Text style={s.qaSaveBtnText}>save</Text>}
         </TouchableOpacity>
       </BottomSheet>
 
@@ -701,7 +675,7 @@ export default function DashboardScreen() {
                 onPress={() => handlePresetSelect(p.key)}
                 activeOpacity={0.75}
               >
-                <Ionicons name={p.icon as any} size={13} color={active ? P.textDark : P.secondary} />
+                <Ionicons name={p.icon as any} size={13} color={active ? Colors.text : Colors.muted} />
                 <Text style={[s.modalPresetText, active && s.modalPresetTextActive]}>{p.label}</Text>
               </TouchableOpacity>
             );
@@ -750,11 +724,11 @@ export default function DashboardScreen() {
             </Text>
             <View style={s.pickerNav}>
               <TouchableOpacity onPress={() => { if (pickerMonth === 0) { setPickerMonth(11); setPickerYear(y => y - 1); } else setPickerMonth(m => m - 1); }}>
-                <Ionicons name="chevron-back" size={18} color={P.text} />
+                <Ionicons name="chevron-back" size={18} color={Colors.text} />
               </TouchableOpacity>
               <Text style={s.pickerMonthText}>{MONTHS[pickerMonth].toLowerCase()} {pickerYear}</Text>
               <TouchableOpacity onPress={() => { if (pickerMonth === 11) { setPickerMonth(0); setPickerYear(y => y + 1); } else setPickerMonth(m => m + 1); }}>
-                <Ionicons name="chevron-forward" size={18} color={P.text} />
+                <Ionicons name="chevron-forward" size={18} color={Colors.text} />
               </TouchableOpacity>
             </View>
             <View style={{ flexDirection: 'row', marginBottom: 6 }}>
@@ -914,161 +888,113 @@ export default function DashboardScreen() {
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: P.bg },
-  topSection: { paddingHorizontal: 16, paddingTop: 20, gap: 10, paddingBottom: 12 },
-  headerCard: {},
-  title: { fontFamily: FBK, fontSize: 28, color: P.text, letterSpacing: -0.8 },
-  subtitle: { fontFamily: I, fontSize: 13, color: P.secondary },
+  container:  { flex: 1, backgroundColor: Colors.white },
+  topSection: { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 12 },
+  titleRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  title:      { fontFamily: Fonts.display, fontSize: 28, color: Colors.text, letterSpacing: -0.8 },
+  addRecBtn:  { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.cyan, alignItems: 'center', justifyContent: 'center' },
 
-  statsCard: {
-    backgroundColor: P.card,
-    borderRadius: 24,
-    paddingVertical: 16,
-  },
-
-  filterBtns: { gap: 6, alignItems: 'flex-end', paddingTop: 4 },
-  filterRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
-  filterBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    paddingHorizontal: 12, paddingVertical: 8,
-    borderRadius: Radius.pill,
-    backgroundColor: P.card,
-    borderWidth: 1, borderColor: P.border,
-  },
-  filterBtnActive:     { backgroundColor: P.tealLight, borderColor: P.teal },
-  filterBtnText:       { fontFamily: IM, fontSize: 11, color: P.text },
-  filterBtnTextActive: { fontFamily: IS, fontSize: 11, color: P.tealDark },
-
-  statsRow: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 20, marginBottom: 4,
-  },
-  statItem:    { flex: 1, alignItems: 'center', gap: 4 },
-  statValue:   { fontFamily: FBK, fontSize: 16, color: P.text, letterSpacing: -0.4 },
-  statLabel:   { fontFamily: I,   fontSize: 10, color: P.secondary, letterSpacing: 0.2 },
-  statDivider: { width: 1, height: 28, backgroundColor: P.border },
-
-  // Tab filter row
-  tabRow:  { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 4 },
-  tabWrap: { flex: 1, alignItems: 'center' },
-  tabCircle: {
-    width: 56, height: 56, borderRadius: 28,
-    justifyContent: 'center', alignItems: 'center',
-    backgroundColor: P.tealLight, gap: 2,
-  },
-  tabCircleActive:      { backgroundColor: P.teal },
-  tabCircleValue:       { fontFamily: FBK, fontSize: 11, color: P.secondary, letterSpacing: -0.3 },
-  tabCircleValueActive: { color: '#FFFFFF' },
-  tabLabel:       { fontFamily: I,  fontSize: 9,  color: P.secondary, marginTop: 5, letterSpacing: 0.2 },
-  tabLabelActive: { fontFamily: IS, fontSize: 9,  color: P.teal },
-
-  sheet: { flex: 1, backgroundColor: P.bg },
+  sheet:    { flex: 1, backgroundColor: Colors.white },
   menuCard: {
     position: 'absolute', top: 0, left: 16, right: 16, zIndex: 10,
-    backgroundColor: P.card, borderRadius: 20,
+    backgroundColor: Colors.white, borderRadius: Radius.xl,
     paddingTop: 12, paddingBottom: 8, gap: 8,
   },
 
-  // Empty state
-  emptyWrap:     { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 14, paddingBottom: 80 },
-  emptyIconWrap: { width: 64, height: 64, borderRadius: 32, justifyContent: 'center', alignItems: 'center', marginBottom: 6 },
-  emptyTitle:    { fontFamily: FB, fontSize: 16, color: P.text },
-  emptyText:     { fontFamily: IM, fontSize: 13, color: P.secondary, textAlign: 'center', lineHeight: 21, letterSpacing: 0.2 },
+  // Tab circles
+  tabRow:  { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 4 },
+  tabWrap: { flex: 1, alignItems: 'center' },
+  tabCircle:            { width: 56, height: 56, borderRadius: 28, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.surface },
+  tabCircleActive:      { backgroundColor: Colors.cyan },
+  tabCircleValue:       { fontFamily: Fonts.monoBold, fontSize: 11, color: Colors.muted, letterSpacing: -0.3 },
+  tabCircleValueActive: { color: Colors.white },
+  tabLabel:             { fontFamily: Fonts.mono, fontSize: 9, color: Colors.muted, marginTop: 5, letterSpacing: 0.2 },
+  tabLabelActive:       { fontFamily: Fonts.monoBold, fontSize: 9, color: Colors.cyan },
 
-  // Transaction list
-  list: { paddingHorizontal: 16, paddingTop: 140, paddingBottom: 20, gap: 12 },
-  dateHeaderRow:  { marginTop: 16, marginBottom: 8, paddingHorizontal: 4, borderTopWidth: 1, borderTopColor: P.border, paddingTop: 16 },
-  dateHeaderText: { fontFamily: IS, fontSize: 10, color: P.secondary, letterSpacing: 1.4, textTransform: 'uppercase' },
+  // Filter row
+  filterRow:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
+  dateNavRow:      { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  dateNavArrow:    { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.surface },
+  filterBtn:       { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: Colors.white, borderWidth: 1, borderColor: Colors.borderMid },
+  filterBtnActive: { backgroundColor: Colors.cyan + '22', borderColor: Colors.cyan },
+  filterBtnText:       { fontFamily: Fonts.mono,     fontSize: 11, color: Colors.text },
+  filterBtnTextActive: { fontFamily: Fonts.monoBold, fontSize: 11, color: Colors.cyan },
 
-  row: {
-    backgroundColor: P.card,
-    borderRadius: 20,
-    flexDirection: 'row', alignItems: 'center', gap: 14,
-    paddingHorizontal: 16, paddingVertical: 14,
-  },
-  rowIconWrap: { width: 46, height: 46, borderRadius: 23, justifyContent: 'center', alignItems: 'center', backgroundColor: P.tealLight },
-  rowMid:     { flex: 1, gap: 2 },
-  rowType:     { fontFamily: IM,  fontSize: 10, color: P.secondary, letterSpacing: 0.4, textTransform: 'uppercase' },
-  rowName:     { fontFamily: FB,  fontSize: 14, color: P.text, letterSpacing: 0.1, lineHeight: 20 },
-  rowSpace:    { fontFamily: I,   fontSize: 11, color: P.muted, letterSpacing: 0.2 },
-  rowCategory: { fontFamily: I,   fontSize: 11, color: P.secondary, letterSpacing: 0.2 },
-  rowAmount:   { fontFamily: FBK, fontSize: 15, letterSpacing: -0.4 },
+  // List
+  list:           { paddingHorizontal: 16, paddingTop: 140, paddingBottom: 20, gap: 12 },
+  dateHeaderRow:  { marginTop: 16, marginBottom: 8, paddingHorizontal: 4, borderTopWidth: 1, borderTopColor: Colors.border, paddingTop: 16 },
+  dateHeaderText: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted, letterSpacing: 1.4, textTransform: 'uppercase' },
 
+  // Recording row
+  row:         { backgroundColor: Colors.white, borderRadius: Radius.xl, flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingVertical: 14 },
+  rowIconWrap: { width: 46, height: 46, borderRadius: 23, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.surface },
+  rowMid:      { flex: 1, gap: 2 },
+  rowType:     { fontFamily: Fonts.mono,     fontSize: 10, color: Colors.muted,  letterSpacing: 0.4, textTransform: 'uppercase' },
+  rowName:     { fontFamily: Fonts.monoBold, fontSize: 14, color: Colors.text,   letterSpacing: 0.1, lineHeight: 20 },
+  rowSpace:    { fontFamily: Fonts.mono,     fontSize: 11, color: Colors.faint,  letterSpacing: 0.2 },
+  rowAmount:   { fontFamily: Fonts.monoBold, fontSize: 15, letterSpacing: -0.4 },
+
+  // Date modal
   modalPresetRow:        { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 },
-  modalPresetChip:       { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: P.bg },
-  modalPresetChipActive: { backgroundColor: P.teal },
-  modalPresetText:       { fontFamily: IM, fontSize: 12, color: P.secondary },
-  modalPresetTextActive: { fontFamily: IS, fontSize: 12, color: P.textDark },
+  modalPresetChip:       { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: Colors.surface },
+  modalPresetChipActive: { backgroundColor: Colors.cyan },
+  modalPresetText:       { fontFamily: Fonts.mono,     fontSize: 12, color: Colors.muted },
+  modalPresetTextActive: { fontFamily: Fonts.monoBold, fontSize: 12, color: Colors.text },
 
-  cutoffRow:       { marginBottom: 16, width: '100%' },
-  cutoffLabel:     { fontFamily: IM, fontSize: 12, color: P.secondary, marginBottom: 10 },
-  cutoffChips:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
-  cutoffChip:      { paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: P.bg },
-  cutoffChipActive:     { backgroundColor: P.teal },
-  cutoffChipText:       { fontFamily: IM, fontSize: 12, color: P.secondary },
-  cutoffChipTextActive: { color: P.textDark },
+  cutoffRow:        { marginBottom: 16, width: '100%' },
+  cutoffLabel:      { fontFamily: Fonts.mono, fontSize: 12, color: Colors.muted, marginBottom: 10 },
+  cutoffChips:      { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
+  cutoffChip:       { paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: Colors.surface },
+  cutoffChipActive: { backgroundColor: Colors.cyan },
+  cutoffChipText:       { fontFamily: Fonts.mono,     fontSize: 12, color: Colors.muted },
+  cutoffChipTextActive: { fontFamily: Fonts.monoBold, fontSize: 12, color: Colors.text },
   cutoffInputRow:   { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  cutoffInputLabel: { fontFamily: I, fontSize: 12, color: P.secondary, flex: 1 },
-  cutoffInput: {
-    backgroundColor: P.bg, borderRadius: Radius.sm,
-    paddingHorizontal: 12, paddingVertical: 8,
-    fontFamily: FB, fontSize: 16, color: P.text,
-    width: 70, textAlign: 'center',
-  },
+  cutoffInputLabel: { fontFamily: Fonts.mono, fontSize: 12, color: Colors.muted, flex: 1 },
+  cutoffInput:      { backgroundColor: Colors.surface, borderRadius: Radius.sm, paddingHorizontal: 12, paddingVertical: 8, fontFamily: Fonts.monoBold, fontSize: 16, color: Colors.text, width: 70, textAlign: 'center' },
 
-  calWrap:    { width: '100%' },
-  calHint:    { fontFamily: I, fontSize: 11, color: P.tealDark, marginBottom: 10 },
-  pickerNav: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    width: '100%', paddingHorizontal: 4, marginBottom: 10,
-  },
-  pickerMonthText:   { fontFamily: FB, fontSize: 15, color: P.text },
-  calDay:            { flex: 1, textAlign: 'center', fontFamily: I, fontSize: 10, color: P.muted },
-  calCell:           { width: '14.28%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center', borderRadius: Radius.pill },
-  calCellRange:      { backgroundColor: P.teal + '55', borderRadius: 0 },
-  calCellEdge:       { backgroundColor: P.teal },
-  calCellToday:      { backgroundColor: P.bg },
-  calCellText:       { fontFamily: I,  fontSize: 13, color: P.text },
-  calCellTextActive: { fontFamily: IS, color: P.textDark },
+  // Calendar
+  calWrap:         { width: '100%' },
+  calHint:         { fontFamily: Fonts.mono, fontSize: 11, color: Colors.cyan, marginBottom: 10 },
+  pickerNav:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', paddingHorizontal: 4, marginBottom: 10 },
+  pickerMonthText: { fontFamily: Fonts.monoBold, fontSize: 15, color: Colors.text },
+  calDay:          { flex: 1, textAlign: 'center', fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted },
+  calCell:         { width: '14.28%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center', borderRadius: Radius.pill },
+  calCellRange:    { backgroundColor: Colors.cyan + '55', borderRadius: 0 },
+  calCellEdge:     { backgroundColor: Colors.cyan },
+  calCellToday:    { backgroundColor: Colors.surface },
+  calCellText:     { fontFamily: Fonts.mono,     fontSize: 13, color: Colors.text },
+  calCellTextActive: { fontFamily: Fonts.monoBold, color: Colors.text },
 
-  spaceChips:        { flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingBottom: 16 },
-  spaceChip:         { paddingHorizontal: 16, paddingVertical: 10, borderRadius: Radius.pill, backgroundColor: P.bg },
-  spaceChipActive:   { backgroundColor: P.teal },
-  spaceChipText:     { fontFamily: IM, fontSize: 13, color: P.secondary },
-  spaceChipTextActive: { fontFamily: IS, fontSize: 13, color: P.textDark },
+  // Filter modal chips
+  spaceChips:          { flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingBottom: 16 },
+  spaceChip:           { paddingHorizontal: 16, paddingVertical: 10, borderRadius: Radius.pill, backgroundColor: Colors.surface },
+  spaceChipActive:     { backgroundColor: Colors.cyan },
+  spaceChipText:       { fontFamily: Fonts.mono,     fontSize: 13, color: Colors.muted },
+  spaceChipTextActive: { fontFamily: Fonts.monoBold, fontSize: 13, color: Colors.text },
+  filterSectionLabel:  { fontFamily: Fonts.monoBold, fontSize: 11, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8, marginTop: 4 },
+  clearBtn:     { alignSelf: 'flex-end', marginBottom: 12, paddingHorizontal: 14, paddingVertical: 7, borderRadius: Radius.pill, backgroundColor: Colors.surface },
+  clearBtnText: { fontFamily: Fonts.monoBold, fontSize: 12, color: Colors.cyan },
 
-  statusFilterRow:      { flexDirection: 'row', gap: 10 },
-  statusChip:           { flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: Radius.lg, backgroundColor: P.bg },
-  statusChipText:       { fontFamily: IS, fontSize: 13, color: P.secondary },
-  statusChipTextActive: { color: P.text },
-  titleRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  addRecBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: P.teal, alignItems: 'center', justifyContent: 'center' },
-  qaError:   { fontFamily: IM, fontSize: 12, color: P.peach, marginBottom: 8 },
-  qaLabel:   { fontFamily: IS, fontSize: 11, color: P.secondary, marginBottom: 6, marginTop: 12, letterSpacing: 0.4, textTransform: 'uppercase' },
-  qaOptional: { fontFamily: I, fontSize: 10, color: P.muted, textTransform: 'none' },
-  qaInput:   { fontFamily: FB, fontSize: 15, color: P.text, backgroundColor: P.card, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1, borderColor: P.border },
-  qaTypeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  qaTypeBtn: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: Radius.pill, backgroundColor: P.card, borderWidth: 1, borderColor: P.border },
-  qaTypeBtnActive: { backgroundColor: P.teal, borderColor: P.teal },
-  qaTypeBtnText: { fontFamily: IM, fontSize: 11, color: P.secondary },
-  qaTypeBtnTextActive: { fontFamily: IS, fontSize: 11, color: '#FFFFFF' },
-  qaChips:   { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  qaChip:    { paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: P.card, borderWidth: 1, borderColor: P.border },
-  qaChipActive: { backgroundColor: P.teal, borderColor: P.teal },
-  qaChipText: { fontFamily: IM, fontSize: 12, color: P.secondary },
-  qaChipTextActive: { fontFamily: IS, fontSize: 12, color: '#FFFFFF' },
-  qaDateRow: { gap: 8 },
-  qaDatePickerLabel: { fontFamily: IM, fontSize: 10, color: P.secondary, marginBottom: 6 },
-  qaDateChip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: Radius.pill, backgroundColor: P.card, borderWidth: 1, borderColor: P.border },
-  qaSaveBtn: { backgroundColor: P.teal, borderRadius: Radius.pill, paddingVertical: 14, alignItems: 'center', marginTop: 20 },
-  qaSaveBtnText: { fontFamily: IS, fontSize: 14, color: '#FFFFFF' },
-  collapsible: { gap: 10 },
-  tabFilterHeader: { gap: 10, marginBottom: 8 },
-  filterSectionLabel: { fontFamily: IS, fontSize: 11, color: P.secondary, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8, marginTop: 4 },
-  clearBtn: { alignSelf: 'flex-end', marginBottom: 12, paddingHorizontal: 14, paddingVertical: 7, borderRadius: Radius.pill, backgroundColor: P.tealLight },
-  clearBtnText: { fontFamily: IS, fontSize: 12, color: P.tealDark },
-  dateNavRow:   { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  dateNavArrow: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: P.tealLight },
+  // Quick add modal
+  qaError:          { fontFamily: Fonts.mono, fontSize: 12, color: PEACH, marginBottom: 8 },
+  qaLabel:          { fontFamily: Fonts.monoBold, fontSize: 11, color: Colors.muted, marginBottom: 6, marginTop: 12, letterSpacing: 0.4, textTransform: 'uppercase' },
+  qaInput:          { fontFamily: Fonts.monoBold, fontSize: 15, color: Colors.text, backgroundColor: Colors.white, borderRadius: Radius.lg, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1, borderColor: Colors.borderMid },
+  qaTypeRow:        { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  qaTypeBtn:        { paddingHorizontal: 12, paddingVertical: 7, borderRadius: Radius.pill, backgroundColor: Colors.white, borderWidth: 1, borderColor: Colors.borderMid },
+  qaTypeBtnActive:  { backgroundColor: Colors.cyan, borderColor: Colors.cyan },
+  qaTypeBtnText:    { fontFamily: Fonts.mono,     fontSize: 11, color: Colors.muted },
+  qaTypeBtnTextActive: { fontFamily: Fonts.monoBold, fontSize: 11, color: Colors.white },
+  qaChips:          { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  qaChip:           { paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: Colors.white, borderWidth: 1, borderColor: Colors.borderMid },
+  qaChipActive:     { backgroundColor: Colors.cyan, borderColor: Colors.cyan },
+  qaChipText:       { fontFamily: Fonts.mono,     fontSize: 12, color: Colors.muted },
+  qaChipTextActive: { fontFamily: Fonts.monoBold, fontSize: 12, color: Colors.white },
+  qaDateRow:        { gap: 8 },
+  qaDatePicker:     {},
+  qaDatePickerLabel: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted, marginBottom: 6 },
+  qaDateChip:       { paddingHorizontal: 10, paddingVertical: 6, borderRadius: Radius.pill, backgroundColor: Colors.white, borderWidth: 1, borderColor: Colors.borderMid },
+  qaSaveBtn:        { backgroundColor: Colors.cyan, borderRadius: Radius.pill, paddingVertical: 14, alignItems: 'center', marginTop: 20 },
+  qaSaveBtnText:    { fontFamily: Fonts.monoBold, fontSize: 14, color: Colors.white },
 });
 
 
