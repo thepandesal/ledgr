@@ -111,11 +111,7 @@ export default function SpacesScreen() {
     queryClient.invalidateQueries({ queryKey: ['spaces', userId] });
   };
 
-  const fmt = (n: number) => {
-    if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
-    if (n >= 1_000) return (n / 1_000).toFixed(1) + 'K';
-    return n.toLocaleString('en-US', { maximumFractionDigits: 0 });
-  };
+  const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   return (
     <SafeAreaView style={s.container}>
@@ -335,7 +331,7 @@ const s = StyleSheet.create({
   cardName:     { fontFamily: SB, fontSize: 14, color: TEXT, letterSpacing: 0.1, lineHeight: 20 },
   cardCount:    { fontFamily: R,  fontSize: 11, color: SEC,  letterSpacing: 0.2 },
   cardRight:    { alignItems: 'flex-end', gap: 2 },
-  cardAmount:   { fontFamily: B,  fontSize: 15, color: TEXT, letterSpacing: -0.4 },
+  cardAmount:   { fontFamily: B,  fontSize: 15, color: '#38B2AC', letterSpacing: -0.4 },
   cardSub:      { fontFamily: R,  fontSize: 11, color: SEC,  letterSpacing: 0.2 },
 
   typeBtn:         { paddingHorizontal: 16, paddingVertical: 9, borderRadius: 999, borderWidth: 1, borderColor: BORDER, backgroundColor: BG },
