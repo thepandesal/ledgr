@@ -167,9 +167,6 @@ export default function SpacesScreen() {
                 activeOpacity={0.85}
                 onPress={() => router.push({ pathname: '/(app)/space-detail', params: { spaceId: space.id, name: space.name, color: space.color } })}
               >
-                <View style={s.cardIconWrap}>
-                  <Ionicons name="grid-outline" size={16} color={T} />
-                </View>
                 <View style={{ flex: 1 }}>
                   <Text style={s.cardName} numberOfLines={1}>{space.name}</Text>
                   <Text style={s.cardCount}>{space.count ?? 0} transaction{(space.count ?? 0) !== 1 ? 's' : ''}</Text>
@@ -204,9 +201,6 @@ export default function SpacesScreen() {
                     activeOpacity={0.85}
                     onPress={() => router.push({ pathname: '/(app)/space-detail', params: { spaceId: space.id, name: space.name, color: space.color } })}
                   >
-                    <View style={s.cardIconWrap}>
-                      <Ionicons name="grid-outline" size={16} color={T} />
-                    </View>
                     <View style={{ flex: 1 }}>
                       <Text style={s.cardName} numberOfLines={1}>{space.name}</Text>
                       <Text style={s.cardCount}>{space.count ?? 0} transaction{(space.count ?? 0) !== 1 ? 's' : ''}</Text>
