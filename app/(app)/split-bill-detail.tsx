@@ -410,6 +410,15 @@ export default function SplitBillDetailScreen() {
                   <Text style={[s.recAmount, { color: typeColor(lr.recording?.type ?? '') }]}>
                     {fmt(Number(lr.amount_contributed))}
                   </Text>
+                  <TouchableOpacity
+                    onPress={async () => {
+                      await supabase.from('split_bill_recordings').delete().eq('id', lr.id);
+                      queryClient.invalidateQueries({ queryKey: ['split-bill-recordings', splitBillId] });
+                    }}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Ionicons name="close" size={14} color={Colors.faint} />
+                  </TouchableOpacity>
                 </TouchableOpacity>
               ))}
             </View>
