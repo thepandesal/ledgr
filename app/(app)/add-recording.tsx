@@ -136,8 +136,8 @@ export default function AddRecordingScreen() {
         setDate(rec.transaction_date);
         setNotes(rec.notes ?? '');
         setPersonName(rec.person_name ?? '');
-        if (rec.categories) setSelectedCategory(rec.categories);
-        if (rec.account) setSelectedAccount(rec.account);
+        if (rec.categories) setSelectedCategory(Array.isArray(rec.categories) ? rec.categories[0] : rec.categories);
+        if (rec.account) setSelectedAccount(Array.isArray(rec.account) ? rec.account[0] : rec.account);
         if (rec.is_recurring) {
           setIsRecurring(true);
           setFrequency(rec.recurring_frequency ?? 'monthly');

@@ -49,7 +49,11 @@ export default function AccountDetailScreen() {
         .select('*, categories:category_id(name, color, icon), account:account_id(account_name, bank)')
         .eq('account_id', accountId)
         .order('transaction_date', { ascending: false });
-      return data ?? [];
+      return (data ?? []).map((r: any) => ({
+        ...r,
+        categories: Array.isArray(r.categories) ? r.categories[0] : r.categories,
+        account: Array.isArray(r.account) ? r.account[0] : r.account,
+      }));
     },
     enabled: !!accountId,
   });
