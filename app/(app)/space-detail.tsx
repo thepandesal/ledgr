@@ -233,8 +233,6 @@ export default function SpaceDetailScreen() {
   const fmtShort = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   const fmtFull  = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   const rangeLabel = isSameDay(range.from, range.to)
-    ? fmtFull(range.from)
-    : `${fmtShort(range.from)} – ${fmtFull(range.to)}`;
 
   // Calendar helpers
   const firstDay    = new Date(pickerYear, pickerMonth, 1).getDay();
@@ -277,8 +275,10 @@ export default function SpaceDetailScreen() {
     return n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
   };
 
+  const rangeLabel = isSameDay(range.from, range.to)
     ? fmtFull(range.from)
     : `${fmtShort(range.from)} – ${fmtFull(range.to)}`;
+
 
   // Calendar helpers
   const handleDayPress = (day: number) => {
