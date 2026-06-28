@@ -169,21 +169,23 @@ export default function SpaceDetailScreen() {
   const { data: recordings = [], isLoading } = useQuery({
     queryKey: ['recordings', spaceId, userId],
     queryFn: async () => {
+      const normalize = (data: any[]) => data.map((r: any) => ({
+        ...r,
+        categories: Array.isArray(r.categories) ? r.categories[0] : r.categories,
+      }));
       const query = supabase
         .from('recordings')
         .select('*, categories:category_id(name,color,icon)');
       if (spaceId === 'all') {
         if (!userId) return [];
         const { data } = await query.eq('user_id', userId).order('transaction_date', { ascending: false });
-        return data ?? [];
+        return normalize(data ?? []);
       }
       const { data } = await query.eq('space_id', spaceId).order('transaction_date', { ascending: false });
-      return data ?? [];
+      return normalize(data ?? []);
     },
     enabled: !!spaceId && (spaceId !== 'all' || !!userId),
   });
-
-  const { data: spaceData } = useQuery({
     queryKey: ['space-budget', spaceId],
     queryFn: async () => {
       const { data } = await supabase

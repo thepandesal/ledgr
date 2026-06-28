@@ -272,13 +272,16 @@ export default function DashboardScreen() {
         .select('*, categories:category_id(name,color,icon), space:space_id(name)')
         .eq('user_id', userId)
         .order('transaction_date', { ascending: false });
-      return data ?? [];
+      return (data ?? []).map((r: any) => ({
+        ...r,
+        categories: Array.isArray(r.categories) ? r.categories[0] : r.categories,
+        space: Array.isArray(r.space) ? r.space[0] : r.space,
+      }));
     },
     enabled: !!userId,
   });
 
   const isAll = selectedTabs.has('all');
-  const currentTypes = isAll
     ? ['income','savings','expense','payable','receivable']
     : ACTIVITY_TABS.filter(t => t.key !== 'all' && selectedTabs.has(t.key)).flatMap(t => t.types as string[]);
 
