@@ -79,9 +79,44 @@ export interface ReceiptPhoto {
   created_at: string;
 }
 
+export interface SplitBill {
+  id: string;
+  user_id: string;
+  name: string;
+  created_at: string;
+  // computed client-side
+  recording_count?: number;
+  people_count?: number;
+  total_amount?: number;
+}
+
+export interface SplitBillRecording {
+  id: string;
+  split_bill_id: string;
+  recording_id: string;
+  amount_contributed: number;
+  created_at: string;
+  // joined
+  recording?: Pick<Recording, 'id' | 'name' | 'amount' | 'type' | 'transaction_date'>;
+}
+
+export interface SplitAdjustment {
+  id: string;
+  split_bill_id: string;
+  type: 'expense' | 'receivable';
+  name: string;
+  amount: number;
+  people: string[];
+  mode: 'equal' | 'manual';
+  manual_amounts: Record<string, number>;
+  source_recording_id: string | null;
+  created_at: string;
+}
+
 export interface BillSplit {
   id: string;
-  recording_id: string;
+  recording_id: string | null;
+  split_bill_id: string | null;
   user_id: string;
   person_name: string;
   created_at: string;
@@ -97,7 +132,8 @@ export interface SplitSubitem {
 
 export interface SplitItem {
   id: string;
-  recording_id: string;
+  recording_id: string | null;
+  split_bill_id: string | null;
   user_id: string;
   name: string;
   cost: number;
@@ -113,7 +149,8 @@ export interface Contact {
 
 export interface SplitShare {
   id: string;
-  recording_id: string;
+  recording_id: string | null;
+  split_bill_id: string | null;
   data: { account_ids?: string[] };
 }
 
