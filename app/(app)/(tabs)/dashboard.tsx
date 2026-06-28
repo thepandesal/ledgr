@@ -282,6 +282,7 @@ export default function DashboardScreen() {
   });
 
   const isAll = selectedTabs.has('all');
+  const currentTypes = isAll
     ? ['income','savings','expense','payable','receivable']
     : ACTIVITY_TABS.filter(t => t.key !== 'all' && selectedTabs.has(t.key)).flatMap(t => t.types as string[]);
 
