@@ -158,7 +158,7 @@ export default function SpacesScreen() {
                     </View>
                     <View style={s.cardRight}>
                       <Text style={[s.cardAmount, overBudget && { color: PEACH }]}>{fmt(value)}</Text>
-                      {budget > 0 && <Text style={s.cardSub}>budget: {fmt(budget - value)} left</Text>}
+                      {budget > 0 && <Text style={s.cardSub}>{fmt(budget - value)} left</Text>}
                     </View>
                     <TouchableOpacity onPress={() => { setSelectedSpace(space); setMenuModal(true); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ padding: 4 }}>
                       <Ionicons name="ellipsis-horizontal" size={15} color={Colors.muted} />
@@ -304,8 +304,8 @@ const s = StyleSheet.create({
   cardName:     { fontFamily: Fonts.monoBold, fontSize: 14, color: Colors.text, letterSpacing: 0.1, lineHeight: 20 },
   cardCount:    { fontFamily: Fonts.mono,     fontSize: 11, color: Colors.muted, letterSpacing: 0.2 },
   cardRight:    { alignItems: 'flex-end', gap: 2 },
-  cardAmount:   { fontFamily: Fonts.monoBold, fontSize: 15, color: Colors.cyan, letterSpacing: -0.4 },
-  cardSub:      { fontFamily: Fonts.mono,     fontSize: 11, color: Colors.muted, letterSpacing: 0.2 },
+  cardAmount:   { fontFamily: Fonts.monoBold, fontSize: 13, color: Colors.cyan, letterSpacing: -0.4 },
+  cardSub:      { fontFamily: Fonts.mono,     fontSize: 10, color: Colors.muted, letterSpacing: 0.2 },
 
   typeBtn:          { paddingHorizontal: 16, paddingVertical: 9, borderRadius: Radius.pill, borderWidth: 1, borderColor: Colors.borderMid, backgroundColor: Colors.surface },
   typeBtnActive:    { backgroundColor: Colors.cyan, borderColor: Colors.cyan },
