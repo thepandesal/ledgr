@@ -10,6 +10,8 @@ import { useUser } from '../../src/hooks/useUser';
 import { supabase } from '../../src/lib/supabase';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import BottomSheet from '@/components/ui/BottomSheet';
+import { Colors, Fonts, Radius } from '@/components/ui/theme';
+import pageStyles from '@/components/ui/pageStyles';
 
 // ── Module-level pending focus date ─────────────────────────────────────────
 export let pendingFocusDate: string | null = null;
@@ -18,19 +20,7 @@ export function setPendingFocusDate(date: string | null) { pendingFocusDate = da
 // ── Constants ────────────────────────────────────────────────────────────────
 const { width } = Dimensions.get('window');
 
-const BG    = '#F7F8FA';
-const CARD  = '#FFFFFF';
-const TEAL  = '#4ECDC4';
-const TEALL = '#E0F5F4';
-const TEALD = '#38B2AC';
 const PEACH = '#FFAB91';
-const TEXT  = '#1A1A2E';
-const SEC   = '#9A9DB0';
-const BOR   = '#ECECEC';
-const R  = 'PlusJakartaSans_400Regular';
-const M  = 'PlusJakartaSans_500Medium';
-const SB = 'PlusJakartaSans_600SemiBold';
-const B  = 'PlusJakartaSans_700Bold';
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
@@ -98,19 +88,19 @@ function fmtAmount(n: number) {
 }
 
 function getTypeLabel(type: string, status: string) {
-  if (type === 'income')     return { label: 'income',    color: TEALD };
-  if (type === 'savings')    return { label: 'savings',   color: TEALD };
-  if (type === 'return')     return { label: 'return',    color: TEALD };
+  if (type === 'income')     return { label: 'income',    color: Colors.cyan };
+  if (type === 'savings')    return { label: 'savings',   color: Colors.cyan };
+  if (type === 'return')     return { label: 'return',    color: Colors.cyan };
   if (type === 'expense')    return { label: 'expense',   color: PEACH };
   if (type === 'payment')    return { label: 'payment',   color: PEACH };
   if (type === 'transfer')   return { label: 'transfer',  color: PEACH };
   if (type === 'payable')    return status === 'paid'
-    ? { label: 'loan · paid', color: TEALD }
+    ? { label: 'loan · paid', color: Colors.cyan }
     : { label: 'loan',        color: PEACH };
   if (type === 'receivable') return status === 'received'
-    ? { label: 'receivable · received', color: TEALD }
-    : { label: 'receivable',            color: TEALD };
-  return { label: type, color: SEC };
+    ? { label: 'receivable · received', color: Colors.cyan }
+    : { label: 'receivable',            color: Colors.cyan };
+  return { label: type, color: Colors.muted };
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -365,13 +355,13 @@ export default function SpaceDetailScreen() {
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
-    <Animated.View style={[{ flex: 1, backgroundColor: BG }, { transform: [{ translateX: slideAnim }] }]}>
+    <Animated.View style={[{ flex: 1, backgroundColor: Colors.white }, { transform: [{ translateX: slideAnim }] }]}>
       <SafeAreaView style={{ flex: 1 }}>
 
         {/* Header */}
         <View style={s.header}>
-          <TouchableOpacity onPress={handleBack} style={s.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="arrow-back" size={20} color={SEC} />
+          <TouchableOpacity onPress={handleBack} style={pageStyles.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name="arrow-back" size={22} color={Colors.muted} />
           </TouchableOpacity>
           <Text style={s.title} numberOfLines={1}>{name}</Text>
           {spaceId !== 'all' && (
@@ -386,7 +376,7 @@ export default function SpaceDetailScreen() {
         </View>
 
         {/* Stats card */}
-        <View style={s.statsCard}>
+        <View style={[pageStyles.infoBlock, { marginHorizontal: 16, marginBottom: 10 }]}>
           <View style={s.statsRow}>
             <View style={s.statItem}>
               <Text style={s.statValue}>{fmtAbbr(moneyIn)}</Text>
@@ -401,7 +391,7 @@ export default function SpaceDetailScreen() {
               <>
                 <View style={s.statDivider} />
                 <View style={s.statItem}>
-                  <Text style={[s.statValue, { color: overBudget ? PEACH : TEAL }]}>{fmtAbbr(Math.abs(budget - mainValue))}</Text>
+                  <Text style={[s.statValue, { color: overBudget ? PEACH : Colors.cyan }]}>{fmtAbbr(Math.abs(budget - mainValue))}</Text>
                   <Text style={s.statLabel}>{overBudget ? 'Over' : 'Left'}</Text>
                 </View>
               </>
@@ -409,7 +399,7 @@ export default function SpaceDetailScreen() {
           </View>
           {budget && (
             <View style={s.budgetTrack}>
-              <View style={[s.budgetFill, { width: `${pct * 100}%` as any, backgroundColor: overBudget ? PEACH : TEAL }]} />
+              <View style={[s.budgetFill, { width: `${pct * 100}%` as any, backgroundColor: overBudget ? PEACH : Colors.cyan }]} />
             </View>
           )}
         </View>
@@ -441,33 +431,29 @@ export default function SpaceDetailScreen() {
             <View style={s.filterRow}>
               <View style={s.dateNavRow}>
                 <TouchableOpacity style={s.dateNavArrow} onPress={() => navigateRange(-1)} activeOpacity={0.7}>
-                  <Ionicons name="chevron-back" size={14} color={TEALD} />
+                  <Ionicons name="chevron-back" size={14} color={Colors.cyan} />
                 </TouchableOpacity>
                 <TouchableOpacity style={s.filterBtn} onPress={() => setShowDateModal(true)} activeOpacity={0.75}>
-                  <Ionicons name="calendar-outline" size={13} color={TEALD} />
+                  <Ionicons name="calendar-outline" size={13} color={Colors.cyan} />
                   <Text style={s.filterBtnText}>{rangeLabel}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={s.dateNavArrow} onPress={() => navigateRange(1)} activeOpacity={0.7}>
-                  <Ionicons name="chevron-forward" size={14} color={TEALD} />
+                  <Ionicons name="chevron-forward" size={14} color={Colors.cyan} />
                 </TouchableOpacity>
               </View>
               <TouchableOpacity style={s.filterBtn} onPress={() => setShowFilterModal(true)} activeOpacity={0.75}>
-                <Ionicons name="options-outline" size={13} color={!isAllCats ? TEAL : SEC} />
-                <Text style={[s.filterBtnText, !isAllCats && { color: TEALD }]}>Filter</Text>
+                <Ionicons name="options-outline" size={13} color={!isAllCats ? Colors.cyan : Colors.muted} />
+                <Text style={[s.filterBtnText, !isAllCats && { color: Colors.cyan }]}>Filter</Text>
               </TouchableOpacity>
             </View>
           </Animated.View>
 
           {/* Recordings */}
           {isLoading ? (
-            <ActivityIndicator color={TEAL} style={{ marginTop: 48 }} />
+            <ActivityIndicator color={Colors.cyan} style={{ marginTop: 48 }} />
           ) : filtered.length === 0 ? (
-            <View style={s.emptyWrap}>
-              <View style={s.emptyIconWrap}>
-                <Ionicons name="receipt-outline" size={28} color="#fff" />
-              </View>
-              <Text style={s.emptyTitle}>nothing here</Text>
-              <Text style={s.emptyText}>no recordings found{'\n'}for this period</Text>
+            <View style={pageStyles.emptyBox}>
+              <Text style={pageStyles.emptyText}>no recordings found for this period</Text>
             </View>
           ) : (
             <ScrollView
@@ -492,7 +478,7 @@ export default function SpaceDetailScreen() {
                         onLongPress={() => { setPendingDeleteId(item.id); setPendingDeleteName(item.name); setConfirmModal(true); }}
                       >
                         <View style={s.rowIconWrap}>
-                          <Ionicons name={(item.categories?.icon ?? 'ellipse-outline') as any} size={18} color={TEALD} />
+                          <Ionicons name={(item.categories?.icon ?? 'ellipse-outline') as any} size={18} color={Colors.cyan} />
                         </View>
                         <View style={s.rowMid}>
                           <Text style={s.rowType}>{tl.label}</Text>
@@ -519,7 +505,7 @@ export default function SpaceDetailScreen() {
             const active = p.key === activePreset;
             return (
               <TouchableOpacity key={p.key} style={[s.chip, active && s.chipActive]} onPress={() => applyPreset(p.key)} activeOpacity={0.75}>
-                <Ionicons name={p.icon as any} size={13} color={active ? '#fff' : SEC} />
+                <Ionicons name={p.icon as any} size={13} color={active ? Colors.white : Colors.muted} />
                 <Text style={[s.chipText, active && s.chipTextActive]}>{p.label}</Text>
               </TouchableOpacity>
             );
@@ -544,11 +530,11 @@ export default function SpaceDetailScreen() {
             <Text style={s.calHint}>{pickingDate === 'from' ? 'tap start date' : 'tap end date'}</Text>
             <View style={s.pickerNav}>
               <TouchableOpacity onPress={() => { if (pickerMonth === 0) { setPickerMonth(11); setPickerYear(y => y - 1); } else setPickerMonth(m => m - 1); }}>
-                <Ionicons name="chevron-back" size={18} color={TEXT} />
+                <Ionicons name="chevron-back" size={18} color={Colors.text} />
               </TouchableOpacity>
               <Text style={s.pickerMonthText}>{MONTHS[pickerMonth].toLowerCase()} {pickerYear}</Text>
               <TouchableOpacity onPress={() => { if (pickerMonth === 11) { setPickerMonth(0); setPickerYear(y => y + 1); } else setPickerMonth(m => m + 1); }}>
-                <Ionicons name="chevron-forward" size={18} color={TEXT} />
+                <Ionicons name="chevron-forward" size={18} color={Colors.text} />
               </TouchableOpacity>
             </View>
             <View style={{ flexDirection: 'row', marginBottom: 6 }}>
@@ -620,85 +606,77 @@ export default function SpaceDetailScreen() {
 
 const s = StyleSheet.create({
   // Header
-  header:  { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 20, paddingBottom: 12, gap: 12 },
-  backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: CARD, alignItems: 'center', justifyContent: 'center' },
-  title:   { flex: 1, fontFamily: B, fontSize: 28, color: TEXT, letterSpacing: -0.8 },
-  addBtn:  { width: 36, height: 36, borderRadius: 18, backgroundColor: TEAL, alignItems: 'center', justifyContent: 'center' },
+  header:  { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 20, paddingBottom: 4, gap: 12 },
+  title:   { flex: 1, fontFamily: Fonts.display, fontSize: 28, color: Colors.text, letterSpacing: -0.8 },
+  addBtn:  { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.cyan, alignItems: 'center', justifyContent: 'center' },
 
   // Stats card
-  statsCard:   { marginHorizontal: 16, backgroundColor: CARD, borderRadius: 24, paddingVertical: 16, paddingHorizontal: 20, marginBottom: 10, gap: 12 },
-  statsRow:    { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
+  statsRow:    { flexDirection: 'row', alignItems: 'center', paddingVertical: 8 },
   statItem:    { flex: 1, alignItems: 'center', gap: 4 },
-  statValue:   { fontFamily: B,  fontSize: 16, color: TEXT, letterSpacing: -0.4 },
-  statLabel:   { fontFamily: R,  fontSize: 10, color: SEC,  letterSpacing: 0.2 },
-  statDivider: { width: 1, height: 28, backgroundColor: BOR },
-  budgetTrack: { height: 4, backgroundColor: BOR, borderRadius: 2, overflow: 'hidden', marginTop: 4 },
+  statValue:   { fontFamily: Fonts.monoBold, fontSize: 16, color: Colors.text, letterSpacing: -0.4 },
+  statLabel:   { fontFamily: Fonts.mono,     fontSize: 10, color: Colors.muted, letterSpacing: 0.2 },
+  statDivider: { width: 1, height: 28, backgroundColor: Colors.border },
+  budgetTrack: { height: 4, backgroundColor: Colors.border, borderRadius: 2, overflow: 'hidden', marginTop: 4 },
   budgetFill:  { height: 4, borderRadius: 2 },
 
   // Menu card
   menuCard: {
     position: 'absolute', top: 0, left: 16, right: 16, zIndex: 10,
-    backgroundColor: CARD, borderRadius: 20,
+    backgroundColor: Colors.white, borderRadius: Radius.xl,
     paddingTop: 12, paddingBottom: 8, gap: 8,
   },
 
   // Tab circles
   tabRow:  { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 4 },
   tabWrap: { flex: 1, alignItems: 'center' },
-  tabCircle: { width: 56, height: 56, borderRadius: 28, justifyContent: 'center', alignItems: 'center', backgroundColor: TEALL },
-  tabCircleActive:      { backgroundColor: TEAL },
-  tabCircleValue:       { fontFamily: B, fontSize: 11, color: SEC,     letterSpacing: -0.3 },
-  tabCircleValueActive: { fontFamily: B, fontSize: 11, color: '#FFFFFF' },
-  tabLabel:       { fontFamily: R,  fontSize: 9, color: SEC,  marginTop: 5, letterSpacing: 0.2 },
-  tabLabelActive: { fontFamily: SB, fontSize: 9, color: TEAL },
+  tabCircle:            { width: 56, height: 56, borderRadius: 28, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.surface },
+  tabCircleActive:      { backgroundColor: Colors.cyan },
+  tabCircleValue:       { fontFamily: Fonts.monoBold, fontSize: 11, color: Colors.muted, letterSpacing: -0.3 },
+  tabCircleValueActive: { color: Colors.white },
+  tabLabel:             { fontFamily: Fonts.mono, fontSize: 9, color: Colors.muted, marginTop: 5, letterSpacing: 0.2 },
+  tabLabelActive:       { fontFamily: Fonts.monoBold, fontSize: 9, color: Colors.cyan },
 
   // Filter row
   filterRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingHorizontal: 16, paddingBottom: 8 },
   dateNavRow:   { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  dateNavArrow: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: TEALL },
-  filterBtn:    { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, backgroundColor: CARD, borderWidth: 1, borderColor: BOR },
-  filterBtnText: { fontFamily: M, fontSize: 11, color: TEXT },
-
-  // Empty state
-  emptyWrap:     { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 14, paddingBottom: 80 },
-  emptyIconWrap: { width: 64, height: 64, borderRadius: 32, backgroundColor: TEAL, justifyContent: 'center', alignItems: 'center', marginBottom: 6 },
-  emptyTitle:    { fontFamily: SB, fontSize: 16, color: TEXT },
-  emptyText:     { fontFamily: M,  fontSize: 13, color: SEC, textAlign: 'center', lineHeight: 21 },
+  dateNavArrow: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.surface },
+  filterBtn:    { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: Colors.white, borderWidth: 1, borderColor: Colors.borderMid },
+  filterBtnText: { fontFamily: Fonts.mono, fontSize: 11, color: Colors.text },
 
   // List
   list:           { paddingHorizontal: 16, paddingTop: 155, paddingBottom: 20, gap: 12 },
-  dateHeaderRow:  { marginTop: 16, marginBottom: 8, paddingHorizontal: 4, borderTopWidth: 1, borderTopColor: BOR, paddingTop: 16 },
-  dateHeaderText: { fontFamily: SB, fontSize: 10, color: SEC, letterSpacing: 1.4, textTransform: 'uppercase' },
+  dateHeaderRow:  { marginTop: 16, marginBottom: 8, paddingHorizontal: 4, borderTopWidth: 1, borderTopColor: Colors.border, paddingTop: 16 },
+  dateHeaderText: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted, letterSpacing: 1.4, textTransform: 'uppercase' },
 
   // Recording row
-  row:       { backgroundColor: CARD, borderRadius: 20, flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingVertical: 14 },
-  rowIconWrap: { width: 46, height: 46, borderRadius: 23, justifyContent: 'center', alignItems: 'center', backgroundColor: TEALL },
-  rowMid:    { flex: 1, gap: 2 },
-  rowType:   { fontFamily: M,  fontSize: 10, color: SEC,  letterSpacing: 0.4, textTransform: 'uppercase' },
-  rowName:   { fontFamily: SB, fontSize: 14, color: TEXT, letterSpacing: 0.1, lineHeight: 20 },
-  rowAmount: { fontFamily: B,  fontSize: 15, letterSpacing: -0.4 },
+  row:         { backgroundColor: Colors.white, borderRadius: Radius.xl, flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingVertical: 14 },
+  rowIconWrap: { width: 46, height: 46, borderRadius: 23, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.surface },
+  rowMid:      { flex: 1, gap: 2 },
+  rowType:     { fontFamily: Fonts.mono,     fontSize: 10, color: Colors.muted, letterSpacing: 0.4, textTransform: 'uppercase' },
+  rowName:     { fontFamily: Fonts.monoBold, fontSize: 14, color: Colors.text,  letterSpacing: 0.1, lineHeight: 20 },
+  rowAmount:   { fontFamily: Fonts.monoBold, fontSize: 15, letterSpacing: -0.4 },
 
   // Modal chips
-  chipRow:      { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
-  chip:         { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, backgroundColor: BG },
-  chipActive:   { backgroundColor: TEAL },
-  chipText:     { fontFamily: M,  fontSize: 12, color: SEC  },
-  chipTextActive: { fontFamily: SB, fontSize: 12, color: '#fff' },
-  modalLabel:   { fontFamily: M, fontSize: 12, color: SEC, marginBottom: 10 },
-  sectionLabel: { fontFamily: SB, fontSize: 11, color: SEC, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8, marginTop: 4 },
-  clearBtn:     { alignSelf: 'flex-end', marginBottom: 12, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, backgroundColor: TEALL },
-  clearBtnText: { fontFamily: SB, fontSize: 12, color: TEALD },
+  chipRow:        { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
+  chip:           { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: Colors.surface },
+  chipActive:     { backgroundColor: Colors.cyan },
+  chipText:       { fontFamily: Fonts.mono,     fontSize: 12, color: Colors.muted },
+  chipTextActive: { fontFamily: Fonts.monoBold, fontSize: 12, color: Colors.white },
+  modalLabel:     { fontFamily: Fonts.mono, fontSize: 12, color: Colors.muted, marginBottom: 10 },
+  sectionLabel:   { fontFamily: Fonts.monoBold, fontSize: 11, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8, marginTop: 4 },
+  clearBtn:       { alignSelf: 'flex-end', marginBottom: 12, paddingHorizontal: 14, paddingVertical: 7, borderRadius: Radius.pill, backgroundColor: Colors.surface },
+  clearBtnText:   { fontFamily: Fonts.monoBold, fontSize: 12, color: Colors.cyan },
 
   // Calendar
-  calWrap:    { width: '100%' },
-  calHint:    { fontFamily: R, fontSize: 11, color: TEALD, marginBottom: 10 },
-  pickerNav:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', paddingHorizontal: 4, marginBottom: 10 },
-  pickerMonthText: { fontFamily: SB, fontSize: 15, color: TEXT },
-  calDay:     { flex: 1, textAlign: 'center', fontFamily: R, fontSize: 10, color: SEC },
-  calCell:    { width: '14.28%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 999 },
-  calCellRange:  { backgroundColor: TEAL + '55', borderRadius: 0 },
-  calCellEdge:   { backgroundColor: TEAL },
-  calCellToday:  { backgroundColor: BG },
-  calCellText:   { fontFamily: R,  fontSize: 13, color: TEXT },
-  calCellTextActive: { fontFamily: SB, color: TEXT },
+  calWrap:         { width: '100%' },
+  calHint:         { fontFamily: Fonts.mono, fontSize: 11, color: Colors.cyan, marginBottom: 10 },
+  pickerNav:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', paddingHorizontal: 4, marginBottom: 10 },
+  pickerMonthText: { fontFamily: Fonts.monoBold, fontSize: 15, color: Colors.text },
+  calDay:          { flex: 1, textAlign: 'center', fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted },
+  calCell:         { width: '14.28%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center', borderRadius: Radius.pill },
+  calCellRange:    { backgroundColor: Colors.cyan + '55', borderRadius: 0 },
+  calCellEdge:     { backgroundColor: Colors.cyan },
+  calCellToday:    { backgroundColor: Colors.surface },
+  calCellText:     { fontFamily: Fonts.mono,     fontSize: 13, color: Colors.text },
+  calCellTextActive: { fontFamily: Fonts.monoBold, color: Colors.text },
 });
