@@ -275,10 +275,6 @@ export default function SpaceDetailScreen() {
     return n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
   };
 
-  const rangeLabel = isSameDay(range.from, range.to)
-    ? fmtFull(range.from)
-    : `${fmtShort(range.from)} – ${fmtFull(range.to)}`;
-
 
   // Calendar helpers
   const handleDayPress = (day: number) => {
