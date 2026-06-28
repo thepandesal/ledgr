@@ -27,7 +27,7 @@ const B = 'PlusJakartaSans_700Bold';
 
 interface SpaceData {
   id: string; name: string; color: string; icon: string;
-  budget?: number | null; spent?: number; saved?: number;
+  budget?: number | null; spent?: number; saved?: number; count?: number;
   space_type?: string; savings_target_date?: string | null;
 }
 
@@ -53,11 +53,12 @@ export default function SpacesScreen() {
       if (!data) return [];
       const { data: expRecs } = await supabase.from('recordings').select('space_id, amount').eq('user_id', userId).in('type', ['expense','payment','transfer']);
       const spentMap: Record<string, number> = {};
-      (expRecs ?? []).forEach((r: any) => { spentMap[r.space_id] = (spentMap[r.space_id] || 0) + Number(r.amount); });
+      const countMap: Record<string, number> = {};
+      (expRecs ?? []).forEach((r: any) => { spentMap[r.space_id] = (spentMap[r.space_id] || 0) + Number(r.amount); countMap[r.space_id] = (countMap[r.space_id] || 0) + 1; });
       const { data: savRecs } = await supabase.from('recordings').select('space_id, amount').eq('user_id', userId).in('type', ['income','savings','return']);
       const savedMap: Record<string, number> = {};
-      (savRecs ?? []).forEach((r: any) => { savedMap[r.space_id] = (savedMap[r.space_id] || 0) + Number(r.amount); });
-      return data.map((s: any) => ({ ...s, spent: spentMap[s.id] ?? 0, saved: savedMap[s.id] ?? 0 })) as SpaceData[];
+      (savRecs ?? []).forEach((r: any) => { savedMap[r.space_id] = (savedMap[r.space_id] || 0) + Number(r.amount); countMap[r.space_id] = (countMap[r.space_id] || 0) + 1; });
+      return data.map((s: any) => ({ ...s, spent: spentMap[s.id] ?? 0, saved: savedMap[s.id] ?? 0, count: countMap[s.id] ?? 0 })) as SpaceData[];
     },
     enabled: !!userId,
   });
@@ -171,6 +172,7 @@ export default function SpacesScreen() {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={s.cardName} numberOfLines={1}>{space.name}</Text>
+                  <Text style={s.cardCount}>{space.count ?? 0} transaction{(space.count ?? 0) !== 1 ? 's' : ''}</Text>
                 </View>
                 <Text style={[s.cardAmount, overBudget && { color: '#FFAB91' }]}>
                   {budget > 0 ? `${fmt(value)} / ${fmt(budget)}` : fmt(value)}
@@ -207,6 +209,7 @@ export default function SpacesScreen() {
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={s.cardName} numberOfLines={1}>{space.name}</Text>
+                      <Text style={s.cardCount}>{space.count ?? 0} transaction{(space.count ?? 0) !== 1 ? 's' : ''}</Text>
                     </View>
                     <Text style={s.cardAmount}>
                       {budget > 0 ? `${fmt(value)} / ${fmt(budget)}` : fmt(value)}
