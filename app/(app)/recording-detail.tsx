@@ -130,7 +130,10 @@ export default function RecordingDetailScreen() {
       .select('split_bill_id, split_bills(id, name)')
       .eq('recording_id', recordingId)
       .maybeSingle();
-    if (data?.split_bills) setLinkedSplitBill(data.split_bills as any);
+    if (data?.split_bills) {
+      const sb = Array.isArray(data.split_bills) ? data.split_bills[0] : data.split_bills;
+      if (sb) setLinkedSplitBill(sb);
+    }
   };
 
   const createAndLinkSplitBill = async () => {
