@@ -88,7 +88,7 @@ export default function SplitBillDetailScreen() {
 
   // ── Add Recordings modal state ────────────────────────────────────────────
   const [addRecModal, setAddRecModal]     = useState(false);
-  const [addRecTab, setAddRecTab]         = useState<'receivable' | 'loan'>('receivable');
+  const [addRecTab, setAddRecTab]         = useState<'receivable' | 'loan' | 'expense'>('receivable');
   const [recSearch, setRecSearch]         = useState('');
   const [existingRecs, setExistingRecs]   = useState<any[]>([]);
   const [loadingRecs2, setLoadingRecs2]   = useState(false);
@@ -118,7 +118,7 @@ export default function SplitBillDetailScreen() {
   const totalItemsCost = items.reduce((s: number, i: any) => s + Number(i.cost), 0);
 
   // ── Add Recordings functions ─────────────────────────────────────────────
-  const openAddRecModal = async (tab: 'receivable' | 'loan') => {
+  const openAddRecModal = async (tab: 'receivable' | 'loan' | 'expense') => {
     setAddRecTab(tab);
     setRecSearch('');
     setNewRecName(''); setNewRecAmount('');
@@ -126,7 +126,7 @@ export default function SplitBillDetailScreen() {
     setLoanPeople([]); setLoanMode('equal'); setLoanManual({}); setLoanError('');
     setLoadingRecs2(true);
     setAddRecModal(true);
-    const type = tab === 'receivable' ? 'receivable' : 'payable';
+    const type = tab === 'receivable' ? 'receivable' : tab === 'loan' ? 'payable' : 'expense';
     const { data } = await supabase.from('recordings')
       .select('id, name, amount, transaction_date, status')
       .eq('user_id', userId).eq('type', type)
@@ -370,16 +370,10 @@ export default function SplitBillDetailScreen() {
           {/* Linked Recordings */}
           <View style={s.sectionRow}>
             <Text style={s.sectionHeader}>recordings</Text>
-            <View style={{ flexDirection: 'row', gap: 12 }}>
-              <TouchableOpacity onPress={() => openAddRecModal('receivable')} style={s.sectionAddBtn}>
-                <Ionicons name="arrow-down-circle-outline" size={14} color={Colors.cyan} />
-                <Text style={s.sectionAddText}>receivable</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => openAddRecModal('loan')} style={s.sectionAddBtn}>
-                <Ionicons name="cash-outline" size={14} color={Colors.cyan} />
-                <Text style={s.sectionAddText}>loan</Text>
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity onPress={() => openAddRecModal('receivable')} style={s.sectionAddBtn}>
+              <Ionicons name="add" size={14} color={Colors.cyan} />
+              <Text style={s.sectionAddText}>add</Text>
+            </TouchableOpacity>
           </View>
           {loadingRecs ? (
             <ActivityIndicator color={Colors.cyan} />
@@ -605,7 +599,7 @@ export default function SplitBillDetailScreen() {
       {/* Add Recordings modal */}
       <BottomSheet visible={addRecModal} onClose={() => setAddRecModal(false)} title="add recording" height="65%">
         <View style={s.modalTabRow}>
-          {(['receivable', 'loan'] as const).map(tab => (
+          {(['receivable', 'expense', 'loan'] as const).map(tab => (
             <TouchableOpacity
               key={tab}
               style={[s.modalTab, addRecTab === tab && s.modalTabActive]}
@@ -615,7 +609,7 @@ export default function SplitBillDetailScreen() {
                 setLoanRecording(null); setLoanStep('pick');
                 setLoanPeople([]); setLoanMode('equal'); setLoanManual({}); setLoanError('');
                 setLoadingRecs2(true);
-                const type = tab === 'receivable' ? 'receivable' : 'payable';
+                const type = tab === 'receivable' ? 'receivable' : tab === 'loan' ? 'payable' : 'expense';
                 const { data } = await supabase.from('recordings')
                   .select('id, name, amount, transaction_date, status')
                   .eq('user_id', userId).eq('type', type)
@@ -629,7 +623,7 @@ export default function SplitBillDetailScreen() {
           ))}
         </View>
 
-        {addRecTab === 'receivable' ? (
+        {(addRecTab === 'receivable' || addRecTab === 'expense') ? (
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             <Text style={s.contactsLabel}>create new</Text>
             <View style={s.itemFormRow}>
@@ -661,7 +655,7 @@ export default function SplitBillDetailScreen() {
             <Text style={s.contactsLabel}>or pick existing</Text>
             <TextInput
               style={[s.itemFormInput, { marginBottom: 10 }]}
-              placeholder="search receivables..."
+              placeholder={`search ${addRecTab}s...`}
               placeholderTextColor={Colors.faint}
               value={recSearch}
               onChangeText={setRecSearch}
