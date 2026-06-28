@@ -317,6 +317,8 @@ const s = StyleSheet.create({
   allCardText: { fontFamily: SB, fontSize: 14, color: T },
 
   list: { gap: 8 },
+  dateHeaderRow:  { marginTop: 8, marginBottom: 8, paddingHorizontal: 4, borderTopWidth: 1, borderTopColor: '#ECECEC', paddingTop: 16 },
+  dateHeaderText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 10, color: '#9A9DB0', letterSpacing: 1.4, textTransform: 'uppercase' },
 
   emptyWrap: { alignItems: 'center', paddingVertical: 48, gap: 8 },
   emptyText: { fontFamily: SB, fontSize: 16, color: TEXT },
