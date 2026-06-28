@@ -646,7 +646,7 @@ const s = StyleSheet.create({
   emptyText:     { fontFamily: M,  fontSize: 13, color: SEC, textAlign: 'center', lineHeight: 21 },
 
   // List
-  list:           { paddingHorizontal: 16, paddingTop: 215, paddingBottom: 20, gap: 12 },
+  list:           { paddingHorizontal: 16, paddingTop: 155, paddingBottom: 20, gap: 12 },
   dateHeaderRow:  { marginTop: 16, marginBottom: 8, paddingHorizontal: 4, borderTopWidth: 1, borderTopColor: BOR, paddingTop: 16 },
   dateHeaderText: { fontFamily: SB, fontSize: 10, color: SEC, letterSpacing: 1.4, textTransform: 'uppercase' },
 
