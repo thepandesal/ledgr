@@ -9,6 +9,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useUser } from '../../src/hooks/useUser';
 import { supabase } from '../../src/lib/supabase';
 import ConfirmModal from '@/components/ui/ConfirmModal';
+import BottomSheet from '@/components/ui/BottomSheet';
 
 export let pendingFocusDate: string | null = null;
 export function setPendingFocusDate(date: string | null) { pendingFocusDate = date; }
@@ -23,14 +24,50 @@ const PEACH = '#FFAB91';
 const TEXT  = '#1A1A2E';
 const SEC   = '#9A9DB0';
 const BOR   = '#ECECEC';
+const TEALD = '#38B2AC';
 const R  = 'PlusJakartaSans_400Regular';
 const M  = 'PlusJakartaSans_500Medium';
 const SB = 'PlusJakartaSans_600SemiBold';
 const B  = 'PlusJakartaSans_700Bold';
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-type ViewMode = 'daily' | 'weekly' | 'monthly';
-const MODES: ViewMode[] = ['daily', 'weekly', 'monthly'];
+type Preset = 'this-month' | 'last-30' | 'cutoff' | 'custom';
+const PRESETS: { key: Preset; label: string; icon: string }[] = [
+  { key: 'this-month', label: 'This Month', icon: 'calendar-outline' },
+  { key: 'last-30',    label: 'Last 30d',   icon: 'time-outline'     },
+  { key: 'cutoff',     label: 'Cutoff',     icon: 'cut-outline'      },
+  { key: 'custom',     label: 'Custom',     icon: 'options-outline'  },
+];
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+function getRangeForPreset(preset: Preset, cutoffDay: number, offset = 0): { from: Date; to: Date } {
+  const now = new Date();
+  if (preset === 'this-month') {
+    return { from: new Date(now.getFullYear(), now.getMonth() + offset, 1), to: new Date(now.getFullYear(), now.getMonth() + offset + 1, 0) };
+  }
+  if (preset === 'last-30') {
+    const base = new Date(now); base.setDate(now.getDate() + offset * 30);
+    const from = new Date(base); from.setDate(base.getDate() - 30);
+    return { from, to: base };
+  }
+  if (preset === 'cutoff') {
+    const day = cutoffDay;
+    const baseMonth = now.getDate() >= day ? now.getMonth() : now.getMonth() - 1;
+    const from = new Date(now.getFullYear(), baseMonth + offset, day);
+    const to   = new Date(now.getFullYear(), baseMonth + offset + 1, day - 1);
+    return { from, to };
+  }
+  return { from: new Date(now.getFullYear(), now.getMonth(), 1), to: now };
+}
+
+const ACTIVITY_TABS = [
+  { key: 'all',         label: 'All',         types: ['income','return','savings','expense','payment','transfer','payable','receivable'] },
+  { key: 'money-in',    label: 'Money In',    types: ['income','return','savings'] },
+  { key: 'money-out',   label: 'Money Out',   types: ['expense','payment','transfer'] },
+  { key: 'loans',       label: 'Loans',       types: ['payable'] },
+  { key: 'receivables', label: 'Receivables', types: ['receivable'] },
+] as const;
+type ActivityTab = typeof ACTIVITY_TABS[number]['key'];
 
 function addDays(date: Date, days: number) { const d = new Date(date); d.setDate(d.getDate() + days); return d; }
 function isSameDay(a: Date, b: Date) { return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate(); }
@@ -65,14 +102,28 @@ export default function SpaceDetailScreen() {
   const queryClient = useQueryClient();
   const { userId } = useUser();
 
-  const [viewMode, setViewMode] = useState<ViewMode>('monthly');
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [activePreset, setActivePreset] = useState<Preset>('this-month');
+  const [rangeOffset,  setRangeOffset]  = useState(0);
+  const [cutoffDay,    setCutoffDay]    = useState(25);
+  const [cutoffInput,  setCutoffInput]  = useState('25');
+  const [customFrom,   setCustomFrom]   = useState<Date>(new Date());
+  const [customTo,     setCustomTo]     = useState<Date>(new Date());
+  const [showDateModal, setShowDateModal] = useState(false);
+  const [showFilterModal, setShowFilterModal] = useState(false);
+  const [pickingDate,  setPickingDate]  = useState<'from' | 'to'>('from');
+  const [pickerMonth,  setPickerMonth]  = useState(new Date().getMonth());
+  const [pickerYear,   setPickerYear]   = useState(new Date().getFullYear());
+
+  const range = activePreset === 'custom'
+    ? { from: customFrom, to: customTo }
+    : getRangeForPreset(activePreset, cutoffDay, rangeOffset);
   const [confirmModal, setConfirmModal] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState('');
   const [pendingDeleteName, setPendingDeleteName] = useState('');
+  const [selectedTabs, setSelectedTabs] = useState<Set<ActivityTab>>(new Set(['all']));
   const menuAnim   = useRef(new Animated.Value(1)).current;
   const lastScrollY = useRef(0);
-  const MENU_HEIGHT = 110;
+  const MENU_HEIGHT = 200;
 
   const onScroll = (e: any) => {
     const y    = e.nativeEvent.contentOffset.y;
@@ -110,6 +161,17 @@ export default function SpaceDetailScreen() {
   });
 
   const budget = spaceData?.budget ?? null;
+  const { data: categories = [] } = useQuery({
+    queryKey: ['categories', userId],
+    queryFn: async () => {
+      const { data } = await supabase.from('categories').select('id,name').eq('user_id', userId).order('created_at');
+      return data ?? [];
+    },
+    enabled: !!userId,
+  });
+
+  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set(['all']));
+  const isAllCategories = selectedCategories.has('all');
   const isExpenseSpace = (spaceData?.space_type ?? 'expense') === 'expense';
 
   useEffect(() => {
@@ -136,14 +198,19 @@ export default function SpaceDetailScreen() {
     setConfirmModal(false);
   };
 
-  const weekStart = addDays(selectedDate, -selectedDate.getDay());
+  const isAll = selectedTabs.has('all');
+  const currentTypes = isAll
+    ? ['income','return','savings','expense','payment','transfer','payable','receivable']
+    : ACTIVITY_TABS.filter(t => t.key !== 'all' && selectedTabs.has(t.key)).flatMap(t => [...t.types]);
 
   const filtered = recordings.filter(r => {
-    const parts = r.transaction_date.split('-');
-    const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-    if (viewMode === 'daily')   return isSameDay(d, selectedDate);
-    if (viewMode === 'weekly')  return d >= weekStart && d <= addDays(weekStart, 6);
-    return d.getMonth() === selectedDate.getMonth() && d.getFullYear() === selectedDate.getFullYear();
+    if (!currentTypes.includes(r.type)) return false;
+    if (!isAllCategories && !selectedCategories.has(r.category_id)) return false;
+    const [y, m, d] = r.transaction_date.split('-').map(Number);
+    const date = new Date(y, m - 1, d);
+    if (date < range.from) return false;
+    const to = new Date(range.to); to.setHours(23, 59, 59);
+    return date <= to;
   });
 
   // Group by date
@@ -164,28 +231,97 @@ export default function SpaceDetailScreen() {
   grouped.sort((a, b) => b.date.getTime() - a.date.getTime());
 
   // Stats
+  const fmtShort = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const fmtFull  = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const rangeLabel = isSameDay(range.from, range.to)
+    ? fmtFull(range.from)
+    : `${fmtShort(range.from)} – ${fmtFull(range.to)}`;
+
+  // Calendar helpers
+  const firstDay    = new Date(pickerYear, pickerMonth, 1).getDay();
+  const daysInMonth = new Date(pickerYear, pickerMonth + 1, 0).getDate();
+  const cells = Array(firstDay).fill(null).concat(Array.from({ length: daysInMonth }, (_, i) => i + 1));
+  const isInRange = (day: number) => { const d = new Date(pickerYear, pickerMonth, day); return d > customFrom && d < customTo; };
+  const isEdge = (day: number) => { const d = new Date(pickerYear, pickerMonth, day); return isSameDay(d, customFrom) || isSameDay(d, customTo); };
+  const handleDayPress = (day: number) => {
+    const d = new Date(pickerYear, pickerMonth, day);
+    if (pickingDate === 'from') { setCustomFrom(d); setCustomTo(d); setPickingDate('to'); }
+    else { if (d < customFrom) { setCustomFrom(d); } else { setCustomTo(d); setActivePreset('custom'); } setPickingDate('from'); }
+  };
+
   const moneyIn  = recordings.filter(r => ['income','savings','return'].includes(r.type)).reduce((s, r) => s + Number(r.amount), 0);
   const moneyOut = recordings.filter(r => ['expense','payment','transfer'].includes(r.type)).reduce((s, r) => s + Number(r.amount), 0);
   const mainValue = isExpenseSpace ? moneyOut : moneyIn;
   const pct = budget ? Math.min(mainValue / budget, 1) : 0;
   const overBudget = isExpenseSpace && budget ? mainValue > budget : false;
 
-  const navLabel = () => {
-    if (viewMode === 'daily') return selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    if (viewMode === 'weekly') {
-      const e = addDays(weekStart, 6);
-      return `${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${e.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+  const navigateRange = (dir: 1 | -1) => {
+    if (activePreset === 'custom') {
+      const days = Math.round((customTo.getTime() - customFrom.getTime()) / 86400000) + 1;
+      const newFrom = new Date(customFrom); newFrom.setDate(newFrom.getDate() + dir * days);
+      const newTo   = new Date(customTo);   newTo.setDate(newTo.getDate() + dir * days);
+      setCustomFrom(newFrom); setCustomTo(newTo); setActivePreset('custom');
+    } else {
+      setRangeOffset(o => o + dir);
     }
-    return selectedDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   };
 
-  const navigate = (dir: 1 | -1) => {
-    setSelectedDate(prev => {
-      if (viewMode === 'daily')  return addDays(prev, dir);
-      if (viewMode === 'weekly') return addDays(prev, dir * 7);
-      const n = new Date(prev); n.setMonth(n.getMonth() + dir); return n;
+  const applyPreset = (key: Preset) => {
+    setRangeOffset(0);
+    setActivePreset(key);
+    if (key === 'custom') setPickingDate('from');
+  };
+
+  const fmtAbbr = (n: number) => {
+    if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
+    if (n >= 1_000)     return (n / 1_000).toFixed(1) + 'K';
+    return n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  };
+
+  const fmtShort = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const fmtFull  = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const rangeLabel = isSameDay(range.from, range.to)
+    ? fmtFull(range.from)
+    : `${fmtShort(range.from)} – ${fmtFull(range.to)}`;
+
+  // Calendar helpers
+  const firstDay    = new Date(pickerYear, pickerMonth, 1).getDay();
+  const daysInMonth = new Date(pickerYear, pickerMonth + 1, 0).getDate();
+  const cells = Array(firstDay).fill(null).concat(Array.from({ length: daysInMonth }, (_, i) => i + 1));
+  const isInRange = (day: number) => { const d = new Date(pickerYear, pickerMonth, day); return d > customFrom && d < customTo; };
+  const isEdge = (day: number) => { const d = new Date(pickerYear, pickerMonth, day); return isSameDay(d, customFrom) || isSameDay(d, customTo); };
+  const handleDayPress = (day: number) => {
+    const d = new Date(pickerYear, pickerMonth, day);
+    if (pickingDate === 'from') { setCustomFrom(d); setCustomTo(d); setPickingDate('to'); }
+    else { if (d < customFrom) { setCustomFrom(d); } else { setCustomTo(d); setActivePreset('custom'); } setPickingDate('from'); }
+  };
+
+  const moneyIn  = recordings.filter(r => ['income','savings','return'].includes(r.type)).reduce((s, r) => s + Number(r.amount), 0);
+  const moneyOut = recordings.filter(r => ['expense','payment','transfer'].includes(r.type)).reduce((s, r) => s + Number(r.amount), 0);
+  const loansActive = recordings.filter(r => r.type === 'payable' && r.status !== 'paid').length;
+  const receivablesPending = recordings.filter(r => r.type === 'receivable' && r.status !== 'received').length;
+
+  const tabValue = (key: string) => {
+    if (key === 'all')          return fmtAbbr(moneyIn + moneyOut);
+    if (key === 'money-in')    return fmtAbbr(moneyIn);
+    if (key === 'money-out')   return fmtAbbr(moneyOut);
+    if (key === 'loans')       return String(loansActive);
+    if (key === 'receivables') return String(receivablesPending);
+    return '';
+  };
+
+  const handleTabToggle = (key: ActivityTab) => {
+    if (key === 'all') { setSelectedTabs(new Set(['all'])); return; }
+    setSelectedTabs(prev => {
+      const next = new Set(prev);
+      next.delete('all');
+      if (next.has(key)) { next.delete(key); if (next.size === 0) return new Set(['all']); }
+      else { next.add(key); if (next.size === 4) return new Set(['all']); }
+      return next;
     });
   };
+
+
 
   return (
     <Animated.View style={[{ flex: 1, backgroundColor: BG }, { transform: [{ translateX: slideAnim }] }]}>
@@ -243,22 +379,37 @@ export default function SpaceDetailScreen() {
           {/* Sticky floating menu */}
           <Animated.View style={[s.menuCard, {
             opacity: menuAnim,
-            transform: [{ translateY: menuAnim.interpolate({ inputRange: [0,1], outputRange: [-MENU_HEIGHT, 0] }) }],
+            transform: [{ translateY: menuAnim.interpolate({ inputRange: [0,1], outputRange: [-220, 0] }) }],
           }]}>
-            <View style={s.modeRow}>
-              {MODES.map(m => (
-                <TouchableOpacity key={m} style={[s.modeBtn, viewMode === m && s.modeBtnActive]} onPress={() => setViewMode(m)} activeOpacity={0.75}>
-                  <Text style={[s.modeBtnText, viewMode === m && s.modeBtnTextActive]}>{m}</Text>
-                </TouchableOpacity>
-              ))}
+            <View style={s.tabRow}>
+              {ACTIVITY_TABS.map(tab => {
+                const isActive = selectedTabs.has(tab.key);
+                return (
+                  <TouchableOpacity key={tab.key} style={s.tabWrap} onPress={() => handleTabToggle(tab.key)} activeOpacity={0.75}>
+                    <View style={[s.tabCircle, isActive && s.tabCircleActive]}>
+                      <Text style={[s.tabCircleValue, isActive && s.tabCircleValueActive]}>{tabValue(tab.key)}</Text>
+                    </View>
+                    <Text style={[s.tabLabel, isActive && s.tabLabelActive]}>{tab.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
-            <View style={s.dateNav}>
-              <TouchableOpacity onPress={() => navigate(-1)} style={s.navArrow}>
-                <Ionicons name="chevron-back" size={16} color={SEC} />
-              </TouchableOpacity>
-              <Text style={s.dateNavLabel}>{navLabel()}</Text>
-              <TouchableOpacity onPress={() => navigate(1)} style={s.navArrow}>
-                <Ionicons name="chevron-forward" size={16} color={SEC} />
+            <View style={s.filterRow}>
+              <View style={s.dateNavRow}>
+                <TouchableOpacity style={s.dateNavArrow} onPress={() => navigateRange(-1)} activeOpacity={0.7}>
+                  <Ionicons name="chevron-back" size={14} color={TEALD} />
+                </TouchableOpacity>
+                <TouchableOpacity style={s.filterBtn} onPress={() => setShowDateModal(true)} activeOpacity={0.75}>
+                  <Ionicons name="calendar-outline" size={13} color={TEALD} />
+                  <Text style={s.filterBtnText}>{rangeLabel}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={s.dateNavArrow} onPress={() => navigateRange(1)} activeOpacity={0.7}>
+                  <Ionicons name="chevron-forward" size={14} color={TEALD} />
+                </TouchableOpacity>
+              </View>
+              <TouchableOpacity style={s.filterBtn} onPress={() => setShowFilterModal(true)} activeOpacity={0.75}>
+                <Ionicons name="options-outline" size={13} color={SEC} />
+                <Text style={s.filterBtnText}>Filter</Text>
               </TouchableOpacity>
             </View>
           </Animated.View>
@@ -268,9 +419,11 @@ export default function SpaceDetailScreen() {
             <ActivityIndicator color={TEAL} style={{ marginTop: 48 }} />
           ) : filtered.length === 0 ? (
             <View style={s.emptyWrap}>
-              <Ionicons name="receipt-outline" size={32} color={SEC} />
-              <Text style={s.emptyText}>no recordings</Text>
-              <Text style={s.emptyHint}>for this {viewMode} period</Text>
+              <View style={s.emptyIconWrap}>
+                <Ionicons name="receipt-outline" size={28} color={TEXT} />
+              </View>
+              <Text style={s.emptyTitle}>nothing here</Text>
+              <Text style={s.emptyText}>no recordings found{`\n`}for this period</Text>
             </View>
           ) : (
             <ScrollView
@@ -295,7 +448,7 @@ export default function SpaceDetailScreen() {
                         onLongPress={() => { setPendingDeleteId(item.id); setPendingDeleteName(item.name); setConfirmModal(true); }}
                       >
                         <View style={s.rowIcon}>
-                          <Ionicons name={(item.categories?.icon ?? 'ellipse-outline') as any} size={16} color={TEXT} />
+                          <Ionicons name={(item.categories?.icon ?? 'ellipse-outline') as any} size={18} color={TEALD} />
                         </View>
                         <View style={s.rowMid}>
                           <Text style={s.rowType}>{tl.label}</Text>
@@ -315,6 +468,111 @@ export default function SpaceDetailScreen() {
           )}
         </View>
       </SafeAreaView>
+
+
+      {/* ── Date modal ── */}
+      <BottomSheet visible={showDateModal} onClose={() => setShowDateModal(false)} title="date range" height="50%">
+        <View style={s.modalPresetRow}>
+          {PRESETS.map(p => {
+            const active = p.key === activePreset;
+            return (
+              <TouchableOpacity
+                key={p.key}
+                style={[s.modalChip, active && s.modalChipActive]}
+                onPress={() => applyPreset(p.key)}
+                activeOpacity={0.75}
+              >
+                <Ionicons name={p.icon as any} size={13} color={active ? TEXT : SEC} />
+                <Text style={[s.modalChipText, active && s.modalChipTextActive]}>{p.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+        {activePreset === 'cutoff' && (
+          <View style={{ marginBottom: 16 }}>
+            <Text style={s.modalLabel}>billing cycle starts on day</Text>
+            <View style={s.modalChipRow}>
+              {[1,5,10,15,20,25,28].map(d => (
+                <TouchableOpacity
+                  key={d}
+                  style={[s.modalChip, parseInt(cutoffInput) === d && s.modalChipActive]}
+                  onPress={() => { setCutoffInput(String(d)); setCutoffDay(d); setActivePreset('cutoff'); }}
+                >
+                  <Text style={[s.modalChipText, parseInt(cutoffInput) === d && s.modalChipTextActive]}>{d}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        )}
+        {activePreset === 'custom' && (
+          <View style={s.calWrap}>
+            <Text style={s.calHint}>{pickingDate === 'from' ? 'tap start date' : 'tap end date'}</Text>
+            <View style={s.pickerNav}>
+              <TouchableOpacity onPress={() => { if (pickerMonth === 0) { setPickerMonth(11); setPickerYear(y => y - 1); } else setPickerMonth(m => m - 1); }}>
+                <Ionicons name="chevron-back" size={18} color={TEXT} />
+              </TouchableOpacity>
+              <Text style={s.pickerMonthText}>{MONTHS[pickerMonth].toLowerCase()} {pickerYear}</Text>
+              <TouchableOpacity onPress={() => { if (pickerMonth === 11) { setPickerMonth(0); setPickerYear(y => y + 1); } else setPickerMonth(m => m + 1); }}>
+                <Ionicons name="chevron-forward" size={18} color={TEXT} />
+              </TouchableOpacity>
+            </View>
+            <View style={{ flexDirection: 'row', marginBottom: 6 }}>
+              {['su','mo','tu','we','th','fr','sa'].map(d => (
+                <Text key={d} style={s.calDay}>{d}</Text>
+              ))}
+            </View>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', width: '100%' }}>
+              {cells.map((day, i) => {
+                if (!day) return <View key={`e${i}`} style={s.calCell} />;
+                const inRange = isInRange(day);
+                const edge    = isEdge(day);
+                const today   = isSameDay(new Date(pickerYear, pickerMonth, day), new Date());
+                return (
+                  <TouchableOpacity
+                    key={day}
+                    style={[s.calCell, inRange && s.calCellRange, edge && s.calCellEdge, !inRange && !edge && today && s.calCellToday]}
+                    onPress={() => handleDayPress(day)}
+                  >
+                    <Text style={[s.calCellText, (edge || today) && s.calCellTextActive]}>{day}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        )}
+      </BottomSheet>
+
+      {/* ── Filter modal ── */}
+      <BottomSheet visible={showFilterModal} onClose={() => setShowFilterModal(false)} title="filter" height="50%">
+        <TouchableOpacity
+          style={s.clearBtn}
+          onPress={() => { setSelectedCategories(new Set(['all'])); }}
+          activeOpacity={0.75}
+        >
+          <Text style={s.clearBtnText}>Clear Filters</Text>
+        </TouchableOpacity>
+        <Text style={s.filterSectionLabel}>Categories</Text>
+        <View style={s.chipRow}>
+          <TouchableOpacity style={[s.modalChip, isAllCategories && s.modalChipActive]} onPress={() => setSelectedCategories(new Set(['all']))} activeOpacity={0.75}>
+            <Text style={[s.modalChipText, isAllCategories && s.modalChipTextActive]}>All</Text>
+          </TouchableOpacity>
+          {categories.map((cat: any) => {
+            const active = selectedCategories.has(cat.id);
+            return (
+              <TouchableOpacity key={cat.id} style={[s.modalChip, active && s.modalChipActive]} onPress={() => {
+                setSelectedCategories(prev => {
+                  const next = new Set(prev); next.delete('all');
+                  if (next.has(cat.id)) { next.delete(cat.id); if (next.size === 0) return new Set(['all']); }
+                  else next.add(cat.id);
+                  return next;
+                });
+              }} activeOpacity={0.75}>
+                <Text style={[s.modalChipText, active && s.modalChipTextActive]}>{cat.name}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </BottomSheet>
 
       <ConfirmModal
         visible={confirmModal}
@@ -336,15 +594,50 @@ const s = StyleSheet.create({
   title:   { flex: 1, fontFamily: B, fontSize: 28, color: TEXT, letterSpacing: -0.8 },
   addBtn:  { width: 36, height: 36, borderRadius: 18, backgroundColor: TEAL, alignItems: 'center', justifyContent: 'center' },
 
-  statsCard: { marginHorizontal: 16, backgroundColor: CARD, borderRadius: 24, paddingVertical: 16, paddingHorizontal: 20, marginBottom: 12, gap: 12 },
-  statsRow:  { flexDirection: 'row', alignItems: 'center' },
+  statsCard: { marginHorizontal: 16, backgroundColor: CARD, borderRadius: 24, paddingVertical: 16, paddingHorizontal: 20, marginBottom: 10, gap: 12 },
+  statsRow:  { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
   statItem:  { flex: 1, alignItems: 'center', gap: 4 },
-  statValue: { fontFamily: B,  fontSize: 17, color: TEXT, letterSpacing: -0.4 },
-  statLabel: { fontFamily: R,  fontSize: 10, color: SEC,  letterSpacing: 0.2 },
-  statDivider: { width: 1, height: 28, backgroundColor: BOR },
-  budgetTrack: { height: 4, backgroundColor: BOR, borderRadius: 2, overflow: 'hidden' },
+  statValue: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 16, color: TEXT, letterSpacing: -0.4 },
+  statLabel: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 10, color: SEC, letterSpacing: 0.2 },
+  statDivider: { width: 1, height: 28, backgroundColor: '#ECECEC' },
+  budgetTrack: { height: 4, backgroundColor: '#ECECEC', borderRadius: 2, overflow: 'hidden', marginTop: 4 },
   budgetFill:  { height: 4, borderRadius: 2 },
 
+  tabRow:  { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 4 },
+  tabWrap: { flex: 1, alignItems: 'center' },
+  tabCircle: { width: 56, height: 56, borderRadius: 28, justifyContent: 'center', alignItems: 'center', backgroundColor: TEALL, gap: 2 },
+  tabCircleActive:      { backgroundColor: TEAL },
+  tabCircleValue:       { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 11, color: SEC, letterSpacing: -0.3 },
+  tabCircleValueActive: { color: '#FFFFFF' },
+  tabLabel:       { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 9, color: SEC, marginTop: 5, letterSpacing: 0.2 },
+  tabLabelActive: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 9, color: TEAL },
+  filterRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingHorizontal: 16, paddingBottom: 8 },
+  dateNavRow:   { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  dateNavArrow: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: TEALL },
+  filterBtn:    { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, backgroundColor: CARD, borderWidth: 1, borderColor: BOR },
+  filterBtnText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, color: TEXT },
+  modalPresetRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
+  modalChipRow:   { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  modalChip:      { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, backgroundColor: '#F7F8FA' },
+  modalChipActive: { backgroundColor: TEAL },
+  modalChipText:  { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 12, color: SEC },
+  modalChipTextActive: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 12, color: TEXT },
+  modalLabel:     { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 12, color: SEC, marginBottom: 10 },
+  calWrap:    { width: '100%' },
+  calHint:    { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 11, color: TEALD, marginBottom: 10 },
+  pickerNav:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', paddingHorizontal: 4, marginBottom: 10 },
+  pickerMonthText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, color: TEXT },
+  calDay:     { flex: 1, textAlign: 'center', fontFamily: 'PlusJakartaSans_400Regular', fontSize: 10, color: SEC },
+  calCell:    { width: '14.28%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 999 },
+  calCellRange: { backgroundColor: TEAL + '55', borderRadius: 0 },
+  calCellEdge:  { backgroundColor: TEAL },
+  calCellToday: { backgroundColor: '#F7F8FA' },
+  calCellText:  { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 13, color: TEXT },
+  calCellTextActive: { fontFamily: 'PlusJakartaSans_600SemiBold', color: TEXT },
+  filterSectionLabel: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11, color: SEC, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8, marginTop: 4 },
+  chipRow:    { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingBottom: 16 },
+  clearBtn:   { alignSelf: 'flex-end', marginBottom: 12, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, backgroundColor: TEALL },
+  clearBtnText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 12, color: TEALD },
   menuCard: {
     position: 'absolute', top: 0, left: 16, right: 16, zIndex: 10,
     backgroundColor: CARD, borderRadius: 20,
@@ -359,19 +652,20 @@ const s = StyleSheet.create({
   navArrow:     { paddingHorizontal: 14 },
   dateNavLabel: { flex: 1, textAlign: 'center', fontFamily: SB, fontSize: 13, color: TEXT },
 
-  emptyWrap: { alignItems: 'center', paddingTop: 60, gap: 8 },
-  emptyText: { fontFamily: SB, fontSize: 16, color: TEXT },
-  emptyHint: { fontFamily: R,  fontSize: 13, color: SEC  },
+  emptyWrap:     { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 14, paddingBottom: 80 },
+  emptyIconWrap: { width: 64, height: 64, borderRadius: 32, backgroundColor: TEAL, justifyContent: 'center', alignItems: 'center', marginBottom: 6 },
+  emptyTitle:    { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 16, color: TEXT },
+  emptyText:  { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, color: SEC, textAlign: 'center', lineHeight: 21, letterSpacing: 0.2 },
 
-  list: { paddingHorizontal: 16, paddingTop: 120, gap: 8 },
+  list: { paddingHorizontal: 16, paddingTop: 210, gap: 8 },
   dateHeaderRow:  { paddingTop: 16, paddingBottom: 8, borderTopWidth: 1, borderTopColor: BOR, marginTop: 8 },
   dateHeaderText: { fontFamily: SB, fontSize: 10, color: SEC, letterSpacing: 1.2, textTransform: 'uppercase' },
 
   row:      { backgroundColor: CARD, borderRadius: 20, flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingVertical: 14 },
-  rowIcon:  { width: 40, height: 40, borderRadius: 20, backgroundColor: TEALL, alignItems: 'center', justifyContent: 'center' },
+  rowIcon:  { width: 46, height: 46, borderRadius: 23, backgroundColor: TEALL, alignItems: 'center', justifyContent: 'center' },
   rowMid:   { flex: 1, gap: 2 },
-  rowType:  { fontFamily: M,  fontSize: 10, color: SEC,  letterSpacing: 0.3, textTransform: 'uppercase' },
-  rowName:  { fontFamily: SB, fontSize: 14, color: TEXT, lineHeight: 20 },
+  rowType:  { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 10, color: SEC, letterSpacing: 0.4, textTransform: 'uppercase' },
+  rowName:  { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 14, color: TEXT, letterSpacing: 0.1, lineHeight: 20 },
   rowSpace: { fontFamily: R,  fontSize: 11, color: SEC },
   rowAmount: { fontFamily: B, fontSize: 15, letterSpacing: -0.4 },
 });
