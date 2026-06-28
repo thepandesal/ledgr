@@ -45,7 +45,11 @@ export default function ReceivablesScreen() {
         .eq('user_id', userId)
         .eq('type', 'receivable')
         .order('transaction_date', { ascending: false });
-      return data ?? [];
+      return (data ?? []).map((r: any) => ({
+        ...r,
+        categories: Array.isArray(r.categories) ? r.categories[0] : r.categories,
+        account: Array.isArray(r.account) ? r.account[0] : r.account,
+      }));
     },
     enabled: !!userId,
   });

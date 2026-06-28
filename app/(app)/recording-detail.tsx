@@ -626,7 +626,11 @@ export default function RecordingDetailScreen() {
     const { data } = await supabase.from('recordings')
       .select('*, categories:category_id(name, color, icon), account:account_id(account_name, bank)')
       .eq('id', recordingId).single();
-    if (data) setRecording(data);
+    if (data) setRecording({
+      ...data,
+      categories: Array.isArray(data.categories) ? data.categories[0] : data.categories,
+      account: Array.isArray(data.account) ? data.account[0] : data.account,
+    });
   };
 
   const loadPeople = async () => {
