@@ -329,12 +329,12 @@ const s = StyleSheet.create({
 
   card: {
     backgroundColor: CARD, borderRadius: 20,
-    paddingHorizontal: 16, paddingVertical: 16,
+    paddingHorizontal: 16, paddingVertical: 14,
     flexDirection: 'row', alignItems: 'center', gap: 14,
   },
   cardIconWrap: { width: 46, height: 46, borderRadius: 23, backgroundColor: TL, alignItems: 'center', justifyContent: 'center' },
-  cardName:     { fontFamily: SB, fontSize: 14, color: TEXT, letterSpacing: 0.1, lineHeight: 20 },
-  cardAmount:   { fontFamily: B,  fontSize: 15, color: TEXT, letterSpacing: -0.4 },
+  cardName:     { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 14, color: '#1A1A2E', letterSpacing: 0.1, lineHeight: 20 },
+  cardAmount:   { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 15, letterSpacing: -0.4 },
 
   typeBtn:         { paddingHorizontal: 16, paddingVertical: 9, borderRadius: 999, borderWidth: 1, borderColor: BORDER, backgroundColor: BG },
   typeBtnActive:   { backgroundColor: T, borderColor: T },
