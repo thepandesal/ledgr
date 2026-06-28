@@ -17,11 +17,11 @@ const PEACH = '#FFAB91';
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
 const ACTIVITY_TABS = [
-  { key: 'all',         label: 'All',         icon: 'apps-outline',              types: ['income','return','savings','expense','payment','transfer','payable','receivable'], color: P.teal, bg: P.tealLight },
-  { key: 'money-in',    label: 'Money In',    icon: 'arrow-down-circle-outline', types: ['income','return','savings'],          color: P.teal, bg: P.tealLight },
-  { key: 'money-out',   label: 'Money Out',   icon: 'arrow-up-circle-outline',   types: ['expense','payment','transfer'],       color: P.teal, bg: P.tealLight },
-  { key: 'loans',       label: 'Loans',       icon: 'cash-outline',              types: ['payable'],         color: P.teal, bg: P.tealLight },
-  { key: 'receivables', label: 'Receivables', icon: 'arrow-undo-outline',        types: ['receivable'],      color: P.teal, bg: P.tealLight },
+  { key: 'all',         label: 'All',         icon: 'apps-outline',              types: ['income','return','savings','expense','payment','transfer','payable','receivable'] },
+  { key: 'money-in',    label: 'Money In',    icon: 'arrow-down-circle-outline', types: ['income','return','savings'] },
+  { key: 'money-out',   label: 'Money Out',   icon: 'arrow-up-circle-outline',   types: ['expense','payment','transfer'] },
+  { key: 'loans',       label: 'Loans',       icon: 'cash-outline',              types: ['payable'] },
+  { key: 'receivables', label: 'Receivables', icon: 'arrow-undo-outline',        types: ['receivable'] },
 ] as const;
 
 type ActivityTab = typeof ACTIVITY_TABS[number]['key'];
@@ -569,7 +569,7 @@ export default function DashboardScreen() {
                       <Text style={s.rowName} numberOfLines={1}>{item.name}</Text>
                       {item.space?.name ? <Text style={s.rowSpace}>{item.space.name}</Text> : null}
                     </View>
-                    <Text style={[s.rowAmount, { color: tl?.color ?? P.tealDark }]}>
+                    <Text style={[s.rowAmount, { color: tl?.color ?? Colors.cyan }]}>
                       {Number(item.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </Text>
                   </TouchableOpacity>
