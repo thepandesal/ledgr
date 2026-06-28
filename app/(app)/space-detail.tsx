@@ -38,7 +38,6 @@ const PRESETS: { key: Preset; label: string; icon: string }[] = [
   { key: 'cutoff',     label: 'Cutoff',     icon: 'cut-outline'      },
   { key: 'custom',     label: 'Custom',     icon: 'options-outline'  },
 ];
-const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
 function getRangeForPreset(preset: Preset, cutoffDay: number, offset = 0): { from: Date; to: Date } {
   const now = new Date();
