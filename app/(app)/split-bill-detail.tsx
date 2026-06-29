@@ -243,7 +243,7 @@ export default function SplitBillDetailScreen() {
     setShareCopied(false);
     const { data: accs } = await supabase
       .from('accounts')
-      .select('id, account_name, bank, account_number')
+      .select('id, account_name, bank, account_number, qr_code')
       .eq('user_id', userId)
       .order('account_name');
     setShareAccounts(accs ?? []);
@@ -372,7 +372,6 @@ export default function SplitBillDetailScreen() {
       const html = `<!DOCTYPE html><html><head><meta charset="utf-8">`+
         `<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#fff;padding:32px;width:520px}</style>`+
         `</head><body>`+
-        `<div style="font-size:20px;color:#7fd8cd;font-weight:900;letter-spacing:-0.5px;margin-bottom:20px">LEDGR</div>`+
         `<div style="font-size:28px;font-weight:600;color:#425252;margin-bottom:4px">${name}</div>`+
         `<div style="font-size:11px;color:#999;margin-bottom:28px">${new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</div>`+
         `<div style="font-size:15px;color:#7fd8cd;font-weight:600;margin-bottom:10px">per person pay</div>`+
