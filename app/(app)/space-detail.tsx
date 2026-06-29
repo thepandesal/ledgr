@@ -39,7 +39,7 @@ const ACTIVITY_TABS = [
   { key: 'money-in',    label: 'Money In',    types: ['income'] },
   { key: 'money-out',   label: 'Money Out',   types: ['expense'] },
   { key: 'loans',       label: 'Debt',        types: ['debt'] },
-  { key: 'receivables', label: 'Due',         types: ['due'] },
+  { key: 'receivables', label: 'Due',         types: ['due','expense'] },
 ] as const;
 type ActivityTab = typeof ACTIVITY_TABS[number]['key'];
 
@@ -91,7 +91,7 @@ function getTypeLabel(type: string, status: string, is_due?: boolean, paid_amoun
   if (type === 'income')  return { label: 'income',  color: Colors.cyan };
   if (type === 'expense') {
     if (is_due) {
-      const collected = paid_amount != null && amount != null && Number(paid_amount) >= Number(amount) - 0.01;
+      const collected = paid_amount != null && amount != null && Number(paid_amount) > 0 && Number(paid_amount) >= Number(amount) - 0.01;
       return { label: collected ? 'expense · collected' : 'expense · due', color: collected ? Colors.cyan : PEACH };
     }
     return { label: 'expense', color: PEACH };
@@ -231,6 +231,8 @@ export default function SpaceDetailScreen() {
 
   const filtered = recordings.filter(r => {
     if (!currentTypes.includes(r.type)) return false;
+    // When Due tab is selected, only show is_due expenses
+    if (!isAll && selectedTabs.has('receivables') && r.type === 'expense' && !r.is_due) return false;
     if (!isAllCats && !selectedCategories.has(r.category_id)) return false;
     const [y, m, d] = r.transaction_date.split('-').map(Number);
     const date = new Date(y, m - 1, d);

@@ -28,7 +28,7 @@ const ACTIVITY_TABS = [
   { key: 'money-in',    label: 'Money In',    icon: 'arrow-down-circle-outline', types: ['income'] },
   { key: 'money-out',   label: 'Money Out',   icon: 'arrow-up-circle-outline',   types: ['expense'] },
   { key: 'loans',       label: 'Debt',        icon: 'cash-outline',              types: ['debt'] },
-  { key: 'receivables', label: 'Due',         icon: 'arrow-undo-outline',        types: ['due'] },
+  { key: 'receivables', label: 'Due',         icon: 'arrow-undo-outline',        types: ['due', 'expense'] },
 ] as const;
 
 type ActivityTab = typeof ACTIVITY_TABS[number]['key'];
@@ -307,6 +307,8 @@ export default function DashboardScreen() {
 
   const filtered = recordings.filter(r => {
     if (!effectiveTypes.includes(r.type)) return false;
+    // When Due tab is selected, only show is_due expenses (not all expenses)
+    if (!isAll && selectedTabs.has('receivables') && r.type === 'expense' && !r.is_due) return false;
     if (!isAllSpaces     && !selectedSpaces.has(r.space_id))                    return false;
     if (!isAllCategories && !selectedCategories.has(r.category_id)) return false;
     const [y, m, d] = r.transaction_date.split('-').map(Number);
