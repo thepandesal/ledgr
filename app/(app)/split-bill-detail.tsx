@@ -136,9 +136,10 @@ export default function SplitBillDetailScreen() {
     if (alreadyUsed + newTotal > recTotal + 0.01) return;
     setSavingItem(true);
     const recType = selectedRecording.recording?.type ?? 'expense';
-    const { data: insertData, error } = await supabase.from('split_items').insert(
+    const { error } = await supabase.from('split_items').insert(
       valid.map(r => ({
         split_bill_id: splitBillId,
+        recording_id: selectedRecording.recording?.id,
         user_id: userId,
         name: r.name.trim(),
         cost: parseFloat(r.cost),
@@ -146,8 +147,7 @@ export default function SplitBillDetailScreen() {
       }))
     ).select();
     setSavingItem(false);
-    if (error) { console.error('split_items insert error:', error.code, error.message, error.details, error.hint); return; }
-    console.log('split_items insert ok:', insertData);
+    if (error) return;
     setAddItemModal(false); refetchItems();
   };
 
