@@ -87,6 +87,7 @@ export default function SplitBillDetailScreen() {
   const [recTab, setRecTab] = useState<'payable' | 'receivable' | 'expense' | 'income'>('expense');
   const [recSearch, setRecSearch] = useState('');
   const [recDays, setRecDays] = useState<30 | 60 | 180 | 365 | null>(30);
+  const [recShowMore, setRecShowMore] = useState(false);
 
   const REC_TABS: { key: 'payable' | 'receivable' | 'expense' | 'income'; label: string }[] = [
     { key: 'expense', label: 'expense' },
@@ -116,6 +117,7 @@ export default function SplitBillDetailScreen() {
     setRecTab('expense');
     setRecSearch('');
     setRecDays(30);
+    setRecShowMore(false);
     setAddRecModal(true);
   };
 
@@ -665,7 +667,7 @@ export default function SplitBillDetailScreen() {
         {/* Tabs */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }} contentContainerStyle={{ gap: 6 }}>
           {REC_TABS.map(t => (
-            <TouchableOpacity key={t.key} style={[s.modeBtn, recTab === t.key && s.modeBtnActive]} onPress={() => { setRecTab(t.key); setRecSearch(''); }}>
+            <TouchableOpacity key={t.key} style={[s.modeBtn, recTab === t.key && s.modeBtnActive]} onPress={() => { setRecTab(t.key); setRecSearch(''); setRecShowMore(false); }}>
               <Text style={[s.modeBtnText, recTab === t.key && s.modeBtnTextActive]}>{t.label}</Text>
             </TouchableOpacity>
           ))}
@@ -673,7 +675,7 @@ export default function SplitBillDetailScreen() {
         {/* Date range */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }} contentContainerStyle={{ gap: 6 }}>
           {REC_RANGES.map(r => (
-            <TouchableOpacity key={String(r.value)} style={[s.modeBtn, { paddingHorizontal: 10, paddingVertical: 5 }, recDays === r.value && s.modeBtnActive]} onPress={() => setRecDays(r.value)}>
+            <TouchableOpacity key={String(r.value)} style={[s.modeBtn, { paddingHorizontal: 10, paddingVertical: 5 }, recDays === r.value && s.modeBtnActive]} onPress={() => { setRecDays(r.value); setRecShowMore(false); }}>
               <Text style={[s.modeBtnText, { fontSize: 11 }, recDays === r.value && s.modeBtnTextActive]}>{r.label}</Text>
             </TouchableOpacity>
           ))}
@@ -686,7 +688,7 @@ export default function SplitBillDetailScreen() {
             placeholder="search..."
             placeholderTextColor={Colors.faint}
             value={recSearch}
-            onChangeText={setRecSearch}
+            onChangeText={v => { setRecSearch(v); setRecShowMore(false); }}
           />
           {recSearch.length > 0 && (
             <TouchableOpacity onPress={() => setRecSearch('')}>
@@ -705,21 +707,33 @@ export default function SplitBillDetailScreen() {
             );
             if (filtered.length === 0)
               return <Text style={{ fontFamily: Fonts.mono, fontSize: 12, color: Colors.faint }}>no recordings found</Text>;
-            return filtered.map((rec: any) => {
-              const deduct = isDeductType(rec.type);
-              return (
-                <TouchableOpacity key={rec.id} style={s.recPickRow} onPress={() => linkRecording(rec)}>
-                  <View style={[s.recIconWrap, { backgroundColor: deduct ? Colors.cyan + '22' : '#FFAB9122' }]}>
-                    <Ionicons name={rec.type === 'payable' ? 'cash-outline' : deduct ? 'arrow-down-circle-outline' : 'arrow-up-circle-outline'} size={16} color={deduct ? Colors.cyan : '#FFAB91'} />
-                  </View>
-                  <View style={s.recMid}>
-                    <Text style={s.recName} numberOfLines={1}>{rec.name}</Text>
-                    <Text style={s.recDate}>{rec.transaction_date ? new Date(rec.transaction_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</Text>
-                  </View>
-                  <Text style={[s.recAmount, { color: deduct ? Colors.cyan : '#FFAB91' }]}>{fmt(Number(rec.amount))}</Text>
-                </TouchableOpacity>
-              );
-            });
+            const visible = filtered.slice(0, recShowMore ? filtered.length : 10);
+            return (
+              <>
+                {visible.map((rec: any) => {
+                  const deduct = isDeductType(rec.type);
+                  return (
+                    <TouchableOpacity key={rec.id} style={s.recPickRow} onPress={() => linkRecording(rec)}>
+                      <View style={[s.recIconWrap, { backgroundColor: deduct ? Colors.cyan + '22' : '#FFAB9122' }]}>
+                        <Ionicons name={rec.type === 'payable' ? 'cash-outline' : deduct ? 'arrow-down-circle-outline' : 'arrow-up-circle-outline'} size={16} color={deduct ? Colors.cyan : '#FFAB91'} />
+                      </View>
+                      <View style={s.recMid}>
+                        <Text style={s.recName} numberOfLines={1}>{rec.name}</Text>
+                        <Text style={s.recDate}>{rec.transaction_date ? new Date(rec.transaction_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</Text>
+                      </View>
+                      <Text style={[s.recAmount, { color: deduct ? Colors.cyan : '#FFAB91' }]}>{fmt(Number(rec.amount))}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+                {!recShowMore && filtered.length > 10 && (
+                  <TouchableOpacity style={{ paddingVertical: 12, alignItems: 'center' }} onPress={() => setRecShowMore(true)}>
+                    <Text style={{ fontFamily: Fonts.mono, fontSize: 12, color: Colors.cyan }}>
+                      show {filtered.length - 10} more
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </>
+            );
           })()}
         </ScrollView>
       </BottomSheet>
