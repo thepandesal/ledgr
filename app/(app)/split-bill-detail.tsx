@@ -81,7 +81,34 @@ export default function SplitBillDetailScreen() {
     setTagInputVal('');
   };
 
-  // ── Items state ──────────────────────────────────────────────────────────
+  // ── Add recording state ──────────────────────────────────────────────────
+  const [addRecModal, setAddRecModal] = useState(false);
+  const [allRecordings, setAllRecordings] = useState<any[]>([]);
+
+  const openAddRecording = async () => {
+    const { data } = await supabase
+      .from('recordings')
+      .select('id, name, amount, type, transaction_date')
+      .eq('user_id', userId)
+      .not('type', 'in', '(expense,income,savings,return)')
+      .order('transaction_date', { ascending: false })
+      .limit(50);
+    // exclude already linked
+    const linkedIds = linkedRecordings.map((lr: any) => lr.recording?.id);
+    setAllRecordings((data ?? []).filter((r: any) => !linkedIds.includes(r.id)));
+    setAddRecModal(true);
+  };
+
+  const linkRecording = async (rec: any) => {
+    await supabase.from('split_bill_recordings').insert({
+      split_bill_id: splitBillId,
+      user_id: userId,
+      recording_id: rec.id,
+      amount_contributed: rec.amount,
+    });
+    setAddRecModal(false);
+    queryClient.invalidateQueries({ queryKey: ['split-bill-recordings', splitBillId] });
+  };
   // Step 1: pick recording → Step 2: add item rows → tap saved item to assign people
   const [addItemModal, setAddItemModal]           = useState(false);
   const [itemStep, setItemStep]                   = useState<'pick-recording' | 'add-items'>('pick-recording');
@@ -244,7 +271,10 @@ export default function SplitBillDetailScreen() {
           {/* Linked Recordings */}
           <View style={s.sectionRow}>
             <Text style={s.sectionHeader}>recordings</Text>
-            <Text style={s.sectionAddText}>recordings</Text>
+            <TouchableOpacity onPress={openAddRecording} style={s.sectionAddBtn}>
+              <Ionicons name="add" size={14} color={Colors.cyan} />
+              <Text style={s.sectionAddText}>add</Text>
+            </TouchableOpacity>
           </View>
           {loadingRecs ? (
             <ActivityIndicator color={Colors.cyan} />
@@ -608,6 +638,29 @@ export default function SplitBillDetailScreen() {
         <TouchableOpacity style={s.doneBtn} onPress={() => setAddPersonModal(false)} activeOpacity={0.8}>
           <Text style={s.doneBtnText}>done</Text>
         </TouchableOpacity>
+      </BottomSheet>
+
+      {/* Add recording modal */}
+      <BottomSheet visible={addRecModal} onClose={() => setAddRecModal(false)} title="link a recording" height="60%">
+        <ScrollView showsVerticalScrollIndicator={false}>
+          {allRecordings.length === 0 ? (
+            <Text style={{ fontFamily: Fonts.mono, fontSize: 12, color: Colors.faint }}>no recordings available</Text>
+          ) : allRecordings.map((rec: any) => {
+            const deduct = isDeductType(rec.type);
+            return (
+              <TouchableOpacity key={rec.id} style={s.recPickRow} onPress={() => linkRecording(rec)}>
+                <View style={[s.recIconWrap, { backgroundColor: deduct ? Colors.cyan + '22' : '#FFAB9122' }]}>
+                  <Ionicons name={rec.type === 'payable' ? 'cash-outline' : deduct ? 'arrow-down-circle-outline' : 'arrow-up-circle-outline'} size={16} color={deduct ? Colors.cyan : '#FFAB91'} />
+                </View>
+                <View style={s.recMid}>
+                  <Text style={s.recName} numberOfLines={1}>{rec.name}</Text>
+                  <Text style={s.recDate}>{rec.type} · {rec.transaction_date ? new Date(rec.transaction_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</Text>
+                </View>
+                <Text style={[s.recAmount, { color: deduct ? Colors.cyan : '#FFAB91' }]}>{fmt(Number(rec.amount))}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
       </BottomSheet>
 
     </Animated.View>
