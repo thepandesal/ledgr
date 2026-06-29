@@ -24,8 +24,8 @@ const PEACH = '#FFAB91';
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
 const ACTIVITY_TABS = [
-  { key: 'all',         label: 'All',         icon: 'apps-outline',              types: ['income','return','expense','debt','due'] },
-  { key: 'money-in',    label: 'Money In',    icon: 'arrow-down-circle-outline', types: ['income','return'] },
+  { key: 'all',         label: 'All',         icon: 'apps-outline',              types: ['income','expense','debt','due'] },
+  { key: 'money-in',    label: 'Money In',    icon: 'arrow-down-circle-outline', types: ['income'] },
   { key: 'money-out',   label: 'Money Out',   icon: 'arrow-up-circle-outline',   types: ['expense'] },
   { key: 'loans',       label: 'Debt',        icon: 'cash-outline',              types: ['debt'] },
   { key: 'receivables', label: 'Due',         icon: 'arrow-undo-outline',        types: ['due'] },
@@ -295,10 +295,9 @@ export default function DashboardScreen() {
 
   const isAll = selectedTabs.has('all');
   const currentTypes = isAll
-    ? ['income','return','expense','debt','due']
+    ? ['income','expense','debt','due']
     : ACTIVITY_TABS.filter(t => t.key !== 'all' && selectedTabs.has(t.key)).flatMap(t => t.types as string[]);
 
-  // treat 'return' same as 'income' for filtering
   const effectiveTypes = currentTypes;
 
   const isAllSpaces    = selectedSpaces.has('all');
@@ -359,7 +358,7 @@ export default function DashboardScreen() {
     return date <= to;
   });
 
-  const moneyInTotal    = allRecordings(['income','return']).reduce((s, r) => s + Number(r.amount), 0);
+  const moneyInTotal    = allRecordings(['income']).reduce((s, r) => s + Number(r.amount), 0);
   const moneyOutTotal   = allRecordings(['expense']).reduce((s, r) => s + Number(r.amount), 0);
   const loansActive     = allRecordings(['debt']).filter(r => r.status !== 'paid').length;
   const loansPaid       = allRecordings(['debt']).filter(r => r.status === 'paid').length;
@@ -489,7 +488,6 @@ export default function DashboardScreen() {
 
   const typeLabel = (r: any) => {
     if (r.type === 'income')  return { label: 'income',  color: ACCENT };
-    if (r.type === 'return')  return { label: 'return',  color: ACCENT };
     if (r.type === 'expense') return { label: r.is_due ? 'expense · due' : 'expense', color: PEACH };
     if (r.type === 'debt')    return r.status === 'paid'
       ? { label: 'debt · paid',    color: ACCENT }
@@ -600,7 +598,7 @@ export default function DashboardScreen() {
         <Text style={s.qaLabel}>type</Text>
         {[
           { label: 'money out',  types: [{ key: 'expense', label: 'expense' }, { key: 'expense_due', label: 'expense + due' }] },
-          { label: 'money in',   types: [{ key: 'income', label: 'income' }, { key: 'return', label: 'return' }] },
+          { label: 'money in',   types: [{ key: 'income', label: 'income' }] },
           { label: 'debt',       types: [{ key: 'debt', label: 'debt' }] },
           { label: 'due',        types: [{ key: 'due', label: 'due' }] },
         ].map(group => (

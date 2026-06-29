@@ -294,12 +294,12 @@ export default function RecordingDetailScreen() {
         setPayablePerPerson({ map: perPersonMap, paidFor });
       }
     } else if (rec.type === 'expense') {
-      const { data: incomePayments } = await supabase.from('recordings')
+      const { data: returnPayments } = await supabase.from('recordings')
         .select('id, name, amount, transaction_date, payment_to, payment_from_account_id, accounts:payment_from_account_id(account_name, bank)')
-        .eq('linked_recording_id', recordingId).eq('type', 'income').order('transaction_date', { ascending: false });
-      if (incomePayments && incomePayments.length > 0) {
-        setLinkedPayments(incomePayments);
-        const totalCollected = incomePayments.reduce((s: number, p: any) => s + Number(p.amount), 0);
+        .eq('linked_recording_id', recordingId).eq('type', 'return').order('transaction_date', { ascending: false });
+      if (returnPayments && returnPayments.length > 0) {
+        setLinkedPayments(returnPayments);
+        const totalCollected = returnPayments.reduce((s: number, p: any) => s + Number(p.amount), 0);
         setRecording((prev: any) => prev ? { ...prev, paid_amount: totalCollected } : prev);
       }
       const { data: recv } = await supabase.from('recordings').select('id, name').eq('linked_recording_id', recordingId).eq('type', 'due').maybeSingle();

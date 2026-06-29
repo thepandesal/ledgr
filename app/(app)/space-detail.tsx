@@ -35,8 +35,8 @@ const PRESETS: { key: Preset; label: string; icon: string }[] = [
 ];
 
 const ACTIVITY_TABS = [
-  { key: 'all',         label: 'All',         types: ['income','return','expense','debt','due'] },
-  { key: 'money-in',    label: 'Money In',    types: ['income','return'] },
+  { key: 'all',         label: 'All',         types: ['income','expense','debt','due'] },
+  { key: 'money-in',    label: 'Money In',    types: ['income'] },
   { key: 'money-out',   label: 'Money Out',   types: ['expense'] },
   { key: 'loans',       label: 'Debt',        types: ['debt'] },
   { key: 'receivables', label: 'Due',         types: ['due'] },
@@ -89,7 +89,6 @@ function fmtAmount(n: number) {
 
 function getTypeLabel(type: string, status: string) {
   if (type === 'income')  return { label: 'income',  color: Colors.cyan };
-  if (type === 'return')  return { label: 'return',  color: Colors.cyan };
   if (type === 'expense') return { label: 'expense', color: PEACH };
   if (type === 'debt')    return status === 'paid'
     ? { label: 'debt · paid', color: Colors.cyan }
@@ -252,7 +251,7 @@ export default function SpaceDetailScreen() {
   grouped.sort((a, b) => b.date.getTime() - a.date.getTime());
 
   // Stats (all recordings, not date-filtered)
-  const moneyIn  = recordings.filter(r => ['income','return'].includes(r.type)).reduce((s, r) => s + Number(r.amount), 0);
+  const moneyIn  = recordings.filter(r => r.type === 'income').reduce((s, r) => s + Number(r.amount), 0);
   const moneyOut = recordings.filter(r => r.type === 'expense').reduce((s, r) => s + Number(r.amount), 0);
   const loansActive        = recordings.filter(r => r.type === 'debt' && r.status !== 'paid').length;
   const receivablesPending = recordings.filter(r => r.type === 'due'  && r.status !== 'paid').length;

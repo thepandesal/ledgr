@@ -612,7 +612,7 @@ export default function SplitBillDetailScreen() {
     if (rec.type === 'expense') {
       await supabase.from('recordings').insert({
         user_id: userId, space_id: rec.space_id,
-        name: rec.name, type: 'income',
+        name: rec.name, type: 'return',
         amount: rec.amount, transaction_date: today,
         status: 'received', account_id: accId,
         category_id: rec.category_id ?? null,
