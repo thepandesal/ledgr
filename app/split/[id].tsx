@@ -291,7 +291,10 @@ export default function SplitSharePage() {
                   </TouchableOpacity>
                 </View>
                 {acc.qr_code && (
-                  <Image source={{ uri: acc.qr_code }} style={s.qr} resizeMode="contain" />
+                  <TouchableOpacity onPress={() => { setQrModalAcc(acc); setQrModal(true); }}>
+                    <Image source={{ uri: acc.qr_code }} style={s.qr} resizeMode="contain" />
+                    <Text style={s.qrHint}>tap to expand</Text>
+                  </TouchableOpacity>
                 )}
               </View>
             ))}
@@ -397,7 +400,7 @@ const s = StyleSheet.create({
   payBank: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted },
   payNumber: { fontFamily: Fonts.monoBold, fontSize: 13, color: Colors.text },
   copyRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
-  qr: { width: 120, height: 120, borderRadius: Radius.md },
+  qr: { width: 68, height: 68, borderRadius: Radius.md },
   qrHint: { fontFamily: Fonts.mono, fontSize: 9, color: Colors.muted, textAlign: 'center', marginTop: 3 },
 
   // Share button — matches addRecordBtn

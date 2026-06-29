@@ -321,7 +321,16 @@ export default function SplitBillDetailScreen() {
         });
         // Fetch share page HTML and write into hidden iframe
         const res = await fetch(shareLink);
-        const html = await res.text();
+        let html = await res.text();
+        // Patch for image: bigger QR, hide "tap to expand" hint
+        html = html.replace('</head>', `<style>
+          img[style*="width: 68"], img[style*="width:68"] { width:160px!important;height:160px!important; }
+          .qr-hint, [class*="qrHint"] { display:none!important; }
+          /* target inline RN-web styles for qr image */
+          img { max-width:none; }
+        </style></head>`);
+        // Also patch any inline width:68 on qr images via regex
+        html = html.replace(/width:\s*68px/g, 'width:160px').replace(/height:\s*68px/g, 'height:160px');
         const iframe = document.createElement('iframe');
         iframe.style.cssText = 'position:fixed;left:-9999px;top:0;width:520px;height:2000px;border:none;background:#fff';
         document.body.appendChild(iframe);
