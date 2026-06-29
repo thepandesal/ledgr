@@ -610,7 +610,6 @@ export default function SplitBillDetailScreen() {
     const accId = markPaidAccount?.id ?? null;
 
     if (rec.type === 'expense') {
-      // Create income linked to this expense
       await supabase.from('recordings').insert({
         user_id: userId, space_id: rec.space_id,
         name: rec.name, type: 'income',
@@ -619,7 +618,7 @@ export default function SplitBillDetailScreen() {
         category_id: rec.category_id ?? null,
         linked_recording_id: rec.id,
       });
-      await supabase.from('recordings').update({ status: 'paid' }).eq('id', rec.id);
+      await supabase.from('recordings').update({ status: 'paid', is_due: true, paid_amount: rec.amount }).eq('id', rec.id);
     } else if (rec.type === 'due') {
       await supabase.from('recordings').insert({
         user_id: userId, space_id: rec.space_id,
