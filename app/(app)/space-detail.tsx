@@ -87,9 +87,15 @@ function fmtAmount(n: number) {
   return n.toLocaleString('en-US', { minimumFractionDigits: 2 });
 }
 
-function getTypeLabel(type: string, status: string) {
+function getTypeLabel(type: string, status: string, is_due?: boolean) {
   if (type === 'income')  return { label: 'income',  color: Colors.cyan };
-  if (type === 'expense') return { label: 'expense', color: PEACH };
+  if (type === 'expense') {
+    if (is_due) {
+      const collected = status === 'paid';
+      return { label: collected ? 'expense · collected' : 'expense · due', color: collected ? Colors.cyan : PEACH };
+    }
+    return { label: 'expense', color: PEACH };
+  }
   if (type === 'debt')    return status === 'paid'
     ? { label: 'debt · paid', color: Colors.cyan }
     : { label: 'debt',        color: PEACH };
@@ -257,7 +263,10 @@ export default function SpaceDetailScreen() {
     return s + net;
   }, 0);
   const loansActive        = recordings.filter(r => r.type === 'debt' && r.status !== 'paid').length;
-  const receivablesPending = recordings.filter(r => r.type === 'due'  && r.status !== 'paid').length;
+  const receivablesPending = recordings.filter(r =>
+    (r.type === 'due' && r.status !== 'paid') ||
+    (r.type === 'expense' && r.is_due && r.status !== 'paid')
+  ).length;
   const mainValue  = isExpSpace ? moneyOut : moneyIn;
   const pct        = budget ? Math.min(mainValue / budget, 1) : 0;
   const overBudget = isExpSpace && budget ? mainValue > budget : false;
@@ -471,7 +480,7 @@ export default function SpaceDetailScreen() {
                     <Text style={s.dateHeaderText}>{group.label}</Text>
                   </View>
                   {group.items.map(item => {
-                    const tl = getTypeLabel(item.type, item.status);
+                    const tl = getTypeLabel(item.type, item.status, item.is_due);
                     return (
                       <TouchableOpacity
                         key={item.id}

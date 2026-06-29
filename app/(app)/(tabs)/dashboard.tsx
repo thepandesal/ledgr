@@ -365,7 +365,8 @@ export default function DashboardScreen() {
   }, 0);
   const loansActive     = allRecordings(['debt']).filter(r => r.status !== 'paid').length;
   const loansPaid       = allRecordings(['debt']).filter(r => r.status === 'paid').length;
-  const receivablesPending  = allRecordings(['due']).filter(r => r.status !== 'paid').length;
+  const receivablesPending  = allRecordings(['due']).filter(r => r.status !== 'paid').length +
+    allRecordings(['expense']).filter(r => r.is_due && r.status !== 'paid').length;
   const receivablesReceived = allRecordings(['due']).filter(r => r.status === 'paid').length;
 
   const fmt     = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2 });
