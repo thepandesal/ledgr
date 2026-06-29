@@ -42,7 +42,7 @@ export default function BottomSheet({ visible, onClose, sub, title, height, chil
         style={[s.flex, s.justify]}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        {/* Transparent dismiss area — no blur, no overlay tint */}
+        {/* Transparent dismiss area */}
         <TouchableOpacity style={s.flex} activeOpacity={1} onPress={onClose} />
 
         {/* Sheet */}
@@ -71,7 +71,8 @@ export default function BottomSheet({ visible, onClose, sub, title, height, chil
 }
 
 const s = StyleSheet.create({
-  flex: { flex: 1 },
+  flex:    { flex: 1 },
   justify: { justifyContent: 'flex-end' },
+  blur:    { justifyContent: 'flex-end' },
   content: { paddingBottom: 16 },
 });

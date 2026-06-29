@@ -3,7 +3,7 @@ import {
   SafeAreaView, ActivityIndicator, TextInput, Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useState, useRef } from 'react';
+import { useState, useRef, useContext, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useUser } from '../../../src/hooks/useUser';
 import { supabase } from '../../../src/lib/supabase';
@@ -11,6 +11,11 @@ import BottomSheet from '@/components/ui/BottomSheet';
 import { Colors, Fonts, Radius } from '@/components/ui/theme';
 import pageStyles from '@/components/ui/pageStyles';
 import { useRouter } from 'expo-router';
+import { BlurContext } from '../../../src/lib/BlurContext';
+
+const ACCENT  = '#B6E1DE'; // prev: #96D7D4
+const ACCENT2 = '#282C2A';
+const ACCENT_TEXT = '#101514'; // dark text on light accent
 
 const PEACH = '#FFAB91';
 
@@ -91,7 +96,7 @@ function smartDateLabel(dateStr: string): string {
 export default function DashboardScreen() {
   const router    = useRouter();
   const { userId } = useUser();
-
+  const { registerAdd, unregisterAdd } = useContext(BlurContext);
   const queryClient = useQueryClient();
 
   const [activePreset, setActivePreset] = useState<Preset>('this-month');
@@ -234,6 +239,11 @@ export default function DashboardScreen() {
 
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [showAddModal,    setShowAddModal]    = useState(false);
+
+  useEffect(() => {
+    registerAdd('dashboard', () => { setShowAddModal(true); setQaError(''); });
+    return () => unregisterAdd('dashboard');
+  }, []);
 
   // ── quick-add form state ──
   const [qaName,     setQaName]     = useState('');
@@ -487,37 +497,27 @@ export default function DashboardScreen() {
   };
 
   const typeLabel = (r: any) => {
-    if (r.type === 'income')     return { label: 'income',   color: Colors.cyan };
-    if (r.type === 'savings')    return { label: 'savings',  color: Colors.cyan };
-    if (r.type === 'return')     return { label: 'return',   color: Colors.cyan };
+    if (r.type === 'income')     return { label: 'income',   color: ACCENT };
+    if (r.type === 'savings')    return { label: 'savings',  color: ACCENT };
+    if (r.type === 'return')     return { label: 'return',   color: ACCENT };
     if (r.type === 'expense')    return { label: 'expense',  color: PEACH };
     if (r.type === 'payment')    return { label: 'payment',  color: PEACH };
     if (r.type === 'transfer')   return { label: 'transfer', color: PEACH };
     if (r.type === 'payable')    return r.status === 'paid'
-      ? { label: 'loan · paid',    color: Colors.cyan }
+      ? { label: 'loan · paid',    color: ACCENT }
       : r.status === 'partial'
       ? { label: 'loan · partial', color: PEACH }
       : { label: 'loan',           color: PEACH };
     if (r.type === 'receivable') return r.status === 'received'
-      ? { label: 'receivable · received', color: Colors.cyan }
+      ? { label: 'receivable · received', color: ACCENT }
       : r.status === 'partial'
-      ? { label: 'receivable · partial',  color: Colors.cyan }
-      : { label: 'receivable',            color: Colors.cyan };
+      ? { label: 'receivable · partial',  color: ACCENT }
+      : { label: 'receivable',            color: ACCENT };
     return null;
   };
 
   return (
     <SafeAreaView style={s.container}>
-
-      {/* ── Top section ── */}
-      <View style={s.topSection}>
-        <View style={s.titleRow}>
-          <Text style={s.title}>Activities</Text>
-          <TouchableOpacity style={s.addRecBtn} onPress={() => { setShowAddModal(true); setQaError(''); }} activeOpacity={0.75}>
-            <Ionicons name="add" size={18} color={Colors.white} />
-          </TouchableOpacity>
-        </View>
-      </View>
 
       {/* ── Sheet: menu floats on top, list scrolls underneath ── */}
       <View style={s.sheet}>
@@ -543,14 +543,14 @@ export default function DashboardScreen() {
           <View style={s.filterRow}>
             <View style={s.dateNavRow}>
               <TouchableOpacity style={s.dateNavArrow} onPress={() => navigateRange(-1)} activeOpacity={0.7}>
-                <Ionicons name="chevron-back" size={14} color={Colors.cyan} />
+                <Ionicons name="chevron-back" size={14} color={ACCENT} />
               </TouchableOpacity>
               <TouchableOpacity style={s.filterBtn} onPress={() => setShowDateModal(true)} activeOpacity={0.75}>
-                <Ionicons name="calendar-outline" size={13} color={Colors.cyan} />
+                <Ionicons name="calendar-outline" size={13} color={ACCENT} />
                 <Text style={s.filterBtnText}>{rangeLabel}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={s.dateNavArrow} onPress={() => navigateRange(1)} activeOpacity={0.7}>
-                <Ionicons name="chevron-forward" size={14} color={Colors.cyan} />
+                <Ionicons name="chevron-forward" size={14} color={ACCENT} />
               </TouchableOpacity>
             </View>
             <TouchableOpacity
@@ -558,13 +558,13 @@ export default function DashboardScreen() {
               onPress={() => setShowFilterModal(true)}
               activeOpacity={0.75}
             >
-              <Ionicons name="options-outline" size={13} color={(!isAllSpaces || !isAllAccounts || !isAllCategories || amountSort !== 'none') ? Colors.cyan : Colors.muted} />
+              <Ionicons name="options-outline" size={13} color={(!isAllSpaces || !isAllAccounts || !isAllCategories || amountSort !== 'none') ? ACCENT : Colors.muted} />
               <Text style={[s.filterBtnText, (!isAllSpaces || !isAllAccounts || !isAllCategories || amountSort !== 'none') && s.filterBtnTextActive]}>Filter</Text>
             </TouchableOpacity>
           </View>
         </Animated.View>
         {isLoading ? (
-          <ActivityIndicator color={Colors.cyan} style={{ marginTop: 48 }} />
+          <ActivityIndicator color={ACCENT} style={{ marginTop: 48 }} />
         ) : filtered.length === 0 ? (
           <View style={pageStyles.emptyBox}>
             <Text style={pageStyles.emptyText}>no {activeTabData.label.toLowerCase()} found for this period</Text>
@@ -585,7 +585,7 @@ export default function DashboardScreen() {
                   )}
                   <TouchableOpacity style={s.row} activeOpacity={0.85} onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: item.id } } as any)}>
                     <View style={s.rowIconWrap}>
-                      <Ionicons name={(item.categories?.icon ?? activeTabData.icon) as any} size={18} color={Colors.cyan} />
+                      <Ionicons name={(item.categories?.icon ?? activeTabData.icon) as any} size={18} color={ACCENT} />
                     </View>
                     <View style={s.rowMid}>
                       <Text style={s.rowType}>{tl?.label ?? activeTabData.label}</Text>
@@ -691,7 +691,7 @@ export default function DashboardScreen() {
           disabled={!qaName.trim() || !qaAmount || !qaSpaceId || !qaCatId || qaLoading}
           activeOpacity={0.8}
         >
-          {qaLoading ? <ActivityIndicator color={Colors.white} /> : <Text style={s.qaSaveBtnText}>save</Text>}
+          {qaLoading ? <ActivityIndicator color={ACCENT_TEXT} /> : <Text style={s.qaSaveBtnText}>save</Text>}
         </TouchableOpacity>
       </BottomSheet>
 
@@ -924,8 +924,8 @@ const s = StyleSheet.create({
   container:  { flex: 1, backgroundColor: Colors.white },
   topSection: { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 12 },
   titleRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  title:      { fontFamily: Fonts.display, fontSize: 28, color: Colors.text, letterSpacing: -0.8 },
-  addRecBtn:  { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.cyan, alignItems: 'center', justifyContent: 'center' },
+  title:      { fontFamily: 'CalSans', fontSize: 28, color: Colors.text, letterSpacing: -0.8 },
+  addRecBtn:  { width: 36, height: 36, borderRadius: 18, backgroundColor: ACCENT, alignItems: 'center', justifyContent: 'center' },
 
   sheet:    { flex: 1, backgroundColor: Colors.white },
   menuCard: {
@@ -938,20 +938,20 @@ const s = StyleSheet.create({
   tabRow:  { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 4 },
   tabWrap: { flex: 1, alignItems: 'center' },
   tabCircle:            { width: 56, height: 56, borderRadius: 28, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.surface },
-  tabCircleActive:      { backgroundColor: Colors.cyan },
+  tabCircleActive:      { backgroundColor: ACCENT },
   tabCircleValue:       { fontFamily: Fonts.monoBold, fontSize: 11, color: Colors.muted, letterSpacing: -0.3 },
-  tabCircleValueActive: { color: Colors.white },
-  tabLabel:             { fontFamily: Fonts.mono, fontSize: 9, color: Colors.muted, marginTop: 5, letterSpacing: 0.2 },
-  tabLabelActive:       { fontFamily: Fonts.monoBold, fontSize: 9, color: Colors.cyan },
+  tabCircleValueActive: { color: ACCENT_TEXT },
+  tabLabel:             { fontFamily: 'ChillaxRegular', fontSize: 9, color: Colors.muted, marginTop: 5, letterSpacing: 0.2 },
+  tabLabelActive:       { fontFamily: 'ChillaxMedium', fontSize: 9, color: ACCENT_TEXT },
 
   // Filter row
   filterRow:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
   dateNavRow:      { flexDirection: 'row', alignItems: 'center', gap: 4 },
   dateNavArrow:    { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.surface },
   filterBtn:       { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: Colors.white, borderWidth: 1, borderColor: Colors.borderMid },
-  filterBtnActive: { backgroundColor: Colors.cyan + '22', borderColor: Colors.cyan },
+  filterBtnActive: { backgroundColor: ACCENT + '22', borderColor: ACCENT },
   filterBtnText:       { fontFamily: Fonts.mono,     fontSize: 11, color: Colors.text },
-  filterBtnTextActive: { fontFamily: Fonts.monoBold, fontSize: 11, color: Colors.cyan },
+  filterBtnTextActive: { fontFamily: Fonts.monoBold, fontSize: 11, color: ACCENT },
 
   // List
   list:           { paddingHorizontal: 16, paddingTop: 140, paddingBottom: 20, gap: 12 },
@@ -962,38 +962,38 @@ const s = StyleSheet.create({
   row:         { backgroundColor: Colors.white, borderRadius: Radius.xl, flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingVertical: 14 },
   rowIconWrap: { width: 46, height: 46, borderRadius: 23, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.surface },
   rowMid:      { flex: 1, gap: 2 },
-  rowType:     { fontFamily: Fonts.mono,     fontSize: 10, color: Colors.muted,  letterSpacing: 0.4, textTransform: 'uppercase' },
-  rowName:     { fontFamily: Fonts.monoBold, fontSize: 14, color: Colors.text,   letterSpacing: 0.1, lineHeight: 20 },
-  rowSpace:    { fontFamily: Fonts.mono,     fontSize: 11, color: Colors.faint,  letterSpacing: 0.2 },
-  rowAmount:   { fontFamily: Fonts.monoBold, fontSize: 15, letterSpacing: -0.4 },
+  rowType:     { fontFamily: 'ChillaxRegular', fontSize: 10, color: Colors.muted, letterSpacing: 0.4, textTransform: 'uppercase' },
+  rowName:     { fontFamily: 'ChillaxMedium',  fontSize: 14, color: Colors.text, letterSpacing: 0.1, lineHeight: 20 },
+  rowSpace:    { fontFamily: Fonts.mono,        fontSize: 11, color: Colors.faint, letterSpacing: 0.2 },
+  rowAmount:   { fontFamily: Fonts.monoBold,    fontSize: 15, letterSpacing: -0.4 },
 
   // Date modal
   modalPresetRow:        { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 },
   modalPresetChip:       { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: Colors.surface },
-  modalPresetChipActive: { backgroundColor: Colors.cyan },
+  modalPresetChipActive: { backgroundColor: ACCENT },
   modalPresetText:       { fontFamily: Fonts.mono,     fontSize: 12, color: Colors.muted },
-  modalPresetTextActive: { fontFamily: Fonts.monoBold, fontSize: 12, color: Colors.text },
+  modalPresetTextActive: { fontFamily: Fonts.monoBold, fontSize: 12, color: ACCENT_TEXT },
 
   cutoffRow:        { marginBottom: 16, width: '100%' },
   cutoffLabel:      { fontFamily: Fonts.mono, fontSize: 12, color: Colors.muted, marginBottom: 10 },
   cutoffChips:      { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
   cutoffChip:       { paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: Colors.surface },
-  cutoffChipActive: { backgroundColor: Colors.cyan },
+  cutoffChipActive: { backgroundColor: ACCENT },
   cutoffChipText:       { fontFamily: Fonts.mono,     fontSize: 12, color: Colors.muted },
-  cutoffChipTextActive: { fontFamily: Fonts.monoBold, fontSize: 12, color: Colors.text },
+  cutoffChipTextActive: { fontFamily: Fonts.monoBold, fontSize: 12, color: ACCENT_TEXT },
   cutoffInputRow:   { flexDirection: 'row', alignItems: 'center', gap: 10 },
   cutoffInputLabel: { fontFamily: Fonts.mono, fontSize: 12, color: Colors.muted, flex: 1 },
   cutoffInput:      { backgroundColor: Colors.surface, borderRadius: Radius.sm, paddingHorizontal: 12, paddingVertical: 8, fontFamily: Fonts.monoBold, fontSize: 16, color: Colors.text, width: 70, textAlign: 'center' },
 
   // Calendar
   calWrap:         { width: '100%' },
-  calHint:         { fontFamily: Fonts.mono, fontSize: 11, color: Colors.cyan, marginBottom: 10 },
+  calHint:         { fontFamily: Fonts.mono, fontSize: 11, color: ACCENT, marginBottom: 10 },
   pickerNav:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', paddingHorizontal: 4, marginBottom: 10 },
   pickerMonthText: { fontFamily: Fonts.monoBold, fontSize: 15, color: Colors.text },
   calDay:          { flex: 1, textAlign: 'center', fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted },
   calCell:         { width: '14.28%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center', borderRadius: Radius.pill },
-  calCellRange:    { backgroundColor: Colors.cyan + '55', borderRadius: 0 },
-  calCellEdge:     { backgroundColor: Colors.cyan },
+  calCellRange:    { backgroundColor: ACCENT + '55', borderRadius: 0 },
+  calCellEdge:     { backgroundColor: ACCENT },
   calCellToday:    { backgroundColor: Colors.surface },
   calCellText:     { fontFamily: Fonts.mono,     fontSize: 13, color: Colors.text },
   calCellTextActive: { fontFamily: Fonts.monoBold, color: Colors.text },
@@ -1001,12 +1001,12 @@ const s = StyleSheet.create({
   // Filter modal chips
   spaceChips:          { flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingBottom: 16 },
   spaceChip:           { paddingHorizontal: 16, paddingVertical: 10, borderRadius: Radius.pill, backgroundColor: Colors.surface },
-  spaceChipActive:     { backgroundColor: Colors.cyan },
+  spaceChipActive:     { backgroundColor: ACCENT },
   spaceChipText:       { fontFamily: Fonts.mono,     fontSize: 13, color: Colors.muted },
-  spaceChipTextActive: { fontFamily: Fonts.monoBold, fontSize: 13, color: Colors.text },
+  spaceChipTextActive: { fontFamily: Fonts.monoBold, fontSize: 13, color: ACCENT_TEXT },
   filterSectionLabel:  { fontFamily: Fonts.monoBold, fontSize: 11, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8, marginTop: 4 },
   clearBtn:     { alignSelf: 'flex-end', marginBottom: 12, paddingHorizontal: 14, paddingVertical: 7, borderRadius: Radius.pill, backgroundColor: Colors.surface },
-  clearBtnText: { fontFamily: Fonts.monoBold, fontSize: 12, color: Colors.cyan },
+  clearBtnText: { fontFamily: Fonts.monoBold, fontSize: 12, color: ACCENT },
 
   // Quick add modal
   qaError:          { fontFamily: Fonts.mono, fontSize: 12, color: PEACH, marginBottom: 8 },
@@ -1014,20 +1014,20 @@ const s = StyleSheet.create({
   qaInput:          { fontFamily: Fonts.monoBold, fontSize: 16, color: Colors.text, backgroundColor: Colors.white, borderRadius: Radius.lg, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1, borderColor: Colors.borderMid },
   qaTypeRow:        { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   qaTypeBtn:        { paddingHorizontal: 12, paddingVertical: 7, borderRadius: Radius.pill, backgroundColor: Colors.white, borderWidth: 1, borderColor: Colors.borderMid },
-  qaTypeBtnActive:  { backgroundColor: Colors.cyan, borderColor: Colors.cyan },
+  qaTypeBtnActive:  { backgroundColor: ACCENT, borderColor: ACCENT },
   qaTypeBtnText:    { fontFamily: Fonts.mono,     fontSize: 11, color: Colors.muted },
-  qaTypeBtnTextActive: { fontFamily: Fonts.monoBold, fontSize: 11, color: Colors.white },
+  qaTypeBtnTextActive: { fontFamily: Fonts.monoBold, fontSize: 11, color: ACCENT_TEXT },
   qaChips:          { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   qaChip:           { paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: Colors.white, borderWidth: 1, borderColor: Colors.borderMid },
-  qaChipActive:     { backgroundColor: Colors.cyan, borderColor: Colors.cyan },
+  qaChipActive:     { backgroundColor: ACCENT, borderColor: ACCENT },
   qaChipText:       { fontFamily: Fonts.mono,     fontSize: 12, color: Colors.muted },
-  qaChipTextActive: { fontFamily: Fonts.monoBold, fontSize: 12, color: Colors.white },
+  qaChipTextActive: { fontFamily: Fonts.monoBold, fontSize: 12, color: ACCENT_TEXT },
   qaDateRow:        { gap: 8 },
   qaDatePicker:     {},
   qaDatePickerLabel: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted, marginBottom: 6 },
   qaDateChip:       { paddingHorizontal: 10, paddingVertical: 6, borderRadius: Radius.pill, backgroundColor: Colors.white, borderWidth: 1, borderColor: Colors.borderMid },
-  qaSaveBtn:        { backgroundColor: Colors.cyan, borderRadius: Radius.pill, paddingVertical: 14, alignItems: 'center', marginTop: 20 },
-  qaSaveBtnText:    { fontFamily: Fonts.monoBold, fontSize: 14, color: Colors.white },
+  qaSaveBtn:        { backgroundColor: ACCENT, borderRadius: Radius.pill, paddingVertical: 14, alignItems: 'center', marginTop: 20 },
+  qaSaveBtnText:    { fontFamily: Fonts.monoBold, fontSize: 14, color: ACCENT_TEXT },
 });
 
 

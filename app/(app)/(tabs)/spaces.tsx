@@ -6,12 +6,12 @@ import { useRouter } from 'expo-router';
 import { supabase } from '../../../src/lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState, useRef } from 'react';
+import { useState, useRef, useContext, useEffect } from 'react';
 import { useUser } from '../../../src/hooks/useUser';
 import BottomSheet from '@/components/ui/BottomSheet';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import { Colors, Fonts, Radius, Spacing } from '@/components/ui/theme';
-import Svg, { Path } from 'react-native-svg';
+import { BlurContext } from '../../../src/lib/BlurContext';
 
 interface SpaceData {
   id: string; name: string; color: string; icon: string;
@@ -19,7 +19,8 @@ interface SpaceData {
   space_type?: string; savings_target_date?: string | null; is_active?: boolean;
 }
 
-const ACCENT = '#4D72BC'; // prev: #5DC9BD | original Colors.cyan: #7fd8cd
+const ACCENT      = '#B6E1DE'; // prev: #96D7D4
+const ACCENT_TEXT = '#101514'; // dark text on light accent
 
 const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -75,10 +76,18 @@ export default function SpacesScreen() {
     enabled: !!userId,
   });
 
+  const { setBlur, registerAdd, unregisterAdd } = useContext(BlurContext);
+
   const openCreate = () => {
     setSpaceName(''); setError(''); setSpaceBudget('');
-    setSpaceType('expense'); setSpaceTargetDate(''); setEditMode(false); setCreateModal(true);
+    setSpaceType('expense'); setSpaceTargetDate(''); setEditMode(false);
+    setCreateModal(true); setBlur(true);
   };
+
+  useEffect(() => {
+    registerAdd('spaces', openCreate);
+    return () => unregisterAdd('spaces');
+  }, []);
 
   const handleCreate = async () => {
     if (!spaceName.trim()) { setError('name is required.'); return; }
@@ -101,7 +110,7 @@ export default function SpacesScreen() {
       if (err) { setError(err.message); setLoading(false); return; }
     }
     queryClient.invalidateQueries({ queryKey: ['spaces', userId] });
-    setLoading(false); setCreateModal(false); setEditMode(false);
+    setLoading(false); setCreateModal(false); setEditMode(false); setBlur(false);
   };
 
   const handleEditSpace = () => {
@@ -191,24 +200,8 @@ export default function SpacesScreen() {
 
   return (
     <SafeAreaView style={s.root}>
-      {/* ── Sticky header ── */}
-      <View style={s.waveBg}>
-        <Text style={s.appLabel}>LEDGR</Text>
-        <Text style={s.pageTitle}>spaces</Text>
-        <Text style={s.dateLine}>
-          {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-        </Text>
-        <Text style={s.motivation}>{motivation}</Text>
-        <Svg viewBox={`0 0 ${W} 64`} width={W} height={64} style={s.wave} preserveAspectRatio="none">
-          <Path
-            d={`M0,32 C${W*0.15},64 ${W*0.35},0 ${W*0.5},32 C${W*0.65},64 ${W*0.85},0 ${W},32 L${W},64 L0,64 Z`}
-            fill={Colors.white}
-          />
-        </Svg>
-      </View>
-
-      <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} style={{ zIndex: 1 }}>
-        {/* Active / Inactive toggle + add */}
+      <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+        {/* Active / Inactive toggle */}
         <View style={s.actionRow}>
           <View style={s.tabToggle}>
             <TouchableOpacity
@@ -226,9 +219,6 @@ export default function SpacesScreen() {
               <Text style={[s.tabBtnText, activeTab === 'inactive' && s.tabBtnTextActive]}>inactive</Text>
             </TouchableOpacity>
           </View>
-          <TouchableOpacity style={s.addBtn} onPress={openCreate} activeOpacity={0.8}>
-            <Ionicons name="add" size={18} color={Colors.white} />
-          </TouchableOpacity>
         </View>
 
         {/* ── Empty ── */}
@@ -286,7 +276,7 @@ export default function SpacesScreen() {
       </ScrollView>
 
       {/* ── Create / Edit modal ── */}
-      <BottomSheet visible={createModal} onClose={() => { setCreateModal(false); setEditMode(false); }} title={editMode ? 'edit space' : 'new space'} height='50%'>
+      <BottomSheet visible={createModal} onClose={() => { setCreateModal(false); setEditMode(false); setBlur(false); }} title={editMode ? 'edit space' : 'new space'} height='50%'>
         {error ? <Text style={s.error}>{error}</Text> : null}
         <Text style={s.label}>type</Text>
         <View style={s.typeRow}>
@@ -331,21 +321,12 @@ const s = StyleSheet.create({
   scroll: { paddingBottom: 60 },
 
   // ── Header ──────────────────────────────────────────────────────────────
-  waveBg: { backgroundColor: '#4D72BC', paddingHorizontal: Spacing.page, paddingTop: 28, paddingBottom: 60, marginBottom: -2, zIndex: 10 },
-  wave:   { position: 'absolute', bottom: -1, left: 0, right: 0, height: 64, zIndex: 10 },
-
-  appLabel:   { fontFamily: 'MuseoModerno_Black', fontSize: 20, color: Colors.white, marginBottom: 12 },
-  pageTitle:  { fontFamily: 'CalSans', fontSize: 32, color: Colors.white, letterSpacing: -0.5, marginBottom: 4 },
-  dateLine:   { fontFamily: Fonts.mono, fontSize: 11, color: 'rgba(255,255,255,0.7)', marginBottom: 4 },
-  motivation: { fontFamily: 'ChillaxRegular', fontSize: 13, color: 'rgba(255,255,255,0.8)', marginBottom: 0 },
-
-  actionRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.page, marginTop: 20, marginBottom: 8 },
+  actionRow:   { alignItems: 'center', paddingHorizontal: Spacing.page, marginTop: 20, marginBottom: 8 },
   tabToggle:       { flexDirection: 'row', backgroundColor: Colors.surface, borderRadius: Radius.pill, padding: 3, borderWidth: 1, borderColor: Colors.border },
   tabBtn:          { paddingHorizontal: 18, paddingVertical: 6, borderRadius: Radius.pill },
   tabBtnActive:    { backgroundColor: ACCENT },
   tabBtnText:      { fontFamily: Fonts.mono, fontSize: 11, color: Colors.muted },
-  tabBtnTextActive:{ fontFamily: Fonts.monoBold, fontSize: 11, color: Colors.white },
-  addBtn:          { width: 36, height: 36, borderRadius: 18, backgroundColor: ACCENT, alignItems: 'center', justifyContent: 'center' },
+  tabBtnTextActive:{ fontFamily: Fonts.monoBold, fontSize: 11, color: ACCENT_TEXT },
 
   slideOuter: { overflow: 'hidden' },
   slidePair:  { flexDirection: 'row' },
@@ -364,7 +345,7 @@ const s = StyleSheet.create({
   cardName:     { fontFamily: 'ChillaxMedium', fontSize: 14, color: Colors.text },
   cardMeta:     { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted },
   cardRight:    { alignItems: 'flex-end', gap: 3 },
-  cardRow:      { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  cardRow:      { flexDirection: 'row', alignItems: 'center', gap: 16 },
   cardRowLabel: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted, letterSpacing: 0.3 },
   cardRowValue: { fontFamily: Fonts.monoBold, fontSize: 12, color: Colors.text, letterSpacing: -0.2 },
 
@@ -377,10 +358,10 @@ const s = StyleSheet.create({
   typeBtn:           { paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, borderWidth: 1, borderColor: Colors.borderMid, backgroundColor: Colors.surface },
   typeBtnActive:     { backgroundColor: ACCENT, borderColor: ACCENT },
   typeBtnText:       { fontFamily: Fonts.mono,     fontSize: 12, color: Colors.muted },
-  typeBtnTextActive: { fontFamily: Fonts.monoBold, fontSize: 12, color: Colors.white },
+  typeBtnTextActive: { fontFamily: Fonts.monoBold, fontSize: 12, color: ACCENT_TEXT },
 
   saveBtn:     { backgroundColor: ACCENT, borderRadius: Radius.pill, paddingVertical: 14, alignItems: 'center', marginTop: 20 },
-  saveBtnText: { fontFamily: Fonts.monoBold, fontSize: 14, color: Colors.white },
+  saveBtnText: { fontFamily: Fonts.monoBold, fontSize: 14, color: ACCENT_TEXT },
 
   // ── Footer ───────────────────────────────────────────────────────────────
   footer: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.faint, textAlign: 'center', marginTop: 32, paddingHorizontal: Spacing.page },
