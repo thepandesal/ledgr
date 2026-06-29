@@ -143,10 +143,11 @@ export default function SplitBillDetailScreen() {
   };
   // Step 1: pick recording → Step 2: add item rows → tap saved item to assign people
   const [addItemModal, setAddItemModal]           = useState(false);
-  const [itemStep, setItemStep]                   = useState<'pick-recording' | 'add-items'>('pick-recording');
+  const [itemStep, setItemStep]                   = useState<'pick-type' | 'pick-recording' | 'add-items' | 'manual'>('pick-type');
   const [selectedRecording, setSelectedRecording] = useState<any>(null);
   const [itemRows, setItemRows]                   = useState<{ name: string; cost: string }[]>([{ name: '', cost: '' }]);
   const [savingItem, setSavingItem]               = useState(false);
+  const [manualItemType, setManualItemType]        = useState<'receivable' | 'payable'>('receivable');
 
   // assign-people sheet (tap an existing item)
   const [assignItem, setAssignItem]   = useState<any>(null);
@@ -172,7 +173,7 @@ export default function SplitBillDetailScreen() {
   const totalItemsCost = items.reduce((s: number, i: any) => s + Number(i.cost), 0);
 
   const openAddItem = () => {
-    setItemStep('pick-recording');
+    setItemStep('pick-type');
     setSelectedRecording(null);
     setItemRows([{ name: '', cost: '' }]);
     setAddItemModal(true);
@@ -182,6 +183,25 @@ export default function SplitBillDetailScreen() {
     setSelectedRecording(lr);
     setItemRows([{ name: '', cost: '' }]);
     setItemStep('add-items');
+  };
+
+  const saveManualItems = async () => {
+    const valid = itemRows.filter(r => r.name.trim() && r.cost);
+    if (!valid.length) return;
+    setSavingItem(true);
+    await supabase.from('split_items').insert(
+      valid.map(r => ({
+        split_bill_id: splitBillId,
+        user_id: userId,
+        name: r.name.trim(),
+        cost: parseFloat(r.cost),
+        recording_type: manualItemType,
+        recording_id: null,
+      }))
+    );
+    setSavingItem(false);
+    setAddItemModal(false);
+    refetchItems();
   };
 
   const saveItems = async () => {
@@ -551,6 +571,7 @@ export default function SplitBillDetailScreen() {
   const [paymentPerson, setPaymentPerson]   = useState('');
   const [paymentMode, setPaymentMode]       = useState<'full' | 'manual'>('full');
   const [paymentAmount, setPaymentAmount]   = useState('');
+  const [paymentRecord, setPaymentRecord]   = useState(true);
   const [paymentSaving, setPaymentSaving]   = useState(false);
 
   // compute per-person totals (reuse across summary + payment)
@@ -571,6 +592,7 @@ export default function SplitBillDetailScreen() {
     setPaymentPerson(person);
     setPaymentMode('full');
     setPaymentAmount('');
+    setPaymentRecord(true);
     setPaymentModal(true);
   };
 
@@ -592,8 +614,8 @@ export default function SplitBillDetailScreen() {
     });
 
     const newTotal = paidSoFar + amount;
-    // If fully settled, create income or expense recording
-    if (Math.abs(newTotal - owed) < 0.01) {
+    // If fully settled and user wants it recorded, create income or expense recording
+    if (paymentRecord && Math.abs(newTotal - owed) < 0.01) {
       const spaceId = linkedRecordings[0]?.recording?.space_id ?? null;
       if (isNegative) {
         // You owe them — create expense
@@ -755,10 +777,10 @@ export default function SplitBillDetailScreen() {
             <TouchableOpacity
               onPress={openAddItem}
               style={s.sectionAddBtn}
-              disabled={filledPeople.length === 0 || linkedRecordings.length === 0}
+              disabled={filledPeople.length === 0}
             >
-              <Ionicons name="add" size={14} color={filledPeople.length === 0 || linkedRecordings.length === 0 ? Colors.faint : Colors.cyan} />
-              <Text style={[s.sectionAddText, (filledPeople.length === 0 || linkedRecordings.length === 0) && { color: Colors.faint }]}>add</Text>
+              <Ionicons name="add" size={14} color={filledPeople.length === 0 ? Colors.faint : Colors.cyan} />
+              <Text style={[s.sectionAddText, filledPeople.length === 0 && { color: Colors.faint }]}>add</Text>
             </TouchableOpacity>
           </View>
           {items.length === 0 ? (
@@ -825,8 +847,8 @@ export default function SplitBillDetailScreen() {
                       {/* Name row */}
                       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                         <Text style={[s.recName, { flex: 1 }]}>{p}</Text>
-                        <Text style={{ fontFamily: Fonts.monoBold, fontSize: 13, color: isNegative ? Colors.cyan : '#FFAB91' }}>
-                          {isNegative ? '-' : '+'}{fmt(absOwed)}
+                        <Text style={{ fontFamily: Fonts.monoBold, fontSize: 13, color: isNegative ? Colors.expense : '#FFAB91' }}>
+                          {isNegative ? 'to pay: ' : 'to collect: '}{fmt(absOwed)}
                         </Text>
                         {!fullyPaid && absOwed > 0 && (
                           <TouchableOpacity
@@ -889,9 +911,97 @@ export default function SplitBillDetailScreen() {
         </ScrollView>
       </SafeAreaView>
 
-      {/* Add item modal: step 1 pick recording, step 2 add item rows */}
-      <BottomSheet visible={addItemModal} onClose={() => setAddItemModal(false)} title={itemStep === 'pick-recording' ? 'for which recording?' : 'add items'} height="65%">
-        {itemStep === 'pick-recording' ? (
+      {/* Add item modal */}
+      <BottomSheet visible={addItemModal} onClose={() => setAddItemModal(false)} title="add items" height="65%">
+        {itemStep === 'pick-type' ? (
+          <View style={{ gap: 12 }}>
+            <Text style={{ fontFamily: Fonts.mono, fontSize: 12, color: Colors.muted, marginBottom: 4 }}>how do you want to add items?</Text>
+            <TouchableOpacity
+              style={[s.recPickRow, { borderBottomWidth: 0, backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: 16 }]}
+              onPress={() => setItemStep(linkedRecordings.length > 0 ? 'pick-recording' : 'manual')}
+            >
+              <View style={[s.recIconWrap, { backgroundColor: Colors.cyan + '22' }]}>
+                <Ionicons name="receipt-outline" size={16} color={Colors.cyan} />
+              </View>
+              <View style={s.recMid}>
+                <Text style={s.recName}>from a recording</Text>
+                <Text style={s.recDate}>link to an existing recording</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={14} color={Colors.muted} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[s.recPickRow, { borderBottomWidth: 0, backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: 16 }]}
+              onPress={() => { setItemRows([{ name: '', cost: '' }]); setItemStep('manual'); }}
+            >
+              <View style={[s.recIconWrap, { backgroundColor: '#FFAB9122' }]}>
+                <Ionicons name="create-outline" size={16} color="#FFAB91" />
+              </View>
+              <View style={s.recMid}>
+                <Text style={s.recName}>manual item</Text>
+                <Text style={s.recDate}>receivable or loan · no recording created</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={14} color={Colors.muted} />
+            </TouchableOpacity>
+          </View>
+        ) : itemStep === 'manual' ? (
+          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            {/* Type toggle */}
+            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
+              {(['receivable', 'payable'] as const).map(t => (
+                <TouchableOpacity
+                  key={t}
+                  style={[s.modeBtn, manualItemType === t && s.modeBtnActive]}
+                  onPress={() => setManualItemType(t)}
+                >
+                  <Text style={[s.modeBtnText, manualItemType === t && s.modeBtnTextActive]}>
+                    {t === 'receivable' ? 'receivable (+)' : 'loan (-)'}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            {itemRows.map((row, i) => (
+              <View key={i} style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
+                <TextInput
+                  style={[s.itemFormInput, { flex: 1 }]}
+                  placeholder="item name"
+                  placeholderTextColor={Colors.faint}
+                  value={row.name}
+                  onChangeText={v => setItemRows(prev => prev.map((r, idx) => idx === i ? { ...r, name: v } : r))}
+                  autoFocus={i === 0}
+                />
+                <TextInput
+                  style={[s.itemFormInput, { width: 90, textAlign: 'right' }]}
+                  placeholder="0.00"
+                  placeholderTextColor={Colors.faint}
+                  value={row.cost}
+                  onChangeText={v => setItemRows(prev => prev.map((r, idx) => idx === i ? { ...r, cost: v } : r))}
+                  keyboardType="decimal-pad"
+                />
+                {itemRows.length > 1 && (
+                  <TouchableOpacity onPress={() => setItemRows(prev => prev.filter((_, idx) => idx !== i))} style={{ justifyContent: 'center', padding: 4 }}>
+                    <Ionicons name="close" size={14} color={Colors.faint} />
+                  </TouchableOpacity>
+                )}
+              </View>
+            ))}
+            <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 8 }} onPress={() => setItemRows(prev => [...prev, { name: '', cost: '' }])}>
+              <Ionicons name="add" size={13} color={Colors.cyan} />
+              <Text style={{ fontFamily: Fonts.mono, fontSize: 12, color: Colors.cyan }}>add another</Text>
+            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+              <TouchableOpacity style={[s.doneBtn, { flex: 1, backgroundColor: Colors.surface, marginTop: 0 }]} onPress={() => setItemStep('pick-type')}>
+                <Text style={[s.doneBtnText, { color: Colors.muted }]}>back</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[s.doneBtn, { flex: 2, marginTop: 0, opacity: savingItem || !itemRows.some(r => r.name.trim() && r.cost) ? 0.4 : 1 }]}
+                onPress={saveManualItems}
+                disabled={savingItem || !itemRows.some(r => r.name.trim() && r.cost)}
+              >
+                <Text style={s.doneBtnText}>save items</Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        ) : itemStep === 'pick-recording' ? (
           <ScrollView showsVerticalScrollIndicator={false}>
             {linkedRecordings.map((lr: any) => {
               const recType = lr.recording?.type ?? '';
@@ -987,6 +1097,8 @@ export default function SplitBillDetailScreen() {
               return (
                 <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
                   <TouchableOpacity style={[s.doneBtn, { flex: 1, backgroundColor: Colors.surface, marginTop: 0 }]} onPress={() => setItemStep('pick-recording')}>
+                    <Text style={[s.doneBtnText, { color: Colors.muted }]}>back</Text>
+                  </TouchableOpacity>
                     <Text style={[s.doneBtnText, { color: Colors.muted }]}>back</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -1303,14 +1415,20 @@ export default function SplitBillDetailScreen() {
         {paymentModal && (() => {
           const totals = computeTotals();
           const owed = Math.abs(totals[paymentPerson] ?? 0);
+          const isNegative = (totals[paymentPerson] ?? 0) < 0;
           const paid = payments
             .filter((p: any) => p.person_name === paymentPerson)
             .reduce((s: number, p: any) => s + Number(p.amount), 0);
           const remaining = Math.max(0, owed - paid);
+          const actionLabel = isNegative ? 'confirm payment' : 'confirm received';
+          const recordHint = isNegative
+            ? 'creates an expense recording when fully settled'
+            : 'creates an income recording when fully settled';
           return (
             <>
-              <Text style={[s.recDate, { marginBottom: 12 }]}>
-                {paymentPerson} · {fmt(remaining)} remaining
+              <Text style={[s.recDate, { marginBottom: 4 }]}>{paymentPerson}</Text>
+              <Text style={{ fontFamily: Fonts.monoBold, fontSize: 13, color: isNegative ? Colors.expense : '#FFAB91', marginBottom: 12 }}>
+                {isNegative ? 'amount to pay: ' : 'amount to collect: '}{fmt(remaining)} remaining
               </Text>
               <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
                 {(['full', 'manual'] as const).map(m => (
@@ -1339,12 +1457,23 @@ export default function SplitBillDetailScreen() {
               {paymentMode === 'full' && (
                 <Text style={{ fontFamily: Fonts.monoBold, fontSize: 15, color: Colors.cyan, marginBottom: 8 }}>{fmt(remaining)}</Text>
               )}
+              {/* Record toggle */}
+              <TouchableOpacity
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, borderTopWidth: 1, borderTopColor: Colors.border, marginTop: 4 }}
+                onPress={() => setPaymentRecord(p => !p)}
+              >
+                <Ionicons name={paymentRecord ? 'checkmark-circle' : 'ellipse-outline'} size={20} color={paymentRecord ? Colors.cyan : Colors.faint} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontFamily: Fonts.monoBold, fontSize: 13, color: Colors.text }}>create a recording</Text>
+                  <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted }}>{recordHint}</Text>
+                </View>
+              </TouchableOpacity>
               <TouchableOpacity
                 style={[s.doneBtn, { opacity: paymentSaving ? 0.5 : 1 }]}
                 onPress={savePayment}
                 disabled={paymentSaving}
               >
-                <Text style={s.doneBtnText}>{paymentSaving ? 'saving...' : 'confirm payment'}</Text>
+                <Text style={s.doneBtnText}>{paymentSaving ? 'saving...' : actionLabel}</Text>
               </TouchableOpacity>
             </>
           );
