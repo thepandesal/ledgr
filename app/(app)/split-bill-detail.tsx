@@ -335,9 +335,26 @@ export default function SplitBillDetailScreen() {
           `</div>`;
       }).join('');
 
-      const payHtml = shareAccounts.filter((a:any)=>shareSelectedIds.includes(a.id)).map((a:any)=>{
-        const qrImg = a.qr_code
-          ? `<img src="${a.qr_code}" width="140" height="140" style="border-radius:10px;object-fit:contain" crossorigin="anonymous"/>`
+      // Pre-convert QR images to base64 to avoid CORS in html2canvas
+      const selectedAccounts = shareAccounts.filter((a: any) => shareSelectedIds.includes(a.id));
+      const accountsWithBase64 = await Promise.all(selectedAccounts.map(async (a: any) => {
+        if (!a.qr_code) return { ...a, qr_base64: null };
+        try {
+          const res = await fetch(a.qr_code);
+          const blob = await res.blob();
+          const base64 = await new Promise<string>(resolve => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.readAsDataURL(blob);
+          });
+          return { ...a, qr_base64: base64 };
+        } catch { return { ...a, qr_base64: null }; }
+      }));
+
+      const payHtml = accountsWithBase64.map((a: any) => {
+        const qrSrc = a.qr_base64 || a.qr_code;
+        const qrImg = qrSrc
+          ? `<img src="${qrSrc}" width="140" height="140" style="border-radius:10px;object-fit:contain"/>`
           : '';
         return `<div style="display:flex;align-items:center;background:#d8efea;border-radius:12px;padding:16px;margin-bottom:8px;gap:12px">`+
           `<div style="flex:1">`+
