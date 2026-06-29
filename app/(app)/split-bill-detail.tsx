@@ -1099,8 +1099,6 @@ export default function SplitBillDetailScreen() {
                   <TouchableOpacity style={[s.doneBtn, { flex: 1, backgroundColor: Colors.surface, marginTop: 0 }]} onPress={() => setItemStep('pick-recording')}>
                     <Text style={[s.doneBtnText, { color: Colors.muted }]}>back</Text>
                   </TouchableOpacity>
-                    <Text style={[s.doneBtnText, { color: Colors.muted }]}>back</Text>
-                  </TouchableOpacity>
                   <TouchableOpacity
                     style={[s.doneBtn, { flex: 2, marginTop: 0, opacity: savingItem || !hasValid || over ? 0.4 : 1 }]}
                     onPress={saveItems}
