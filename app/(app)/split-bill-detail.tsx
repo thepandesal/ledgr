@@ -232,6 +232,7 @@ export default function SplitBillDetailScreen() {
   const [shareModal, setShareModal]             = useState(false);
   const [shareAccounts, setShareAccounts]       = useState<any[]>([]);
   const [shareSelectedIds, setShareSelectedIds] = useState<string[]>([]);
+  const [shareOriginalIds, setShareOriginalIds] = useState<string[]>([]);
   const [shareLink, setShareLink]               = useState('');
   const [shareCopied, setShareCopied]           = useState(false);
   const [shareSaving, setShareSaving]           = useState(false);
@@ -247,10 +248,13 @@ export default function SplitBillDetailScreen() {
       .order('account_name');
     setShareAccounts(accs ?? []);
     if (shareRow) {
-      setShareSelectedIds(shareRow.data?.account_ids ?? []);
+      const savedIds = shareRow.data?.account_ids ?? [];
+      setShareSelectedIds(savedIds);
+      setShareOriginalIds(savedIds);
       setShareLink(`https://ledgr.art/split/${shareRow.id}`);
     } else {
       setShareSelectedIds([]);
+      setShareOriginalIds([]);
       setShareLink('');
     }
     setShareModal(true);
@@ -261,6 +265,7 @@ export default function SplitBillDetailScreen() {
     setShareSaving(true);
     await supabase.from('split_shares').update({ data: { account_ids: shareSelectedIds } }).eq('id', shareRow.id);
     await refetchShareRow();
+    setShareOriginalIds([...shareSelectedIds]);
     setShareSaving(false);
   };
 
@@ -935,15 +940,29 @@ export default function SplitBillDetailScreen() {
         </ScrollView>
 
         {/* Save accounts button — only shown when link exists */}
-        {shareLink ? (
-          <TouchableOpacity
-            style={[s.modeBtn, { marginTop: 8, alignItems: 'center', opacity: shareSaving ? 0.5 : 1 }]}
-            onPress={saveShareAccounts}
-            disabled={shareSaving}
-          >
-            <Text style={s.modeBtnText}>{shareSaving ? 'saving...' : 'save account selection'}</Text>
-          </TouchableOpacity>
-        ) : null}
+        {shareLink ? (() => {
+          const hasChanged = JSON.stringify([...shareSelectedIds].sort()) !== JSON.stringify([...shareOriginalIds].sort());
+          return (
+            <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+              <TouchableOpacity
+                style={[s.modeBtn, { flex: 1, alignItems: 'center', opacity: !hasChanged ? 0.4 : 1 }]}
+                onPress={() => setShareSelectedIds([...shareOriginalIds])}
+                disabled={!hasChanged}
+              >
+                <Text style={s.modeBtnText}>cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[s.modeBtn, { flex: 2, alignItems: 'center', opacity: shareSaving ? 0.5 : 1, borderColor: hasChanged ? Colors.cyan : Colors.borderMid, backgroundColor: hasChanged ? Colors.cyan + '18' : Colors.surface }]}
+                onPress={saveShareAccounts}
+                disabled={shareSaving || !hasChanged}
+              >
+                <Text style={[s.modeBtnText, hasChanged && { color: Colors.cyan, fontFamily: Fonts.monoBold }]}>
+                  {shareSaving ? 'saving...' : 'save account selection'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          );
+        })() : null}
 
         {/* Generate link — only shown when no link yet */}
         {!shareLink && (
