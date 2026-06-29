@@ -82,25 +82,16 @@ export default function SplitBillDetailScreen() {
   };
 
   // ── Items state ──────────────────────────────────────────────────────────
-  const [addModal, setAddModal]         = useState(false);
-  const [addModalTab, setAddModalTab]   = useState<'item' | 'adjustment'>('item');
-  const [itemForms, setItemForms] = useState([{ name: '', cost: '', people: [] as string[] }]);
-
-  // ── Add Recordings modal state ────────────────────────────────────────────
-  const [addRecModal, setAddRecModal]     = useState(false);
-  const [addRecTab, setAddRecTab]         = useState<'receivable' | 'loan' | 'expense'>('receivable');
-  const [recSearch, setRecSearch]         = useState('');
-  const [existingRecs, setExistingRecs]   = useState<any[]>([]);
-  const [loadingRecs2, setLoadingRecs2]   = useState(false);
-  const [newRecName, setNewRecName]       = useState('');
-  const [newRecAmount, setNewRecAmount]   = useState('');
-  const [loanRecording, setLoanRecording] = useState<any>(null);
-  const [loanStep, setLoanStep]           = useState<'pick' | 'split'>('pick');
-  const [loanPeople, setLoanPeople]       = useState<string[]>([]);
-  const [loanMode, setLoanMode]           = useState<'equal' | 'manual'>('equal');
-  const [loanManual, setLoanManual]       = useState<Record<string, string>>({});
-  const [loanError, setLoanError]         = useState('');
-  const [savingRec, setSavingRec]         = useState(false);
+  const [addItemModal, setAddItemModal]         = useState(false);
+  const [itemStep, setItemStep]                 = useState<'pick-recording' | 'configure'>('pick-recording');
+  const [selectedRecording, setSelectedRecording] = useState<any>(null);
+  const [itemName, setItemName]                 = useState('');
+  const [itemCost, setItemCost]                 = useState('');
+  const [itemPeople, setItemPeople]             = useState<string[]>([]);
+  const [itemMode, setItemMode]                 = useState<'equal' | 'manual'>('equal');
+  const [itemManual, setItemManual]             = useState<Record<string, string>>({});
+  const [itemError, setItemError]               = useState('');
+  const [savingItem, setSavingItem]             = useState(false);
 
   const { data: items = [], refetch: refetchItems } = useQuery({
     queryKey: ['split-bill-items', splitBillId],
@@ -117,179 +108,52 @@ export default function SplitBillDetailScreen() {
 
   const totalItemsCost = items.reduce((s: number, i: any) => s + Number(i.cost), 0);
 
-  // ── Add Recordings functions ─────────────────────────────────────────────
-  const openAddRecModal = async (tab: 'receivable' | 'loan' | 'expense') => {
-    setAddRecTab(tab);
-    setRecSearch('');
-    setNewRecName(''); setNewRecAmount('');
-    setLoanRecording(null); setLoanStep('pick');
-    setLoanPeople([]); setLoanMode('equal'); setLoanManual({}); setLoanError('');
-    setLoadingRecs2(true);
-    setAddRecModal(true);
-    const type = tab === 'receivable' ? 'receivable' : tab === 'loan' ? 'payable' : 'expense';
-    const { data } = await supabase.from('recordings')
-      .select('id, name, amount, transaction_date, status')
-      .eq('user_id', userId).eq('type', type)
-      .order('transaction_date', { ascending: false });
-    setExistingRecs(data ?? []);
-    setLoadingRecs2(false);
+  const openAddItem = () => {
+    setItemStep('pick-recording');
+    setSelectedRecording(null);
+    setItemName(''); setItemCost(''); setItemPeople([]);
+    setItemMode('equal'); setItemManual({}); setItemError('');
+    setAddItemModal(true);
   };
 
-  const linkRecording = async (rec: any) => {
-    await supabase.from('split_bill_recordings').insert({
-      split_bill_id: splitBillId,
-      recording_id: rec.id,
-      amount_contributed: Number(rec.amount),
-    });
-    queryClient.invalidateQueries({ queryKey: ['split-bill-recordings', splitBillId] });
+  const handlePickRecording = (lr: any) => {
+    setSelectedRecording(lr);
+    const recType = lr.recording?.type;
+    const isDeductType = recType === 'payable' || recType === 'receivable';
+    setItemName(isDeductType ? (lr.recording?.name ?? '') : '');
+    setItemCost(isDeductType ? String(lr.amount_contributed) : '');
+    setItemPeople([]); setItemMode('equal'); setItemManual({}); setItemError('');
+    setItemStep('configure');
   };
 
-  const handleSelectReceivable = async (rec: any) => {
-    setSavingRec(true);
-    await linkRecording(rec);
-    setSavingRec(false);
-    setAddRecModal(false);
-  };
-
-  const handleCreateAndLinkReceivable = async () => {
-    if (!newRecName.trim() || !newRecAmount) return;
-    setSavingRec(true);
-    const { data: newRec } = await supabase.from('recordings').insert({
-      user_id: userId,
-      name: newRecName.trim(),
-      type: 'receivable',
-      amount: parseFloat(newRecAmount),
-      transaction_date: new Date().toISOString().split('T')[0],
-      status: 'pending',
-    }).select('id, name, amount').single();
-    if (newRec) await linkRecording(newRec);
-    setSavingRec(false);
-    setAddRecModal(false);
-  };
-
-  const handleSelectLoan = (rec: any) => {
-    setLoanRecording(rec);
-    setLoanStep('split');
-  };
-
-  const handleCreateLoan = async () => {
-    if (!newRecName.trim() || !newRecAmount) return;
-    setSavingRec(true);
-    const { data: newRec } = await supabase.from('recordings').insert({
-      user_id: userId,
-      name: newRecName.trim(),
-      type: 'payable',
-      amount: parseFloat(newRecAmount),
-      transaction_date: new Date().toISOString().split('T')[0],
-      status: 'unpaid',
-    }).select('id, name, amount').single();
-    setSavingRec(false);
-    if (newRec) { setLoanRecording(newRec); setLoanStep('split'); }
-  };
-
-  const handleSaveLoan = async () => {
-    if (!loanRecording || loanPeople.length === 0) { setLoanError('select at least one person'); return; }
-    const amount = Number(loanRecording.amount);
-    if (loanMode === 'manual') {
-      const total = loanPeople.reduce((s, p) => s + parseFloat(loanManual[p] || '0'), 0);
-      if (Math.abs(total - amount) > 0.01) { setLoanError(`amounts must total ${fmt(amount)}`); return; }
+  const saveItem = async () => {
+    if (!selectedRecording) return;
+    const recType = selectedRecording.recording?.type;
+    const isDeductType = recType === 'payable' || recType === 'receivable';
+    if (!isDeductType && (!itemName.trim() || !itemCost)) { setItemError('name and amount required.'); return; }
+    if (itemPeople.length === 0) { setItemError('select at least one person.'); return; }
+    const cost = parseFloat(isDeductType ? String(selectedRecording.amount_contributed) : itemCost);
+    if (itemMode === 'manual') {
+      const total = itemPeople.reduce((s, p) => s + parseFloat(itemManual[p] || '0'), 0);
+      if (Math.abs(total - cost) > 0.01) { setItemError(`amounts must total ${fmt(cost)}`); return; }
     }
-    setSavingRec(true);
-    await linkRecording(loanRecording);
-    const manual_amounts = loanMode === 'manual'
-      ? Object.fromEntries(loanPeople.map(p => [p, parseFloat(loanManual[p] || '0')]))
-      : {};
-    await supabase.from('split_adjustments').insert({
+    setSavingItem(true);
+    await supabase.from('split_items').insert({
       split_bill_id: splitBillId,
-      type: 'receivable',
-      name: loanRecording.name,
-      amount,
-      people: loanPeople,
-      mode: loanMode,
-      manual_amounts,
+      user_id: userId,
+      name: isDeductType ? (selectedRecording.recording?.name ?? itemName) : itemName.trim(),
+      cost,
+      people: itemPeople,
+      recording_type: recType ?? 'expense',
     });
-    setSavingRec(false);
-    refetchAdj();
-    setAddRecModal(false);
-  };
-
-  const saveItems = async () => {
-    const valid = itemForms.filter(f => f.name.trim() && f.cost);
-    if (!valid.length) return;
-    await supabase.from('split_items').insert(
-      valid.map(f => ({ split_bill_id: splitBillId, user_id: userId, name: f.name.trim(), cost: parseFloat(f.cost), people: f.people }))
-    );
-    setItemForms([{ name: '', cost: '', people: [] }]);
-    setAddModal(false);
+    setSavingItem(false);
+    setAddItemModal(false);
     refetchItems();
   };
 
   const deleteItem = async (id: string) => {
     await supabase.from('split_items').delete().eq('id', id);
     refetchItems();
-  };
-
-  const toggleItemPerson = (idx: number, person: string) => {
-    setItemForms(prev => {
-      const next = [...prev];
-      const p = next[idx].people.includes(person)
-        ? next[idx].people.filter(x => x !== person)
-        : [...next[idx].people, person];
-      next[idx] = { ...next[idx], people: p };
-      return next;
-    });
-  };
-
-  // ── Adjustments state ─────────────────────────────────────────────────
-  const [adjType, setAdjType]         = useState<'expense' | 'receivable'>('expense');
-  const [adjName, setAdjName]         = useState('');
-  const [adjAmount, setAdjAmount]     = useState('');
-  const [adjMode, setAdjMode]         = useState<'equal' | 'manual'>('equal');
-  const [adjPeople, setAdjPeople]     = useState<string[]>([]);
-  const [adjManual, setAdjManual]     = useState<Record<string, string>>({});
-  const [adjError, setAdjError]       = useState('');
-
-  const { data: adjustments = [], refetch: refetchAdj } = useQuery({
-    queryKey: ['split-bill-adjustments', splitBillId],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('split_adjustments')
-        .select('*')
-        .eq('split_bill_id', splitBillId)
-        .order('created_at');
-      return data ?? [];
-    },
-    enabled: !!splitBillId,
-  });
-
-  const saveAdjustment = async () => {
-    if (!adjName.trim() || !adjAmount) { setAdjError('name and amount required.'); return; }
-    const amount = parseFloat(adjAmount);
-    if (adjMode === 'manual') {
-      const manualTotal = adjPeople.reduce((s, p) => s + parseFloat(adjManual[p] || '0'), 0);
-      if (Math.abs(manualTotal - amount) > 0.01) { setAdjError(`manual amounts must total ${fmt(amount)}`); return; }
-    }
-    const manual_amounts = adjMode === 'manual'
-      ? Object.fromEntries(adjPeople.map(p => [p, parseFloat(adjManual[p] || '0')]))
-      : {};
-    await supabase.from('split_adjustments').insert({
-      split_bill_id: splitBillId,
-      type: adjType,
-      name: adjName.trim(),
-      amount,
-      people: adjPeople,
-      mode: adjMode,
-      manual_amounts,
-    });
-    setAddModal(false);
-    setAdjName(''); setAdjAmount(''); setAdjMode('equal'); setAdjPeople([]); setAdjManual({}); setAdjError('');
-    refetchAdj();
-    refetchAdj();
-  };
-
-  const deleteAdj = async (id: string) => {
-    await supabase.from('split_adjustments').delete().eq('id', id);
-    refetchAdj();
   };
 
   // ── Share ──────────────────────────────────────────────────────────────────
@@ -342,7 +206,6 @@ export default function SplitBillDetailScreen() {
   });
 
   const totalAmount = linkedRecordings.reduce((s: number, r: any) => s + Number(r.amount_contributed), 0);
-  const remainingAmount = Math.max(0, totalAmount - totalItemsCost);
   const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   const typeColor = (type: string) => {
@@ -370,10 +233,7 @@ export default function SplitBillDetailScreen() {
           {/* Linked Recordings */}
           <View style={s.sectionRow}>
             <Text style={s.sectionHeader}>recordings</Text>
-            <TouchableOpacity onPress={() => openAddRecModal('receivable')} style={s.sectionAddBtn}>
-              <Ionicons name="add" size={14} color={Colors.cyan} />
-              <Text style={s.sectionAddText}>add</Text>
-            </TouchableOpacity>
+            <Text style={s.sectionAddText}>recordings</Text>
           </View>
           {loadingRecs ? (
             <ActivityIndicator color={Colors.cyan} />
@@ -447,12 +307,12 @@ export default function SplitBillDetailScreen() {
           <View style={s.sectionRow}>
             <Text style={s.sectionHeader}>items</Text>
             <TouchableOpacity
-              onPress={() => { setItemForms([{ name: '', cost: '', people: [] }]); setAddModalTab('item'); setAddModal(true); }}
+              onPress={openAddItem}
               style={s.sectionAddBtn}
-              disabled={filledPeople.length === 0}
+              disabled={filledPeople.length === 0 || linkedRecordings.length === 0}
             >
-              <Ionicons name="add" size={14} color={filledPeople.length === 0 ? Colors.faint : Colors.cyan} />
-              <Text style={[s.sectionAddText, filledPeople.length === 0 && { color: Colors.faint }]}>add</Text>
+              <Ionicons name="add" size={14} color={filledPeople.length === 0 || linkedRecordings.length === 0 ? Colors.faint : Colors.cyan} />
+              <Text style={[s.sectionAddText, (filledPeople.length === 0 || linkedRecordings.length === 0) && { color: Colors.faint }]}>add</Text>
             </TouchableOpacity>
           </View>
           {items.length === 0 ? (
@@ -462,6 +322,7 @@ export default function SplitBillDetailScreen() {
           ) : (
             <View style={s.list}>
               {items.map((item: any, idx: number) => {
+                const isDeduct = item.recording_type === 'receivable' || item.recording_type === 'payable';
                 const perPerson = item.people?.length > 0 ? Number(item.cost) / item.people.length : 0;
                 return (
                   <View key={item.id} style={s.itemCard}>
@@ -469,10 +330,12 @@ export default function SplitBillDetailScreen() {
                     <View style={{ flex: 1, gap: 2 }}>
                       <Text style={s.itemName} numberOfLines={1}>{item.name}</Text>
                       {item.people?.length > 0 && (
-                        <Text style={s.itemSplit}>{item.people.length} people · {perPerson.toLocaleString('en-US', { minimumFractionDigits: 2 })} each</Text>
+                        <Text style={[s.itemSplit, { color: isDeduct ? Colors.cyan : '#FFAB91' }]}>
+                          {isDeduct ? '-' : '+'}{perPerson.toLocaleString('en-US', { minimumFractionDigits: 2 })} each
+                        </Text>
                       )}
                     </View>
-                    <Text style={s.itemCost}>{fmt(Number(item.cost))}</Text>
+                    <Text style={[s.itemCost, { color: isDeduct ? Colors.cyan : Colors.text }]}>{isDeduct ? '-' : ''}{fmt(Number(item.cost))}</Text>
                     <TouchableOpacity onPress={() => deleteItem(item.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                       <Ionicons name="close" size={14} color={Colors.faint} />
                     </TouchableOpacity>
@@ -487,42 +350,6 @@ export default function SplitBillDetailScreen() {
             </View>
           )}
 
-          {/* Adjustments */}
-          <View style={s.sectionRow}>
-            <Text style={s.sectionHeader}>adjustments</Text>
-            <TouchableOpacity onPress={() => { setAdjName(''); setAdjAmount(''); setAdjMode('equal'); setAdjPeople([]); setAdjManual({}); setAdjError(''); setAddModalTab('adjustment'); setAddModal(true); }} style={s.sectionAddBtn}>
-              <Ionicons name="add" size={14} color={Colors.cyan} />
-              <Text style={s.sectionAddText}>add</Text>
-            </TouchableOpacity>
-          </View>
-          {adjustments.length === 0 ? (
-            <View style={pageStyles.emptyBox}>
-              <Text style={pageStyles.emptyText}>no adjustments yet</Text>
-            </View>
-          ) : (
-            <View style={s.list}>
-              {adjustments.map((adj: any) => (
-                <View key={adj.id} style={s.adjCard}>
-                  <View style={[s.adjTypeBadge, { backgroundColor: adj.type === 'receivable' ? Colors.cyan + '22' : '#FFAB9122' }]}>
-                    <Ionicons name={adj.type === 'receivable' ? 'arrow-down-circle-outline' : 'arrow-up-circle-outline'} size={14} color={adj.type === 'receivable' ? Colors.cyan : '#FFAB91'} />
-                  </View>
-                  <View style={{ flex: 1, gap: 2 }}>
-                    <Text style={s.adjName}>{adj.name}</Text>
-                    <Text style={s.adjMeta}>
-                      {adj.type} · {adj.mode} · {adj.people?.length ?? 0} {adj.people?.length === 1 ? 'person' : 'people'}
-                    </Text>
-                  </View>
-                  <Text style={[s.adjAmount, { color: adj.type === 'receivable' ? Colors.cyan : '#FFAB91' }]}>
-                    {adj.type === 'receivable' ? '-' : '+'}{fmt(Number(adj.amount))}
-                  </Text>
-                  <TouchableOpacity onPress={() => deleteAdj(adj.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Ionicons name="close" size={14} color={Colors.faint} />
-                  </TouchableOpacity>
-                </View>
-              ))}
-            </View>
-          )}
-
           {/* Per-person summary */}
           <Text style={s.sectionHeader}>per person summary</Text>
           {filledPeople.length === 0 || items.length === 0 ? (
@@ -534,37 +361,11 @@ export default function SplitBillDetailScreen() {
             const totals: Record<string, number> = {};
             filledPeople.forEach(p => { totals[p] = 0; });
             items.forEach((item: any) => {
-              const subs = item.subitems ?? [];
-              if (subs.length === 0) {
-                const pp = item.people?.length > 0 ? Number(item.cost) / item.people.length : 0;
-                (item.people ?? []).forEach((p: string) => { if (totals[p] !== undefined) totals[p] += pp; });
-              } else {
-                subs.forEach((sub: any) => {
-                  const pp = sub.people?.length > 0 ? Number(sub.cost) / sub.people.length : 0;
-                  (sub.people ?? []).forEach((p: string) => { if (totals[p] !== undefined) totals[p] += pp; });
-                });
-              }
-            });
-            // apply adjustments
-            adjustments.forEach((adj: any) => {
-              const people: string[] = adj.people ?? [];
-              if (adj.mode === 'manual') {
-                const manual = adj.manual_amounts ?? {};
-                people.forEach(p => {
-                  if (totals[p] !== undefined) {
-                    totals[p] = adj.type === 'receivable'
-                      ? totals[p] - (manual[p] ?? 0)
-                      : totals[p] + (manual[p] ?? 0);
-                  }
-                });
-              } else {
-                const pp = people.length > 0 ? Number(adj.amount) / people.length : 0;
-                people.forEach(p => {
-                  if (totals[p] !== undefined) {
-                    totals[p] = adj.type === 'receivable' ? totals[p] - pp : totals[p] + pp;
-                  }
-                });
-              }
+              const isDeduct = item.recording_type === 'receivable' || item.recording_type === 'payable';
+              const pp = item.people?.length > 0 ? Number(item.cost) / item.people.length : 0;
+              (item.people ?? []).forEach((p: string) => {
+                if (totals[p] !== undefined) totals[p] += isDeduct ? -pp : pp;
+              });
             });
             const grandTotal = Object.values(totals).reduce((s, v) => s + v, 0);
             return (
@@ -596,351 +397,143 @@ export default function SplitBillDetailScreen() {
         </ScrollView>
       </SafeAreaView>
 
-      {/* Add Recordings modal */}
-      <BottomSheet visible={addRecModal} onClose={() => setAddRecModal(false)} title="add recording" height="65%">
-        <View style={s.modalTabRow}>
-          {(['receivable', 'expense', 'loan'] as const).map(tab => (
-            <TouchableOpacity
-              key={tab}
-              style={[s.modalTab, addRecTab === tab && s.modalTabActive]}
-              onPress={async () => {
-                setAddRecTab(tab);
-                setNewRecName(''); setNewRecAmount('');
-                setLoanRecording(null); setLoanStep('pick');
-                setLoanPeople([]); setLoanMode('equal'); setLoanManual({}); setLoanError('');
-                setLoadingRecs2(true);
-                const type = tab === 'receivable' ? 'receivable' : tab === 'loan' ? 'payable' : 'expense';
-                const { data } = await supabase.from('recordings')
-                  .select('id, name, amount, transaction_date, status')
-                  .eq('user_id', userId).eq('type', type)
-                  .order('transaction_date', { ascending: false });
-                setExistingRecs(data ?? []);
-                setLoadingRecs2(false);
-              }}
-            >
-              <Text style={[s.modalTabText, addRecTab === tab && s.modalTabTextActive]}>{tab}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {(addRecTab === 'receivable' || addRecTab === 'expense') ? (
-          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-            <Text style={s.contactsLabel}>create new</Text>
-            <View style={s.itemFormRow}>
-              <TextInput
-                style={[s.itemFormInput, { flex: 1 }]}
-                placeholder="name"
-                placeholderTextColor={Colors.faint}
-                value={newRecName}
-                onChangeText={setNewRecName}
-                autoFocus
-              />
-              <TextInput
-                style={[s.itemFormInput, { width: 90, textAlign: 'right' }]}
-                placeholder="0.00"
-                placeholderTextColor={Colors.faint}
-                value={newRecAmount}
-                onChangeText={setNewRecAmount}
-                keyboardType="decimal-pad"
-              />
-            </View>
-            <TouchableOpacity
-              style={[s.doneBtn, { marginBottom: 20 }, (!newRecName.trim() || !newRecAmount || savingRec) && { opacity: 0.4 }]}
-              onPress={handleCreateAndLinkReceivable}
-              disabled={!newRecName.trim() || !newRecAmount || savingRec}
-            >
-              <Text style={s.doneBtnText}>{savingRec ? '...' : 'create & link'}</Text>
-            </TouchableOpacity>
-
-            <Text style={s.contactsLabel}>or pick existing</Text>
-            <TextInput
-              style={[s.itemFormInput, { marginBottom: 10 }]}
-              placeholder={`search ${addRecTab}s...`}
-              placeholderTextColor={Colors.faint}
-              value={recSearch}
-              onChangeText={setRecSearch}
-            />
-            {loadingRecs2
-              ? <ActivityIndicator color={Colors.cyan} />
-              : existingRecs
-                  .filter(r => r.name.toLowerCase().includes(recSearch.toLowerCase()))
-                  .map((r: any) => (
-                    <TouchableOpacity key={r.id} style={s.recPickRow} onPress={() => handleSelectReceivable(r)} disabled={savingRec}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={s.recName}>{r.name}</Text>
-                        <Text style={s.recDate}>{r.transaction_date} · {r.status}</Text>
-                      </View>
-                      <Text style={[s.recAmount, { color: Colors.cyan }]}>{fmt(Number(r.amount))}</Text>
-                    </TouchableOpacity>
-                  ))
-            }
-          </ScrollView>
-        ) : loanStep === 'pick' ? (
-          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-            <Text style={s.contactsLabel}>create new loan</Text>
-            <View style={s.itemFormRow}>
-              <TextInput
-                style={[s.itemFormInput, { flex: 1 }]}
-                placeholder="name"
-                placeholderTextColor={Colors.faint}
-                value={newRecName}
-                onChangeText={setNewRecName}
-                autoFocus
-              />
-              <TextInput
-                style={[s.itemFormInput, { width: 90, textAlign: 'right' }]}
-                placeholder="0.00"
-                placeholderTextColor={Colors.faint}
-                value={newRecAmount}
-                onChangeText={setNewRecAmount}
-                keyboardType="decimal-pad"
-              />
-            </View>
-            <TouchableOpacity
-              style={[s.doneBtn, { marginBottom: 20 }, (!newRecName.trim() || !newRecAmount || savingRec) && { opacity: 0.4 }]}
-              onPress={handleCreateLoan}
-              disabled={!newRecName.trim() || !newRecAmount || savingRec}
-            >
-              <Text style={s.doneBtnText}>{savingRec ? '...' : 'create & continue'}</Text>
-            </TouchableOpacity>
-
-            <Text style={s.contactsLabel}>or pick existing loan</Text>
-            <TextInput
-              style={[s.itemFormInput, { marginBottom: 10 }]}
-              placeholder="search loans..."
-              placeholderTextColor={Colors.faint}
-              value={recSearch}
-              onChangeText={setRecSearch}
-            />
-            {loadingRecs2
-              ? <ActivityIndicator color={Colors.cyan} />
-              : existingRecs
-                  .filter(r => r.name.toLowerCase().includes(recSearch.toLowerCase()))
-                  .map((r: any) => (
-                    <TouchableOpacity key={r.id} style={s.recPickRow} onPress={() => handleSelectLoan(r)}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={s.recName}>{r.name}</Text>
-                        <Text style={s.recDate}>{r.transaction_date} · {r.status}</Text>
-                      </View>
-                      <Text style={[s.recAmount, { color: '#FFAB91' }]}>{fmt(Number(r.amount))}</Text>
-                    </TouchableOpacity>
-                  ))
-            }
-          </ScrollView>
-        ) : (
+      {/* Add item modal */}
+      <BottomSheet visible={addItemModal} onClose={() => setAddItemModal(false)} title={itemStep === 'pick-recording' ? 'for which recording?' : 'configure item'} height="65%">
+        {itemStep === 'pick-recording' ? (
           <ScrollView showsVerticalScrollIndicator={false}>
-            <TouchableOpacity onPress={() => setLoanStep('pick')} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 14 }}>
-              <Ionicons name="arrow-back" size={14} color={Colors.muted} />
-              <Text style={{ fontFamily: Fonts.mono, fontSize: 12, color: Colors.muted }}>
-                {loanRecording?.name} · {fmt(Number(loanRecording?.amount))}
-              </Text>
-            </TouchableOpacity>
-
-            {loanError ? <Text style={{ fontFamily: Fonts.mono, fontSize: 12, color: Colors.expense, marginBottom: 8 }}>{loanError}</Text> : null}
-
-            <Text style={s.contactsLabel}>who is this loan for?</Text>
-            <View style={s.chipWrap}>
-              {filledPeople.map((p, pi) => {
-                const sel = loanPeople.includes(p);
-                return (
-                  <TouchableOpacity
-                    key={pi}
-                    style={[s.personChip, sel && { backgroundColor: Colors.cyan, borderColor: Colors.cyan }]}
-                    onPress={() => { setLoanError(''); setLoanPeople(prev => prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p]); }}
-                  >
-                    <Text style={[s.personChipText, sel && { color: Colors.white }]}>{p}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            <Text style={s.contactsLabel}>split mode</Text>
-            <View style={s.chipWrap}>
-              {(['equal', 'manual'] as const).map(m => (
-                <TouchableOpacity key={m} style={[s.personChip, loanMode === m && { backgroundColor: Colors.cyan, borderColor: Colors.cyan }]} onPress={() => setLoanMode(m)}>
-                  <Text style={[s.personChipText, loanMode === m && { color: Colors.white }]}>{m}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            {loanMode === 'equal' && loanPeople.length > 0 && (
-              <Text style={{ fontFamily: Fonts.monoBold, fontSize: 11, color: Colors.cyan, marginBottom: 10 }}>
-                {fmt(Number(loanRecording?.amount) / loanPeople.length)} each
-              </Text>
-            )}
-
-            {loanMode === 'manual' && loanPeople.length > 0 && (
-              <View style={{ gap: 8, marginBottom: 10 }}>
-                <Text style={s.contactsLabel}>amounts (must total {fmt(Number(loanRecording?.amount))})</Text>
-                {loanPeople.map(p => (
-                  <View key={p} style={s.itemFormRow}>
-                    <Text style={[s.personChipText, { flex: 1 }]}>{p}</Text>
-                    <TextInput
-                      style={[s.itemFormInput, { width: 100, textAlign: 'right' }]}
-                      placeholder="0.00"
-                      placeholderTextColor={Colors.faint}
-                      value={loanManual[p] ?? ''}
-                      onChangeText={v => setLoanManual(prev => ({ ...prev, [p]: v }))}
-                      keyboardType="decimal-pad"
-                    />
+            {linkedRecordings.map((lr: any) => {
+              const recType = lr.recording?.type;
+              const isDeduct = recType === 'receivable' || recType === 'payable';
+              // show how many items are already under this recording
+              const recItems = items.filter((i: any) => i.recording_type === recType && i.name === lr.recording?.name);
+              const usedAmt = recItems.reduce((s: number, i: any) => s + Number(i.cost), 0);
+              const remaining = Number(lr.amount_contributed) - usedAmt;
+              return (
+                <TouchableOpacity key={lr.id} style={s.recPickRow} onPress={() => handlePickRecording(lr)}>
+                  <View style={[s.recIconWrap, { backgroundColor: isDeduct ? Colors.cyan + '22' : '#FFAB9122' }]}>
+                    <Ionicons name={recType === 'payable' ? 'cash-outline' : isDeduct ? 'arrow-down-circle-outline' : 'arrow-up-circle-outline'} size={16} color={isDeduct ? Colors.cyan : '#FFAB91'} />
                   </View>
-                ))}
-              </View>
-            )}
-
-            <TouchableOpacity
-              style={[s.doneBtn, (loanPeople.length === 0 || savingRec) && { opacity: 0.4 }]}
-              onPress={handleSaveLoan}
-              disabled={loanPeople.length === 0 || savingRec}
-            >
-              <Text style={s.doneBtnText}>{savingRec ? '...' : 'save loan'}</Text>
-            </TouchableOpacity>
+                  <View style={s.recMid}>
+                    <Text style={s.recName} numberOfLines={1}>{lr.recording?.name ?? '—'}</Text>
+                    <Text style={s.recDate}>{recType} · {fmt(Number(lr.amount_contributed))}</Text>
+                  </View>
+                  {isDeduct ? (
+                    <Text style={[s.recDate, { color: remaining < 0 ? Colors.expense : Colors.cyan }]}>
+                      {fmt(remaining)} left
+                    </Text>
+                  ) : null}
+                  <Ionicons name="chevron-forward" size={14} color={Colors.muted} />
+                </TouchableOpacity>
+              );
+            })}
           </ScrollView>
-        )}
-      </BottomSheet>
-
-      {/* Add item / adjustment modal */}
-      <BottomSheet visible={addModal} onClose={() => setAddModal(false)} title="add" height="65%">
-
-        {/* Tab switcher */}
-        <View style={s.modalTabRow}>
-          {(['item', 'adjustment'] as const).map(tab => (
-            <TouchableOpacity
-              key={tab}
-              style={[s.modalTab, addModalTab === tab && s.modalTabActive]}
-              onPress={() => setAddModalTab(tab)}
-            >
-              <Text style={[s.modalTabText, addModalTab === tab && s.modalTabTextActive]}>
-                {tab === 'item' ? 'item' : 'adjustment'}
+        ) : (() => {
+          if (!selectedRecording) return null;
+          const recType = selectedRecording.recording?.type;
+          const isDeductType = recType === 'payable' || recType === 'receivable';
+          const cost = isDeductType ? Number(selectedRecording.amount_contributed) : parseFloat(itemCost) || 0;
+          const perPerson = itemPeople.length > 0 && itemMode === 'equal' ? cost / itemPeople.length : 0;
+          return (
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              {/* Recording label */}
+              <Text style={[s.recDate, { marginBottom: 12 }]}>
+                {selectedRecording.recording?.name} · {recType} · {fmt(Number(selectedRecording.amount_contributed))}
               </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
 
-        {addModalTab === 'item' ? (
-          <>
-            {itemForms.map((form, idx) => (
-              <View key={idx} style={s.itemFormRow}>
-                <TextInput
-                  style={[s.itemFormInput, { flex: 1 }]}
-                  placeholder="item name"
-                  placeholderTextColor={Colors.faint}
-                  value={form.name}
-                  onChangeText={v => setItemForms(prev => { const n = [...prev]; n[idx] = { ...n[idx], name: v }; return n; })}
-                  autoFocus={idx === 0}
-                />
-                <TextInput
-                  style={[s.itemFormInput, { width: 80, textAlign: 'right' }]}
-                  placeholder="0.00"
-                  placeholderTextColor={Colors.faint}
-                  value={form.cost}
-                  onChangeText={v => setItemForms(prev => { const n = [...prev]; n[idx] = { ...n[idx], cost: v }; return n; })}
-                  keyboardType="decimal-pad"
-                />
-              </View>
-            ))}
-            {filledPeople.length > 0 && itemForms[0]?.cost ? (
-              <View style={{ marginTop: 10 }}>
-                <Text style={s.contactsLabel}>who's included</Text>
-                <View style={s.chipWrap}>
-                  {filledPeople.map((p, pi) => {
-                    const sel = itemForms[0].people.includes(p);
-                    return (
-                      <TouchableOpacity key={pi} style={[s.personChip, sel && { backgroundColor: Colors.cyan, borderColor: Colors.cyan }]} onPress={() => toggleItemPerson(0, p)}>
-                        <Text style={[s.personChipText, sel && { color: Colors.white }]}>{p}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
+              {/* Name + cost (expense only) */}
+              {!isDeductType && (
+                <View style={{ gap: 8, marginBottom: 12 }}>
+                  <TextInput
+                    style={s.itemFormInput}
+                    placeholder="item name"
+                    placeholderTextColor={Colors.faint}
+                    value={itemName}
+                    onChangeText={setItemName}
+                    autoFocus
+                  />
+                  <TextInput
+                    style={[s.itemFormInput, { textAlign: 'right' }]}
+                    placeholder="amount"
+                    placeholderTextColor={Colors.faint}
+                    value={itemCost}
+                    onChangeText={setItemCost}
+                    keyboardType="decimal-pad"
+                  />
                 </View>
-                {itemForms[0].people.length > 0 && itemForms[0].cost && (
-                  <Text style={{ fontFamily: Fonts.monoBold, fontSize: 11, color: Colors.cyan, marginTop: 6 }}>
-                    {(parseFloat(itemForms[0].cost) / itemForms[0].people.length).toLocaleString('en-US', { minimumFractionDigits: 2 })} each
-                  </Text>
-                )}
+              )}
+
+              {/* People */}
+              <Text style={[s.recDate, { marginBottom: 6 }]}>who's included?</Text>
+              <View style={[itemStyles.personSelectRow, { marginBottom: 12 }]}>
+                {filledPeople.map((p, pi) => {
+                  const sel = itemPeople.includes(p);
+                  return (
+                    <TouchableOpacity
+                      key={pi}
+                      style={[itemStyles.personSelectChip, sel && itemStyles.personSelectChipActive]}
+                      onPress={() => setItemPeople(prev => sel ? prev.filter(x => x !== p) : [...prev, p])}
+                    >
+                      <Text style={[itemStyles.personSelectText, sel && itemStyles.personSelectTextActive]}>{p}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
-            ) : null}
-            <TouchableOpacity
-              style={[s.doneBtn, { marginTop: 16 }, (!itemForms[0]?.name.trim() || !itemForms[0]?.cost) && { opacity: 0.4 }]}
-              onPress={saveItems}
-              disabled={!itemForms[0]?.name.trim() || !itemForms[0]?.cost}
-            >
-              <Text style={s.doneBtnText}>save item</Text>
-            </TouchableOpacity>
-          </>
-        ) : (
-          <>
-            {adjError ? <Text style={{ fontFamily: Fonts.mono, fontSize: 12, color: Colors.expense, marginBottom: 8 }}>{adjError}</Text> : null}
 
-            <Text style={s.contactsLabel}>type</Text>
-            <View style={s.chipWrap}>
-              {([
-                { key: 'expense',    label: '↑ add expense',             sub: 'adds to what they owe' },
-                { key: 'receivable', label: '↓ add receivable / loan',   sub: 'deducts from what they owe' },
-              ] as const).map(t => (
-                <TouchableOpacity key={t.key} style={[s.adjTypeBtn, adjType === t.key && s.adjTypeBtnActive]} onPress={() => setAdjType(t.key)}>
-                  <Text style={[s.adjTypeBtnLabel, adjType === t.key && { color: Colors.white }]}>{t.label}</Text>
-                  <Text style={[s.adjTypeBtnSub, adjType === t.key && { color: Colors.white + 'cc' }]}>{t.sub}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <Text style={s.contactsLabel}>name</Text>
-            <TextInput style={s.itemFormInput} placeholder="e.g. shared loan" placeholderTextColor={Colors.faint} value={adjName} onChangeText={v => { setAdjName(v); setAdjError(''); }} />
-
-            <Text style={s.contactsLabel}>amount</Text>
-            <TextInput style={s.itemFormInput} placeholder="0.00" placeholderTextColor={Colors.faint} value={adjAmount} onChangeText={v => { setAdjAmount(v); setAdjError(''); }} keyboardType="decimal-pad" />
-
-            <Text style={s.contactsLabel}>split mode</Text>
-            <View style={s.chipWrap}>
-              {(['equal', 'manual'] as const).map(m => (
-                <TouchableOpacity key={m} style={[s.personChip, adjMode === m && { backgroundColor: Colors.cyan, borderColor: Colors.cyan }]} onPress={() => setAdjMode(m)}>
-                  <Text style={[s.personChipText, adjMode === m && { color: Colors.white }]}>{m}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <Text style={s.contactsLabel}>assign to</Text>
-            <View style={s.chipWrap}>
-              {filledPeople.map((p, pi) => {
-                const sel = adjPeople.includes(p);
-                return (
-                  <TouchableOpacity key={pi} style={[s.personChip, sel && { backgroundColor: Colors.cyan, borderColor: Colors.cyan }]} onPress={() => {
-                    setAdjPeople(prev => prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p]);
-                  }}>
-                    <Text style={[s.personChipText, sel && { color: Colors.white }]}>{p}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            {adjMode === 'manual' && adjPeople.length > 0 && adjAmount ? (
-              <View style={{ gap: 8, marginTop: 4 }}>
-                <Text style={s.contactsLabel}>manual amounts (must total {fmt(parseFloat(adjAmount || '0'))})</Text>
-                {adjPeople.map(p => (
-                  <View key={p} style={s.itemFormRow}>
-                    <Text style={[s.personChipText, { flex: 1 }]}>{p}</Text>
-                    <TextInput
-                      style={[s.itemFormInput, { width: 100, textAlign: 'right' }]}
-                      placeholder="0.00"
-                      placeholderTextColor={Colors.faint}
-                      value={adjManual[p] ?? ''}
-                      onChangeText={v => setAdjManual(prev => ({ ...prev, [p]: v }))}
-                      keyboardType="decimal-pad"
-                    />
+              {/* Equal / Manual toggle */}
+              {itemPeople.length > 0 && cost > 0 && (
+                <View style={{ gap: 8, marginBottom: 12 }}>
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    {(['equal', 'manual'] as const).map(m => (
+                      <TouchableOpacity
+                        key={m}
+                        style={[s.modeBtn, itemMode === m && s.modeBtnActive]}
+                        onPress={() => { setItemMode(m); setItemManual({}); }}
+                      >
+                        <Text style={[s.modeBtnText, itemMode === m && s.modeBtnTextActive]}>{m}</Text>
+                      </TouchableOpacity>
+                    ))}
                   </View>
-                ))}
-              </View>
-            ) : null}
+                  {itemMode === 'equal' ? (
+                    <Text style={{ fontFamily: Fonts.monoBold, fontSize: 11, color: isDeductType ? Colors.cyan : '#FFAB91' }}>
+                      {isDeductType ? '-' : '+'}{fmt(perPerson)} each
+                    </Text>
+                  ) : (
+                    <View style={{ gap: 6 }}>
+                      {itemPeople.map(p => (
+                        <View key={p} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                          <Text style={[s.recName, { flex: 1 }]}>{p}</Text>
+                          <TextInput
+                            style={[s.itemFormInput, { width: 100, textAlign: 'right' }]}
+                            placeholder="0.00"
+                            placeholderTextColor={Colors.faint}
+                            value={itemManual[p] ?? ''}
+                            onChangeText={v => setItemManual(prev => ({ ...prev, [p]: v }))}
+                            keyboardType="decimal-pad"
+                          />
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                </View>
+              )}
 
-            <TouchableOpacity
-              style={[s.doneBtn, { marginTop: 16 }, (!adjName.trim() || !adjAmount || adjPeople.length === 0) && { opacity: 0.4 }]}
-              onPress={saveAdjustment}
-              disabled={!adjName.trim() || !adjAmount || adjPeople.length === 0}
-            >
-              <Text style={s.doneBtnText}>save adjustment</Text>
-            </TouchableOpacity>
-          </>
-        )}
+              {itemError ? <Text style={{ fontFamily: Fonts.mono, fontSize: 11, color: Colors.expense, marginBottom: 8 }}>{itemError}</Text> : null}
+
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
+                <TouchableOpacity style={[s.doneBtn, { flex: 1, backgroundColor: Colors.surface }]} onPress={() => setItemStep('pick-recording')}>
+                  <Text style={[s.doneBtnText, { color: Colors.muted }]}>back</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[s.doneBtn, { flex: 2, opacity: savingItem || itemPeople.length === 0 ? 0.4 : 1 }]}
+                  onPress={saveItem}
+                  disabled={savingItem || itemPeople.length === 0}
+                >
+                  <Text style={s.doneBtnText}>save</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          );
+        })()}
       </BottomSheet>
 
       {/* Add person modal */}
@@ -1045,27 +638,15 @@ const s = StyleSheet.create({
   summaryDots:   { flex: 1, borderBottomWidth: 1, borderStyle: 'dotted', borderColor: Colors.faint, marginHorizontal: 10 },
   summaryAmount: { fontFamily: Fonts.monoBold, fontSize: 13, color: Colors.text, flexShrink: 0 },
 
-  adjCard:      { backgroundColor: Colors.white, borderRadius: Radius.lg, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1, borderColor: Colors.borderMid },
-  adjTypeBadge:  { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
-  adjName:       { fontFamily: Fonts.monoBold, fontSize: 13, color: Colors.text },
-  adjMeta:       { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted },
-  adjAmount:     { fontFamily: Fonts.monoBold, fontSize: 14, letterSpacing: -0.4 },
-
   shareBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: Radius.pill, paddingVertical: 12, paddingHorizontal: 24, borderWidth: 1, borderColor: Colors.borderMid, backgroundColor: Colors.surface, marginTop: 24, marginBottom: 8 },
   shareBtnText:  { fontFamily: Fonts.monoBold, fontSize: 13, color: Colors.muted },
 
-  modalTabRow:       { flexDirection: 'row', gap: 8, marginBottom: 16 },
-  modalTab:          { flex: 1, paddingVertical: 10, borderRadius: Radius.pill, backgroundColor: Colors.surface, alignItems: 'center', borderWidth: 1, borderColor: Colors.borderMid },
-  modalTabActive:    { backgroundColor: Colors.cyan, borderColor: Colors.cyan },
-  modalTabText:      { fontFamily: Fonts.mono,     fontSize: 12, color: Colors.muted },
-  modalTabTextActive:{ fontFamily: Fonts.monoBold, fontSize: 12, color: Colors.white },
+  recPickRow:    { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 12 },
 
-  adjTypeBtn:        { flex: 1, paddingVertical: 10, paddingHorizontal: 12, borderRadius: Radius.lg, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.borderMid, gap: 2 },
-  adjTypeBtnActive:  { backgroundColor: Colors.cyan, borderColor: Colors.cyan },
-  adjTypeBtnLabel:   { fontFamily: Fonts.monoBold, fontSize: 12, color: Colors.text },
-  adjTypeBtnSub:     { fontFamily: Fonts.mono,     fontSize: 10, color: Colors.muted },
-
-  recPickRow:    { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 10 },
+  modeBtn:       { paddingHorizontal: 14, paddingVertical: 7, borderRadius: Radius.pill, borderWidth: 1, borderColor: Colors.borderMid, backgroundColor: Colors.surface },
+  modeBtnActive: { backgroundColor: Colors.cyan, borderColor: Colors.cyan },
+  modeBtnText:   { fontFamily: Fonts.mono, fontSize: 12, color: Colors.muted },
+  modeBtnTextActive: { color: Colors.white, fontFamily: Fonts.monoBold },
 
   doneBtn:       { backgroundColor: Colors.cyan, borderRadius: Radius.pill, paddingVertical: 14, alignItems: 'center', marginTop: 16 },
   doneBtnText:   { fontFamily: Fonts.monoBold, fontSize: 14, color: Colors.white },
