@@ -220,7 +220,7 @@ export default function SpaceDetailScreen() {
 
   const isAll = selectedTabs.has('all');
   const currentTypes = isAll
-    ? ['income','return','savings','expense','payment','transfer','payable','receivable']
+    ? ['income','expense','debt','due']
     : ACTIVITY_TABS.filter(t => t.key !== 'all' && selectedTabs.has(t.key)).flatMap(t => [...t.types]);
 
   const filtered = recordings.filter(r => {
