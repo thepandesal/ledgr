@@ -269,7 +269,6 @@ export default function SplitBillDetailScreen() {
         name: r.name.trim(),
         cost: parseFloat(r.cost),
         recording_type: manualItemType,
-        recording_id: null,
       }))
     );
     setSavingItem(false);
