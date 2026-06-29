@@ -216,12 +216,12 @@ export default function SplitBillDetailScreen() {
   };
 
   // ── Share ──────────────────────────────────────────────────────────────────
-  const { data: shareRow } = useQuery({
+  const { data: shareRow, refetch: refetchShareRow } = useQuery({
     queryKey: ['split-bill-share', splitBillId],
     queryFn: async () => {
       const { data } = await supabase
         .from('split_shares')
-        .select('id')
+        .select('id, data')
         .eq('split_bill_id', splitBillId)
         .maybeSingle();
       return data;
@@ -229,82 +229,123 @@ export default function SplitBillDetailScreen() {
     enabled: !!splitBillId,
   });
 
-  const [shareCopied, setShareCopied] = useState(false);
-  const [shareModal, setShareModal] = useState(false);
-  const [shareAccounts, setShareAccounts] = useState<any[]>([]);
+  const [shareModal, setShareModal]             = useState(false);
+  const [shareAccounts, setShareAccounts]       = useState<any[]>([]);
   const [shareSelectedIds, setShareSelectedIds] = useState<string[]>([]);
-  const [shareLoading, setShareLoading] = useState(false);
-  const [shareConfirmed, setShareConfirmed] = useState(false);
-  const [shareLinkModal, setShareLinkModal] = useState(false);
-  const [shareLink, setShareLink] = useState('');
+  const [shareLink, setShareLink]               = useState('');
+  const [shareCopied, setShareCopied]           = useState(false);
+  const [shareSaving, setShareSaving]           = useState(false);
+  const [shareGenerating, setShareGenerating]   = useState(false);
+  const [saveImgLoading, setSaveImgLoading]     = useState(false);
 
   const openShareModal = async () => {
-    setShareConfirmed(false);
+    setShareCopied(false);
     const { data: accs } = await supabase
       .from('accounts')
-      .select('id, account_name, holder_name, bank, account_number')
+      .select('id, account_name, bank, account_number')
       .eq('user_id', userId)
       .order('account_name');
+    setShareAccounts(accs ?? []);
     if (shareRow) {
-      const { data: sr } = await supabase.from('split_shares').select('data').eq('id', shareRow.id).single();
-      setShareSelectedIds(sr?.data?.account_ids ?? []);
+      setShareSelectedIds(shareRow.data?.account_ids ?? []);
+      setShareLink(`https://ledgr.art/split/${shareRow.id}`);
     } else {
       setShareSelectedIds([]);
+      setShareLink('');
     }
-    setShareAccounts(accs ?? []);
     setShareModal(true);
   };
 
-  const handleShare = async () => {
-    setShareLoading(true);
+  const saveShareAccounts = async () => {
+    if (!shareRow) return;
+    setShareSaving(true);
+    await supabase.from('split_shares').update({ data: { account_ids: shareSelectedIds } }).eq('id', shareRow.id);
+    await refetchShareRow();
+    setShareSaving(false);
+  };
+
+  const generateLink = async () => {
+    setShareGenerating(true);
     const firstRecordingId = linkedRecordings[0]?.recording?.id ?? null;
-    let shareId = shareRow?.id;
-    if (!shareId) {
-      const { data } = await supabase
-        .from('split_shares')
-        .insert({ split_bill_id: splitBillId, recording_id: firstRecordingId, data: { account_ids: shareSelectedIds } })
-        .select('id')
-        .single();
-      shareId = data?.id;
-      queryClient.invalidateQueries({ queryKey: ['split-bill-share', splitBillId] });
-    } else {
-      await supabase.from('split_shares').update({ data: { account_ids: shareSelectedIds } }).eq('id', shareId);
-    }
-    setShareLoading(false);
-    if (!shareId) return;
-    setShareLink(`https://ledgr.art/split/${shareId}`);
-    setShareModal(false);
-    setShareCopied(false);
-    setShareLinkModal(true);
+    const { data } = await supabase.from('split_shares')
+      .insert({ split_bill_id: splitBillId, recording_id: firstRecordingId, data: { account_ids: shareSelectedIds } })
+      .select('id').single();
+    setShareGenerating(false);
+    if (!data) return;
+    setShareLink(`https://ledgr.art/split/${data.id}`);
+    await refetchShareRow();
   };
 
   const copyShareLink = () => {
-    if (Platform.OS !== 'web') {
-      Share.share({ message: shareLink, url: shareLink });
-      return;
-    }
-    // Mobile Safari / Chrome fallback: use execCommand if clipboard API unavailable
+    if (!shareLink) return;
+    if (Platform.OS !== 'web') { Share.share({ message: shareLink, url: shareLink }); return; }
     if (typeof navigator !== 'undefined' && navigator.clipboard) {
-      navigator.clipboard.writeText(shareLink).then(() => {
-        setShareCopied(true);
-        setTimeout(() => setShareCopied(false), 2000);
-      }).catch(() => fallbackCopy());
-    } else {
-      fallbackCopy();
-    }
+      navigator.clipboard.writeText(shareLink)
+        .then(() => { setShareCopied(true); setTimeout(() => setShareCopied(false), 2000); })
+        .catch(fallbackCopy);
+    } else { fallbackCopy(); }
   };
 
   const fallbackCopy = () => {
     if (typeof document === 'undefined') return;
     const el = document.createElement('textarea');
     el.value = shareLink;
-    el.style.position = 'fixed';
-    el.style.opacity = '0';
-    document.body.appendChild(el);
-    el.focus();
-    el.select();
+    el.style.cssText = 'position:fixed;opacity:0;top:0;left:0;font-size:16px';
+    document.body.appendChild(el); el.focus(); el.select();
     try { document.execCommand('copy'); setShareCopied(true); setTimeout(() => setShareCopied(false), 2000); } catch (_) {}
     document.body.removeChild(el);
+  };
+
+  const saveAsImage = async () => {
+    setSaveImgLoading(true);
+    try {
+      if (Platform.OS !== 'web') {
+        const url = shareLink || (shareRow ? `https://ledgr.art/split/${shareRow.id}` : '');
+        if (url) await Share.share({ message: `Split bill: ${name}\n${url}`, url });
+      } else if (typeof document !== 'undefined') {
+        const totals: Record<string, number> = {};
+        filledPeople.forEach((p: string) => { totals[p] = 0; });
+        items.forEach((item: any) => {
+          const d = isDeductType(item.recording_type);
+          const pp = (item.people ?? []).length > 0 ? Number(item.cost) / item.people.length : 0;
+          (item.people ?? []).forEach((p: string) => { if (totals[p] !== undefined) totals[p] += d ? -pp : pp; });
+        });
+        const rows = filledPeople.map((p: string) =>
+          `<tr><td style="font-family:monospace;padding:8px 0;border-bottom:1px dotted #ddd;font-size:13px">${p}</td>`+
+          `<td style="font-family:monospace;font-weight:bold;text-align:right;padding:8px 0;border-bottom:1px dotted #ddd;font-size:13px;color:${totals[p]<0?'#7fd8cd':'#425252'}">`+
+          `${totals[p]<0?'-':''}${Math.abs(totals[p]).toLocaleString('en-US',{minimumFractionDigits:2})}</td></tr>`
+        ).join('');
+        const itemRows = items.map((item: any) => {
+          const d = isDeductType(item.recording_type);
+          return `<div style="background:#fafafa;border-radius:10px;padding:12px;margin-bottom:8px;border:1px solid #eee">`+
+            `<div style="display:flex;justify-content:space-between"><span style="font-family:monospace;font-weight:bold;font-size:13px">${item.name}</span>`+
+            `<span style="font-family:monospace;font-size:12px;color:${d?'#7fd8cd':'#ff7043'}">${d?'-':'+'}${Number(item.cost).toLocaleString('en-US',{minimumFractionDigits:2})}</span></div>`+
+            (item.people?.length>0?`<div style="font-family:monospace;font-size:10px;color:#999;margin-top:4px">${item.people.join(', ')}</div>`:'')+`</div>`;
+        }).join('');
+        const accHtml = shareAccounts.filter((a: any) => shareSelectedIds.includes(a.id)).map((a: any) =>
+          `<div style="background:#d8efea;border-radius:10px;padding:12px;margin-bottom:8px">`+
+          `<div style="font-size:14px;font-weight:600">${a.account_name}</div>`+
+          `<div style="font-family:monospace;font-size:11px;color:#666">${a.bank}</div>`+
+          `<div style="font-family:monospace;font-weight:bold;font-size:13px">${a.account_number}</div></div>`
+        ).join('');
+        const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">`+
+          `<style>body{margin:0;padding:24px;background:#fff;font-family:sans-serif}*{box-sizing:border-box}</style></head><body>`+
+          `<div style="font-size:18px;color:#7fd8cd;font-weight:900;margin-bottom:16px">LEDGR</div>`+
+          `<div style="font-size:22px;font-weight:600;color:#425252;margin-bottom:20px">${name}</div>`+
+          `<h3 style="font-size:13px;color:#7fd8cd;margin:0 0 8px">per person</h3>`+
+          `<div style="background:#fafafa;border-radius:10px;padding:8px 14px;margin-bottom:20px;border:1px solid #eee"><table style="width:100%;border-collapse:collapse">${rows}</table></div>`+
+          `<h3 style="font-size:13px;color:#7fd8cd;margin:0 0 8px">items</h3>${itemRows}`+
+          (accHtml?`<h3 style="font-size:13px;color:#7fd8cd;margin:16px 0 8px">payment</h3>${accHtml}`:'')+
+          `<div style="font-family:monospace;font-size:10px;color:#ccc;text-align:center;margin-top:24px">generated by LEDGR</div></body></html>`;
+        const blob = new Blob([html], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = `${String(name).replace(/\s+/g,'-')}-split.html`;
+        document.body.appendChild(a); a.click();
+        document.body.removeChild(a); URL.revokeObjectURL(url);
+      }
+    } catch (_) {}
+    setSaveImgLoading(false);
   };
 
   const { data: linkedRecordings = [], isLoading: loadingRecs } = useQuery({
@@ -797,35 +838,17 @@ export default function SplitBillDetailScreen() {
       </BottomSheet>
 
       {/* Share modal */}
-      <BottomSheet visible={shareModal} onClose={() => setShareModal(false)} title="share split bill" height="60%">
-        <Text style={{ fontFamily: Fonts.mono, fontSize: 12, color: Colors.muted, marginBottom: 12 }}>
-          select a bank account to include for payment, or choose none.
-        </Text>
-        <ScrollView style={{ maxHeight: 220 }} showsVerticalScrollIndicator={false}>
-          {/* No account option */}
-          <TouchableOpacity
-            style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 10 }}
-            onPress={() => { setShareSelectedIds([]); setShareConfirmed(true); }}
-          >
-            <Ionicons
-              name={shareConfirmed && shareSelectedIds.length === 0 ? 'checkmark-circle' : 'ellipse-outline'}
-              size={18}
-              color={shareConfirmed && shareSelectedIds.length === 0 ? Colors.cyan : Colors.faint}
-            />
-            <Text style={{ fontFamily: Fonts.mono, fontSize: 13, color: Colors.muted }}>no bank account</Text>
-          </TouchableOpacity>
+      <BottomSheet visible={shareModal} onClose={() => setShareModal(false)} title="share split bill" height="72%">
+        {/* Accounts */}
+        <Text style={{ fontFamily: Fonts.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 6 }}>payment account (optional)</Text>
+        <ScrollView style={{ maxHeight: 160 }} showsVerticalScrollIndicator={false}>
           {shareAccounts.map((acc: any) => {
             const sel = shareSelectedIds.includes(acc.id);
             return (
               <TouchableOpacity
                 key={acc.id}
-                style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 10 }}
-                onPress={() => {
-                  setShareConfirmed(true);
-                  setShareSelectedIds(prev =>
-                    sel ? prev.filter(x => x !== acc.id) : [...prev, acc.id]
-                  );
-                }}
+                style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 10 }}
+                onPress={() => setShareSelectedIds(prev => sel ? prev.filter(x => x !== acc.id) : [...prev, acc.id])}
               >
                 <Ionicons name={sel ? 'checkmark-circle' : 'ellipse-outline'} size={18} color={sel ? Colors.cyan : Colors.faint} />
                 <View style={{ flex: 1 }}>
@@ -835,40 +858,54 @@ export default function SplitBillDetailScreen() {
               </TouchableOpacity>
             );
           })}
+          {shareAccounts.length === 0 && <Text style={{ fontFamily: Fonts.mono, fontSize: 12, color: Colors.faint, paddingVertical: 8 }}>no accounts found</Text>}
         </ScrollView>
-        <TouchableOpacity
-          style={[s.doneBtn, { opacity: shareLoading || !shareConfirmed ? 0.4 : 1 }]}
-          onPress={handleShare}
-          disabled={shareLoading || !shareConfirmed}
-        >
-          <Text style={s.doneBtnText}>{shareLoading ? 'generating...' : 'generate link'}</Text>
-        </TouchableOpacity>
-      </BottomSheet>
 
-      {/* Share link modal */}
-      <BottomSheet visible={shareLinkModal} onClose={() => setShareLinkModal(false)} title="your split bill link" height="35%">
-        <Text style={{ fontFamily: Fonts.mono, fontSize: 11, color: Colors.muted, marginBottom: 10 }}>
-          share this link with your group.
-        </Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: Colors.borderMid, borderRadius: Radius.md, paddingHorizontal: 12, gap: 8, marginBottom: 16 }}>
-          <Text style={{ flex: 1, fontFamily: Fonts.mono, fontSize: 12, color: Colors.text, paddingVertical: 12 }} numberOfLines={1}>
-            {shareLink}
+        {/* Save accounts button — only shown when link exists */}
+        {shareLink ? (
+          <TouchableOpacity
+            style={[s.modeBtn, { marginTop: 8, alignItems: 'center', opacity: shareSaving ? 0.5 : 1 }]}
+            onPress={saveShareAccounts}
+            disabled={shareSaving}
+          >
+            <Text style={s.modeBtnText}>{shareSaving ? 'saving...' : 'save account selection'}</Text>
+          </TouchableOpacity>
+        ) : null}
+
+        {/* Generate link — only shown when no link yet */}
+        {!shareLink && (
+          <TouchableOpacity
+            style={[s.doneBtn, { marginTop: 12, opacity: shareGenerating ? 0.5 : 1 }]}
+            onPress={generateLink}
+            disabled={shareGenerating}
+          >
+            <Text style={s.doneBtnText}>{shareGenerating ? 'generating...' : 'generate link'}</Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Link textbox + copy */}
+        <Text style={{ fontFamily: Fonts.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginTop: 16, marginBottom: 6 }}>link</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: shareLink ? Colors.cyan : Colors.borderMid, borderRadius: Radius.md, paddingHorizontal: 12, gap: 8 }}>
+          <Text style={{ flex: 1, fontFamily: Fonts.mono, fontSize: 11, color: shareLink ? Colors.text : Colors.faint, paddingVertical: 12 }} numberOfLines={1}>
+            {shareLink || 'generate a link first'}
           </Text>
+          {shareLink ? (
+            <TouchableOpacity onPress={copyShareLink} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name={shareCopied ? 'checkmark-circle' : 'copy-outline'} size={16} color={shareCopied ? Colors.income : Colors.cyan} />
+            </TouchableOpacity>
+          ) : null}
         </View>
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          <TouchableOpacity
-            style={[s.doneBtn, { flex: 1, backgroundColor: Colors.surface, marginTop: 0 }]}
-            onPress={() => setShareLinkModal(false)}
-          >
-            <Text style={[s.doneBtnText, { color: Colors.muted }]}>close</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[s.doneBtn, { flex: 2, marginTop: 0, backgroundColor: shareCopied ? Colors.income : Colors.cyan }]}
-            onPress={copyShareLink}
-          >
-            <Text style={s.doneBtnText}>{shareCopied ? 'copied!' : 'copy link'}</Text>
-          </TouchableOpacity>
-        </View>
+        {shareCopied && <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: Colors.income, marginTop: 4 }}>copied to clipboard!</Text>}
+
+        {/* Save as image */}
+        <TouchableOpacity
+          style={[s.doneBtn, { backgroundColor: Colors.surface, marginTop: 12, flexDirection: 'row', justifyContent: 'center', gap: 8, opacity: saveImgLoading ? 0.5 : 1 }]}
+          onPress={saveAsImage}
+          disabled={saveImgLoading}
+        >
+          <Ionicons name="download-outline" size={15} color={Colors.text} />
+          <Text style={[s.doneBtnText, { color: Colors.text }]}>{saveImgLoading ? 'saving...' : 'save as file'}</Text>
+        </TouchableOpacity>
       </BottomSheet>
 
     </Animated.View>
