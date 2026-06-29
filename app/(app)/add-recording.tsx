@@ -37,11 +37,12 @@ import formStyles from '@/components/ui/formStyles';
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const TYPES = [
-  { key: 'expense',    label: 'expense',    color: Colors.expense, icon: 'arrow-down-outline' },
-  { key: 'income',     label: 'income',     color: Colors.income,  icon: 'arrow-up-outline' },
-  { key: 'savings',    label: 'savings',    color: Colors.income,  icon: 'save-outline' },
-  { key: 'receivable', label: 'receivable', color: Colors.text,    icon: 'arrow-undo-outline' },
-  { key: 'payable',    label: 'payable',    color: Colors.text,    icon: 'ellipsis-horizontal-outline' },
+  { key: 'expense',             label: 'expense',            color: Colors.expense, icon: 'arrow-down-outline' },
+  { key: 'income',              label: 'income',             color: Colors.income,  icon: 'arrow-up-outline' },
+  { key: 'savings',             label: 'savings',            color: Colors.income,  icon: 'save-outline' },
+  { key: 'receivable',          label: 'receivable',         color: Colors.text,    icon: 'arrow-undo-outline' },
+  { key: 'payable',             label: 'payable',            color: Colors.text,    icon: 'ellipsis-horizontal-outline' },
+  { key: 'expense_receivable',  label: 'expense + receivable', color: Colors.cyan,  icon: 'git-branch-outline' },
 ] as const;
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -96,6 +97,7 @@ export default function AddRecordingScreen() {
 
   // ── Derived ──────────────────────────────────────────────────────────────
   const isLoanType   = type === 'receivable' || type === 'payable';
+  const isComboType  = type === 'expense_receivable';
   const selectedType = TYPES.find(t => t.key === type)!;
 
   // ─── Lifecycle ─────────────────────────────────────────────────────────
@@ -205,8 +207,38 @@ export default function AddRecordingScreen() {
       } else {
         const statusMap: Record<string, string> = {
           expense: 'paid', income: 'received', savings: 'saved',
-          payable: 'unpaid', receivable: 'pending',
+          payable: 'unpaid', receivable: 'pending', expense_receivable: 'paid',
         };
+
+        if (isComboType) {
+          // Create expense first
+          const { data: expRec, error: expErr } = await supabase.from('recordings').insert({
+            space_id: spaceId, user_id: user!.id,
+            name: recName.trim(), type: 'expense',
+            amount: parseFloat(amount), transaction_date: date,
+            notes: notes.trim() || null,
+            category_id: selectedCategory?.id || null,
+            account_id: selectedAccount?.id || null,
+            status: 'paid',
+          }).select('id').single();
+          if (expErr) throw expErr;
+          // Create receivable linked to expense
+          const { error: recErr } = await supabase.from('recordings').insert({
+            space_id: spaceId, user_id: user!.id,
+            name: recName.trim(), type: 'receivable',
+            amount: parseFloat(amount), transaction_date: date,
+            notes: notes.trim() || null,
+            category_id: selectedCategory?.id || null,
+            account_id: receiveToAccount?.id || null,
+            status: 'pending',
+            person_name: personName.trim() || null,
+            linked_recording_id: expRec!.id,
+          });
+          if (recErr) throw recErr;
+          setPendingFocusDate(date);
+          router.back();
+          return;
+        }
         const { data: newRec, error: err } = await supabase.from('recordings').insert({
           space_id: spaceId,
           user_id: user!.id,
@@ -408,7 +440,33 @@ export default function AddRecordingScreen() {
         </>
       )}
 
-      {/* ── Receivable: link to expense + decreased from + receive to ── */}
+      {/* ── Combo type extra fields ── */}
+      {isComboType && (
+        <>
+          <FormLabel optional>who owes you?</FormLabel>
+          <FormInput placeholder="e.g. john" value={personName} onChangeText={setPersonName} />
+          <FormLabel optional>expecting to receive in</FormLabel>
+          <SelectorButton
+            placeholder="select account"
+            onPress={() => setShowReceiveToModal(true)}
+            hasValue={!!receiveToAccount}
+            onClear={() => setReceiveToAccount(null)}
+          >
+            {receiveToAccount && (
+              <View style={s.selectedItem}>
+                <View style={[s.catDot, { backgroundColor: receiveToAccount.color ?? Colors.borderMid }]} />
+                <View>
+                  <Text style={s.selectedItemText}>{receiveToAccount.account_name}</Text>
+                  <Text style={s.selectedItemSub}>{receiveToAccount.bank}</Text>
+                </View>
+              </View>
+            )}
+          </SelectorButton>
+          <Text style={s.hint}>creates an expense + a linked receivable</Text>
+        </>
+      )}
+
+      {/* ── Receivable: link to expense + decreased from + receive to ── */}}
       {type === 'receivable' && (
         <>
           <FormLabel optional>linked expense (optional shortcut)</FormLabel>
