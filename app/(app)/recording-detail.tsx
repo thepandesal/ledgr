@@ -13,17 +13,14 @@ import PayModal from '@/components/modals/PayModal';
 import CollectModal from '@/components/modals/CollectModal';
 import ShareModal from '@/components/modals/ShareModal';
 import ReceivableModal from '@/components/modals/ReceivableModal';
-import { InfoRow } from '@/components/ui';
 import formStyles from '@/components/ui/formStyles';
-import pageStyles from '@/components/ui/pageStyles';
-import itemStyles from '@/components/ui/itemStyles';
-import accountStyles from '@/components/ui/accountStyles';
 import { Colors, Radius } from '@/components/ui/theme';
 import { Brand } from '../../src/lib/brand';
 
 const ACCENT      = Brand.color.accent;
 const ACCENT_DARK = Brand.color.accentDark;
 const PEACH       = '#FFAB91';
+const PAGE        = 20;
 
 const { width } = Dimensions.get('window');
 const MAX_NAME_CHARS = 18;
@@ -1111,51 +1108,47 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
   const extraCount = filledPeople.length - PREVIEW_LIMIT;
 
   return (
-    <Animated.View style={[pageStyles.container, { transform: [{ translateX: slideAnim }] }]}>
-      <SafeAreaView style={pageStyles.inner}>
-        <TouchableOpacity onPress={handleBack} style={pageStyles.backBtn}>
-          <Ionicons name="arrow-back" size={22} color={Colors.text} />
-        </TouchableOpacity>
-        <TouchableOpacity onPress={openEditModal} style={{ position: 'absolute', top: 14, right: 28, zIndex: 20, padding: 6 }}>
-          <Ionicons name="create-outline" size={20} color={Colors.muted} />
-        </TouchableOpacity>
+    <Animated.View style={[{ flex: 1, backgroundColor: Colors.white }, { transform: [{ translateX: slideAnim }] }]}>
+      <SafeAreaView style={{ flex: 1 }}>
 
-        <ScrollView contentContainerStyle={pageStyles.scroll} showsVerticalScrollIndicator={false}>
+        {/* Header */}
+        <View style={rd.header}>
+          <TouchableOpacity onPress={handleBack} style={rd.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name="arrow-back" size={20} color={Colors.text} />
+          </TouchableOpacity>
+          <Text style={rd.title} numberOfLines={1}>{truncate(recording?.name ?? '', MAX_NAME_CHARS).toLowerCase()}</Text>
+          <TouchableOpacity onPress={openEditModal} style={{ padding: 4 }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name="create-outline" size={16} color={Colors.muted} />
+          </TouchableOpacity>
+          <View style={rd.amountBadge}>
+            <Text style={[rd.amountBadgeText, { color: amountColor() }]}>{displayAmount()}</Text>
+          </View>
+        </View>
 
-          {/* Header */}
-          <View style={[pageStyles.titleBlock, { marginBottom: 20 }]}>
-            <Text style={{ fontFamily: Brand.font.body, fontSize: 13, color: Colors.muted, marginBottom: 4 }}>recordings</Text>
-            <Text style={{ fontFamily: Brand.font.display, fontSize: 32, color: Colors.text, letterSpacing: -0.5 }} numberOfLines={2}>
-              {truncate(recording?.name ?? '', MAX_NAME_CHARS).toLowerCase()}
-            </Text>
-            <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 22, color: amountColor(), marginTop: 4 }}>
-              {displayAmount()}
-            </Text>
+        <ScrollView contentContainerStyle={rd.scroll} showsVerticalScrollIndicator={false}>
+          <View style={{ height: 8 }} />
+          {/* Hero */}
+          <View style={rd.heroBlock}>
+            <Text style={rd.heroLabel}>{typeLabel(recording?.type ?? '', recording?.status ?? '')}</Text>
+            <Text style={rd.heroDate}>{formatDate(recording?.transaction_date)}{recording?.account?.account_name ? ` · ${recording.account.account_name}` : ''}</Text>
             {recording?.is_due && Number(recording?.paid_amount ?? 0) > 0 && (
-              <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: Colors.muted, marginTop: 2 }}>
-                original: {Number(recording.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })} · collected: {Number(recording.paid_amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-              </Text>
+              <Text style={rd.heroDate}>collected: {Number(recording.paid_amount).toLocaleString('en-US', { minimumFractionDigits: 2 })} / {Number(recording.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
             )}
-            <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: Colors.muted, marginTop: 4 }}>
-              {formatDate(recording?.transaction_date)} · {typeLabel(recording?.type ?? '', recording?.status ?? '')}
-            </Text>
             {recording?.is_due && Number(recording?.amount) > 0 && (() => {
               const total = Number(recording.amount);
               const paid = Number(recording.paid_amount ?? 0);
               const pct = Math.min(paid / total, 1);
               const fullyCollected = paid >= total - 0.01;
               return (
-                <View style={{ marginTop: 10, gap: 4 }}>
-                  <View style={{ height: 4, backgroundColor: Colors.border, borderRadius: 2, overflow: 'hidden' }}>
-                    <View style={{ height: 4, width: `${pct * 100}%` as any, backgroundColor: fullyCollected ? ACCENT_DARK : PEACH, borderRadius: 2 }} />
+                <View style={{ marginTop: 8, gap: 4 }}>
+                  <View style={{ height: 3, backgroundColor: Colors.border, borderRadius: 2, overflow: 'hidden' }}>
+                    <View style={{ height: 3, width: `${pct * 100}%` as any, backgroundColor: fullyCollected ? ACCENT_DARK : PEACH, borderRadius: 2 }} />
                   </View>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                    <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: Colors.muted }}>
-                      {paid.toLocaleString('en-US', { minimumFractionDigits: 2 })} collected
-                    </Text>
+                    <Text style={{ fontFamily: Brand.font.mono, fontSize: 9, color: Colors.muted }}>{paid.toLocaleString('en-US', { minimumFractionDigits: 2 })} collected</Text>
                     {fullyCollected
-                      ? <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: ACCENT_DARK }}>fully collected ✓</Text>
-                      : <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: Colors.muted }}>{Math.max(0, total - paid).toLocaleString('en-US', { minimumFractionDigits: 2 })} remaining</Text>
+                      ? <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 9, color: ACCENT_DARK }}>fully collected ✓</Text>
+                      : <Text style={{ fontFamily: Brand.font.mono, fontSize: 9, color: Colors.muted }}>{Math.max(0, total - paid).toLocaleString('en-US', { minimumFractionDigits: 2 })} remaining</Text>
                     }
                   </View>
                 </View>
@@ -1163,182 +1156,165 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
             })()}
           </View>
 
-          {/* Action buttons */}
-          <View style={pageStyles.actionRow}>
-          {recording?.type === 'expense' && !linkedPayable && !linkedReceivable && (
-              <TouchableOpacity style={pageStyles.actionBtn} onPress={() => {
-                setReceivableMode('full');
-                setReceivableManualAmount('');
-                setReceivableSelectedPeople([]);
-                setReceivableModal(true);
-              }}>
-                <Ionicons name="arrow-undo-outline" size={15} color={Colors.text} />
-                <Text style={pageStyles.actionBtnText}>tag as due</Text>
+          {/* Actions */}
+          <View style={rd.divider} />
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ paddingVertical: 12 }} contentContainerStyle={{ paddingHorizontal: PAGE, gap: 8 }}>
+            {recording?.type === 'expense' && !linkedPayable && !linkedReceivable && (
+              <TouchableOpacity style={rd.actionChip} onPress={() => { setReceivableMode('full'); setReceivableManualAmount(''); setReceivableSelectedPeople([]); setReceivableModal(true); }}>
+                <Ionicons name="arrow-undo-outline" size={13} color={ACCENT_DARK} />
+                <Text style={rd.actionChipText}>tag as due</Text>
               </TouchableOpacity>
             )}
             {recording?.type === 'debt' && recording?.status !== 'paid' && (
-              <TouchableOpacity style={pageStyles.actionBtn} onPress={openPayModal}>
-                <Ionicons name="cash-outline" size={15} color={Colors.text} />
-                <Text style={pageStyles.actionBtnText}>pay debt</Text>
+              <TouchableOpacity style={rd.actionChip} onPress={openPayModal}>
+                <Ionicons name="cash-outline" size={13} color={ACCENT_DARK} />
+                <Text style={rd.actionChipText}>pay debt</Text>
               </TouchableOpacity>
             )}
             {recording?.type === 'debt' && recording?.status === 'paid' && (
-              <View style={[pageStyles.actionBtn, pageStyles.actionBtnSuccess]}>
-                <Ionicons name="checkmark-circle" size={15} color={Colors.success} />
-                <Text style={[pageStyles.actionBtnText, { color: Colors.success }]}>fully paid</Text>
+              <View style={[rd.actionChip, { backgroundColor: Colors.successBg }]}>
+                <Ionicons name="checkmark-circle" size={13} color={Colors.success} />
+                <Text style={[rd.actionChipText, { color: Colors.success }]}>fully paid</Text>
               </View>
             )}
             {recording?.type === 'due' && recording?.status !== 'paid' && (
-              <TouchableOpacity style={pageStyles.actionBtn} onPress={openCollectModal}>
-                <Ionicons name="arrow-down-circle-outline" size={15} color={Colors.text} />
-                <Text style={pageStyles.actionBtnText}>collect</Text>
+              <TouchableOpacity style={rd.actionChip} onPress={openCollectModal}>
+                <Ionicons name="arrow-down-circle-outline" size={13} color={ACCENT_DARK} />
+                <Text style={rd.actionChipText}>collect</Text>
               </TouchableOpacity>
             )}
             {recording?.type === 'due' && recording?.status === 'paid' && (
-              <View style={[pageStyles.actionBtn, pageStyles.actionBtnSuccess]}>
-                <Ionicons name="checkmark-circle" size={15} color={Colors.success} />
-                <Text style={[pageStyles.actionBtnText, { color: Colors.success }]}>fully collected</Text>
+              <View style={[rd.actionChip, { backgroundColor: Colors.successBg }]}>
+                <Ionicons name="checkmark-circle" size={13} color={Colors.success} />
+                <Text style={[rd.actionChipText, { color: Colors.success }]}>fully collected</Text>
               </View>
             )}
-            <TouchableOpacity style={[pageStyles.actionBtn, pageStyles.actionBtnDanger]} onPress={() => setDeleteConfirm(true)}>
-              <Ionicons name="trash-outline" size={15} color={Colors.danger} />
-              <Text style={[pageStyles.actionBtnText, { color: Colors.danger }]}>delete</Text>
+            <TouchableOpacity style={[rd.actionChip, { backgroundColor: Colors.dangerBg }]} onPress={() => setDeleteConfirm(true)}>
+              <Ionicons name="trash-outline" size={13} color={Colors.danger} />
+              <Text style={[rd.actionChipText, { color: Colors.danger }]}>delete</Text>
+            </TouchableOpacity>
+          </ScrollView>
+
+          {/* Receipt */}
+          <View style={rd.divider} />
+          <View style={rd.sectionRow}>
+            <Text style={rd.sectionHeader}>receipt</Text>
+            <TouchableOpacity style={rd.sectionAddBtn} onPress={() => setAddReceiptModal(true)}>
+              <Ionicons name="add" size={12} color={ACCENT_DARK} />
+              <Text style={rd.sectionAddText}>add</Text>
             </TouchableOpacity>
           </View>
-
-          {/* Receipt strip */}
-          {linkedReceipt && (
-            <View style={accountStyles.receiptStrip}>
-              <View style={accountStyles.receiptStripHeader}>
-                <Text style={accountStyles.receiptStripLabel}>receipt</Text>
-                <TouchableOpacity onPress={async () => {
-                  await supabase.from('receipt_entries').update({ recording_id: null }).eq('id', linkedReceipt.id);
-                  setLinkedReceipt(null); setReceiptPhotos([]);
-                }}>
-                  <Text style={accountStyles.receiptUnlink}>unlink</Text>
-                </TouchableOpacity>
-              </View>
+          {linkedReceipt ? (
+            <>
               {receiptPhotos.length > 0 ? (
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 8 }}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ paddingBottom: 12 }} contentContainerStyle={{ gap: 8 }}>
                   {receiptPhotos.map((p, idx) => (
                     <TouchableOpacity key={p.id} onPress={() => { setPhotoModalIndex(idx); setPhotoModal(true); }} activeOpacity={0.85}>
-                      <Image source={{ uri: p.url }} style={[accountStyles.receiptThumb, { backgroundColor: Colors.input }]} resizeMode="cover" />
+                      <Image source={{ uri: p.url }} style={{ width: 90, height: 90, borderRadius: Radius.md, backgroundColor: Colors.surface }} resizeMode="cover" />
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
               ) : (
-                <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: Colors.faint, marginTop: 8 }}>loading photos...</Text>
+                <View style={rd.emptyWrap}><Text style={{ fontFamily: Brand.font.mono, fontSize: 12, color: Colors.muted }}>loading photos...</Text></View>
               )}
-              <TouchableOpacity
-                style={[pageStyles.actionBtn, { marginTop: 10 }]}
-                onPress={() => router.push({ pathname: '/(app)/receipt-detail', params: { receiptId: linkedReceipt.id } } as any)}
-              >
-                <Ionicons name="arrow-forward-circle-outline" size={15} color={ACCENT_DARK} />
-                <Text style={[pageStyles.actionBtnText, { color: ACCENT_DARK }]}>go to receipt</Text>
+              <TouchableOpacity style={rd.recRow} onPress={() => router.push({ pathname: '/(app)/receipt-detail', params: { receiptId: linkedReceipt.id } } as any)}>
+                <View style={rd.recIconWrap}><Ionicons name="receipt-outline" size={14} color={ACCENT_DARK} /></View>
+                <Text style={[rd.recName, { flex: 1 }]}>view full receipt</Text>
+                <Ionicons name="chevron-forward" size={13} color={Colors.muted} />
               </TouchableOpacity>
-            </View>
+            </>
+          ) : (
+            <View style={rd.emptyWrap}><Text style={{ fontFamily: Brand.font.mono, fontSize: 12, color: Colors.muted }}>no receipt attached</Text></View>
           )}
 
           {/* Information */}
-          <Text style={[pageStyles.sectionHeader, { fontFamily: Brand.font.display }]}>information</Text>
-          <View style={pageStyles.infoBlock}>
-            <InfoRow label="Date of transaction" value={formatDate(recording?.transaction_date)} />
-            <InfoRow label="Transaction type" value={typeLabel(recording?.type ?? '', recording?.status ?? '')} />
-            <InfoRow label="Bank / Account" value={truncate(recording?.account?.account_name ?? '—', 16)} />
+          <View style={rd.divider} />
+          <View style={rd.sectionRow}>
+            <Text style={rd.sectionHeader}>information</Text>
+          </View>
+          <View style={{ paddingHorizontal: PAGE }}>
+            <View style={rd.infoRow}>
+              <Text style={rd.infoLabel}>date</Text>
+              <Text style={rd.infoValue}>{formatDate(recording?.transaction_date)}</Text>
+            </View>
+            <View style={rd.infoRow}>
+              <Text style={rd.infoLabel}>type</Text>
+              <Text style={rd.infoValue}>{typeLabel(recording?.type ?? '', recording?.status ?? '')}</Text>
+            </View>
+            <View style={rd.infoRow}>
+              <Text style={rd.infoLabel}>account</Text>
+              <Text style={rd.infoValue}>{truncate(recording?.account?.account_name ?? '—', 20)}</Text>
+            </View>
+            {recording?.categories?.name && (
+              <View style={rd.infoRow}>
+                <Text style={rd.infoLabel}>category</Text>
+                <Text style={rd.infoValue}>{recording.categories.name}</Text>
+              </View>
+            )}
             {recording?.notes ? (
-              <>
-                <View style={{ height: 1, backgroundColor: Colors.border, marginVertical: 2 }} />
-                <View style={{ paddingVertical: 8 }}>
-                  <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: Colors.muted, marginBottom: 4 }}>Notes</Text>
-                  <Text style={{ fontFamily: Brand.font.mono, fontSize: 12, color: Colors.text, lineHeight: 18 }}>{recording.notes}</Text>
-                </View>
-              </>
+              <View style={[rd.infoRow, { flexDirection: 'column', alignItems: 'flex-start', gap: 4 }]}>
+                <Text style={rd.infoLabel}>notes</Text>
+                <Text style={{ fontFamily: Brand.font.mono, fontSize: 12, color: Colors.text, lineHeight: 18 }}>{recording.notes}</Text>
+              </View>
             ) : null}
             {linkedPayable && (
-              <>
-                <View style={{ height: 1, backgroundColor: Colors.border, marginVertical: 2 }} />
-                <InfoRow label={recording?.type === 'return' ? 'linked due' : 'linked debt'} value={truncate(linkedPayable.name, 16)} />
-              </>
+              <TouchableOpacity style={rd.infoRow} onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: linkedPayable.id } } as any)}>
+                <Text style={rd.infoLabel}>{recording?.type === 'return' ? 'linked due' : 'linked debt'}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Text style={[rd.infoValue, { color: ACCENT_DARK }]}>{truncate(linkedPayable.name, 16)}</Text>
+                  <Ionicons name="chevron-forward" size={11} color={ACCENT_DARK} />
+                </View>
+              </TouchableOpacity>
             )}
             {linkedReceivable && (
-              <>
-                <View style={{ height: 1, backgroundColor: Colors.border, marginVertical: 2 }} />
-                <InfoRow label="linked receivable" value={truncate(linkedReceivable.name, 16)} />
-              </>
+              <TouchableOpacity style={rd.infoRow} onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: linkedReceivable.id } } as any)}>
+                <Text style={rd.infoLabel}>linked receivable</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Text style={[rd.infoValue, { color: ACCENT_DARK }]}>{truncate(linkedReceivable.name, 16)}</Text>
+                  <Ionicons name="chevron-forward" size={11} color={ACCENT_DARK} />
+                </View>
+              </TouchableOpacity>
             )}
           </View>
-          {linkedPayable && (
-            <TouchableOpacity style={pageStyles.linkedBtn} onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: linkedPayable.id } } as any)}>
-              <Ionicons name="link-outline" size={12} color={Colors.muted} />
-              <Text style={pageStyles.linkedBtnText}>{recording?.type === 'return' ? 'view due' : 'view debt'}</Text>
-              <Ionicons name="arrow-forward" size={11} color={Colors.muted} />
-            </TouchableOpacity>
-          )}
-          {linkedReceivable && (
-            <TouchableOpacity style={pageStyles.linkedBtn} onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: linkedReceivable.id } } as any)}>
-              <Ionicons name="link-outline" size={12} color={Colors.muted} />
-              <Text style={pageStyles.linkedBtnText}>view receivable</Text>
-              <Ionicons name="arrow-forward" size={11} color={Colors.muted} />
-            </TouchableOpacity>
-          )}
 
-          {/* Payment/collection history */}
+          {/* Payments / Collections */}
           {(recording?.type === 'debt' || recording?.type === 'due' || (recording?.type === 'expense' && linkedPayments.length > 0)) && linkedPayments.length > 0 && (
             <>
-              <Text style={[pageStyles.sectionHeader, { fontFamily: Brand.font.display }]}>{recording.type === 'due' ? 'collections' : recording.type === 'expense' ? 'collections' : 'payments'}</Text>
-              <View style={pageStyles.infoBlock}>
+              <View style={rd.divider} />
+              <View style={rd.sectionRow}>
+                <Text style={rd.sectionHeader}>{recording.type === 'due' ? 'collections' : 'collections'}</Text>
+              </View>
+              <View style={{ paddingHorizontal: PAGE }}>
                 {linkedPayments.map((p: any, i: number) => (
-                  <TouchableOpacity key={p.id} onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: p.id } } as any)}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8, gap: 8 }}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 11, color: PEACH }}>
-                          {Number(p.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                        </Text>
-                        <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: Colors.muted }}>
-                          {formatDate(p.transaction_date)} · {p.accounts?.account_name ?? '—'}
-                        </Text>
-                        {p.payment_to && (
-                          <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: ACCENT_DARK, marginTop: 2 }}>
-                            {p.payment_to}
-                          </Text>
-                        )}
-                      </View>
-                      <Ionicons name="chevron-forward" size={12} color={Colors.faint} />
+                  <TouchableOpacity key={p.id} style={rd.recRow} onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: p.id } } as any)}>
+                    <View style={rd.recIconWrap}><Ionicons name="cash-outline" size={14} color={ACCENT_DARK} /></View>
+                    <View style={rd.recMid}>
+                      <Text style={rd.recName}>{Number(p.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+                      <Text style={rd.recDate}>{formatDate(p.transaction_date)}{p.accounts?.account_name ? ` · ${p.accounts.account_name}` : ''}</Text>
+                      {p.payment_to && <Text style={[rd.recDate, { color: ACCENT_DARK }]}>{p.payment_to}</Text>}
                     </View>
-                    {i < linkedPayments.length - 1 && <View style={{ height: 1, backgroundColor: Colors.border }} />}
+                    <Ionicons name="chevron-forward" size={13} color={Colors.muted} />
                   </TouchableOpacity>
                 ))}
               </View>
-
-              {/* Per-person payment status */}
               {personPayStatus.length > 0 && (
                 <>
-                  <Text style={[pageStyles.sectionHeader, { fontFamily: Brand.font.display }]}>per person status</Text>
-                  <View style={pageStyles.infoBlock}>
+                  <View style={rd.sectionRow}>
+                    <Text style={rd.sectionHeader}>per person status</Text>
+                  </View>
+                  <View style={{ paddingHorizontal: PAGE }}>
                     {personPayStatus.map((s, i) => {
                       const fullyPaid = s.total > 0 && s.paid >= s.total - 0.01;
                       const partial = s.paid > 0 && !fullyPaid;
                       const statusColor = fullyPaid ? ACCENT_DARK : partial ? ACCENT_DARK : Colors.muted;
                       return (
-                        <View key={s.person}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8, gap: 8 }}>
-                            <Ionicons
-                              name={fullyPaid ? 'checkmark-circle' : partial ? 'ellipse' : 'ellipse-outline'}
-                              size={16} color={statusColor}
-                            />
-                            <View style={{ flex: 1 }}>
-                              <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 12, color: Colors.text }}>{s.person}</Text>
-                              <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: Colors.muted }}>
-                                {s.paid > 0
-                                  ? `${s.paid.toLocaleString('en-US', { minimumFractionDigits: 2 })} of ${s.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
-                                  : `owes ${s.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
-                              </Text>
-                            </View>
-                            <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 11, color: statusColor }}>
-                              {fullyPaid ? 'paid' : partial ? 'partial' : 'unpaid'}
-                            </Text>
+                        <View key={s.person} style={rd.recRow}>
+                          <Ionicons name={fullyPaid ? 'checkmark-circle' : partial ? 'ellipse' : 'ellipse-outline'} size={16} color={statusColor} />
+                          <View style={rd.recMid}>
+                            <Text style={rd.recName}>{s.person}</Text>
+                            <Text style={rd.recDate}>{s.paid > 0 ? `${s.paid.toLocaleString('en-US', { minimumFractionDigits: 2 })} of ${s.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : `owes ${s.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}</Text>
                           </View>
-                          {i < personPayStatus.length - 1 && <View style={{ height: 1, backgroundColor: Colors.border }} />}
+                          <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 11, color: statusColor }}>{fullyPaid ? 'paid' : partial ? 'partial' : 'unpaid'}</Text>
                         </View>
                       );
                     })}
@@ -1349,45 +1325,50 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
           )}
 
           {/* Split bill */}
-          <Text style={[pageStyles.sectionHeader, { fontFamily: Brand.font.display }]}>split bill</Text>
+          <View style={rd.divider} />
+          <View style={rd.sectionRow}>
+            <Text style={rd.sectionHeader}>split bill</Text>
+            {!linkedSplitBill && (
+              <TouchableOpacity style={rd.sectionAddBtn} onPress={openSplitBillModal}>
+                <Ionicons name="add" size={12} color={ACCENT_DARK} />
+                <Text style={rd.sectionAddText}>link</Text>
+              </TouchableOpacity>
+            )}
+          </View>
           {linkedSplitBill ? (
-            <TouchableOpacity
-              style={[pageStyles.linkedBtn, { borderColor: ACCENT, backgroundColor: ACCENT + '44' }]}
-              onPress={() => router.push({ pathname: '/(app)/split-bill-detail', params: { splitBillId: linkedSplitBill.id, name: linkedSplitBill.name } } as any)}
-            >
-              <Ionicons name="people-outline" size={14} color={ACCENT_DARK} />
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 12, color: ACCENT_DARK }}>{linkedSplitBill.name}</Text>
-                <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: Colors.muted }}>
-                  contributed {Number(recording?.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                </Text>
-              </View>
-              <Ionicons name="arrow-forward" size={13} color={ACCENT_DARK} />
-            </TouchableOpacity>
+            <View style={{ paddingHorizontal: PAGE }}>
+              <TouchableOpacity style={rd.recRow} onPress={() => router.push({ pathname: '/(app)/split-bill-detail', params: { splitBillId: linkedSplitBill.id, name: linkedSplitBill.name } } as any)}>
+                <View style={rd.recIconWrap}><Ionicons name="people-outline" size={14} color={ACCENT_DARK} /></View>
+                <View style={rd.recMid}>
+                  <Text style={rd.recName}>{linkedSplitBill.name}</Text>
+                  <Text style={rd.recDate}>contributed {Number(recording?.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={13} color={Colors.muted} />
+              </TouchableOpacity>
+            </View>
           ) : (
-            <TouchableOpacity style={pageStyles.actionBtn} onPress={openSplitBillModal}>
-              <Ionicons name="people-outline" size={15} color={Colors.text} />
-              <Text style={pageStyles.actionBtnText}>split bill</Text>
-            </TouchableOpacity>
+            <View style={rd.emptyWrap}><Text style={{ fontFamily: Brand.font.mono, fontSize: 12, color: Colors.muted }}>no split bill linked</Text></View>
           )}
+          <View style={{ height: 20 }} />
 
         </ScrollView>
       </SafeAreaView>
 
       {/* Split bill modal */}
       <BottomSheet visible={splitBillModal} onClose={() => setSplitBillModal(false)} title="split bill" height="50%">
-        <TouchableOpacity style={[pageStyles.actionBtn, { marginBottom: 16, borderColor: ACCENT, backgroundColor: ACCENT + '44' }]} onPress={createAndLinkSplitBill}>
+        <TouchableOpacity style={rd.doneBtn} onPress={createAndLinkSplitBill}>
           <Ionicons name="add-circle-outline" size={15} color={ACCENT_DARK} />
-          <Text style={[pageStyles.actionBtnText, { color: ACCENT_DARK }]}>create new split bill</Text>
+          <Text style={rd.doneBtnText}>create new split bill</Text>
         </TouchableOpacity>
         {existingSplitBills.length > 0 && (
           <>
-            <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8 }}>add to existing</Text>
+            <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8, marginTop: 16 }}>add to existing</Text>
             <ScrollView style={{ maxHeight: 240 }} showsVerticalScrollIndicator={false}>
               {existingSplitBills.map((bill: any) => (
-                <TouchableOpacity key={bill.id} style={[pageStyles.actionBtn, { marginBottom: 8, justifyContent: 'flex-start', borderColor: ACCENT, backgroundColor: ACCENT + '44' }]} onPress={() => linkToExistingSplitBill(bill)}>
-                  <Ionicons name="people-outline" size={15} color={ACCENT_DARK} />
-                  <Text style={[pageStyles.actionBtnText, { color: ACCENT_DARK }]}>{bill.name}</Text>
+                <TouchableOpacity key={bill.id} style={rd.recRow} onPress={() => linkToExistingSplitBill(bill)}>
+                  <View style={rd.recIconWrap}><Ionicons name="people-outline" size={14} color={ACCENT_DARK} /></View>
+                  <Text style={[rd.recName, { flex: 1 }]}>{bill.name}</Text>
+                  <Ionicons name="chevron-forward" size={13} color={Colors.muted} />
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -1395,11 +1376,10 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
         )}
       </BottomSheet>
 
-      {/* Tooltip */}
       {tooltip && (
         <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setTooltip(null)} activeOpacity={1}>
-          <View style={pageStyles.tooltip}>
-            <Text style={pageStyles.tooltipText}>{tooltip.name}</Text>
+          <View style={rd.tooltip}>
+            <Text style={rd.tooltipText}>{tooltip.name}</Text>
           </View>
         </TouchableOpacity>
       )}
@@ -1532,29 +1512,22 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
 
 
       {copiedToast && (
-        <View style={pageStyles.toast} pointerEvents="none">
+        <View style={rd.toast} pointerEvents="none">
           <Ionicons name="checkmark-circle" size={16} color={Colors.white} />
-          <Text style={pageStyles.toastText}>link copied to clipboard</Text>
+          <Text style={rd.toastText}>link copied to clipboard</Text>
         </View>
       )}
 
       {/* Add receipt modal */}
-      <BottomSheet visible={addReceiptModal} onClose={() => setAddReceiptModal(false)} sub="recording" title="add receipt">
-        <View style={accountStyles.photoButtons}>
-          <TouchableOpacity style={accountStyles.photoBtn} onPress={addReceiptFromCamera}>
-            <Ionicons name="camera-outline" size={28} color={ACCENT_DARK} />
-            <Text style={accountStyles.photoBtnText}>camera</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={accountStyles.photoBtn} onPress={addReceiptFromGallery}>
-            <Ionicons name="images-outline" size={28} color={Colors.text} />
-            <Text style={[accountStyles.photoBtnText, { color: Colors.text }]}>gallery</Text>
-          </TouchableOpacity>
-        </View>
-        <View style={formStyles.actions}>
-          <TouchableOpacity style={formStyles.cancelBtn} onPress={() => setAddReceiptModal(false)}>
-            <Text style={formStyles.cancelBtnText}>cancel</Text>
-          </TouchableOpacity>
-        </View>
+      <BottomSheet visible={addReceiptModal} onClose={() => setAddReceiptModal(false)} sub="recording" title="add receipt" height="30%">
+        <TouchableOpacity style={rd.doneBtn} onPress={addReceiptFromCamera}>
+          <Ionicons name="camera-outline" size={18} color={ACCENT_DARK} />
+          <Text style={rd.doneBtnText}>camera</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[rd.doneBtn, { backgroundColor: Colors.surface, marginTop: 8 }]} onPress={addReceiptFromGallery}>
+          <Ionicons name="images-outline" size={18} color={Colors.text} />
+          <Text style={[rd.doneBtnText, { color: Colors.text }]}>gallery</Text>
+        </TouchableOpacity>
       </BottomSheet>
 
       {/* Edit recording modal */}
@@ -1562,13 +1535,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
         <View style={formStyles.block}>
           <View style={formStyles.blockRow}>
             <Text style={formStyles.blockLabel}>date</Text>
-            <TextInput
-              style={formStyles.inlineInput}
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor={Colors.faint}
-              value={editDate}
-              onChangeText={setEditDate}
-            />
+            <TextInput style={formStyles.inlineInput} placeholder="YYYY-MM-DD" placeholderTextColor={Colors.faint} value={editDate} onChangeText={setEditDate} />
           </View>
           <View style={formStyles.blockDivider} />
           <View style={[formStyles.blockRow, { flexDirection: 'column', alignItems: 'flex-start', gap: 8 }]}>
@@ -1577,11 +1544,10 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
               {editAccounts.map(acc => (
                 <TouchableOpacity
                   key={acc.id}
-                  style={[{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, gap: 10, borderBottomWidth: 1, borderBottomColor: Colors.border },
-                    editAccountId === acc.id && { backgroundColor: ACCENT + '44', borderRadius: Radius.md, paddingHorizontal: 8 }]}
+                  style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 10, ...(editAccountId === acc.id ? { backgroundColor: ACCENT + '44', borderRadius: Radius.md, paddingHorizontal: 8 } : {}) }}
                   onPress={() => setEditAccountId(acc.id)}
                 >
-                  <Ionicons name={editAccountId === acc.id ? 'checkmark-circle' : 'ellipse-outline'} size={16} color={editAccountId === acc.id ? ACCENT_DARK : Colors.faint} />
+                  <Ionicons name={editAccountId === acc.id ? 'checkmark-circle' : 'ellipse-outline'} size={18} color={editAccountId === acc.id ? ACCENT_DARK : Colors.faint} />
                   <View style={{ flex: 1 }}>
                     <Text style={{ fontFamily: Brand.font.heading, fontSize: 13, color: Colors.text }}>{acc.account_name}</Text>
                     <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: Colors.muted }}>{acc.bank} · {acc.account_number}</Text>
@@ -1641,8 +1607,71 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
   );
 }
 
+const rd = StyleSheet.create({
+  // Container
+  header:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: PAGE, paddingTop: 16, paddingBottom: 8, gap: 10, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  backBtn:    { width: 34, height: 34, borderRadius: 17, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center' },
+  title:      { flex: 1, fontFamily: Brand.font.display, fontSize: 20, color: Colors.text, letterSpacing: -0.3 },
+  amountBadge:     { backgroundColor: ACCENT + '44', borderRadius: Radius.pill, paddingHorizontal: 12, paddingVertical: 5 },
+  amountBadgeText: { fontFamily: Brand.font.monoBold, fontSize: 13 },
+  scroll:     { paddingBottom: 80 },
+
+  // Hero
+  heroBlock:  { paddingHorizontal: PAGE, paddingTop: 12, paddingBottom: 4 },
+  heroLabel:  { fontFamily: Brand.font.monoBold, fontSize: 10, color: ACCENT_DARK, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 2 },
+  heroDate:   { fontFamily: Brand.font.mono, fontSize: 11, color: Colors.muted, marginTop: 1 },
+
+  // Divider
+  divider:    { height: 8, backgroundColor: Colors.surface, marginHorizontal: -PAGE },
+
+  // Section rows
+  sectionRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: PAGE, paddingTop: 20, paddingBottom: 8 },
+  sectionHeader:  { ...Brand.type.sectionHeader },
+  sectionAddBtn:  { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: Radius.pill, backgroundColor: ACCENT + '44' },
+  sectionAddText: { fontFamily: Brand.font.heading, fontSize: 11, color: ACCENT_DARK },
+
+  // List rows
+  recRow:     { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  recIconWrap:{ width: 34, height: 34, borderRadius: 17, backgroundColor: ACCENT + '44', justifyContent: 'center', alignItems: 'center' },
+  recMid:     { flex: 1, gap: 2 },
+  recName:    { fontFamily: Brand.font.monoBold, fontSize: 13, color: Colors.text },
+  recDate:    { fontFamily: Brand.font.mono, fontSize: 10, color: Colors.muted },
+
+  // Info rows
+  infoRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  infoLabel:  { fontFamily: Brand.font.mono, fontSize: 11, color: Colors.muted },
+  infoValue:  { fontFamily: Brand.font.monoBold, fontSize: 12, color: Colors.text },
+
+  // Action chips
+  actionChip:     { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: Radius.pill, backgroundColor: ACCENT + '44' },
+  actionChipText: { fontFamily: Brand.font.heading, fontSize: 11, color: ACCENT_DARK },
+
+  // Empty
+  emptyWrap:  { alignItems: 'center', gap: 8, paddingVertical: 16, paddingHorizontal: PAGE },
+
+  // Done button
+  doneBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: ACCENT + '44', borderRadius: Radius.pill, paddingVertical: 14, marginTop: 8 },
+  doneBtnText: { fontFamily: Brand.font.monoBold, fontSize: 13, color: ACCENT_DARK },
+
+  // Toast
+  toast:      { position: 'absolute', bottom: 48, alignSelf: 'center', backgroundColor: Colors.text, borderRadius: Radius.pill, paddingVertical: 10, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  toastText:  { fontFamily: Brand.font.mono, fontSize: 12, color: Colors.white },
+
+  // Tooltip
+  tooltip:     { position: 'absolute', top: '50%', alignSelf: 'center', backgroundColor: Colors.text, borderRadius: Radius.sm, paddingVertical: 6, paddingHorizontal: 12 },
+  tooltipText: { fontFamily: Brand.font.mono, fontSize: 11, color: Colors.white },
+
+  // Tag input (people modal)
+  tagInputWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, borderWidth: 1, borderColor: Colors.borderMid, borderRadius: Radius.md, padding: 8, minHeight: 44, marginBottom: 12 },
+  tagChip:      { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: ACCENT + '44', borderRadius: Radius.pill, paddingVertical: 4, paddingLeft: 10, paddingRight: 6 },
+  tagChipText:  { fontFamily: Brand.font.monoBold, fontSize: 11, color: ACCENT_DARK },
+  tagInput:     { fontFamily: Brand.font.mono, fontSize: 16, color: Colors.text, minWidth: 120, flex: 1, padding: 2 },
+  contactsLabel:{ ...Brand.type.modalLabel, marginBottom: 6 },
+  contactRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  contactName:  { fontFamily: Brand.font.mono, fontSize: 13, color: Colors.text },
+});
+
 const styles = StyleSheet.create({
-  // screen-specific only — everything else uses shared style files
   personRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
   removeBtn: { padding: 4 },
   addMoreBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start' },
@@ -1653,14 +1682,6 @@ const styles = StyleSheet.create({
   suggestionText: { fontFamily: Brand.font.mono, fontSize: 12, color: Colors.text },
   subitemFormRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 8, marginLeft: 4 },
   subitemFormInputRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  // Tag input
-  tagInputWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, borderWidth: 1, borderColor: Colors.borderMid, borderRadius: Radius.md, padding: 8, minHeight: 44, marginBottom: 4 },
-  tagChip: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: ACCENT + '44', borderRadius: Radius.pill, paddingVertical: 4, paddingLeft: 10, paddingRight: 6 },
-  tagChipText: { fontFamily: Brand.font.monoBold, fontSize: 11, color: ACCENT_DARK },
-  tagInput: { fontFamily: Brand.font.mono, fontSize: 14, color: Colors.text, minWidth: 120, flex: 1, padding: 2 },
-  // Contacts list
-  contactRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  contactName: { fontFamily: Brand.font.mono, fontSize: 13, color: Colors.text },
 });
 
 
