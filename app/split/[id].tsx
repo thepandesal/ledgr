@@ -283,8 +283,8 @@ export default function SplitSharePage() {
             {payments.map((acc: any, i: number) => (
               <View key={i} style={s.payCard}>
                 <View style={{ flex: 1, gap: 2 }}>
-                  <Text style={s.payName}>{acc.holder_name || acc.account_name || ''}</Text>
-                  <Text style={s.payBank}>{acc.account_name} · {acc.bank ?? ''}</Text>
+                  <Text style={s.payName}>{acc.bank || ''}</Text>
+                  <Text style={s.payBank}>{acc.holder_name || acc.account_name || ''}</Text>
                   <TouchableOpacity style={s.copyRow} onPress={() => copyAccountNumber(acc.account_number ?? '', i)} activeOpacity={0.7}>
                     <Text style={s.payNumber}>{acc.account_number ?? ''}</Text>
                     <Ionicons name={copiedAccIdx === i ? 'checkmark' : 'copy-outline'} size={13} color={copiedAccIdx === i ? Colors.income : Colors.muted} />

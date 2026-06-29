@@ -363,8 +363,8 @@ export default function SplitBillDetailScreen() {
           : '';
         return `<div style="display:flex;align-items:center;background:#d8efea;border-radius:12px;padding:16px;margin-bottom:8px;gap:12px">`+
           `<div style="flex:1">`+
-          `<div style="font-size:15px;font-weight:600;color:#292929">${a.account_name}</div>`+
-          `<div style="font-size:10px;color:#888;margin:2px 0">${a.bank??''}</div>`+
+          `<div style="font-size:15px;font-weight:600;color:#292929">${a.bank??''}</div>`+
+          `<div style="font-size:11px;color:#666;margin:2px 0">${a.holder_name??a.account_name??''}</div>`+
           `<div style="font-size:13px;font-weight:700;color:#425252">${a.account_number??''}</div>`+
           `</div>${qrImg}</div>`;
       }).join('');
