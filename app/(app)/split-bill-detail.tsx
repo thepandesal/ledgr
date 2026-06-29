@@ -229,12 +229,15 @@ export default function SplitBillDetailScreen() {
     enabled: !!splitBillId,
   });
 
+  const [shareCopied, setShareCopied] = useState(false);
+
   const handleShare = async () => {
     let shareId = shareRow?.id;
     if (!shareId) {
+      const firstRecordingId = linkedRecordings[0]?.recording?.id ?? null;
       const { data } = await supabase
         .from('split_shares')
-        .insert({ split_bill_id: splitBillId, data: {} })
+        .insert({ split_bill_id: splitBillId, recording_id: firstRecordingId, data: {} })
         .select('id')
         .single();
       shareId = data?.id;
@@ -244,7 +247,12 @@ export default function SplitBillDetailScreen() {
     if (Platform.OS !== 'web') {
       Share.share({ message: url, url });
     } else if (typeof navigator !== 'undefined' && navigator.clipboard) {
-      navigator.clipboard.writeText(url);
+      navigator.clipboard.writeText(url).then(() => {
+        setShareCopied(true);
+        setTimeout(() => setShareCopied(false), 3000);
+      });
+    } else if (typeof window !== 'undefined') {
+      window.prompt('Copy this link:', url);
     }
   };
 
@@ -454,8 +462,10 @@ export default function SplitBillDetailScreen() {
 
           {/* Share */}
           <TouchableOpacity style={s.shareBtn} onPress={handleShare} activeOpacity={0.8}>
-            <Ionicons name="share-outline" size={15} color={Colors.muted} />
-            <Text style={s.shareBtnText}>share split bill</Text>
+            <Ionicons name={shareCopied ? 'checkmark-circle' : 'share-outline'} size={15} color={shareCopied ? Colors.cyan : Colors.muted} />
+            <Text style={[s.shareBtnText, shareCopied && { color: Colors.cyan }]}>
+              {shareCopied ? 'link copied!' : 'share split bill'}
+            </Text>
           </TouchableOpacity>
 
         </ScrollView>
