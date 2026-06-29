@@ -128,21 +128,26 @@ export default function SplitBillDetailScreen() {
   const saveItems = async () => {
     const valid = itemRows.filter(r => r.name.trim() && r.cost);
     if (!valid.length) return;
+    const recTotal = Number(selectedRecording.amount_contributed);
+    const alreadyUsed = items
+      .filter((i: any) => i.recording_type === (selectedRecording.recording?.type ?? 'expense'))
+      .reduce((s: number, i: any) => s + Number(i.cost), 0);
+    const newTotal = valid.reduce((s, r) => s + parseFloat(r.cost || '0'), 0);
+    if (alreadyUsed + newTotal > recTotal + 0.01) return;
     setSavingItem(true);
     const recType = selectedRecording.recording?.type ?? 'expense';
-    await supabase.from('split_items').insert(
+    const { error } = await supabase.from('split_items').insert(
       valid.map(r => ({
         split_bill_id: splitBillId,
         user_id: userId,
         name: r.name.trim(),
         cost: parseFloat(r.cost),
-        people: [],
+        people: null,
         recording_type: recType,
       }))
     );
     setSavingItem(false);
-    setAddItemModal(false);
-    refetchItems();
+    if (!error) { setAddItemModal(false); refetchItems(); }
   };
 
   const openAssign = (item: any) => {
@@ -151,7 +156,7 @@ export default function SplitBillDetailScreen() {
   };
 
   const saveAssign = async () => {
-    await supabase.from('split_items').update({ people: assignPeople }).eq('id', assignItem.id);
+    await supabase.from('split_items').update({ people: assignPeople.length ? assignPeople : null }).eq('id', assignItem.id);
     setAssignItem(null);
     refetchItems();
   };
@@ -427,10 +432,41 @@ export default function SplitBillDetailScreen() {
           </ScrollView>
         ) : (
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-            <Text style={[s.recDate, { marginBottom: 12 }]}>
+            <Text style={[s.recDate, { marginBottom: 8 }]}>
               {selectedRecording?.recording?.name} · {selectedRecording?.recording?.type} · {fmt(Number(selectedRecording?.amount_contributed))}
             </Text>
-            {itemRows.map((row, i) => (
+            {/* Budget bar */}
+            {(() => {
+              const recTotal = Number(selectedRecording?.amount_contributed ?? 0);
+              const alreadyUsed = items
+                .filter((i: any) => i.recording_type === (selectedRecording?.recording?.type ?? 'expense'))
+                .reduce((s: number, i: any) => s + Number(i.cost), 0);
+              const newTotal = itemRows.reduce((s, r) => s + parseFloat(r.cost || '0'), 0);
+              const used = alreadyUsed + newTotal;
+              const pct = recTotal > 0 ? Math.min(used / recTotal, 1) : 0;
+              const over = recTotal > 0 && used > recTotal + 0.01;
+              return (
+                <View style={{ marginBottom: 12 }}>
+                  <View style={{ height: 4, backgroundColor: Colors.border, borderRadius: 2, overflow: 'hidden' }}>
+                    <View style={{ height: 4, borderRadius: 2, width: `${pct * 100}%` as any, backgroundColor: over ? Colors.expense : Colors.cyan }} />
+                  </View>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
+                    <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: over ? Colors.expense : Colors.cyan }}>{fmt(used)} used</Text>
+                    <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: over ? Colors.expense : Colors.muted }}>
+                      {over ? `${fmt(used - recTotal)} over` : `${fmt(recTotal - used)} left`}
+                    </Text>
+                  </View>
+                </View>
+              );
+            })()}
+            {itemRows.map((row, i) => {
+              const recTotal = Number(selectedRecording?.amount_contributed ?? 0);
+              const alreadyUsed = items
+                .filter((i2: any) => i2.recording_type === (selectedRecording?.recording?.type ?? 'expense'))
+                .reduce((s: number, i2: any) => s + Number(i2.cost), 0);
+              const runningTotal = itemRows.slice(0, i + 1).reduce((s, r) => s + parseFloat(r.cost || '0'), 0);
+              const rowOver = recTotal > 0 && alreadyUsed + runningTotal > recTotal + 0.01;
+              return (
               <View key={i} style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
                 <TextInput
                   style={[s.itemFormInput, { flex: 1 }]}
@@ -441,7 +477,7 @@ export default function SplitBillDetailScreen() {
                   autoFocus={i === 0}
                 />
                 <TextInput
-                  style={[s.itemFormInput, { width: 90, textAlign: 'right' }]}
+                  style={[s.itemFormInput, { width: 90, textAlign: 'right', color: rowOver ? Colors.expense : Colors.text }]}
                   placeholder="0.00"
                   placeholderTextColor={Colors.faint}
                   value={row.cost}
@@ -454,23 +490,35 @@ export default function SplitBillDetailScreen() {
                   </TouchableOpacity>
                 )}
               </View>
-            ))}
+              );
+            })}
             <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 8 }} onPress={() => setItemRows(prev => [...prev, { name: '', cost: '' }])}>
               <Ionicons name="add" size={13} color={Colors.cyan} />
               <Text style={{ fontFamily: Fonts.mono, fontSize: 12, color: Colors.cyan }}>add another</Text>
             </TouchableOpacity>
-            <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-              <TouchableOpacity style={[s.doneBtn, { flex: 1, backgroundColor: Colors.surface, marginTop: 0 }]} onPress={() => setItemStep('pick-recording')}>
-                <Text style={[s.doneBtnText, { color: Colors.muted }]}>back</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[s.doneBtn, { flex: 2, marginTop: 0, opacity: savingItem || !itemRows.some(r => r.name.trim() && r.cost) ? 0.4 : 1 }]}
-                onPress={saveItems}
-                disabled={savingItem || !itemRows.some(r => r.name.trim() && r.cost)}
-              >
-                <Text style={s.doneBtnText}>save items</Text>
-              </TouchableOpacity>
-            </View>
+            {(() => {
+              const recTotal = Number(selectedRecording?.amount_contributed ?? 0);
+              const alreadyUsed = items
+                .filter((i: any) => i.recording_type === (selectedRecording?.recording?.type ?? 'expense'))
+                .reduce((s: number, i: any) => s + Number(i.cost), 0);
+              const newTotal = itemRows.reduce((s, r) => s + parseFloat(r.cost || '0'), 0);
+              const over = recTotal > 0 && alreadyUsed + newTotal > recTotal + 0.01;
+              const hasValid = itemRows.some(r => r.name.trim() && r.cost);
+              return (
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+                  <TouchableOpacity style={[s.doneBtn, { flex: 1, backgroundColor: Colors.surface, marginTop: 0 }]} onPress={() => setItemStep('pick-recording')}>
+                    <Text style={[s.doneBtnText, { color: Colors.muted }]}>back</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[s.doneBtn, { flex: 2, marginTop: 0, opacity: savingItem || !hasValid || over ? 0.4 : 1 }]}
+                    onPress={saveItems}
+                    disabled={savingItem || !hasValid || over}
+                  >
+                    <Text style={s.doneBtnText}>save items</Text>
+                  </TouchableOpacity>
+                </View>
+              );
+            })()}
           </ScrollView>
         )}
       </BottomSheet>
