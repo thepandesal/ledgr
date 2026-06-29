@@ -252,7 +252,10 @@ export default function SpaceDetailScreen() {
 
   // Stats (all recordings, not date-filtered)
   const moneyIn  = recordings.filter(r => r.type === 'income').reduce((s, r) => s + Number(r.amount), 0);
-  const moneyOut = recordings.filter(r => r.type === 'expense').reduce((s, r) => s + Number(r.amount), 0);
+  const moneyOut = recordings.filter(r => r.type === 'expense').reduce((s, r) => {
+    const net = r.is_due ? Math.max(0, Number(r.amount) - Number(r.paid_amount ?? 0)) : Number(r.amount);
+    return s + net;
+  }, 0);
   const loansActive        = recordings.filter(r => r.type === 'debt' && r.status !== 'paid').length;
   const receivablesPending = recordings.filter(r => r.type === 'due'  && r.status !== 'paid').length;
   const mainValue  = isExpSpace ? moneyOut : moneyIn;
@@ -485,7 +488,9 @@ export default function SpaceDetailScreen() {
                           <Text style={s.rowName} numberOfLines={1}>{item.name}</Text>
                         </View>
                         <Text style={[s.rowAmount, { color: tl.color }]}>
-                          {fmtAmount(Number(item.amount))}
+                          {item.is_due
+                            ? Math.max(0, Number(item.amount) - Number(item.paid_amount ?? 0)).toLocaleString('en-US', { minimumFractionDigits: 2 })
+                            : fmtAmount(Number(item.amount))}
                         </Text>
                       </TouchableOpacity>
                     );

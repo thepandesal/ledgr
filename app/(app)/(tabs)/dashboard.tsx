@@ -359,7 +359,10 @@ export default function DashboardScreen() {
   });
 
   const moneyInTotal    = allRecordings(['income']).reduce((s, r) => s + Number(r.amount), 0);
-  const moneyOutTotal   = allRecordings(['expense']).reduce((s, r) => s + Number(r.amount), 0);
+  const moneyOutTotal   = allRecordings(['expense']).reduce((s, r) => {
+    const net = r.is_due ? Math.max(0, Number(r.amount) - Number(r.paid_amount ?? 0)) : Number(r.amount);
+    return s + net;
+  }, 0);
   const loansActive     = allRecordings(['debt']).filter(r => r.status !== 'paid').length;
   const loansPaid       = allRecordings(['debt']).filter(r => r.status === 'paid').length;
   const receivablesPending  = allRecordings(['due']).filter(r => r.status !== 'paid').length;
