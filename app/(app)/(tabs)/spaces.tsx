@@ -388,14 +388,14 @@ const s = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1, borderColor: BORDER,
     padding: 16,
-    marginBottom: 16, ...SHADOW,
+    marginBottom: 16,
   },
 
   // Row 1: title + badge + menu
   cardRow:     { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
   cardTitleRow:{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
   cardIconWrap:{ width: 28, height: 28, borderRadius: 6, backgroundColor: SURFACE, justifyContent: 'center', alignItems: 'center' },
-  cardTitle:   { fontFamily: FONT_SB, fontSize: 13, color: BLACK, flex: 1 },
+  cardTitle:   { fontFamily: FONT_SB, fontSize: 16, color: BLACK, flex: 1 },
 
   // Badge top-right
   badge:        { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, backgroundColor: SURFACE, borderWidth: 1, borderColor: BORDER },
