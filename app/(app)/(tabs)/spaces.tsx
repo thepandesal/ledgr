@@ -19,7 +19,7 @@ const MUTED   = '#6B7280';
 const BORDER  = '#E5E7EB';
 const SURFACE = '#F9FAFB';
 const WHITE   = '#FFFFFF';
-const RED     = '#DC2626';
+const RED     = '#B73E28';
 const FONT    = 'Outfit_400Regular';
 const FONT_SB = 'Outfit_600SemiBold';
 const FONT_B  = 'Outfit_700Bold';
@@ -347,8 +347,8 @@ const s = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 16, gap: 12,
   },
-  greeting: { fontFamily: FONT_B,  fontSize: 13, color: BLACK, letterSpacing: -0.2 },
-  date:     { fontFamily: FONT,    fontSize: 10, color: DARK,  marginTop: 2 },
+  greeting: { fontFamily: FONT_B,  fontSize: 15, color: BLACK, letterSpacing: -0.2 },
+  date:     { fontFamily: FONT,    fontSize: 12, color: DARK,  marginTop: 2 },
   addBtn:   {
     width: 42, height: 42, borderRadius: 10,
     backgroundColor: BLACK, alignItems: 'center', justifyContent: 'center',
@@ -367,11 +367,11 @@ const s = StyleSheet.create({
     width: 32, height: 32, borderRadius: 8,
     backgroundColor: SURFACE, justifyContent: 'center', alignItems: 'center',
   },
-  allCardText: { fontFamily: FONT_SB, fontSize: 10, color: BLACK },
+  allCardText: { fontFamily: FONT_SB, fontSize: 12, color: BLACK },
 
   // ── Empty ───────────────────────────────────────────────────────────────
   emptyWrap: { alignItems: 'center', gap: 12, paddingVertical: 72 },
-  emptyText: { fontFamily: FONT, fontSize: 10, color: MUTED },
+  emptyText: { fontFamily: FONT, fontSize: 12, color: MUTED },
 
   // ── Section ─────────────────────────────────────────────────────────────
   section: { marginBottom: 8 },
@@ -379,8 +379,8 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center',
     justifyContent: 'space-between', marginBottom: 12,
   },
-  sectionTitle: { fontFamily: FONT_SB, fontSize: 11, color: BLACK },
-  sectionCount: { fontFamily: FONT,    fontSize: 9,  color: MUTED },
+  sectionTitle: { fontFamily: FONT_SB, fontSize: 13, color: BLACK },
+  sectionCount: { fontFamily: FONT,    fontSize: 11, color: MUTED },
 
   // ── Card ────────────────────────────────────────────────────────────────
   card: {
@@ -395,18 +395,18 @@ const s = StyleSheet.create({
   cardRow:     { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
   cardTitleRow:{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
   cardIconWrap:{ width: 28, height: 28, borderRadius: 6, backgroundColor: SURFACE, justifyContent: 'center', alignItems: 'center' },
-  cardTitle:   { fontFamily: FONT_SB, fontSize: 11, color: BLACK, flex: 1 },
+  cardTitle:   { fontFamily: FONT_SB, fontSize: 13, color: BLACK, flex: 1 },
 
   // Badge top-right
   badge:        { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, backgroundColor: SURFACE, borderWidth: 1, borderColor: BORDER },
   badgeRed:     { backgroundColor: '#FEF2F2', borderColor: '#FECACA' },
-  badgeText:    { fontFamily: FONT_B, fontSize: 8,  color: DARK,  letterSpacing: 0.4 },
+  badgeText:    { fontFamily: FONT_B, fontSize: 10, color: DARK,  letterSpacing: 0.4 },
   badgeTextRed: { color: RED },
 
   menuBtn: { padding: 4 },
 
   // Row 2: detail
-  cardDetail: { fontFamily: FONT, fontSize: 9,  color: DARK, marginBottom: 8 },
+  cardDetail: { fontFamily: FONT, fontSize: 11, color: DARK, marginBottom: 8 },
 
   // Row 3: progress bar
   progressTrack: { height: 6, backgroundColor: BORDER, borderRadius: 3, overflow: 'hidden', marginBottom: 12 },
@@ -414,30 +414,30 @@ const s = StyleSheet.create({
 
   // Row 4: footer totals
   cardFooter:    { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
-  cardAmount:    { fontFamily: FONT_B,  fontSize: 13, color: BLACK, letterSpacing: -0.3 },
-  cardGoalAmount:{ fontFamily: FONT_B,  fontSize: 13, color: BLACK, letterSpacing: -0.3 },
-  cardSub:       { fontFamily: FONT,    fontSize: 9,  color: MUTED },
+  cardAmount:    { fontFamily: FONT_B,  fontSize: 15, color: BLACK, letterSpacing: -0.3 },
+  cardGoalAmount:{ fontFamily: FONT_B,  fontSize: 15, color: BLACK, letterSpacing: -0.3 },
+  cardSub:       { fontFamily: FONT,    fontSize: 11, color: MUTED },
 
   // ── Modal ────────────────────────────────────────────────────────────────
   typeRow:           { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   typeBtn:           { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, borderWidth: 1, borderColor: BORDER, backgroundColor: WHITE },
   typeBtnActive:     { backgroundColor: BLACK, borderColor: BLACK },
-  typeBtnText:       { fontFamily: FONT,   fontSize: 10, color: MUTED },
-  typeBtnTextActive: { fontFamily: FONT_B, fontSize: 10, color: WHITE },
+  typeBtnText:       { fontFamily: FONT,   fontSize: 12, color: MUTED },
+  typeBtnTextActive: { fontFamily: FONT_B, fontSize: 12, color: WHITE },
 
   qaLabel: {
-    fontFamily: FONT_B, fontSize: 9, color: BLACK,
+    fontFamily: FONT_B, fontSize: 11, color: BLACK,
     letterSpacing: 0.5, textTransform: 'uppercase',
     marginBottom: 4, marginTop: 12,
   },
   qaInput: {
-    fontFamily: FONT, fontSize: 11, color: BLACK,
+    fontFamily: FONT, fontSize: 13, color: BLACK,
     backgroundColor: WHITE, borderRadius: 10,
     paddingHorizontal: 12, paddingVertical: 10,
     borderWidth: 1, borderColor: BORDER,
   },
-  qaError: { fontFamily: FONT, fontSize: 9, color: RED, marginBottom: 6 },
+  qaError: { fontFamily: FONT, fontSize: 11, color: RED, marginBottom: 6 },
 
   saveBtn:     { backgroundColor: BLACK, borderRadius: 10, paddingVertical: 12, alignItems: 'center', marginTop: 20 },
-  saveBtnText: { fontFamily: FONT_B, fontSize: 11, color: WHITE, letterSpacing: 0.2 },
+  saveBtnText: { fontFamily: FONT_B, fontSize: 13, color: WHITE, letterSpacing: 0.2 },
 });
