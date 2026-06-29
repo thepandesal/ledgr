@@ -702,10 +702,30 @@ export default function SplitBillDetailScreen() {
     setPaymentModal(true);
   };
 
+  // ── Manual return prompt state ─────────────────────────────────────────
+  const [manualReturnModal, setManualReturnModal] = useState(false);
+  const [manualReturnAmount, setManualReturnAmount] = useState(0);
+  const [manualReturnType, setManualReturnType] = useState<'return' | 'expense'>('return');
+  const [manualReturnSaving, setManualReturnSaving] = useState(false);
+
+  const confirmManualReturn = async () => {
+    setManualReturnSaving(true);
+    const spaceId = linkedRecordings[0]?.recording?.space_id ?? null;
+    await supabase.from('recordings').insert({
+      user_id: userId, space_id: spaceId,
+      name: String(name),
+      type: manualReturnType,
+      amount: manualReturnAmount,
+      transaction_date: new Date().toISOString().split('T')[0],
+      status: manualReturnType === 'return' ? 'received' : 'paid',
+    });
+    setManualReturnSaving(false);
+    setManualReturnModal(false);
+  };
+
   const savePayment = async () => {
     const totals = computeTotals();
     const owed = Math.abs(totals[paymentPerson] ?? 0);
-    const isNegative = (totals[paymentPerson] ?? 0) < 0; // they owe you money = positive, you owe them = negative
     const paidSoFar = payments
       .filter((p: any) => p.person_name === paymentPerson)
       .reduce((s: number, p: any) => s + Number(p.amount), 0);
@@ -713,40 +733,97 @@ export default function SplitBillDetailScreen() {
     if (!amount || amount <= 0) return;
     setPaymentSaving(true);
 
+    // 1. Record the payment in split_bill_payments
     await supabase.from('split_bill_payments').insert({
       split_bill_id: splitBillId,
       person_name: paymentPerson,
       amount,
     });
 
-    const newTotal = paidSoFar + amount;
-    // If fully settled and user wants it recorded, create income or expense recording
-    if (paymentRecord && Math.abs(newTotal - owed) < 0.01) {
-      const spaceId = linkedRecordings[0]?.recording?.space_id ?? null;
-      if (isNegative) {
-        // You owe them — create expense
-        await supabase.from('recordings').insert({
-          user_id: userId, space_id: spaceId,
-          name: `${name} · ${paymentPerson}`,
-          type: 'expense', amount: owed,
-          transaction_date: new Date().toISOString().split('T')[0],
-          status: 'paid',
-        });
+    // 2. Compute per-recording and manual breakdown for this person
+    // Build: { recordingId -> amount_owed_by_person } and manual total
+    const recordingOwed: Record<string, { amount: number; rec: any }> = {};
+    let manualOwed = 0;
+
+    items.forEach((item: any) => {
+      const assignedToMe = (item.people ?? []).includes(paymentPerson);
+      if (!assignedToMe) return;
+      const pp = Number(item.cost) / item.people.length;
+      if (item.recording_id) {
+        const rid = item.recording_id;
+        // Find the recording details from linkedRecordings
+        const lr = linkedRecordings.find((l: any) => l.recording?.id === rid);
+        if (!recordingOwed[rid]) recordingOwed[rid] = { amount: 0, rec: lr?.recording };
+        recordingOwed[rid].amount += pp;
       } else {
-        // They owe you — create income
-        await supabase.from('recordings').insert({
-          user_id: userId, space_id: spaceId,
-          name: `${name} · ${paymentPerson}`,
-          type: 'income', amount: owed,
-          transaction_date: new Date().toISOString().split('T')[0],
-          status: 'received',
-        });
+        manualOwed += pp;
       }
+    });
+
+    // 3. Sequential assignment — pay recording items first, then manual
+    let remaining = amount;
+    const today = new Date().toISOString().split('T')[0];
+
+    for (const rid of Object.keys(recordingOwed)) {
+      if (remaining <= 0) break;
+      const { amount: itemAmount, rec } = recordingOwed[rid];
+      if (!rec) continue;
+      const credit = Math.min(remaining, itemAmount);
+      remaining -= credit;
+
+      // Create a return linked to this recording
+      await supabase.from('recordings').insert({
+        user_id: userId,
+        space_id: rec.space_id,
+        name: `${rec.name} · ${paymentPerson}`,
+        type: 'return',
+        amount: credit,
+        transaction_date: today,
+        status: 'received',
+        linked_recording_id: rid,
+      });
+
+      // Update paid_amount on the parent recording
+      const { data: parentRec } = await supabase
+        .from('recordings').select('paid_amount, amount, is_due')
+        .eq('id', rid).single();
+      if (parentRec) {
+        const newPaid = Number(parentRec.paid_amount ?? 0) + credit;
+        const fullyCollected = newPaid >= Number(parentRec.amount) - 0.01;
+        await supabase.from('recordings').update({
+          paid_amount: newPaid,
+          is_due: true,
+          ...(fullyCollected ? { status: 'paid' } : {}),
+        }).eq('id', rid);
+      }
+    }
+
+    // 4. Handle manual portion
+    if (remaining > 0 && manualOwed > 0) {
+      const manualCredit = Math.min(remaining, manualOwed);
+      // Check if this split bill already has a manual return/income recording
+      const { data: existingManual } = await supabase
+        .from('recordings')
+        .select('id')
+        .eq('user_id', userId)
+        .in('type', ['return', 'income', 'expense'])
+        .is('linked_recording_id', null)
+        .eq('name', String(name))
+        .limit(1);
+
+      if (!existingManual || existingManual.length === 0) {
+        // No existing manual recording — prompt user
+        setManualReturnAmount(manualCredit);
+        setManualReturnType('return');
+        setManualReturnModal(true);
+      }
+      // If it already exists, silently skip (already tracked)
     }
 
     setPaymentSaving(false);
     setPaymentModal(false);
     refetchPayments();
+    queryClient.invalidateQueries({ queryKey: ['split-bill-recordings', splitBillId] });
   };
   const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -1585,17 +1662,6 @@ export default function SplitBillDetailScreen() {
               {paymentMode === 'full' && (
                 <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 15, color: ACCENT_DARK, marginBottom: 8 }}>{fmt(remaining)}</Text>
               )}
-              {/* Record toggle */}
-              <TouchableOpacity
-                style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, borderTopWidth: 1, borderTopColor: Colors.border, marginTop: 4 }}
-                onPress={() => setPaymentRecord(p => !p)}
-              >
-                <Ionicons name={paymentRecord ? 'checkmark-circle' : 'ellipse-outline'} size={20} color={paymentRecord ? ACCENT_DARK : Colors.faint} />
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 13, color: Colors.text }}>create a recording</Text>
-                  <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: Colors.muted }}>{recordHint}</Text>
-                </View>
-              </TouchableOpacity>
               <TouchableOpacity
                 style={[s.doneBtn, { opacity: paymentSaving ? 0.5 : 1 }]}
                 onPress={savePayment}
@@ -1642,6 +1708,41 @@ export default function SplitBillDetailScreen() {
           </ScrollView>
         </View>
       </Modal>
+
+      {/* Manual return prompt */}
+      <BottomSheet visible={manualReturnModal} onClose={() => setManualReturnModal(false)} title="manual item settlement" height="40%">
+        <Text style={{ fontFamily: Brand.font.mono, fontSize: 13, color: Colors.text, marginBottom: 16 }}>
+          ₱{fmt(manualReturnAmount)} is from a manual item with no linked recording.
+        </Text>
+        <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 10 }}>create a recording for this?</Text>
+        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
+          <TouchableOpacity
+            style={[s.modeBtn, manualReturnType === 'return' && s.modeBtnActive]}
+            onPress={() => setManualReturnType('return')}
+          >
+            <Text style={[s.modeBtnText, manualReturnType === 'return' && s.modeBtnTextActive]}>money in (return)</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[s.modeBtn, manualReturnType === 'expense' && s.modeBtnActive]}
+            onPress={() => setManualReturnType('expense')}
+          >
+            <Text style={[s.modeBtnText, manualReturnType === 'expense' && s.modeBtnTextActive]}>money out (expense)</Text>
+          </TouchableOpacity>
+        </View>
+        <TouchableOpacity
+          style={[s.doneBtn, { opacity: manualReturnSaving ? 0.5 : 1 }]}
+          onPress={confirmManualReturn}
+          disabled={manualReturnSaving}
+        >
+          <Text style={s.doneBtnText}>{manualReturnSaving ? 'saving...' : 'create recording'}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[s.doneBtn, { backgroundColor: Colors.surface, marginTop: 8 }]}
+          onPress={() => setManualReturnModal(false)}
+        >
+          <Text style={[s.doneBtnText, { color: Colors.muted }]}>skip</Text>
+        </TouchableOpacity>
+      </BottomSheet>
 
       {/* Edit name modal */}
       <BottomSheet visible={editNameModal} onClose={() => setEditNameModal(false)} title="rename split bill" height="30%">
