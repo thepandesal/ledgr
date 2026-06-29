@@ -230,8 +230,8 @@ export default function RecordingDetailScreen() {
     const { data: rec } = await supabase.from('recordings').select('type, linked_recording_id').eq('id', recordingId).single();
     if (!rec) return;
 
-    if (rec.type === 'payable' || rec.type === 'receivable') {
-      const paymentType = rec.type === 'payable' ? 'expense' : 'return';
+    if (rec.type === 'debt' || rec.type === 'due') {
+      const paymentType = rec.type === 'debt' ? 'expense' : 'return';
       const { data: payments } = await supabase.from('recordings')
         .select('id, name, amount, transaction_date, payment_to, payment_from_account_id, accounts:payment_from_account_id(account_name, bank)')
         .eq('linked_recording_id', recordingId).eq('type', paymentType).order('transaction_date', { ascending: false });
@@ -294,8 +294,7 @@ export default function RecordingDetailScreen() {
         setPayablePerPerson({ map: perPersonMap, paidFor });
       }
     } else if (rec.type === 'expense') {
-      // check if a receivable points to this expense
-      const { data: recv } = await supabase.from('recordings').select('id, name').eq('linked_recording_id', recordingId).eq('type', 'receivable').maybeSingle();
+      const { data: recv } = await supabase.from('recordings').select('id, name').eq('linked_recording_id', recordingId).eq('type', 'due').maybeSingle();
       if (recv) setLinkedReceivable(recv);
     }
   };
@@ -389,10 +388,10 @@ export default function RecordingDetailScreen() {
       const prevPaid = Number(recording.paid_amount ?? 0);
       const newPaid = prevPaid + amount;
       await supabase.from('recordings').update({
-        status: collectComplete ? 'received' : 'partial',
+        status: collectComplete ? 'paid' : 'partial',
         paid_amount: newPaid,
       }).eq('id', recordingId);
-      setRecording((prev: any) => ({ ...prev, status: collectComplete ? 'received' : 'partial', paid_amount: newPaid }));
+      setRecording((prev: any) => ({ ...prev, status: collectComplete ? 'paid' : 'partial', paid_amount: newPaid }));
       setCollectModal(false);
       loadPaymentData();
     } catch (e) { console.log(e); }
@@ -528,14 +527,17 @@ export default function RecordingDetailScreen() {
         space_id: recording.space_id,
         user_id: user.id,
         name: recording.name,
-        type: 'receivable',
+        type: 'due',
         amount,
         transaction_date: recording.transaction_date,
-        status: 'pending',
+        status: 'unpaid',
         account_id: recording.account_id ?? null,
         category_id: recording.category_id ?? null,
         linked_recording_id: recordingId,
       }).select('id').single();
+      // Tag the parent expense as is_due
+      await supabase.from('recordings').update({ is_due: true }).eq('id', recordingId);
+      setRecording((prev: any) => ({ ...prev, is_due: true }));
       setReceivableModal(false);
       setReceivableMode('full');
       setReceivableManualAmount('');
@@ -1079,8 +1081,8 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
 
   const amountColor = () => {
     if (!recording) return Colors.muted;
-    if (recording.type === 'expense' || recording.type === 'payable') return PEACH;
-    if (recording.type === 'income' || recording.type === 'savings' || recording.type === 'return' || recording.type === 'receivable') return ACCENT_DARK;
+    if (recording.type === 'expense' || recording.type === 'debt') return PEACH;
+    if (recording.type === 'income' || recording.type === 'return' || recording.type === 'due') return ACCENT_DARK;
     return Colors.text;
   };
 
@@ -1090,14 +1092,15 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
   };
 
   const typeLabel = (type: string, status: string) => {
-    if (type === 'payable') return `Payable · ${status === 'paid' ? 'Paid' : status === 'partial' ? 'Partial' : 'Unpaid'}`;
-    if (type === 'receivable') return `Receivable · ${status === 'received' ? 'Received' : status === 'partial' ? 'Partial' : 'Pending'}`;
+    if (type === 'debt') return `Debt · ${status === 'paid' ? 'Paid' : status === 'partial' ? 'Partial' : 'Unpaid'}`;
+    if (type === 'due')  return `Due · ${status === 'paid' ? 'Collected' : status === 'partial' ? 'Partial' : 'Unpaid'}`;
     if (type === 'return') return 'Return';
-    return { expense: 'Expense', income: 'Income', savings: 'Savings' }[type] ?? type;
+    if (type === 'expense' && recording?.is_due) return 'Expense · Due';
+    return { expense: 'Expense', income: 'Income' }[type] ?? type;
   };
 
-  const isPayableLocked = recording?.type === 'payable' && (recording?.status === 'partial' || recording?.status === 'paid');
-  const isReceivableLocked = recording?.type === 'receivable' && (recording?.status === 'partial' || recording?.status === 'received');
+          const isPayableLocked = recording?.type === 'debt' && (recording?.status === 'partial' || recording?.status === 'paid');
+  const isReceivableLocked = recording?.type === 'due' && (recording?.status === 'partial' || recording?.status === 'paid');
   const isSplitLocked = isPayableLocked || isReceivableLocked;
 
   const PREVIEW_LIMIT = 4;
@@ -1132,7 +1135,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
 
           {/* Action buttons */}
           <View style={pageStyles.actionRow}>
-            {recording?.type === 'expense' && !linkedPayable && !linkedReceivable && (
+          {recording?.type === 'expense' && !linkedPayable && !linkedReceivable && (
               <TouchableOpacity style={pageStyles.actionBtn} onPress={() => {
                 setReceivableMode('full');
                 setReceivableManualAmount('');
@@ -1140,31 +1143,31 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                 setReceivableModal(true);
               }}>
                 <Ionicons name="arrow-undo-outline" size={15} color={Colors.text} />
-                <Text style={pageStyles.actionBtnText}>create receivable</Text>
+                <Text style={pageStyles.actionBtnText}>tag as due</Text>
               </TouchableOpacity>
             )}
-            {recording?.type === 'payable' && recording?.status !== 'paid' && (
+            {recording?.type === 'debt' && recording?.status !== 'paid' && (
               <TouchableOpacity style={pageStyles.actionBtn} onPress={openPayModal}>
                 <Ionicons name="cash-outline" size={15} color={Colors.text} />
-                <Text style={pageStyles.actionBtnText}>pay bill</Text>
+                <Text style={pageStyles.actionBtnText}>pay debt</Text>
               </TouchableOpacity>
             )}
-            {recording?.type === 'payable' && recording?.status === 'paid' && (
+            {recording?.type === 'debt' && recording?.status === 'paid' && (
               <View style={[pageStyles.actionBtn, pageStyles.actionBtnSuccess]}>
                 <Ionicons name="checkmark-circle" size={15} color={Colors.success} />
                 <Text style={[pageStyles.actionBtnText, { color: Colors.success }]}>fully paid</Text>
               </View>
             )}
-            {recording?.type === 'receivable' && recording?.status !== 'received' && (
+            {recording?.type === 'due' && recording?.status !== 'paid' && (
               <TouchableOpacity style={pageStyles.actionBtn} onPress={openCollectModal}>
                 <Ionicons name="arrow-down-circle-outline" size={15} color={Colors.text} />
                 <Text style={pageStyles.actionBtnText}>collect</Text>
               </TouchableOpacity>
             )}
-            {recording?.type === 'receivable' && recording?.status === 'received' && (
+            {recording?.type === 'due' && recording?.status === 'paid' && (
               <View style={[pageStyles.actionBtn, pageStyles.actionBtnSuccess]}>
                 <Ionicons name="checkmark-circle" size={15} color={Colors.success} />
-                <Text style={[pageStyles.actionBtnText, { color: Colors.success }]}>fully received</Text>
+                <Text style={[pageStyles.actionBtnText, { color: Colors.success }]}>fully collected</Text>
               </View>
             )}
             <TouchableOpacity style={[pageStyles.actionBtn, pageStyles.actionBtnDanger]} onPress={() => setDeleteConfirm(true)}>
@@ -1224,7 +1227,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
             {linkedPayable && (
               <>
                 <View style={{ height: 1, backgroundColor: Colors.border, marginVertical: 2 }} />
-                <InfoRow label={recording?.type === 'return' ? 'linked receivable' : 'linked payable'} value={truncate(linkedPayable.name, 16)} />
+                <InfoRow label={recording?.type === 'return' ? 'linked due' : 'linked debt'} value={truncate(linkedPayable.name, 16)} />
               </>
             )}
             {linkedReceivable && (
@@ -1237,7 +1240,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
           {linkedPayable && (
             <TouchableOpacity style={pageStyles.linkedBtn} onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: linkedPayable.id } } as any)}>
               <Ionicons name="link-outline" size={12} color={Colors.muted} />
-              <Text style={pageStyles.linkedBtnText}>{recording?.type === 'return' ? 'view receivable' : 'view payable'}</Text>
+              <Text style={pageStyles.linkedBtnText}>{recording?.type === 'return' ? 'view due' : 'view debt'}</Text>
               <Ionicons name="arrow-forward" size={11} color={Colors.muted} />
             </TouchableOpacity>
           )}
@@ -1250,9 +1253,9 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
           )}
 
           {/* Payment/collection history */}
-          {(recording?.type === 'payable' || recording?.type === 'receivable') && linkedPayments.length > 0 && (
+          {(recording?.type === 'debt' || recording?.type === 'due') && linkedPayments.length > 0 && (
             <>
-              <Text style={[pageStyles.sectionHeader, { fontFamily: Brand.font.display }]}>{recording.type === 'receivable' ? 'collections' : 'payments'}</Text>
+              <Text style={[pageStyles.sectionHeader, { fontFamily: Brand.font.display }]}>{recording.type === 'due' ? 'collections' : 'payments'}</Text>
               <View style={pageStyles.infoBlock}>
                 {linkedPayments.map((p: any, i: number) => (
                   <TouchableOpacity key={p.id} onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: p.id } } as any)}>

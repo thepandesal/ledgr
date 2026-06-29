@@ -35,11 +35,11 @@ const PRESETS: { key: Preset; label: string; icon: string }[] = [
 ];
 
 const ACTIVITY_TABS = [
-  { key: 'all',         label: 'All',         types: ['income','return','savings','expense','payment','transfer','payable','receivable'] },
-  { key: 'money-in',    label: 'Money In',    types: ['income','return','savings'] },
-  { key: 'money-out',   label: 'Money Out',   types: ['expense','payment','transfer'] },
-  { key: 'loans',       label: 'Loans',       types: ['payable'] },
-  { key: 'receivables', label: 'Receivables', types: ['receivable'] },
+  { key: 'all',         label: 'All',         types: ['income','return','expense','debt','due'] },
+  { key: 'money-in',    label: 'Money In',    types: ['income','return'] },
+  { key: 'money-out',   label: 'Money Out',   types: ['expense'] },
+  { key: 'loans',       label: 'Debt',        types: ['debt'] },
+  { key: 'receivables', label: 'Due',         types: ['due'] },
 ] as const;
 type ActivityTab = typeof ACTIVITY_TABS[number]['key'];
 
@@ -88,18 +88,15 @@ function fmtAmount(n: number) {
 }
 
 function getTypeLabel(type: string, status: string) {
-  if (type === 'income')     return { label: 'income',    color: Colors.cyan };
-  if (type === 'savings')    return { label: 'savings',   color: Colors.cyan };
-  if (type === 'return')     return { label: 'return',    color: Colors.cyan };
-  if (type === 'expense')    return { label: 'expense',   color: PEACH };
-  if (type === 'payment')    return { label: 'payment',   color: PEACH };
-  if (type === 'transfer')   return { label: 'transfer',  color: PEACH };
-  if (type === 'payable')    return status === 'paid'
-    ? { label: 'loan · paid', color: Colors.cyan }
-    : { label: 'loan',        color: PEACH };
-  if (type === 'receivable') return status === 'received'
-    ? { label: 'receivable · received', color: Colors.cyan }
-    : { label: 'receivable',            color: Colors.cyan };
+  if (type === 'income')  return { label: 'income',  color: Colors.cyan };
+  if (type === 'return')  return { label: 'return',  color: Colors.cyan };
+  if (type === 'expense') return { label: 'expense', color: PEACH };
+  if (type === 'debt')    return status === 'paid'
+    ? { label: 'debt · paid', color: Colors.cyan }
+    : { label: 'debt',        color: PEACH };
+  if (type === 'due')     return status === 'paid'
+    ? { label: 'due · collected', color: Colors.cyan }
+    : { label: 'due',             color: Colors.cyan };
   return { label: type, color: Colors.muted };
 }
 
@@ -255,10 +252,10 @@ export default function SpaceDetailScreen() {
   grouped.sort((a, b) => b.date.getTime() - a.date.getTime());
 
   // Stats (all recordings, not date-filtered)
-  const moneyIn  = recordings.filter(r => ['income','savings','return'].includes(r.type)).reduce((s, r) => s + Number(r.amount), 0);
-  const moneyOut = recordings.filter(r => ['expense','payment','transfer'].includes(r.type)).reduce((s, r) => s + Number(r.amount), 0);
-  const loansActive        = recordings.filter(r => r.type === 'payable'    && r.status !== 'paid').length;
-  const receivablesPending = recordings.filter(r => r.type === 'receivable' && r.status !== 'received').length;
+  const moneyIn  = recordings.filter(r => ['income','return'].includes(r.type)).reduce((s, r) => s + Number(r.amount), 0);
+  const moneyOut = recordings.filter(r => r.type === 'expense').reduce((s, r) => s + Number(r.amount), 0);
+  const loansActive        = recordings.filter(r => r.type === 'debt' && r.status !== 'paid').length;
+  const receivablesPending = recordings.filter(r => r.type === 'due'  && r.status !== 'paid').length;
   const mainValue  = isExpSpace ? moneyOut : moneyIn;
   const pct        = budget ? Math.min(mainValue / budget, 1) : 0;
   const overBudget = isExpSpace && budget ? mainValue > budget : false;

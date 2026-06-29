@@ -24,11 +24,11 @@ const PEACH = '#FFAB91';
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
 const ACTIVITY_TABS = [
-  { key: 'all',         label: 'All',         icon: 'apps-outline',              types: ['income','return','savings','expense','payment','transfer','payable','receivable'] },
-  { key: 'money-in',    label: 'Money In',    icon: 'arrow-down-circle-outline', types: ['income','return','savings'] },
-  { key: 'money-out',   label: 'Money Out',   icon: 'arrow-up-circle-outline',   types: ['expense','payment','transfer'] },
-  { key: 'loans',       label: 'Loans',       icon: 'cash-outline',              types: ['payable'] },
-  { key: 'receivables', label: 'Receivables', icon: 'arrow-undo-outline',        types: ['receivable'] },
+  { key: 'all',         label: 'All',         icon: 'apps-outline',              types: ['income','return','expense','debt','due'] },
+  { key: 'money-in',    label: 'Money In',    icon: 'arrow-down-circle-outline', types: ['income','return'] },
+  { key: 'money-out',   label: 'Money Out',   icon: 'arrow-up-circle-outline',   types: ['expense'] },
+  { key: 'loans',       label: 'Debt',        icon: 'cash-outline',              types: ['debt'] },
+  { key: 'receivables', label: 'Due',         icon: 'arrow-undo-outline',        types: ['due'] },
 ] as const;
 
 type ActivityTab = typeof ACTIVITY_TABS[number]['key'];
@@ -295,13 +295,11 @@ export default function DashboardScreen() {
 
   const isAll = selectedTabs.has('all');
   const currentTypes = isAll
-    ? ['income','savings','expense','payable','receivable']
+    ? ['income','return','expense','debt','due']
     : ACTIVITY_TABS.filter(t => t.key !== 'all' && selectedTabs.has(t.key)).flatMap(t => t.types as string[]);
 
   // treat 'return' same as 'income' for filtering
-  const effectiveTypes = currentTypes.includes('income')
-    ? [...new Set([...currentTypes, 'return'])]
-    : currentTypes;
+  const effectiveTypes = currentTypes;
 
   const isAllSpaces    = selectedSpaces.has('all');
   const isAllAccounts  = selectedAccounts.has('all');
@@ -317,10 +315,10 @@ export default function DashboardScreen() {
     if (date < range.from) return false;
     const to = new Date(range.to); to.setHours(23, 59, 59);
     if (date > to) return false;
-    if (statusFilter === 'active'   && r.type === 'payable'    && r.status === 'paid')     return false;
-    if (statusFilter === 'paid'     && r.type === 'payable'    && r.status !== 'paid')     return false;
-    if (statusFilter === 'pending'  && r.type === 'receivable' && r.status === 'received') return false;
-    if (statusFilter === 'received' && r.type === 'receivable' && r.status !== 'received') return false;
+    if (statusFilter === 'active'   && r.type === 'debt' && r.status === 'paid')   return false;
+    if (statusFilter === 'paid'     && r.type === 'debt' && r.status !== 'paid')   return false;
+    if (statusFilter === 'pending'  && r.type === 'due'  && r.status === 'paid')   return false;
+    if (statusFilter === 'received' && r.type === 'due'  && r.status !== 'paid')   return false;
     return true;
   });
 
@@ -361,12 +359,12 @@ export default function DashboardScreen() {
     return date <= to;
   });
 
-  const moneyInTotal    = allRecordings(['income','savings','return']).reduce((s, r) => s + Number(r.amount), 0);
-  const moneyOutTotal   = allRecordings(['expense','payment','transfer']).reduce((s, r) => s + Number(r.amount), 0);
-  const loansActive     = allRecordings(['payable']).filter(r => r.status !== 'paid').length;
-  const loansPaid       = allRecordings(['payable']).filter(r => r.status === 'paid').length;
-  const receivablesPending  = allRecordings(['receivable']).filter(r => r.status !== 'received').length;
-  const receivablesReceived = allRecordings(['receivable']).filter(r => r.status === 'received').length;
+  const moneyInTotal    = allRecordings(['income','return']).reduce((s, r) => s + Number(r.amount), 0);
+  const moneyOutTotal   = allRecordings(['expense']).reduce((s, r) => s + Number(r.amount), 0);
+  const loansActive     = allRecordings(['debt']).filter(r => r.status !== 'paid').length;
+  const loansPaid       = allRecordings(['debt']).filter(r => r.status === 'paid').length;
+  const receivablesPending  = allRecordings(['due']).filter(r => r.status !== 'paid').length;
+  const receivablesReceived = allRecordings(['due']).filter(r => r.status === 'paid').length;
 
   const fmt     = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2 });
   const fmtAbbr = (n: number) => {
@@ -457,27 +455,18 @@ export default function DashboardScreen() {
     setQaLoading(true); setQaError('');
     try {
       const statusMap: Record<string, string> = {
-        expense: 'paid', income: 'received', savings: 'saved', return: 'received',
-        payment: 'paid', transfer: 'paid', payable: 'unpaid', receivable: 'pending',
+        expense: 'paid', income: 'received', return: 'received',
+        debt: 'unpaid', due: 'unpaid',
       };
       const txDate = `${qaYear}-${_pad(parseInt(qaMonth))}-${_pad(parseInt(qaDay))}`;
 
-      if (qaType === 'expense_receivable') {
-        const { data: expRec } = await supabase.from('recordings').insert({
+      if (qaType === 'expense_due') {
+        await supabase.from('recordings').insert({
           user_id: userId, space_id: qaSpaceId || null,
           name: qaName.trim(), type: 'expense',
           amount: parseFloat(qaAmount), transaction_date: txDate,
-          category_id: qaCatId || null, status: 'paid',
-        }).select('id').single();
-        if (expRec?.id) {
-          await supabase.from('recordings').insert({
-            user_id: userId, space_id: qaSpaceId || null,
-            name: qaName.trim(), type: 'receivable',
-            amount: parseFloat(qaAmount), transaction_date: txDate,
-            category_id: qaCatId || null, status: 'pending',
-            linked_recording_id: expRec.id,
-          });
-        }
+          category_id: qaCatId || null, status: 'paid', is_due: true,
+        });
       } else {
         await supabase.from('recordings').insert({
           user_id: userId,
@@ -499,22 +488,19 @@ export default function DashboardScreen() {
   };
 
   const typeLabel = (r: any) => {
-    if (r.type === 'income')     return { label: 'income',   color: ACCENT };
-    if (r.type === 'savings')    return { label: 'savings',  color: ACCENT };
-    if (r.type === 'return')     return { label: 'return',   color: ACCENT };
-    if (r.type === 'expense')    return { label: 'expense',  color: PEACH };
-    if (r.type === 'payment')    return { label: 'payment',  color: PEACH };
-    if (r.type === 'transfer')   return { label: 'transfer', color: PEACH };
-    if (r.type === 'payable')    return r.status === 'paid'
-      ? { label: 'loan · paid',    color: ACCENT }
+    if (r.type === 'income')  return { label: 'income',  color: ACCENT };
+    if (r.type === 'return')  return { label: 'return',  color: ACCENT };
+    if (r.type === 'expense') return { label: r.is_due ? 'expense · due' : 'expense', color: PEACH };
+    if (r.type === 'debt')    return r.status === 'paid'
+      ? { label: 'debt · paid',    color: ACCENT }
       : r.status === 'partial'
-      ? { label: 'loan · partial', color: PEACH }
-      : { label: 'loan',           color: PEACH };
-    if (r.type === 'receivable') return r.status === 'received'
-      ? { label: 'receivable · received', color: ACCENT }
+      ? { label: 'debt · partial', color: PEACH }
+      : { label: 'debt',           color: PEACH };
+    if (r.type === 'due')     return r.status === 'paid'
+      ? { label: 'due · collected', color: ACCENT }
       : r.status === 'partial'
-      ? { label: 'receivable · partial',  color: ACCENT }
-      : { label: 'receivable',            color: ACCENT };
+      ? { label: 'due · partial',   color: ACCENT }
+      : { label: 'due',             color: ACCENT };
     return null;
   };
 
@@ -613,10 +599,10 @@ export default function DashboardScreen() {
         {/* Type */}
         <Text style={s.qaLabel}>type</Text>
         {[
-          { label: 'money out',  types: [{ key: 'expense', label: 'expense' }] },
-          { label: 'money in',   types: [{ key: 'income', label: 'income' }, { key: 'savings', label: 'savings' }] },
-          { label: 'loan',       types: [{ key: 'payable', label: 'payable' }] },
-          { label: 'receivable', types: [{ key: 'receivable', label: 'receivable' }, { key: 'expense_receivable', label: 'expense + receivable' }] },
+          { label: 'money out',  types: [{ key: 'expense', label: 'expense' }, { key: 'expense_due', label: 'expense + due' }] },
+          { label: 'money in',   types: [{ key: 'income', label: 'income' }, { key: 'return', label: 'return' }] },
+          { label: 'debt',       types: [{ key: 'debt', label: 'debt' }] },
+          { label: 'due',        types: [{ key: 'due', label: 'due' }] },
         ].map(group => (
           <View key={group.label} style={{ marginBottom: 6 }}>
             <Text style={{ fontFamily: Fonts.monoBold, fontSize: 9, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 4 }}>{group.label}</Text>

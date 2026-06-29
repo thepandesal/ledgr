@@ -37,7 +37,7 @@ export interface Account {
   created_at: string;
 }
 
-export type RecordingType = 'expense' | 'income' | 'savings' | 'payable' | 'receivable' | 'expense' | 'return';
+export type RecordingType = 'expense' | 'income' | 'return' | 'debt' | 'due';
 export type RecordingStatus = 'paid' | 'unpaid' | 'partial' | 'pending' | 'received' | 'saved';
 
 export interface Recording {

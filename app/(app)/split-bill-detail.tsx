@@ -1,13 +1,15 @@
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  SafeAreaView, Animated, Dimensions, ActivityIndicator, TextInput, Share, Platform,
+  SafeAreaView, Animated, Dimensions, ActivityIndicator, TextInput, Share, Platform, Image, Modal,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '../../src/lib/supabase';
 import { useUser } from '../../src/hooks/useUser';
+import { compressImage, uploadReceiptPhoto } from '../../src/lib/receiptUpload';
 import { Colors, Fonts, Radius } from '@/components/ui/theme';
 import BottomSheet from '@/components/ui/BottomSheet';
 import itemStyles from '@/components/ui/itemStyles';
@@ -53,6 +55,72 @@ export default function SplitBillDetailScreen() {
   const [addPersonModal, setAddPersonModal] = useState(false);
   const [tagInputVal, setTagInputVal] = useState('');
   const [contacts, setContacts] = useState<string[]>([]);
+
+  // ── Receipt state ─────────────────────────────────────────────────────────
+  const [linkedReceipt, setLinkedReceipt]   = useState<any>(null);
+  const [receiptPhotos, setReceiptPhotos]   = useState<{ id: string; url: string }[]>([]);
+  const [addReceiptModal, setAddReceiptModal] = useState(false);
+  const [photoModal, setPhotoModal]         = useState(false);
+  const [photoModalIndex, setPhotoModalIndex] = useState(0);
+
+  const loadLinkedReceipt = async () => {
+    if (!splitBillId) return;
+    const { data: entry } = await supabase.from('receipt_entries').select('id, note, created_at').eq('split_bill_id', splitBillId).maybeSingle();
+    if (!entry) { setLinkedReceipt(null); setReceiptPhotos([]); return; }
+    setLinkedReceipt(entry);
+    const { data: photos } = await supabase.from('receipt_photos').select('id, storage_path, url').eq('entry_id', entry.id).order('created_at');
+    if (photos) {
+      const urls = await Promise.all(photos.map(async (p: any) => {
+        let url = p.url ?? '';
+        if (!url && p.storage_path) {
+          const { data } = await supabase.storage.from('receipts').createSignedUrl(p.storage_path, 3600);
+          url = data?.signedUrl ?? '';
+        }
+        return { id: p.id, url };
+      }));
+      setReceiptPhotos(urls);
+    }
+  };
+
+  const addReceiptFromCamera = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') return;
+    const result = await ImagePicker.launchCameraAsync({ quality: 1 });
+    if (!result.canceled && result.assets[0]) {
+      let entryId = linkedReceipt?.id;
+      if (!entryId) {
+        const { data: entry } = await supabase.from('receipt_entries').insert({ user_id: userId, note: String(name), split_bill_id: splitBillId }).select().maybeSingle();
+        entryId = entry?.id;
+      }
+      if (!entryId) return;
+      const compressed = await compressImage(result.assets[0].uri);
+      await uploadReceiptPhoto(compressed, entryId);
+      setAddReceiptModal(false);
+      loadLinkedReceipt();
+    }
+  };
+
+  const addReceiptFromGallery = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') return;
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsMultipleSelection: true, quality: 1 });
+    if (!result.canceled) {
+      let entryId = linkedReceipt?.id;
+      if (!entryId) {
+        const { data: entry } = await supabase.from('receipt_entries').insert({ user_id: userId, note: String(name), split_bill_id: splitBillId }).select().maybeSingle();
+        entryId = entry?.id;
+      }
+      if (!entryId) return;
+      for (const asset of result.assets) {
+        const compressed = await compressImage(asset.uri);
+        await uploadReceiptPhoto(compressed, entryId);
+      }
+      setAddReceiptModal(false);
+      loadLinkedReceipt();
+    }
+  };
+
+  useEffect(() => { if (splitBillId) loadLinkedReceipt(); }, [splitBillId]);
 
   const { data: people = [], refetch: refetchPeople } = useQuery({
     queryKey: ['split-bill-people', splitBillId],
@@ -101,16 +169,16 @@ export default function SplitBillDetailScreen() {
   // ── Add recording state ──────────────────────────────────────────────────
   const [addRecModal, setAddRecModal] = useState(false);
   const [allRecordings, setAllRecordings] = useState<any[]>([]);
-  const [recTab, setRecTab] = useState<'payable' | 'receivable' | 'expense' | 'income'>('expense');
+  const [recTab, setRecTab] = useState<'debt' | 'due' | 'expense' | 'income'>('expense');
   const [recSearch, setRecSearch] = useState('');
   const [recDays, setRecDays] = useState<30 | 60 | 180 | 365 | null>(30);
   const [recShowMore, setRecShowMore] = useState(false);
 
-  const REC_TABS: { key: 'payable' | 'receivable' | 'expense' | 'income'; label: string }[] = [
+  const REC_TABS: { key: 'debt' | 'due' | 'expense' | 'income'; label: string }[] = [
     { key: 'expense', label: 'expense' },
-    { key: 'receivable', label: 'receivable' },
-    { key: 'payable', label: 'loan' },
-    { key: 'income', label: 'income' },
+    { key: 'due',     label: 'due' },
+    { key: 'debt',    label: 'debt' },
+    { key: 'income',  label: 'income' },
   ];
 
   const REC_RANGES: { value: 30 | 60 | 180 | 365 | null; label: string }[] = [
@@ -127,7 +195,7 @@ export default function SplitBillDetailScreen() {
       .from('recordings')
       .select('id, name, amount, type, transaction_date, status')
       .eq('user_id', userId)
-      .in('type', ['expense', 'receivable', 'payable', 'income'])
+      .in('type', ['expense', 'due', 'debt', 'income'])
       .order('transaction_date', { ascending: false })
       .limit(200);
     setAllRecordings((data ?? []).filter((r: any) => !linkedIds.includes(r.id)));
@@ -522,9 +590,9 @@ export default function SplitBillDetailScreen() {
     const rec = lr.recording;
     if (!rec) return;
     const alreadyDone =
-      (rec.type === 'expense'    && rec.status === 'paid') ||
-      (rec.type === 'receivable' && rec.status === 'received') ||
-      (rec.type === 'payable'    && rec.status === 'paid');
+      (rec.type === 'expense' && rec.status === 'paid') ||
+      (rec.type === 'due'     && rec.status === 'paid') ||
+      (rec.type === 'debt'    && rec.status === 'paid');
     if (alreadyDone) return;
     const { data: accs } = await supabase
       .from('accounts').select('id, account_name, bank, account_number')
@@ -552,8 +620,7 @@ export default function SplitBillDetailScreen() {
         linked_recording_id: rec.id,
       });
       await supabase.from('recordings').update({ status: 'paid' }).eq('id', rec.id);
-    } else if (rec.type === 'receivable') {
-      // Create income linked to receivable
+    } else if (rec.type === 'due') {
       await supabase.from('recordings').insert({
         user_id: userId, space_id: rec.space_id,
         name: rec.name, type: 'income',
@@ -562,7 +629,6 @@ export default function SplitBillDetailScreen() {
         category_id: rec.category_id ?? null,
         linked_recording_id: rec.id,
       });
-      // If receivable has a linked expense, also create expense linked back
       if (rec.linked_recording_id) {
         await supabase.from('recordings').insert({
           user_id: userId, space_id: rec.space_id,
@@ -573,8 +639,8 @@ export default function SplitBillDetailScreen() {
           linked_recording_id: rec.linked_recording_id,
         });
       }
-      await supabase.from('recordings').update({ status: 'received', paid_amount: rec.amount }).eq('id', rec.id);
-    } else if (rec.type === 'payable') {
+      await supabase.from('recordings').update({ status: 'paid', paid_amount: rec.amount }).eq('id', rec.id);
+    } else if (rec.type === 'debt') {
       // Create expense payment linked to loan
       await supabase.from('recordings').insert({
         user_id: userId, space_id: rec.space_id,
@@ -686,7 +752,7 @@ export default function SplitBillDetailScreen() {
   const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   const typeColor = (type: string) => {
-    if (type === 'payable') return PEACH;
+    if (type === 'debt') return PEACH;
     return ACCENT_DARK;
   };
 
@@ -728,10 +794,10 @@ export default function SplitBillDetailScreen() {
               {linkedRecordings.map((lr: any) => {
                   const rec = lr.recording;
                   const isDone =
-                    (rec?.type === 'expense'    && rec?.status === 'paid') ||
-                    (rec?.type === 'receivable' && rec?.status === 'received') ||
-                    (rec?.type === 'payable'    && rec?.status === 'paid');
-                  const actionable = rec?.type === 'expense' || rec?.type === 'receivable' || rec?.type === 'payable';
+                    (rec?.type === 'expense' && rec?.status === 'paid') ||
+                    (rec?.type === 'due'     && rec?.status === 'paid') ||
+                    (rec?.type === 'debt'    && rec?.status === 'paid');
+                  const actionable = rec?.type === 'expense' || rec?.type === 'due' || rec?.type === 'debt';
                   return (
                 <TouchableOpacity
                   key={lr.id}
@@ -753,7 +819,7 @@ export default function SplitBillDetailScreen() {
                       {isDone && (
                         <View style={{ backgroundColor: ACCENT + '44', borderRadius: Radius.pill, paddingHorizontal: 6, paddingVertical: 1 }}>
                           <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 9, color: ACCENT_DARK }}>
-                            {rec?.type === 'receivable' ? 'received' : 'paid'}
+                            {rec?.type === 'due' ? 'collected' : 'paid'}
                           </Text>
                         </View>
                       )}
@@ -858,6 +924,29 @@ export default function SplitBillDetailScreen() {
                 <View style={s.itemsTotalDots} />
                 <Text style={s.itemsTotalValue}>{fmt(totalItemsCost)}</Text>
               </View>
+            </View>
+          )}
+
+          {/* Receipt */}
+          <View style={s.divider} />
+          <View style={s.sectionRow}>
+            <Text style={s.sectionHeader}>receipt</Text>
+            <TouchableOpacity onPress={() => setAddReceiptModal(true)} style={s.sectionAddBtn}>
+              <Ionicons name="add" size={12} color={ACCENT_DARK} />
+              <Text style={s.sectionAddText}>add</Text>
+            </TouchableOpacity>
+          </View>
+          {linkedReceipt && receiptPhotos.length > 0 ? (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ paddingBottom: 12 }} contentContainerStyle={{ gap: 8 }}>
+              {receiptPhotos.map((p, idx) => (
+                <TouchableOpacity key={p.id} onPress={() => { setPhotoModalIndex(idx); setPhotoModal(true); }} activeOpacity={0.85}>
+                  <Image source={{ uri: p.url }} style={{ width: 90, height: 90, borderRadius: Radius.md, backgroundColor: Colors.surface }} resizeMode="cover" />
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          ) : (
+            <View style={s.emptyWrap}>
+              <Text style={Brand.type.emptyText}>no receipt photos yet</Text>
             </View>
           )}
 
@@ -1519,6 +1608,41 @@ export default function SplitBillDetailScreen() {
           );
         })()}
       </BottomSheet>
+
+      {/* Add receipt modal */}
+      <BottomSheet visible={addReceiptModal} onClose={() => setAddReceiptModal(false)} title="add receipt" height="30%">
+        <TouchableOpacity
+          style={[s.doneBtn, { flexDirection: 'row', justifyContent: 'center', gap: 8, marginTop: 0 }]}
+          onPress={addReceiptFromCamera}
+        >
+          <Ionicons name="camera-outline" size={18} color={ACCENT_DARK} />
+          <Text style={s.doneBtnText}>camera</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[s.doneBtn, { flexDirection: 'row', justifyContent: 'center', gap: 8, backgroundColor: Colors.surface }]}
+          onPress={addReceiptFromGallery}
+        >
+          <Ionicons name="images-outline" size={18} color={Colors.text} />
+          <Text style={[s.doneBtnText, { color: Colors.text }]}>gallery</Text>
+        </TouchableOpacity>
+      </BottomSheet>
+
+      {/* Photo carousel modal */}
+      <Modal visible={photoModal} transparent animationType="fade" onRequestClose={() => setPhotoModal(false)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center' }}>
+          <TouchableOpacity style={{ position: 'absolute', top: 52, right: 24, zIndex: 10 }} onPress={() => setPhotoModal(false)}>
+            <Ionicons name="close" size={26} color="#fff" />
+          </TouchableOpacity>
+          <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} contentOffset={{ x: photoModalIndex * width, y: 0 }}>
+            {receiptPhotos.map((p, i) => (
+              <View key={p.id} style={{ width, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 16 }}>
+                <Image source={{ uri: p.url }} style={{ width: width - 32, height: width - 32, borderRadius: 12 }} resizeMode="contain" />
+                <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 12 }}>{i + 1} / {receiptPhotos.length}</Text>
+              </View>
+            ))}
+          </ScrollView>
+        </View>
+      </Modal>
 
       {/* Edit name modal */}
       <BottomSheet visible={editNameModal} onClose={() => setEditNameModal(false)} title="rename split bill" height="30%">
