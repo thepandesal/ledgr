@@ -234,17 +234,17 @@ export default function SplitBillDetailScreen() {
   const [shareAccounts, setShareAccounts] = useState<any[]>([]);
   const [shareSelectedIds, setShareSelectedIds] = useState<string[]>([]);
   const [shareLoading, setShareLoading] = useState(false);
+  const [shareConfirmed, setShareConfirmed] = useState(false); // whether user clicked "no account"
 
   const openShareModal = async () => {
+    setShareConfirmed(false);
     const { data: accs } = await supabase
       .from('accounts')
       .select('id, account_name, holder_name, bank, account_number')
       .eq('user_id', userId)
       .order('account_name');
-    // pre-load previously selected accounts from existing share row
-    const existing = shareRow;
-    if (existing) {
-      const { data: sr } = await supabase.from('split_shares').select('data').eq('id', existing.id).single();
+    if (shareRow) {
+      const { data: sr } = await supabase.from('split_shares').select('data').eq('id', shareRow.id).single();
       setShareSelectedIds(sr?.data?.account_ids ?? []);
     } else {
       setShareSelectedIds([]);
@@ -255,8 +255,8 @@ export default function SplitBillDetailScreen() {
 
   const handleShare = async () => {
     setShareLoading(true);
-    let shareId = shareRow?.id;
     const firstRecordingId = linkedRecordings[0]?.recording?.id ?? null;
+    let shareId = shareRow?.id;
     if (!shareId) {
       const { data } = await supabase
         .from('split_shares')
@@ -264,6 +264,7 @@ export default function SplitBillDetailScreen() {
         .select('id')
         .single();
       shareId = data?.id;
+      queryClient.invalidateQueries({ queryKey: ['split-bill-share', splitBillId] });
     } else {
       await supabase.from('split_shares').update({ data: { account_ids: shareSelectedIds } }).eq('id', shareId);
     }
@@ -489,10 +490,8 @@ export default function SplitBillDetailScreen() {
 
           {/* Share */}
           <TouchableOpacity style={s.shareBtn} onPress={openShareModal} activeOpacity={0.8}>
-            <Ionicons name={shareCopied ? 'checkmark-circle' : 'share-outline'} size={15} color={shareCopied ? Colors.cyan : Colors.muted} />
-            <Text style={[s.shareBtnText, shareCopied && { color: Colors.cyan }]}>
-              {shareCopied ? 'link copied!' : 'share split bill'}
-            </Text>
+            <Ionicons name="share-outline" size={15} color={Colors.muted} />
+            <Text style={s.shareBtnText}>share split bill</Text>
           </TouchableOpacity>
 
         </ScrollView>
@@ -775,18 +774,35 @@ export default function SplitBillDetailScreen() {
       </BottomSheet>
 
       {/* Share modal */}
-      <BottomSheet visible={shareModal} onClose={() => setShareModal(false)} title="share split bill" height="55%">
-        <Text style={{ fontFamily: Fonts.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8 }}>payment accounts (optional)</Text>
-        <ScrollView style={{ maxHeight: 240 }} showsVerticalScrollIndicator={false}>
-          {shareAccounts.length === 0 ? (
-            <Text style={{ fontFamily: Fonts.mono, fontSize: 12, color: Colors.faint }}>no accounts found</Text>
-          ) : shareAccounts.map((acc: any) => {
+      <BottomSheet visible={shareModal} onClose={() => setShareModal(false)} title="share split bill" height="60%">
+        <Text style={{ fontFamily: Fonts.mono, fontSize: 12, color: Colors.muted, marginBottom: 12 }}>
+          select a bank account to include for payment, or choose none.
+        </Text>
+        <ScrollView style={{ maxHeight: 220 }} showsVerticalScrollIndicator={false}>
+          {/* No account option */}
+          <TouchableOpacity
+            style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 10 }}
+            onPress={() => { setShareSelectedIds([]); setShareConfirmed(true); }}
+          >
+            <Ionicons
+              name={shareConfirmed && shareSelectedIds.length === 0 ? 'checkmark-circle' : 'ellipse-outline'}
+              size={18}
+              color={shareConfirmed && shareSelectedIds.length === 0 ? Colors.cyan : Colors.faint}
+            />
+            <Text style={{ fontFamily: Fonts.mono, fontSize: 13, color: Colors.muted }}>no bank account</Text>
+          </TouchableOpacity>
+          {shareAccounts.map((acc: any) => {
             const sel = shareSelectedIds.includes(acc.id);
             return (
               <TouchableOpacity
                 key={acc.id}
                 style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 10 }}
-                onPress={() => setShareSelectedIds(prev => sel ? prev.filter(x => x !== acc.id) : [...prev, acc.id])}
+                onPress={() => {
+                  setShareConfirmed(true);
+                  setShareSelectedIds(prev =>
+                    sel ? prev.filter(x => x !== acc.id) : [...prev, acc.id]
+                  );
+                }}
               >
                 <Ionicons name={sel ? 'checkmark-circle' : 'ellipse-outline'} size={18} color={sel ? Colors.cyan : Colors.faint} />
                 <View style={{ flex: 1 }}>
@@ -798,11 +814,11 @@ export default function SplitBillDetailScreen() {
           })}
         </ScrollView>
         <TouchableOpacity
-          style={[s.doneBtn, { opacity: shareLoading ? 0.5 : 1 }]}
+          style={[s.doneBtn, { opacity: shareLoading || !shareConfirmed ? 0.4 : 1 }]}
           onPress={handleShare}
-          disabled={shareLoading}
+          disabled={shareLoading || !shareConfirmed}
         >
-          <Text style={s.doneBtnText}>{shareLoading ? 'generating...' : 'copy link'}</Text>
+          <Text style={s.doneBtnText}>{shareLoading ? 'generating...' : 'generate link'}</Text>
         </TouchableOpacity>
       </BottomSheet>
 
