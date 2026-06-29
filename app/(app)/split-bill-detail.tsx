@@ -520,6 +520,8 @@ export default function SplitBillDetailScreen() {
     queryClient.invalidateQueries({ queryKey: ['split-bill-recordings', splitBillId] });
   };
 
+  const totalAmount = linkedRecordings.reduce((s: number, r: any) => s + Number(r.amount_contributed), 0);
+
   // ── Payment history ────────────────────────────────────────────────────────────
   const { data: payments = [], refetch: refetchPayments } = useQuery({
     queryKey: ['split-bill-payments', splitBillId],
