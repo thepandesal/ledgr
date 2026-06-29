@@ -1,48 +1,35 @@
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  SafeAreaView, TextInput, ActivityIndicator,
+  SafeAreaView, TextInput, ActivityIndicator, useWindowDimensions, Animated,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../../src/lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useUser } from '../../../src/hooks/useUser';
 import BottomSheet from '@/components/ui/BottomSheet';
 import ConfirmModal from '@/components/ui/ConfirmModal';
-
-// ── Strict B&W design tokens ──────────────────────────────────────────────────
-const BLACK   = '#000000';
-const NEAR_BK = '#111827';
-const DARK    = '#1F2937';
-const MUTED   = '#6B7280';
-const BORDER  = '#E5E7EB';
-const SURFACE = '#F9FAFB';
-const WHITE   = '#FFFFFF';
-const RED     = '#B73E28';
-const FONT    = 'Outfit_400Regular';
-const FONT_SB = 'Outfit_600SemiBold';
-const FONT_B  = 'Outfit_700Bold';
-
-const SHADOW = {
-  shadowColor: '#000',
-  shadowOffset: { width: 0, height: 2 },
-  shadowOpacity: 0.06,
-  shadowRadius: 8,
-  elevation: 3,
-};
+import { Colors, Fonts, Radius, Spacing } from '@/components/ui/theme';
+import Svg, { Path } from 'react-native-svg';
 
 interface SpaceData {
   id: string; name: string; color: string; icon: string;
   budget?: number | null; spent?: number; saved?: number; count?: number;
-  space_type?: string; savings_target_date?: string | null;
+  space_type?: string; savings_target_date?: string | null; is_active?: boolean;
 }
 
-function todayLabel() {
-  return new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-}
+const ACCENT = '#4D72BC'; // prev: #5DC9BD | original Colors.cyan: #7fd8cd
 
 const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+const MOTIVATIONS = [
+  'Every peso saved is a step forward.',
+  'Small habits build big wealth.',
+  'Track today, thrive tomorrow.',
+  'You\'re in control of your finances.',
+  'Consistency beats perfection.',
+];
 
 export default function SpacesScreen() {
   const router = useRouter();
@@ -58,6 +45,18 @@ export default function SpacesScreen() {
   const [menuModal, setMenuModal] = useState(false);
   const [selectedSpace, setSelectedSpace] = useState<SpaceData | null>(null);
   const [editMode, setEditMode] = useState(false);
+  const [activeTab, setActiveTab] = useState<'active' | 'inactive'>('active');
+  const slideAnim = useRef(new Animated.Value(0)).current;
+  const { width: W } = useWindowDimensions();
+
+  const switchTab = (tab: 'active' | 'inactive') => {
+    Animated.timing(slideAnim, {
+      toValue: tab === 'inactive' ? -W : 0,
+      duration: 260,
+      useNativeDriver: true,
+    }).start();
+    setActiveTab(tab);
+  };
 
   const { data: spaces = [] } = useQuery<SpaceData[]>({
     queryKey: ['spaces', userId],
@@ -82,7 +81,7 @@ export default function SpacesScreen() {
   };
 
   const handleCreate = async () => {
-    if (!spaceName.trim()) { setError('Name is required.'); return; }
+    if (!spaceName.trim()) { setError('name is required.'); return; }
     setLoading(true);
     if (editMode && selectedSpace) {
       const { error: err } = await supabase.from('spaces').update({
@@ -94,7 +93,7 @@ export default function SpacesScreen() {
       if (err) { setError(err.message); setLoading(false); return; }
     } else {
       const { error: err } = await supabase.from('spaces').insert({
-        user_id: userId, name: spaceName.trim(), color: BLACK, icon: 'grid',
+        user_id: userId, name: spaceName.trim(), color: ACCENT, icon: 'grid',
         budget: spaceBudget.trim() ? parseFloat(spaceBudget) : null,
         space_type: spaceType,
         savings_target_date: spaceType === 'savings' && spaceTargetDate.trim() ? spaceTargetDate.trim() : null,
@@ -123,184 +122,173 @@ export default function SpacesScreen() {
     queryClient.invalidateQueries({ queryKey: ['spaces', userId] });
   };
 
+  const handleToggleActive = async () => {
+    if (!selectedSpace) return;
+    setMenuModal(false);
+    await supabase.from('spaces').update({ is_active: !selectedSpace.is_active }).eq('id', selectedSpace.id);
+    queryClient.invalidateQueries({ queryKey: ['spaces', userId] });
+  };
+
+  const renderExpenseCard = (space: SpaceData) => {
+    const value       = space.spent ?? 0;
+    const budget      = space.budget ?? 0;
+    const over        = budget > 0 && value > budget;
+    const remaining   = budget - value;
+    const statusColor = over ? Colors.expense : budget > 0 && remaining / budget < 0.2 ? '#F97316' : ACCENT;
+    return (
+      <TouchableOpacity key={space.id} style={s.card} activeOpacity={0.85} onPress={() => router.push({ pathname: '/(app)/space-detail', params: { spaceId: space.id, name: space.name, color: space.color } })}>
+        <View style={s.cardLeft}>
+          <Text style={s.cardName}>{String(space.name).toLowerCase()}</Text>
+          <Text style={s.cardMeta}>{space.count ?? 0} transaction{(space.count ?? 0) !== 1 ? 's' : ''}</Text>
+        </View>
+        <View style={s.cardRight}>
+          <View style={s.cardRow}><Text style={s.cardRowLabel}>spend</Text><Text style={[s.cardRowValue, over && { color: Colors.expense }]}>{fmt(value)}</Text></View>
+          {budget > 0 && (<>
+            <View style={s.cardRow}><Text style={s.cardRowLabel}>budget</Text><Text style={s.cardRowValue}>{fmt(budget)}</Text></View>
+            <View style={s.cardRow}><Text style={s.cardRowLabel}>usable</Text><Text style={[s.cardRowValue, { color: statusColor }]}>{fmt(Math.max(remaining, 0))}</Text></View>
+          </>)}
+        </View>
+        <TouchableOpacity onPress={() => { setSelectedSpace(space); setMenuModal(true); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Ionicons name="ellipsis-horizontal" size={14} color={Colors.muted} />
+        </TouchableOpacity>
+      </TouchableOpacity>
+    );
+  };
+
+  const renderSavingsCard = (space: SpaceData) => {
+    const value       = space.saved ?? 0;
+    const budget      = space.budget ?? 0;
+    const pct         = budget > 0 ? Math.min(value / budget, 1) : 0;
+    const statusColor = pct >= 1 ? ACCENT : '#F97316';
+    return (
+      <TouchableOpacity key={space.id} style={s.card} activeOpacity={0.85} onPress={() => router.push({ pathname: '/(app)/space-detail', params: { spaceId: space.id, name: space.name, color: space.color } })}>
+        <View style={s.cardLeft}>
+          <Text style={s.cardName}>{String(space.name).toLowerCase()}</Text>
+          <Text style={s.cardMeta}>{space.count ?? 0} transaction{(space.count ?? 0) !== 1 ? 's' : ''}</Text>
+        </View>
+        <View style={s.cardRight}>
+          <View style={s.cardRow}><Text style={s.cardRowLabel}>saved</Text><Text style={[s.cardRowValue, { color: ACCENT }]}>{fmt(value)}</Text></View>
+          {budget > 0 && (<>
+            <View style={s.cardRow}><Text style={s.cardRowLabel}>goal</Text><Text style={s.cardRowValue}>{fmt(budget)}</Text></View>
+            <View style={s.cardRow}><Text style={s.cardRowLabel}>remaining</Text><Text style={[s.cardRowValue, { color: statusColor }]}>{fmt(Math.max(budget - value, 0))}</Text></View>
+          </>)}
+        </View>
+        <TouchableOpacity onPress={() => { setSelectedSpace(space); setMenuModal(true); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Ionicons name="ellipsis-horizontal" size={14} color={Colors.muted} />
+        </TouchableOpacity>
+      </TouchableOpacity>
+    );
+  };
+
   const firstName = userName?.split(' ')[0] || 'there';
-  const expenseSpaces = spaces.filter(sp => (sp.space_type ?? 'expense') === 'expense');
-  const savingsSpaces = spaces.filter(sp => sp.space_type === 'savings');
+  const expenseActive   = spaces.filter(sp => (sp.space_type ?? 'expense') === 'expense' && sp.is_active !== false).sort((a, b) => a.name.localeCompare(b.name));
+  const savingsActive   = spaces.filter(sp => sp.space_type === 'savings'  && sp.is_active !== false).sort((a, b) => a.name.localeCompare(b.name));
+  const expenseInactive = spaces.filter(sp => (sp.space_type ?? 'expense') === 'expense' && sp.is_active === false).sort((a, b) => a.name.localeCompare(b.name));
+  const savingsInactive = spaces.filter(sp => sp.space_type === 'savings'  && sp.is_active === false).sort((a, b) => a.name.localeCompare(b.name));
+  const expenseSpaces   = activeTab === 'active' ? expenseActive : expenseInactive;
+  const savingsSpaces   = activeTab === 'active' ? savingsActive : savingsInactive;
+  const motivation = MOTIVATIONS[new Date().getDay() % MOTIVATIONS.length];
 
   return (
     <SafeAreaView style={s.root}>
-      <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+      {/* ── Sticky header ── */}
+      <View style={s.waveBg}>
+        <Text style={s.appLabel}>LEDGR</Text>
+        <Text style={s.pageTitle}>spaces</Text>
+        <Text style={s.dateLine}>
+          {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+        </Text>
+        <Text style={s.motivation}>{motivation}</Text>
+        <Svg viewBox={`0 0 ${W} 64`} width={W} height={64} style={s.wave} preserveAspectRatio="none">
+          <Path
+            d={`M0,32 C${W*0.15},64 ${W*0.35},0 ${W*0.5},32 C${W*0.65},64 ${W*0.85},0 ${W},32 L${W},64 L0,64 Z`}
+            fill={Colors.white}
+          />
+        </Svg>
+      </View>
 
-        {/* ── Header ── */}
-        <View style={s.header}>
-          <View style={{ flex: 1 }}>
-            <Text style={s.greeting}>Hi, {firstName} 👋</Text>
-            <Text style={s.date}>{todayLabel()}</Text>
+      <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} style={{ zIndex: 1 }}>
+        {/* Active / Inactive toggle + add */}
+        <View style={s.actionRow}>
+          <View style={s.tabToggle}>
+            <TouchableOpacity
+              style={[s.tabBtn, activeTab === 'active' && s.tabBtnActive]}
+              onPress={() => switchTab('active')}
+              activeOpacity={0.8}
+            >
+              <Text style={[s.tabBtnText, activeTab === 'active' && s.tabBtnTextActive]}>active</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[s.tabBtn, activeTab === 'inactive' && s.tabBtnActive]}
+              onPress={() => switchTab('inactive')}
+              activeOpacity={0.8}
+            >
+              <Text style={[s.tabBtnText, activeTab === 'inactive' && s.tabBtnTextActive]}>inactive</Text>
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity style={s.addBtn} onPress={openCreate} activeOpacity={0.75}>
-            <Ionicons name="add" size={22} color={WHITE} />
+          <TouchableOpacity style={s.addBtn} onPress={openCreate} activeOpacity={0.8}>
+            <Ionicons name="add" size={18} color={Colors.white} />
           </TouchableOpacity>
         </View>
 
-        {/* ── View all shortcut ── */}
-        <TouchableOpacity
-          style={s.allCard}
-          activeOpacity={0.82}
-          onPress={() => router.push({ pathname: '/(app)/space-detail', params: { spaceId: 'all', name: 'all spaces' } })}
-        >
-          <View style={s.allIconWrap}>
-            <Ionicons name="layers-outline" size={16} color={BLACK} />
-          </View>
-          <Text style={s.allCardText}>View all spaces</Text>
-          <Ionicons name="chevron-forward" size={14} color={MUTED} style={{ marginLeft: 'auto' }} />
-        </TouchableOpacity>
-
-        {/* ── Empty state ── */}
+        {/* ── Empty ── */}
         {spaces.length === 0 ? (
           <View style={s.emptyWrap}>
-            <Ionicons name="layers-outline" size={36} color={BORDER} />
-            <Text style={s.emptyText}>No spaces yet — tap + to create one</Text>
+            <Text style={s.emptyText}>no spaces yet — tap + to create one</Text>
           </View>
         ) : (
-          <>
-            {/* ── Expense Trackers ── */}
-            {expenseSpaces.length > 0 && (
-              <View style={s.section}>
-                <View style={s.sectionHeader}>
-                  <Text style={s.sectionTitle}>Expense Trackers</Text>
-                  <Text style={s.sectionCount}>{expenseSpaces.length} space{expenseSpaces.length !== 1 ? 's' : ''}</Text>
-                </View>
-                {expenseSpaces.map(space => {
-                  const value   = space.spent ?? 0;
-                  const budget  = space.budget ?? 0;
-                  const over    = budget > 0 && value > budget;
-                  const pct     = budget > 0 ? Math.min(value / budget, 1) : 0;
-                  return (
-                    <TouchableOpacity
-                      key={space.id}
-                      style={s.card}
-                      activeOpacity={0.82}
-                      onPress={() => router.push({ pathname: '/(app)/space-detail', params: { spaceId: space.id, name: space.name, color: space.color } })}
-                    >
-                      {/* Row 1 — title left, badge right */}
-                      <View style={s.cardRow}>
-                        <View style={s.cardTitleRow}>
-                          <View style={s.cardIconWrap}>
-                            <Ionicons name="wallet-outline" size={16} color={over ? RED : BLACK} />
-                          </View>
-                          <Text style={s.cardTitle} numberOfLines={1}>{space.name}</Text>
-                        </View>
-                        <View style={[s.badge, over && s.badgeRed]}>
-                          <Text style={[s.badgeText, over && s.badgeTextRed]}>
-                            {over ? 'OVER BUDGET' : 'ON TRACK'}
-                          </Text>
-                        </View>
-                        <TouchableOpacity
-                          onPress={() => { setSelectedSpace(space); setMenuModal(true); }}
-                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                          style={s.menuBtn}
-                        >
-                          <Ionicons name="ellipsis-vertical" size={14} color={MUTED} />
-                        </TouchableOpacity>
-                      </View>
+          <View style={s.slideOuter}>
+            <Animated.View style={[s.slidePair, { width: W * 2, transform: [{ translateX: slideAnim }] }]}>
 
-                      {/* Row 2 — detail */}
-                      <Text style={s.cardDetail}>{space.count ?? 0} transaction{(space.count ?? 0) !== 1 ? 's' : ''}</Text>
-
-                      {/* Row 3 — progress bar */}
-                      {budget > 0 && (
-                        <View style={s.progressTrack}>
-                          <View style={[s.progressFill, { width: `${pct * 100}%` as any, backgroundColor: over ? RED : BLACK }]} />
-                        </View>
-                      )}
-
-                      {/* Row 4 — totals bottom-aligned */}
-                      <View style={s.cardFooter}>
-                        <Text style={[s.cardAmount, over && { color: RED }]}>{fmt(value)}</Text>
-                        {budget > 0 && (
-                          <Text style={[s.cardSub, over && { color: RED }]}>
-                            {over ? `${fmt(value - budget)} over limit` : `${fmt(budget - value)} remaining`}
-                          </Text>
-                        )}
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })}
+              {/* ── Panel 1: Active ── */}
+              <View style={{ width: W }}>
+                {expenseActive.length === 0 && savingsActive.length === 0 && (
+                  <View style={s.emptyWrap}><Text style={s.emptyText}>no active spaces</Text></View>
+                )}
+                {expenseActive.length > 0 && (
+                  <>
+                    <Text style={s.sectionHeader}>expense trackers</Text>
+                    <View style={s.list}>{expenseActive.map(space => renderExpenseCard(space))}</View>
+                  </>
+                )}
+                {savingsActive.length > 0 && (
+                  <>
+                    <Text style={s.sectionHeader}>savings trackers</Text>
+                    <View style={s.list}>{savingsActive.map(space => renderSavingsCard(space))}</View>
+                  </>
+                )}
               </View>
-            )}
 
-            {/* ── Savings Trackers ── */}
-            {savingsSpaces.length > 0 && (
-              <View style={[s.section, { marginTop: 20 }]}>
-                <View style={s.sectionHeader}>
-                  <Text style={s.sectionTitle}>Savings Trackers</Text>
-                  <Text style={s.sectionCount}>{savingsSpaces.length} space{savingsSpaces.length !== 1 ? 's' : ''}</Text>
-                </View>
-                {savingsSpaces.map(space => {
-                  const value  = space.saved ?? 0;
-                  const budget = space.budget ?? 0;
-                  const pct    = budget > 0 ? Math.min(value / budget, 1) : 0;
-                  return (
-                    <TouchableOpacity
-                      key={space.id}
-                      style={s.card}
-                      activeOpacity={0.82}
-                      onPress={() => router.push({ pathname: '/(app)/space-detail', params: { spaceId: space.id, name: space.name, color: space.color } })}
-                    >
-                      {/* Row 1 — title left, badge right */}
-                      <View style={s.cardRow}>
-                        <View style={s.cardTitleRow}>
-                          <View style={s.cardIconWrap}>
-                            <Ionicons name="trending-up-outline" size={16} color={BLACK} />
-                          </View>
-                          <Text style={s.cardTitle} numberOfLines={1}>{space.name}</Text>
-                        </View>
-                        {budget > 0 && (
-                          <View style={s.badge}>
-                            <Text style={s.badgeText}>{Math.round(pct * 100)}% SAVED</Text>
-                          </View>
-                        )}
-                        <TouchableOpacity
-                          onPress={() => { setSelectedSpace(space); setMenuModal(true); }}
-                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                          style={s.menuBtn}
-                        >
-                          <Ionicons name="ellipsis-vertical" size={14} color={MUTED} />
-                        </TouchableOpacity>
-                      </View>
-
-                      {/* Row 2 — goal detail */}
-                      <Text style={s.cardDetail}>
-                        {budget > 0 ? `Goal: ${fmt(budget)}` : `${space.count ?? 0} transaction${(space.count ?? 0) !== 1 ? 's' : ''}`}
-                      </Text>
-
-                      {/* Row 3 — progress bar */}
-                      {budget > 0 && (
-                        <View style={s.progressTrack}>
-                          <View style={[s.progressFill, { width: `${pct * 100}%` as any, backgroundColor: BLACK }]} />
-                        </View>
-                      )}
-
-                      {/* Row 4 — totals bottom-aligned */}
-                      <View style={s.cardFooter}>
-                        <Text style={s.cardGoalAmount}>{fmt(value)}</Text>
-                        {budget > 0 && (
-                          <Text style={s.cardSub}>{fmt(budget - value > 0 ? budget - value : 0)} to go</Text>
-                        )}
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })}
+              {/* ── Panel 2: Inactive ── */}
+              <View style={{ width: W }}>
+                {expenseInactive.length === 0 && savingsInactive.length === 0 && (
+                  <View style={s.emptyWrap}><Text style={s.emptyText}>no inactive spaces</Text></View>
+                )}
+                {expenseInactive.length > 0 && (
+                  <>
+                    <Text style={s.sectionHeader}>expense trackers</Text>
+                    <View style={s.list}>{expenseInactive.map(space => renderExpenseCard(space))}</View>
+                  </>
+                )}
+                {savingsInactive.length > 0 && (
+                  <>
+                    <Text style={s.sectionHeader}>savings trackers</Text>
+                    <View style={s.list}>{savingsInactive.map(space => renderSavingsCard(space))}</View>
+                  </>
+                )}
               </View>
-            )}
-          </>
+
+            </Animated.View>
+          </View>
         )}
+
+        <Text style={s.footer}>managed by LEDGR</Text>
       </ScrollView>
 
       {/* ── Create / Edit modal ── */}
-      <BottomSheet visible={createModal} onClose={() => { setCreateModal(false); setEditMode(false); }} title={editMode ? 'Edit Space' : 'New Space'} height='50%'>
-        {error ? <Text style={s.qaError}>{error}</Text> : null}
-        <Text style={s.qaLabel}>Type</Text>
+      <BottomSheet visible={createModal} onClose={() => { setCreateModal(false); setEditMode(false); }} title={editMode ? 'edit space' : 'new space'} height='50%'>
+        {error ? <Text style={s.error}>{error}</Text> : null}
+        <Text style={s.label}>type</Text>
         <View style={s.typeRow}>
           {(['expense', 'savings'] as const).map(t => (
             <TouchableOpacity key={t} style={[s.typeBtn, spaceType === t && s.typeBtnActive]} onPress={() => setSpaceType(t)} activeOpacity={0.75}>
@@ -308,18 +296,18 @@ export default function SpacesScreen() {
             </TouchableOpacity>
           ))}
         </View>
-        <Text style={s.qaLabel}>Name</Text>
-        <TextInput style={s.qaInput} placeholder="e.g. Household" placeholderTextColor={MUTED} value={spaceName} onChangeText={v => { setSpaceName(v.slice(0, 20)); setError(''); }} maxLength={20} autoFocus />
-        <Text style={s.qaLabel}>{spaceType === 'expense' ? 'Budget' : 'Target Goal'} <Text style={{ fontFamily: FONT, color: MUTED }}>(optional)</Text></Text>
-        <TextInput style={s.qaInput} placeholder="e.g. 10000" placeholderTextColor={MUTED} value={spaceBudget} onChangeText={setSpaceBudget} keyboardType="decimal-pad" />
+        <Text style={s.label}>name</Text>
+        <TextInput style={s.input} placeholder="e.g. household" placeholderTextColor={Colors.faint} value={spaceName} onChangeText={v => { setSpaceName(v.slice(0, 20)); setError(''); }} maxLength={20} autoFocus />
+        <Text style={s.label}>{spaceType === 'expense' ? 'budget' : 'target goal'} <Text style={{ color: Colors.muted }}>(optional)</Text></Text>
+        <TextInput style={s.input} placeholder="e.g. 10000" placeholderTextColor={Colors.faint} value={spaceBudget} onChangeText={setSpaceBudget} keyboardType="decimal-pad" />
         {spaceType === 'savings' && (
           <>
-            <Text style={s.qaLabel}>Target Date <Text style={{ fontFamily: FONT, color: MUTED }}>(optional)</Text></Text>
-            <TextInput style={s.qaInput} placeholder="YYYY-MM-DD" placeholderTextColor={MUTED} value={spaceTargetDate} onChangeText={setSpaceTargetDate} />
+            <Text style={s.label}>target date <Text style={{ color: Colors.muted }}>(optional)</Text></Text>
+            <TextInput style={s.input} placeholder="YYYY-MM-DD" placeholderTextColor={Colors.faint} value={spaceTargetDate} onChangeText={setSpaceTargetDate} />
           </>
         )}
-        <TouchableOpacity style={[s.saveBtn, (!spaceName.trim() || loading) && { opacity: 0.4 }]} onPress={handleCreate} disabled={loading || !spaceName.trim()} activeOpacity={0.75}>
-          {loading ? <ActivityIndicator color={WHITE} /> : <Text style={s.saveBtnText}>{editMode ? 'Save Changes' : 'Create Space'}</Text>}
+        <TouchableOpacity style={[s.saveBtn, (!spaceName.trim() || loading) && { opacity: 0.4 }]} onPress={handleCreate} disabled={loading || !spaceName.trim()} activeOpacity={0.8}>
+          {loading ? <ActivityIndicator color={Colors.white} /> : <Text style={s.saveBtnText}>{editMode ? 'save changes' : 'create space'}</Text>}
         </TouchableOpacity>
       </BottomSheet>
 
@@ -328,9 +316,10 @@ export default function SpacesScreen() {
         onClose={() => setMenuModal(false)}
         title={selectedSpace?.name?.toLowerCase() ?? 'space'}
         actions={[
-          { label: 'cancel',  onPress: () => setMenuModal(false), muted: true },
-          { label: 'edit',    onPress: handleEditSpace },
-          { label: 'delete',  onPress: handleDeleteSpace, destructive: true },
+          { label: 'cancel',                                          onPress: () => setMenuModal(false), muted: true },
+          { label: 'edit',                                            onPress: handleEditSpace },
+          { label: selectedSpace?.is_active !== false ? 'mark inactive' : 'mark active', onPress: handleToggleActive },
+          { label: 'delete',                                          onPress: handleDeleteSpace, destructive: true },
         ]}
       />
     </SafeAreaView>
@@ -338,106 +327,61 @@ export default function SpacesScreen() {
 }
 
 const s = StyleSheet.create({
-  root:   { flex: 1, backgroundColor: WHITE },
-  scroll: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 80 },
+  root:   { flex: 1, backgroundColor: Colors.white },
+  scroll: { paddingBottom: 60 },
 
   // ── Header ──────────────────────────────────────────────────────────────
-  header: {
-    flexDirection: 'row', alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    paddingVertical: 16, gap: 12,
-  },
-  greeting: { fontFamily: FONT_B,  fontSize: 15, color: BLACK, letterSpacing: -0.2 },
-  date:     { fontFamily: FONT,    fontSize: 12, color: DARK,  marginTop: 2 },
-  addBtn:   {
-    width: 42, height: 42, borderRadius: 10,
-    backgroundColor: BLACK, alignItems: 'center', justifyContent: 'center',
-    marginTop: 2, ...SHADOW,
-  },
+  waveBg: { backgroundColor: '#4D72BC', paddingHorizontal: Spacing.page, paddingTop: 28, paddingBottom: 60, marginBottom: -2, zIndex: 10 },
+  wave:   { position: 'absolute', bottom: -1, left: 0, right: 0, height: 64, zIndex: 10 },
 
-  // ── All card ────────────────────────────────────────────────────────────
-  allCard: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: WHITE, borderRadius: 12,
-    borderWidth: 1, borderColor: BORDER,
-    paddingHorizontal: 16, paddingVertical: 14,
-    marginBottom: 24, ...SHADOW,
-  },
-  allIconWrap: {
-    width: 32, height: 32, borderRadius: 8,
-    backgroundColor: SURFACE, justifyContent: 'center', alignItems: 'center',
-  },
-  allCardText: { fontFamily: FONT_SB, fontSize: 12, color: BLACK },
+  appLabel:   { fontFamily: 'MuseoModerno_Black', fontSize: 20, color: Colors.white, marginBottom: 12 },
+  pageTitle:  { fontFamily: 'CalSans', fontSize: 32, color: Colors.white, letterSpacing: -0.5, marginBottom: 4 },
+  dateLine:   { fontFamily: Fonts.mono, fontSize: 11, color: 'rgba(255,255,255,0.7)', marginBottom: 4 },
+  motivation: { fontFamily: 'ChillaxRegular', fontSize: 13, color: 'rgba(255,255,255,0.8)', marginBottom: 0 },
 
-  // ── Empty ───────────────────────────────────────────────────────────────
-  emptyWrap: { alignItems: 'center', gap: 12, paddingVertical: 72 },
-  emptyText: { fontFamily: FONT, fontSize: 12, color: MUTED },
+  actionRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.page, marginTop: 20, marginBottom: 8 },
+  tabToggle:       { flexDirection: 'row', backgroundColor: Colors.surface, borderRadius: Radius.pill, padding: 3, borderWidth: 1, borderColor: Colors.border },
+  tabBtn:          { paddingHorizontal: 18, paddingVertical: 6, borderRadius: Radius.pill },
+  tabBtnActive:    { backgroundColor: ACCENT },
+  tabBtnText:      { fontFamily: Fonts.mono, fontSize: 11, color: Colors.muted },
+  tabBtnTextActive:{ fontFamily: Fonts.monoBold, fontSize: 11, color: Colors.white },
+  addBtn:          { width: 36, height: 36, borderRadius: 18, backgroundColor: ACCENT, alignItems: 'center', justifyContent: 'center' },
 
-  // ── Section ─────────────────────────────────────────────────────────────
-  section: { marginBottom: 8 },
-  sectionHeader: {
-    flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'space-between', marginBottom: 12,
-  },
-  sectionTitle: { fontFamily: FONT_SB, fontSize: 13, color: BLACK },
-  sectionCount: { fontFamily: FONT,    fontSize: 11, color: MUTED },
+  slideOuter: { overflow: 'hidden' },
+  slidePair:  { flexDirection: 'row' },
 
-  // ── Card ────────────────────────────────────────────────────────────────
-  card: {
-    backgroundColor: WHITE,
-    borderRadius: 12,
-    borderWidth: 1, borderColor: BORDER,
-    padding: 16,
-    marginBottom: 16,
-  },
+  // ── Empty ────────────────────────────────────────────────────────────────
+  emptyWrap: { paddingVertical: 48, alignItems: 'center', paddingHorizontal: Spacing.page },
+  emptyText: { fontFamily: Fonts.mono, fontSize: 13, color: Colors.muted },
 
-  // Row 1: title + badge + menu
-  cardRow:     { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
-  cardTitleRow:{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
-  cardIconWrap:{ width: 28, height: 28, borderRadius: 6, backgroundColor: SURFACE, justifyContent: 'center', alignItems: 'center' },
-  cardTitle:   { fontFamily: FONT_SB, fontSize: 16, color: BLACK, flex: 1 },
+  // ── Section ──────────────────────────────────────────────────────────────
+  sectionHeader: { fontFamily: 'CalSans', fontSize: 15, color: ACCENT, marginBottom: 10, marginTop: 24, paddingHorizontal: Spacing.page },
+  list: { marginBottom: 8, paddingHorizontal: Spacing.page },
 
-  // Badge top-right
-  badge:        { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, backgroundColor: SURFACE, borderWidth: 1, borderColor: BORDER },
-  badgeRed:     { backgroundColor: '#FEF2F2', borderColor: '#FECACA' },
-  badgeText:    { fontFamily: FONT_B, fontSize: 10, color: DARK,  letterSpacing: 0.4 },
-  badgeTextRed: { color: RED },
+  // ── Card ─────────────────────────────────────────────────────────────────
+  card:         { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  cardLeft:     { flex: 1, gap: 4 },
+  cardName:     { fontFamily: 'ChillaxMedium', fontSize: 14, color: Colors.text },
+  cardMeta:     { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted },
+  cardRight:    { alignItems: 'flex-end', gap: 3 },
+  cardRow:      { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  cardRowLabel: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted, letterSpacing: 0.3 },
+  cardRowValue: { fontFamily: Fonts.monoBold, fontSize: 12, color: Colors.text, letterSpacing: -0.2 },
 
-  menuBtn: { padding: 4 },
+  // ── Modal ─────────────────────────────────────────────────────────────────
+  error:   { fontFamily: Fonts.mono, fontSize: 12, color: Colors.expense, marginBottom: 8 },
+  label:   { fontFamily: Fonts.monoBold, fontSize: 11, color: Colors.muted, marginBottom: 6, marginTop: 14, letterSpacing: 0.4, textTransform: 'uppercase' },
+  input:   { fontFamily: Fonts.monoBold, fontSize: 15, color: Colors.text, backgroundColor: Colors.white, borderRadius: Radius.lg, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1, borderColor: Colors.borderMid },
 
-  // Row 2: detail
-  cardDetail: { fontFamily: FONT, fontSize: 11, color: DARK, marginBottom: 8 },
-
-  // Row 3: progress bar
-  progressTrack: { height: 6, backgroundColor: BORDER, borderRadius: 3, overflow: 'hidden', marginBottom: 12 },
-  progressFill:  { height: 6, borderRadius: 3 },
-
-  // Row 4: footer totals
-  cardFooter:    { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
-  cardAmount:    { fontFamily: FONT_B,  fontSize: 15, color: BLACK, letterSpacing: -0.3 },
-  cardGoalAmount:{ fontFamily: FONT_B,  fontSize: 15, color: BLACK, letterSpacing: -0.3 },
-  cardSub:       { fontFamily: FONT,    fontSize: 11, color: MUTED },
-
-  // ── Modal ────────────────────────────────────────────────────────────────
   typeRow:           { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  typeBtn:           { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, borderWidth: 1, borderColor: BORDER, backgroundColor: WHITE },
-  typeBtnActive:     { backgroundColor: BLACK, borderColor: BLACK },
-  typeBtnText:       { fontFamily: FONT,   fontSize: 12, color: MUTED },
-  typeBtnTextActive: { fontFamily: FONT_B, fontSize: 12, color: WHITE },
+  typeBtn:           { paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, borderWidth: 1, borderColor: Colors.borderMid, backgroundColor: Colors.surface },
+  typeBtnActive:     { backgroundColor: ACCENT, borderColor: ACCENT },
+  typeBtnText:       { fontFamily: Fonts.mono,     fontSize: 12, color: Colors.muted },
+  typeBtnTextActive: { fontFamily: Fonts.monoBold, fontSize: 12, color: Colors.white },
 
-  qaLabel: {
-    fontFamily: FONT_B, fontSize: 11, color: BLACK,
-    letterSpacing: 0.5, textTransform: 'uppercase',
-    marginBottom: 4, marginTop: 12,
-  },
-  qaInput: {
-    fontFamily: FONT, fontSize: 13, color: BLACK,
-    backgroundColor: WHITE, borderRadius: 10,
-    paddingHorizontal: 12, paddingVertical: 10,
-    borderWidth: 1, borderColor: BORDER,
-  },
-  qaError: { fontFamily: FONT, fontSize: 11, color: RED, marginBottom: 6 },
+  saveBtn:     { backgroundColor: ACCENT, borderRadius: Radius.pill, paddingVertical: 14, alignItems: 'center', marginTop: 20 },
+  saveBtnText: { fontFamily: Fonts.monoBold, fontSize: 14, color: Colors.white },
 
-  saveBtn:     { backgroundColor: BLACK, borderRadius: 10, paddingVertical: 12, alignItems: 'center', marginTop: 20 },
-  saveBtnText: { fontFamily: FONT_B, fontSize: 13, color: WHITE, letterSpacing: 0.2 },
+  // ── Footer ───────────────────────────────────────────────────────────────
+  footer: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.faint, textAlign: 'center', marginTop: 32, paddingHorizontal: Spacing.page },
 });

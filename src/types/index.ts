@@ -8,6 +8,7 @@ export interface Space {
   icon: string;
   budget?: number | null;
   default_category_id?: string | null;
+  is_active: boolean;
   created_at: string;
   // computed client-side
   spent?: number;
