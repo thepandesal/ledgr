@@ -11,6 +11,7 @@ import { useUser } from '../../../src/hooks/useUser';
 import BottomSheet from '@/components/ui/BottomSheet';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import { Colors, Fonts, Radius, Spacing } from '@/components/ui/theme';
+import { Brand } from '../../../src/lib/brand';
 import { BlurContext } from '../../../src/lib/BlurContext';
 
 interface SpaceData {
@@ -19,8 +20,9 @@ interface SpaceData {
   space_type?: string; savings_target_date?: string | null; is_active?: boolean;
 }
 
-const ACCENT      = '#B6E1DE'; // prev: #96D7D4
-const ACCENT_TEXT = '#101514'; // dark text on light accent
+const ACCENT      = '#B6E1DE'; // light mint — backgrounds only
+const ACCENT_TEXT = '#101514'; // dark text ON accent bg
+const ACCENT_DARK = Brand.color.accentDark; // dark teal — text/icons on white bg
 
 const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -143,7 +145,7 @@ export default function SpacesScreen() {
     const budget      = space.budget ?? 0;
     const over        = budget > 0 && value > budget;
     const remaining   = budget - value;
-    const statusColor = over ? Colors.expense : budget > 0 && remaining / budget < 0.2 ? '#F97316' : ACCENT;
+    const statusColor = over ? Colors.expense : budget > 0 && remaining / budget < 0.2 ? '#F97316' : ACCENT_DARK;
     return (
       <TouchableOpacity key={space.id} style={s.card} activeOpacity={0.85} onPress={() => router.push({ pathname: '/(app)/space-detail', params: { spaceId: space.id, name: space.name, color: space.color } })}>
         <View style={s.cardLeft}>
@@ -168,7 +170,7 @@ export default function SpacesScreen() {
     const value       = space.saved ?? 0;
     const budget      = space.budget ?? 0;
     const pct         = budget > 0 ? Math.min(value / budget, 1) : 0;
-    const statusColor = pct >= 1 ? ACCENT : '#F97316';
+    const statusColor = pct >= 1 ? ACCENT_DARK : '#F97316';
     return (
       <TouchableOpacity key={space.id} style={s.card} activeOpacity={0.85} onPress={() => router.push({ pathname: '/(app)/space-detail', params: { spaceId: space.id, name: space.name, color: space.color } })}>
         <View style={s.cardLeft}>
@@ -336,7 +338,7 @@ const s = StyleSheet.create({
   emptyText: { fontFamily: Fonts.mono, fontSize: 13, color: Colors.muted },
 
   // ── Section ──────────────────────────────────────────────────────────────
-  sectionHeader: { fontFamily: 'CalSans', fontSize: 15, color: ACCENT, marginBottom: 10, marginTop: 24, paddingHorizontal: Spacing.page },
+  sectionHeader: { ...Brand.type.sectionHeader, marginBottom: 8, marginTop: Brand.spacing.section, paddingHorizontal: Spacing.page },
   list: { marginBottom: 8, paddingHorizontal: Spacing.page },
 
   // ── Card ─────────────────────────────────────────────────────────────────

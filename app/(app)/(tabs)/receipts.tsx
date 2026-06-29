@@ -9,9 +9,9 @@ import * as ImagePicker from 'expo-image-picker';
 import BottomSheet from '@/components/ui/BottomSheet';
 import formStyles from '@/components/ui/formStyles';
 import accountStyles from '@/components/ui/accountStyles';
-import pageStyles from '@/components/ui/pageStyles';
-import { Colors, Fonts, Radius, Spacing } from '@/components/ui/theme';
+import { Colors, Radius, Spacing } from '@/components/ui/theme';
 import { compressImage, uploadReceiptPhoto } from '../../../src/lib/receiptUpload';
+import { Brand } from '../../../src/lib/brand';
 
 interface Entry {
   id: string;
@@ -67,17 +67,11 @@ export default function ReceiptsScreen() {
     const note = folderName.trim() || timeStr;
     const { data: entry, error } = await supabase.from('receipt_entries').insert({ user_id: userId, note }).select().single();
     setCreating(false);
-    if (!error && entry) {
-      setActiveEntryId(entry.id);
-      setAddStep('photos');
-    }
+    if (!error && entry) { setActiveEntryId(entry.id); setAddStep('photos'); }
   };
 
   const closeAddModal = () => {
-    setAddModal(false);
-    setAddStep('name');
-    setFolderName('');
-    setActiveEntryId(null);
+    setAddModal(false); setAddStep('name'); setFolderName(''); setActiveEntryId(null);
     queryClient.invalidateQueries({ queryKey: ['receipts', userId] });
   };
 
@@ -104,48 +98,33 @@ export default function ReceiptsScreen() {
   };
 
   const formatDate = (d: string) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-
   const typeColor = (type: string) => type === 'expense' ? Colors.expense : type === 'income' ? Colors.income : Colors.text;
 
   return (
     <SafeAreaView style={s.container}>
-      <View style={s.header}>
-        <View>
-          <Text style={s.pageTitle}>receipts</Text>
-          <Text style={s.pageSubtitle}>your paper trail, digitized.</Text>
-        </View>
-        <TouchableOpacity style={s.addBtn} onPress={() => setAddModal(true)} activeOpacity={0.85}>
-          <Ionicons name="add" size={14} color={Colors.muted} />
-          <Text style={s.addBtnText}>add receipt</Text>
-        </TouchableOpacity>
-      </View>
-
       {loading ? (
-        <View style={s.center}><ActivityIndicator color={Colors.cyan} /></View>
+        <View style={s.center}><ActivityIndicator color={Brand.color.accent} /></View>
       ) : entries.length === 0 ? (
         <View style={s.center}>
           <Ionicons name="receipt-outline" size={40} color={Colors.borderMid} />
-          <Text style={s.emptyText}>no receipts yet</Text>
-          <TouchableOpacity style={s.emptyActionBtn} onPress={() => setAddModal(true)}>
-            <Text style={s.emptyActionBtnText}>add your first receipt</Text>
-          </TouchableOpacity>
+          <Text style={Brand.type.emptyText}>no receipts yet</Text>
         </View>
       ) : (
         <ScrollView contentContainerStyle={s.list} showsVerticalScrollIndicator={false}>
           {entries.map(entry => (
-            <TouchableOpacity key={entry.id} style={s.folderCard} activeOpacity={0.85}
+            <TouchableOpacity key={entry.id} style={s.card} activeOpacity={0.85}
               onPress={() => router.push({ pathname: '/(app)/receipt-detail', params: { receiptId: entry.id } } as any)}>
               {entry.firstPhoto ? (
-                <Image source={{ uri: entry.firstPhoto }} style={s.folderThumb} resizeMode="cover" />
+                <Image source={{ uri: entry.firstPhoto }} style={s.thumb} resizeMode="cover" />
               ) : (
-                <View style={s.folderThumbEmpty}>
+                <View style={s.thumbEmpty}>
                   <Ionicons name="image-outline" size={22} color={Colors.faint} />
                 </View>
               )}
-              <View style={s.folderInfo}>
-                <Text style={s.folderDate}>{formatDate(entry.created_at)}</Text>
-                <Text style={s.folderName} numberOfLines={1}>{entry.note ?? formatDate(entry.created_at)}</Text>
-                <Text style={s.folderCount}>{entry.photoCount} photo{entry.photoCount !== 1 ? 's' : ''}</Text>
+              <View style={s.cardInfo}>
+                <Text style={s.cardDate}>{formatDate(entry.created_at)}</Text>
+                <Text style={s.cardName} numberOfLines={1}>{entry.note ?? formatDate(entry.created_at)}</Text>
+                <Text style={s.cardMeta}>{entry.photoCount} photo{entry.photoCount !== 1 ? 's' : ''}</Text>
                 {entry.recording ? (
                   <View style={s.linkedBadge}>
                     <View style={[s.linkedDot, { backgroundColor: typeColor(entry.recording.type) }]} />
@@ -158,10 +137,15 @@ export default function ReceiptsScreen() {
               <Ionicons name="chevron-forward" size={16} color={Colors.faint} />
             </TouchableOpacity>
           ))}
+          <Text style={[Brand.type.footer, { marginTop: 24 }]}>managed by LEDGR</Text>
         </ScrollView>
       )}
 
-      <BottomSheet visible={addModal} onClose={closeAddModal} sub="receipts" title={addStep === 'name' ? 'new receipt' : 'add photos'}>
+      <TouchableOpacity style={s.fab} onPress={() => setAddModal(true)} activeOpacity={0.8}>
+        <Ionicons name="add" size={22} color={Brand.color.accentText} />
+      </TouchableOpacity>
+
+      <BottomSheet visible={addModal} onClose={closeAddModal} title={addStep === 'name' ? 'new receipt' : 'add photos'}>
         {addStep === 'name' ? (
           <>
             <TextInput style={formStyles.input} placeholder="folder name (optional)" placeholderTextColor={Colors.faint} value={folderName} onChangeText={setFolderName} autoFocus returnKeyType="done" onSubmitEditing={createEntry} />
@@ -179,7 +163,7 @@ export default function ReceiptsScreen() {
           <>
             <View style={accountStyles.photoButtons}>
               <TouchableOpacity style={accountStyles.photoBtn} onPress={addFromCamera}>
-                <Ionicons name="camera-outline" size={28} color={Colors.cyan} />
+                <Ionicons name="camera-outline" size={28} color={Brand.color.headerText} />
                 <Text style={accountStyles.photoBtnText}>camera</Text>
               </TouchableOpacity>
               <TouchableOpacity style={accountStyles.photoBtn} onPress={addFromGallery}>
@@ -201,36 +185,26 @@ export default function ReceiptsScreen() {
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.white },
-  header: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', paddingHorizontal: Spacing.page, paddingTop: 32, paddingBottom: 16 },
-  pageTitle: { fontFamily: Fonts.calSans, fontSize: 36, color: '#425252', marginBottom: 4 },
-  pageSubtitle: { fontFamily: 'ChillaxRegular', fontSize: 13, color: Colors.muted },
-  addBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingVertical: 8, paddingHorizontal: 14,
-    borderRadius: Radius.pill, borderWidth: 2, borderStyle: 'dotted',
-    borderColor: Colors.cyan, backgroundColor: 'transparent',
-  },
-  addBtnText: { fontFamily: 'ChillaxMedium', fontSize: 12, color: Colors.muted },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
-  emptyText: { fontFamily: 'ChillaxRegular', fontSize: 13, color: Colors.muted },
-  emptyActionBtn: { borderRadius: Radius.pill, paddingVertical: 10, paddingHorizontal: 20, borderWidth: 2, borderStyle: 'dotted', borderColor: Colors.cyan, marginTop: 8 },
-  emptyActionBtnText: { fontFamily: 'ChillaxMedium', fontSize: 12, color: Colors.muted },
-  list: { paddingHorizontal: Spacing.page, paddingBottom: 60, gap: 12, paddingTop: 8 },
-  folderCard: {
-    flexDirection: 'row', alignItems: 'center', gap: 14,
-    backgroundColor: Colors.white, borderRadius: Radius.pill,
-    paddingVertical: 10, paddingHorizontal: 14,
-    borderWidth: 1, borderStyle: 'dashed', borderColor: Colors.borderMid,
-  },
-  folderThumb: { width: 48, height: 48, borderRadius: Radius.md, flexShrink: 0 },
-  folderThumbEmpty: { width: 48, height: 48, borderRadius: Radius.md, backgroundColor: Colors.input, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
-  folderInfo: { flex: 1, gap: 2 },
-  folderDate: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted },
-  folderName: { fontFamily: 'ChillaxMedium', fontSize: 14, color: Colors.text },
-  folderCount: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.faint },
-  linkedBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
-  linkedDot: { width: 6, height: 6, borderRadius: 3 },
-  linkedText: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.text, maxWidth: 140 },
-  unlinkedText: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.faint, marginTop: 2 },
-});
+  center:    { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
+  list:      { paddingHorizontal: Spacing.page, paddingTop: 12, paddingBottom: 80, gap: Brand.spacing.gap },
 
+  card:      { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: Brand.spacing.card, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  thumb:     { width: 48, height: 48, borderRadius: Radius.md, flexShrink: 0 },
+  thumbEmpty:{ width: 48, height: 48, borderRadius: Radius.md, backgroundColor: Colors.input, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
+  cardInfo:  { flex: 1, gap: 2 },
+  cardDate:  { ...Brand.type.cardMeta },
+  cardName:  { ...Brand.type.cardTitle },
+  cardMeta:  { ...Brand.type.cardMeta },
+
+  linkedBadge:  { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
+  linkedDot:    { width: 6, height: 6, borderRadius: 3 },
+  linkedText:   { ...Brand.type.cardMeta, color: Colors.text, maxWidth: 140 },
+  unlinkedText: { ...Brand.type.cardMeta, marginTop: 2 },
+
+  fab: {
+    position: 'absolute', bottom: 24, right: 24,
+    width: 52, height: 52, borderRadius: 26,
+    backgroundColor: Brand.color.accent,
+    alignItems: 'center', justifyContent: 'center',
+  },
+});

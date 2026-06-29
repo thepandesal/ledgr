@@ -1,4 +1,4 @@
-import { View, TouchableOpacity, Text, StyleSheet, Animated, Dimensions, Platform, InteractionManager, SafeAreaView, ScrollView, useWindowDimensions } from 'react-native';
+import { View, TouchableOpacity, Text, StyleSheet, Animated, Dimensions, Platform, SafeAreaView, ScrollView, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useRef, memo, useCallback } from 'react';
 import { BlurView } from 'expo-blur';
@@ -218,21 +218,23 @@ export default function TabsLayout() {
     const prev = activeTabRef.current;
     activeTabRef.current = key;
 
-    // Fade title with native driver (opacity only)
-    Animated.timing(titleAnim, { toValue: 0, duration: 100, useNativeDriver: true }).start(() => {
-      setActiveTab(key);
-      Animated.timing(titleAnim, { toValue: 1, duration: 150, useNativeDriver: true }).start();
-    });
+    const incoming = key === 'notifications' ? notifAnim : slideAnims[key];
+    const outgoing = prev === 'notifications' ? notifAnim : slideAnims[prev];
+    incoming?.setValue(width);
 
-    // Slide screens after interactions settle
-    InteractionManager.runAfterInteractions(() => {
-      const incoming = key === 'notifications' ? notifAnim : slideAnims[key];
-      const outgoing = prev === 'notifications' ? notifAnim : slideAnims[prev];
-      incoming?.setValue(width);
-      Animated.parallel([
-        Animated.timing(incoming, { toValue: 0, duration: 220, useNativeDriver: true }),
-        Animated.timing(outgoing, { toValue: -width, duration: 220, useNativeDriver: true }),
-      ]).start(() => { outgoing?.setValue(width); });
+    // Start animations immediately on native thread
+    Animated.parallel([
+      Animated.timing(incoming, { toValue: 0, duration: 320, useNativeDriver: true }),
+      Animated.timing(outgoing, { toValue: -width, duration: 320, useNativeDriver: true }),
+    ]).start(() => { outgoing?.setValue(width); });
+
+    // Defer state update to next frame so re-render doesn't block animation start
+    requestAnimationFrame(() => {
+      setActiveTab(key);
+      Animated.sequence([
+        Animated.timing(titleAnim, { toValue: 0, duration: 150, useNativeDriver: true }),
+        Animated.timing(titleAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
+      ]).start();
     });
   }, []);
 

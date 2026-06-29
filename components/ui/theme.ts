@@ -87,7 +87,7 @@ export const Spacing = {
   lg: 16,
   xl: 20,
   xxl: 24,
-  page: 32,
+  page: 25,
 } as const;
 
 export const LetterSpacing = {

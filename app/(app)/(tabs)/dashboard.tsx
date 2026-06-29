@@ -9,8 +9,10 @@ import { useUser } from '../../../src/hooks/useUser';
 import { supabase } from '../../../src/lib/supabase';
 import BottomSheet from '@/components/ui/BottomSheet';
 import { Colors, Fonts, Radius } from '@/components/ui/theme';
+import { Spacing } from '@/components/ui/theme';
 import pageStyles from '@/components/ui/pageStyles';
 import { useRouter } from 'expo-router';
+import { Brand } from '../../../src/lib/brand';
 import { BlurContext } from '../../../src/lib/BlurContext';
 
 const ACCENT  = '#B6E1DE'; // prev: #96D7D4
@@ -922,20 +924,20 @@ export default function DashboardScreen() {
 
 const s = StyleSheet.create({
   container:  { flex: 1, backgroundColor: Colors.white },
-  topSection: { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 12 },
+  topSection: { paddingHorizontal: 25, paddingTop: 20, paddingBottom: 12 },
   titleRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   title:      { fontFamily: 'CalSans', fontSize: 28, color: Colors.text, letterSpacing: -0.8 },
   addRecBtn:  { width: 36, height: 36, borderRadius: 18, backgroundColor: ACCENT, alignItems: 'center', justifyContent: 'center' },
 
   sheet:    { flex: 1, backgroundColor: Colors.white },
   menuCard: {
-    position: 'absolute', top: 0, left: 16, right: 16, zIndex: 10,
+    position: 'absolute', top: 0, left: 25, right: 25, zIndex: 10,
     backgroundColor: Colors.white, borderRadius: Radius.xl,
     paddingTop: 12, paddingBottom: 8, gap: 8,
   },
 
   // Tab circles
-  tabRow:  { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 4 },
+  tabRow:  { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 25, paddingVertical: 4 },
   tabWrap: { flex: 1, alignItems: 'center' },
   tabCircle:            { width: 56, height: 56, borderRadius: 28, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.surface },
   tabCircleActive:      { backgroundColor: ACCENT },
@@ -954,12 +956,12 @@ const s = StyleSheet.create({
   filterBtnTextActive: { fontFamily: Fonts.monoBold, fontSize: 11, color: ACCENT },
 
   // List
-  list:           { paddingHorizontal: 16, paddingTop: 140, paddingBottom: 20, gap: 12 },
-  dateHeaderRow:  { marginTop: 16, marginBottom: 8, paddingHorizontal: 4, borderTopWidth: 1, borderTopColor: Colors.border, paddingTop: 16 },
-  dateHeaderText: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted, letterSpacing: 1.4, textTransform: 'uppercase' },
+  list:           { paddingHorizontal: Spacing.page, paddingTop: 140, paddingBottom: 20, gap: 12 },
+  dateHeaderRow:  { marginTop: 16, marginBottom: 8, paddingTop: 16 },
+  dateHeaderText: { ...Brand.type.sectionHeader },
 
   // Recording row
-  row:         { backgroundColor: Colors.white, borderRadius: Radius.xl, flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingVertical: 14 },
+  row:         { backgroundColor: Colors.white, borderRadius: Radius.xl, flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14 },
   rowIconWrap: { width: 46, height: 46, borderRadius: 23, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.surface },
   rowMid:      { flex: 1, gap: 2 },
   rowType:     { fontFamily: 'ChillaxRegular', fontSize: 10, color: Colors.muted, letterSpacing: 0.4, textTransform: 'uppercase' },

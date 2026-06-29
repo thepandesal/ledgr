@@ -380,7 +380,7 @@ export default function SpaceDetailScreen() {
         </View>
 
         {/* Stats card */}
-        <View style={[pageStyles.infoBlock, { marginHorizontal: 16, marginBottom: 10 }]}>
+        <View style={[pageStyles.infoBlock, { marginHorizontal: 25, marginBottom: 10 }]}>
           <View style={s.statsRow}>
             <View style={s.statItem}>
               <Text style={s.statValue}>{fmtAbbr(moneyIn)}</Text>
@@ -610,7 +610,7 @@ export default function SpaceDetailScreen() {
 
 const s = StyleSheet.create({
   // Header
-  header:  { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 20, paddingBottom: 4, gap: 12 },
+  header:  { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 25, paddingTop: 20, paddingBottom: 4, gap: 12 },
   title:   { flex: 1, fontFamily: Fonts.display, fontSize: 28, color: Colors.text, letterSpacing: -0.8 },
   addBtn:  { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.cyan, alignItems: 'center', justifyContent: 'center' },
 
@@ -625,13 +625,13 @@ const s = StyleSheet.create({
 
   // Menu card
   menuCard: {
-    position: 'absolute', top: 0, left: 16, right: 16, zIndex: 10,
+    position: 'absolute', top: 0, left: 25, right: 25, zIndex: 10,
     backgroundColor: Colors.white, borderRadius: Radius.xl,
     paddingTop: 12, paddingBottom: 8, gap: 8,
   },
 
   // Tab circles
-  tabRow:  { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 4 },
+  tabRow:  { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 25, paddingVertical: 4 },
   tabWrap: { flex: 1, alignItems: 'center' },
   tabCircle:            { width: 56, height: 56, borderRadius: 28, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.surface },
   tabCircleActive:      { backgroundColor: Colors.cyan },
@@ -641,19 +641,19 @@ const s = StyleSheet.create({
   tabLabelActive:       { fontFamily: Fonts.monoBold, fontSize: 9, color: Colors.cyan },
 
   // Filter row
-  filterRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingHorizontal: 16, paddingBottom: 8 },
+  filterRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingHorizontal: 25, paddingBottom: 8 },
   dateNavRow:   { flexDirection: 'row', alignItems: 'center', gap: 4 },
   dateNavArrow: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.surface },
   filterBtn:    { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: Colors.white, borderWidth: 1, borderColor: Colors.borderMid },
   filterBtnText: { fontFamily: Fonts.mono, fontSize: 11, color: Colors.text },
 
   // List
-  list:           { paddingHorizontal: 16, paddingTop: 155, paddingBottom: 20, gap: 12 },
+  list:           { paddingHorizontal: 25, paddingTop: 155, paddingBottom: 20, gap: 12 },
   dateHeaderRow:  { marginTop: 16, marginBottom: 8, paddingHorizontal: 4, borderTopWidth: 1, borderTopColor: Colors.border, paddingTop: 16 },
   dateHeaderText: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted, letterSpacing: 1.4, textTransform: 'uppercase' },
 
   // Recording row
-  row:         { backgroundColor: Colors.white, borderRadius: Radius.xl, flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingVertical: 14 },
+  row:         { backgroundColor: Colors.white, borderRadius: Radius.xl, flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 25, paddingVertical: 14 },
   rowIconWrap: { width: 46, height: 46, borderRadius: 23, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.surface },
   rowMid:      { flex: 1, gap: 2 },
   rowType:     { fontFamily: Fonts.mono,     fontSize: 10, color: Colors.muted, letterSpacing: 0.4, textTransform: 'uppercase' },

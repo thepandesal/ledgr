@@ -18,7 +18,12 @@ import formStyles from '@/components/ui/formStyles';
 import pageStyles from '@/components/ui/pageStyles';
 import itemStyles from '@/components/ui/itemStyles';
 import accountStyles from '@/components/ui/accountStyles';
-import { Colors, Fonts, Radius } from '@/components/ui/theme';
+import { Colors, Radius } from '@/components/ui/theme';
+import { Brand } from '../../src/lib/brand';
+
+const ACCENT      = Brand.color.accent;
+const ACCENT_DARK = Brand.color.accentDark;
+const PEACH       = '#FFAB91';
 
 const { width } = Dimensions.get('window');
 const MAX_NAME_CHARS = 18;
@@ -1074,8 +1079,8 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
 
   const amountColor = () => {
     if (!recording) return Colors.muted;
-    if (recording.type === 'expense') return Colors.expense;
-    if (recording.type === 'income' || recording.type === 'savings' || recording.type === 'return') return Colors.income;
+    if (recording.type === 'expense' || recording.type === 'payable') return PEACH;
+    if (recording.type === 'income' || recording.type === 'savings' || recording.type === 'return' || recording.type === 'receivable') return ACCENT_DARK;
     return Colors.text;
   };
 
@@ -1103,7 +1108,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
     <Animated.View style={[pageStyles.container, { transform: [{ translateX: slideAnim }] }]}>
       <SafeAreaView style={pageStyles.inner}>
         <TouchableOpacity onPress={handleBack} style={pageStyles.backBtn}>
-          <Ionicons name="arrow-back" size={22} color={Colors.muted} />
+          <Ionicons name="arrow-back" size={22} color={Colors.text} />
         </TouchableOpacity>
         <TouchableOpacity onPress={openEditModal} style={{ position: 'absolute', top: 14, right: 28, zIndex: 20, padding: 6 }}>
           <Ionicons name="create-outline" size={20} color={Colors.muted} />
@@ -1113,14 +1118,14 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
 
           {/* Header */}
           <View style={[pageStyles.titleBlock, { marginBottom: 20 }]}>
-            <Text style={{ fontFamily: 'ChillaxRegular', fontSize: 13, color: Colors.muted, marginBottom: 4 }}>recordings</Text>
-            <Text style={{ fontFamily: Fonts.calSans, fontSize: 32, color: Colors.text, letterSpacing: -0.5 }} numberOfLines={2}>
+            <Text style={{ fontFamily: Brand.font.body, fontSize: 13, color: Colors.muted, marginBottom: 4 }}>recordings</Text>
+            <Text style={{ fontFamily: Brand.font.display, fontSize: 32, color: Colors.text, letterSpacing: -0.5 }} numberOfLines={2}>
               {truncate(recording?.name ?? '', MAX_NAME_CHARS).toLowerCase()}
             </Text>
-            <Text style={{ fontFamily: Fonts.monoBold, fontSize: 22, color: amountColor(), marginTop: 4 }}>
+            <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 22, color: amountColor(), marginTop: 4 }}>
               {recording ? Number(recording.amount).toLocaleString('en-US', { minimumFractionDigits: 2 }) : '—'}
             </Text>
-            <Text style={{ fontFamily: Fonts.mono, fontSize: 11, color: Colors.muted, marginTop: 4 }}>
+            <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: Colors.muted, marginTop: 4 }}>
               {formatDate(recording?.transaction_date)} · {typeLabel(recording?.type ?? '', recording?.status ?? '')}
             </Text>
           </View>
@@ -1189,20 +1194,20 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                   ))}
                 </ScrollView>
               ) : (
-                <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: Colors.faint, marginTop: 8 }}>loading photos...</Text>
+                <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: Colors.faint, marginTop: 8 }}>loading photos...</Text>
               )}
               <TouchableOpacity
                 style={[pageStyles.actionBtn, { marginTop: 10 }]}
                 onPress={() => router.push({ pathname: '/(app)/receipt-detail', params: { receiptId: linkedReceipt.id } } as any)}
               >
-                <Ionicons name="arrow-forward-circle-outline" size={15} color={Colors.cyan} />
-                <Text style={[pageStyles.actionBtnText, { color: Colors.cyan }]}>go to receipt</Text>
+                <Ionicons name="arrow-forward-circle-outline" size={15} color={ACCENT_DARK} />
+                <Text style={[pageStyles.actionBtnText, { color: ACCENT_DARK }]}>go to receipt</Text>
               </TouchableOpacity>
             </View>
           )}
 
           {/* Information */}
-          <Text style={[pageStyles.sectionHeader, { fontFamily: Fonts.calSans }]}>information</Text>
+          <Text style={[pageStyles.sectionHeader, { fontFamily: Brand.font.display }]}>information</Text>
           <View style={pageStyles.infoBlock}>
             <InfoRow label="Date of transaction" value={formatDate(recording?.transaction_date)} />
             <InfoRow label="Transaction type" value={typeLabel(recording?.type ?? '', recording?.status ?? '')} />
@@ -1211,8 +1216,8 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
               <>
                 <View style={{ height: 1, backgroundColor: Colors.border, marginVertical: 2 }} />
                 <View style={{ paddingVertical: 8 }}>
-                  <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted, marginBottom: 4 }}>Notes</Text>
-                  <Text style={{ fontFamily: Fonts.mono, fontSize: 12, color: Colors.text, lineHeight: 18 }}>{recording.notes}</Text>
+                  <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: Colors.muted, marginBottom: 4 }}>Notes</Text>
+                  <Text style={{ fontFamily: Brand.font.mono, fontSize: 12, color: Colors.text, lineHeight: 18 }}>{recording.notes}</Text>
                 </View>
               </>
             ) : null}
@@ -1247,20 +1252,20 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
           {/* Payment/collection history */}
           {(recording?.type === 'payable' || recording?.type === 'receivable') && linkedPayments.length > 0 && (
             <>
-              <Text style={[pageStyles.sectionHeader, { fontFamily: Fonts.calSans }]}>{recording.type === 'receivable' ? 'collections' : 'payments'}</Text>
+              <Text style={[pageStyles.sectionHeader, { fontFamily: Brand.font.display }]}>{recording.type === 'receivable' ? 'collections' : 'payments'}</Text>
               <View style={pageStyles.infoBlock}>
                 {linkedPayments.map((p: any, i: number) => (
                   <TouchableOpacity key={p.id} onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: p.id } } as any)}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8, gap: 8 }}>
                       <View style={{ flex: 1 }}>
-                        <Text style={{ fontFamily: Fonts.monoBold, fontSize: 11, color: Colors.expense }}>
+                        <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 11, color: PEACH }}>
                           {Number(p.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                         </Text>
-                        <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted }}>
+                        <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: Colors.muted }}>
                           {formatDate(p.transaction_date)} · {p.accounts?.account_name ?? '—'}
                         </Text>
                         {p.payment_to && (
-                          <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: Colors.cyan, marginTop: 2 }}>
+                          <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: ACCENT_DARK, marginTop: 2 }}>
                             {p.payment_to}
                           </Text>
                         )}
@@ -1275,12 +1280,12 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
               {/* Per-person payment status */}
               {personPayStatus.length > 0 && (
                 <>
-                  <Text style={[pageStyles.sectionHeader, { fontFamily: Fonts.calSans }]}>per person status</Text>
+                  <Text style={[pageStyles.sectionHeader, { fontFamily: Brand.font.display }]}>per person status</Text>
                   <View style={pageStyles.infoBlock}>
                     {personPayStatus.map((s, i) => {
                       const fullyPaid = s.total > 0 && s.paid >= s.total - 0.01;
                       const partial = s.paid > 0 && !fullyPaid;
-                      const statusColor = fullyPaid ? Colors.income : partial ? Colors.cyan : Colors.muted;
+                      const statusColor = fullyPaid ? ACCENT_DARK : partial ? ACCENT_DARK : Colors.muted;
                       return (
                         <View key={s.person}>
                           <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8, gap: 8 }}>
@@ -1289,14 +1294,14 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                               size={16} color={statusColor}
                             />
                             <View style={{ flex: 1 }}>
-                              <Text style={{ fontFamily: Fonts.monoBold, fontSize: 12, color: Colors.text }}>{s.person}</Text>
-                              <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted }}>
+                              <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 12, color: Colors.text }}>{s.person}</Text>
+                              <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: Colors.muted }}>
                                 {s.paid > 0
                                   ? `${s.paid.toLocaleString('en-US', { minimumFractionDigits: 2 })} of ${s.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
                                   : `owes ${s.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
                               </Text>
                             </View>
-                            <Text style={{ fontFamily: Fonts.monoBold, fontSize: 11, color: statusColor }}>
+                            <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 11, color: statusColor }}>
                               {fullyPaid ? 'paid' : partial ? 'partial' : 'unpaid'}
                             </Text>
                           </View>
@@ -1311,20 +1316,20 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
           )}
 
           {/* Split bill */}
-          <Text style={[pageStyles.sectionHeader, { fontFamily: Fonts.calSans }]}>split bill</Text>
+          <Text style={[pageStyles.sectionHeader, { fontFamily: Brand.font.display }]}>split bill</Text>
           {linkedSplitBill ? (
             <TouchableOpacity
-              style={[pageStyles.linkedBtn, { borderColor: Colors.cyan, backgroundColor: Colors.cyan + '11' }]}
+              style={[pageStyles.linkedBtn, { borderColor: ACCENT, backgroundColor: ACCENT + '44' }]}
               onPress={() => router.push({ pathname: '/(app)/split-bill-detail', params: { splitBillId: linkedSplitBill.id, name: linkedSplitBill.name } } as any)}
             >
-              <Ionicons name="people-outline" size={14} color={Colors.cyan} />
+              <Ionicons name="people-outline" size={14} color={ACCENT_DARK} />
               <View style={{ flex: 1 }}>
-                <Text style={{ fontFamily: Fonts.monoBold, fontSize: 12, color: Colors.cyan }}>{linkedSplitBill.name}</Text>
-                <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted }}>
+                <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 12, color: ACCENT_DARK }}>{linkedSplitBill.name}</Text>
+                <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: Colors.muted }}>
                   contributed {Number(recording?.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                 </Text>
               </View>
-              <Ionicons name="arrow-forward" size={13} color={Colors.cyan} />
+              <Ionicons name="arrow-forward" size={13} color={ACCENT_DARK} />
             </TouchableOpacity>
           ) : (
             <TouchableOpacity style={pageStyles.actionBtn} onPress={openSplitBillModal}>
@@ -1338,18 +1343,18 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
 
       {/* Split bill modal */}
       <BottomSheet visible={splitBillModal} onClose={() => setSplitBillModal(false)} title="split bill" height="50%">
-        <TouchableOpacity style={[pageStyles.actionBtn, { marginBottom: 16 }]} onPress={createAndLinkSplitBill}>
-          <Ionicons name="add-circle-outline" size={15} color={Colors.cyan} />
-          <Text style={[pageStyles.actionBtnText, { color: Colors.cyan }]}>create new split bill</Text>
+        <TouchableOpacity style={[pageStyles.actionBtn, { marginBottom: 16, borderColor: ACCENT, backgroundColor: ACCENT + '44' }]} onPress={createAndLinkSplitBill}>
+          <Ionicons name="add-circle-outline" size={15} color={ACCENT_DARK} />
+          <Text style={[pageStyles.actionBtnText, { color: ACCENT_DARK }]}>create new split bill</Text>
         </TouchableOpacity>
         {existingSplitBills.length > 0 && (
           <>
-            <Text style={{ fontFamily: Fonts.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8 }}>add to existing</Text>
+            <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8 }}>add to existing</Text>
             <ScrollView style={{ maxHeight: 240 }} showsVerticalScrollIndicator={false}>
               {existingSplitBills.map((bill: any) => (
-                <TouchableOpacity key={bill.id} style={[pageStyles.actionBtn, { marginBottom: 8, justifyContent: 'flex-start' }]} onPress={() => linkToExistingSplitBill(bill)}>
-                  <Ionicons name="people-outline" size={15} color={Colors.text} />
-                  <Text style={pageStyles.actionBtnText}>{bill.name}</Text>
+                <TouchableOpacity key={bill.id} style={[pageStyles.actionBtn, { marginBottom: 8, justifyContent: 'flex-start', borderColor: ACCENT, backgroundColor: ACCENT + '44' }]} onPress={() => linkToExistingSplitBill(bill)}>
+                  <Ionicons name="people-outline" size={15} color={ACCENT_DARK} />
+                  <Text style={[pageStyles.actionBtnText, { color: ACCENT_DARK }]}>{bill.name}</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -1387,12 +1392,12 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
           ) : (
             linkReceiptEntries.map((entry: any) => (
               <TouchableOpacity key={entry.id} style={formStyles.listItem} onPress={() => linkReceiptToRecording(entry)}>
-                <Ionicons name="folder-outline" size={18} color={Colors.cyan} />
+                <Ionicons name="folder-outline" size={18} color={ACCENT_DARK} />
                 <View style={{ flex: 1 }}>
-                  <Text style={{ fontFamily: Fonts.heading, fontSize: 13, color: Colors.text }} numberOfLines={1}>{entry.note ?? 'untitled'}</Text>
-                  <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted }}>{new Date(entry.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</Text>
+                  <Text style={{ fontFamily: Brand.font.heading, fontSize: 13, color: Colors.text }} numberOfLines={1}>{entry.note ?? 'untitled'}</Text>
+                  <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: Colors.muted }}>{new Date(entry.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</Text>
                 </View>
-                <Ionicons name="link-outline" size={14} color={Colors.cyan} />
+                <Ionicons name="link-outline" size={14} color={ACCENT_DARK} />
               </TouchableOpacity>
             ))
           )}
@@ -1504,7 +1509,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
       <BottomSheet visible={addReceiptModal} onClose={() => setAddReceiptModal(false)} sub="recording" title="add receipt">
         <View style={accountStyles.photoButtons}>
           <TouchableOpacity style={accountStyles.photoBtn} onPress={addReceiptFromCamera}>
-            <Ionicons name="camera-outline" size={28} color={Colors.cyan} />
+            <Ionicons name="camera-outline" size={28} color={ACCENT_DARK} />
             <Text style={accountStyles.photoBtnText}>camera</Text>
           </TouchableOpacity>
           <TouchableOpacity style={accountStyles.photoBtn} onPress={addReceiptFromGallery}>
@@ -1540,13 +1545,13 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                 <TouchableOpacity
                   key={acc.id}
                   style={[{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, gap: 10, borderBottomWidth: 1, borderBottomColor: Colors.border },
-                    editAccountId === acc.id && { backgroundColor: Colors.cyan + '11', borderRadius: Radius.md, paddingHorizontal: 8 }]}
+                    editAccountId === acc.id && { backgroundColor: ACCENT + '44', borderRadius: Radius.md, paddingHorizontal: 8 }]}
                   onPress={() => setEditAccountId(acc.id)}
                 >
-                  <Ionicons name={editAccountId === acc.id ? 'checkmark-circle' : 'ellipse-outline'} size={16} color={editAccountId === acc.id ? Colors.cyan : Colors.faint} />
+                  <Ionicons name={editAccountId === acc.id ? 'checkmark-circle' : 'ellipse-outline'} size={16} color={editAccountId === acc.id ? ACCENT_DARK : Colors.faint} />
                   <View style={{ flex: 1 }}>
-                    <Text style={{ fontFamily: Fonts.heading, fontSize: 13, color: Colors.text }}>{acc.account_name}</Text>
-                    <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted }}>{acc.bank} · {acc.account_number}</Text>
+                    <Text style={{ fontFamily: Brand.font.heading, fontSize: 13, color: Colors.text }}>{acc.account_name}</Text>
+                    <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: Colors.muted }}>{acc.bank} · {acc.account_number}</Text>
                   </View>
                 </TouchableOpacity>
               ))}
@@ -1578,7 +1583,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
             {receiptPhotos.map((p, i) => (
               <View key={p.id} style={{ width, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 16 }}>
                 <Image source={{ uri: p.url }} style={{ width: width - 32, height: width - 32, borderRadius: 12 }} resizeMode="contain" />
-                <Text style={{ fontFamily: Fonts.mono, fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 12 }}>{i + 1} / {receiptPhotos.length}</Text>
+                <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 12 }}>{i + 1} / {receiptPhotos.length}</Text>
               </View>
             ))}
           </ScrollView>
@@ -1608,21 +1613,21 @@ const styles = StyleSheet.create({
   personRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
   removeBtn: { padding: 4 },
   addMoreBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start' },
-  addMoreText: { fontFamily: Fonts.mono, fontSize: 11, color: Colors.cyan },
-  deleteWarning: { fontFamily: Fonts.mono, fontSize: 12, color: Colors.muted, textAlign: 'center', lineHeight: 18 },
+  addMoreText: { fontFamily: Brand.font.mono, fontSize: 11, color: ACCENT_DARK },
+  deleteWarning: { fontFamily: Brand.font.mono, fontSize: 12, color: Colors.muted, textAlign: 'center', lineHeight: 18 },
   suggestionBox: { backgroundColor: Colors.white, borderRadius: 8, borderWidth: 1, borderColor: Colors.border, marginTop: -4, marginBottom: 6, overflow: 'hidden' },
   suggestionItem: { paddingHorizontal: 12, paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  suggestionText: { fontFamily: Fonts.mono, fontSize: 12, color: Colors.text },
+  suggestionText: { fontFamily: Brand.font.mono, fontSize: 12, color: Colors.text },
   subitemFormRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 8, marginLeft: 4 },
   subitemFormInputRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   // Tag input
   tagInputWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, borderWidth: 1, borderColor: Colors.borderMid, borderRadius: Radius.md, padding: 8, minHeight: 44, marginBottom: 4 },
-  tagChip: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: Colors.cyan, borderRadius: Radius.pill, paddingVertical: 4, paddingLeft: 10, paddingRight: 6 },
-  tagChipText: { fontFamily: Fonts.monoBold, fontSize: 11, color: Colors.white },
-  tagInput: { fontFamily: Fonts.mono, fontSize: 14, color: Colors.text, minWidth: 120, flex: 1, padding: 2 },
+  tagChip: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: ACCENT + '44', borderRadius: Radius.pill, paddingVertical: 4, paddingLeft: 10, paddingRight: 6 },
+  tagChipText: { fontFamily: Brand.font.monoBold, fontSize: 11, color: ACCENT_DARK },
+  tagInput: { fontFamily: Brand.font.mono, fontSize: 14, color: Colors.text, minWidth: 120, flex: 1, padding: 2 },
   // Contacts list
   contactRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  contactName: { fontFamily: Fonts.mono, fontSize: 13, color: Colors.text },
+  contactName: { fontFamily: Brand.font.mono, fontSize: 13, color: Colors.text },
 });
 
 

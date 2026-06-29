@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Image, TouchableOpacity, Modal, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Image, TouchableOpacity, Modal, Platform, TextInput } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../src/lib/supabase';
@@ -10,24 +10,25 @@ import { Brand } from '../../src/lib/brand';
 const PAGE        = 25;
 const ACCENT      = Brand.color.accent;
 const ACCENT_DARK = Brand.color.accentDark;
+const ACCENT_TEXT = Brand.color.accentText;
 const PEACH       = '#FFAB91';
 
 export default function SplitSharePage() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const [loading, setLoading]               = useState(true);
-  const [notFound, setNotFound]             = useState(false);
-  const [recording, setRecording]           = useState<any>(null);
-  const [perPerson, setPerPerson]           = useState<{ name: string; total: number }[]>([]);
-  const [items, setItems]                   = useState<any[]>([]);
-  const [payments, setPayments]             = useState<any[]>([]);
-  const [receiptId, setReceiptId]           = useState<string | null>(null);
-  const [receiptPhotos, setReceiptPhotos]   = useState<string[]>([]);
-  const [receiptModal, setReceiptModal]     = useState(false);
+  const [loading, setLoading]           = useState(true);
+  const [notFound, setNotFound]         = useState(false);
+  const [recording, setRecording]       = useState<any>(null);
+  const [perPerson, setPerPerson]       = useState<{ name: string; total: number }[]>([]);
+  const [items, setItems]               = useState<any[]>([]);
+  const [payments, setPayments]         = useState<any[]>([]);
+  const [receiptId, setReceiptId]       = useState<string | null>(null);
+  const [receiptPhotos, setReceiptPhotos] = useState<string[]>([]);
+  const [receiptModal, setReceiptModal] = useState(false);
   const [receiptLoading, setReceiptLoading] = useState(false);
-  const [qrModal, setQrModal]               = useState(false);
-  const [qrModalAcc, setQrModalAcc]         = useState<any>(null);
-  const [showUrlBar, setShowUrlBar]         = useState(false);
-  const [copiedAccIdx, setCopiedAccIdx]     = useState<number | null>(null);
+  const [qrModal, setQrModal]           = useState(false);
+  const [qrModalAcc, setQrModalAcc]     = useState<any>(null);
+  const [showUrlBar, setShowUrlBar]     = useState(false);
+  const [copiedAccIdx, setCopiedAccIdx] = useState<number | null>(null);
 
   const shareUrl = typeof window !== 'undefined' ? window.location.href : `https://ledgr.art/split/${id}`;
 
@@ -46,6 +47,7 @@ export default function SplitSharePage() {
     const { data: share, error } = await supabase.from('split_shares').select('recording_id, split_bill_id, data').eq('id', id).single();
     if (error || !share) { setNotFound(true); setLoading(false); return; }
     const accountIds: string[] = share.data?.account_ids ?? [];
+
     const splitBillId = share.split_bill_id;
     const rid = share.recording_id;
 
@@ -152,8 +154,7 @@ export default function SplitSharePage() {
     if (photos && photos.length > 0) {
       const urls = await Promise.all(photos.map(async (p: any) => {
         if (p.url) return p.url;
-        let url = '';
-        if (p.storage_path) { const { data } = await supabase.storage.from('receipts').createSignedUrl(p.storage_path, 3600); url = data?.signedUrl ?? ''; }
+        let url = ''; if (p.storage_path) { const { data } = await supabase.storage.from('receipts').createSignedUrl(p.storage_path, 3600); url = data?.signedUrl ?? ''; }
         return url;
       }));
       setReceiptPhotos(urls.filter(Boolean));
@@ -166,8 +167,8 @@ export default function SplitSharePage() {
   if (loading) return <View style={s.center}><ActivityIndicator color={ACCENT_DARK} /></View>;
   if (notFound || !recording) return (
     <View style={s.center}>
-      <Ionicons name="search-outline" size={36} color={Colors.borderMid} />
-      <Text style={s.emptyText}>split not found</Text>
+      <Ionicons name="search-outline" size={40} color={Colors.borderMid} />
+      <Text style={Brand.type.emptyText}>split not found</Text>
     </View>
   );
 
@@ -176,52 +177,43 @@ export default function SplitSharePage() {
     ? new Date(recording.transaction_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
     : '';
 
-  const grandTotal = perPerson.reduce((sum, p) => sum + p.total, 0);
-
   return (
     <>
-      <ScrollView style={s.container} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView style={s.container} contentContainerStyle={s.scroll}>
 
         {/* App label */}
         <Text style={s.appLabel}>LEDGR</Text>
 
-        {/* Title block */}
+        {/* Header */}
         <Text style={s.recName}>{String(recording.name ?? '').toLowerCase()}</Text>
-        <View style={s.metaRow}>
-          <Text style={[s.recAmount, { color: amtColor }]}>{fmt(Number(recording.amount ?? 0))}</Text>
-          {!!formattedDate && <Text style={s.recDate}>{formattedDate}</Text>}
-        </View>
+        <Text style={[s.recAmount, { color: amtColor }]}>{fmt(Number(recording.amount ?? 0))}</Text>
+        {!!formattedDate && <Text style={s.recDate}>{formattedDate}</Text>}
 
-        {/* Per person pay */}
+        {/* Per Person Pay */}
         {perPerson.length > 0 && <>
           <Text style={s.sectionHeader}>per person pay</Text>
-          <View style={s.listBlock}>
+          <View style={{ gap: 8, marginBottom: 8 }}>
             {perPerson.map((p, i) => (
-              <View key={i} style={s.row}>
-                <View style={s.rowIconWrap}>
-                  <Ionicons name="person-outline" size={15} color={ACCENT_DARK} />
-                </View>
-                <Text style={s.rowName}>{p.name}</Text>
-                <Text style={[s.rowAmount, { color: p.total < 0 ? PEACH : ACCENT_DARK }]}>
-                  {p.total < 0 ? '-' : ''}{fmt(Math.abs(p.total))}
-                </Text>
+              <View key={i} style={s.personRow}>
+                <Text style={s.personName}>{p.name}</Text>
+                <View style={s.personDots} />
+                <Text style={[s.personAmount, { color: p.total < 0 ? PEACH : Colors.text }]}>{fmt(Math.abs(p.total))}</Text>
               </View>
             ))}
-            {/* Total row */}
-            <View style={[s.row, { backgroundColor: ACCENT + '44' }]}>
-              <View style={[s.rowIconWrap, { backgroundColor: ACCENT }]}>
-                <Ionicons name="calculator-outline" size={15} color={ACCENT_DARK} />
-              </View>
-              <Text style={[s.rowName, { fontFamily: Brand.font.monoBold, color: ACCENT_DARK }]}>total</Text>
-              <Text style={[s.rowAmount, { color: ACCENT_DARK }]}>{fmt(grandTotal)}</Text>
+            <View style={[s.personRow, { backgroundColor: ACCENT + '44', borderColor: ACCENT }]}>
+              <Text style={[s.personName, { color: ACCENT_DARK, fontFamily: Brand.font.monoBold }]}>total</Text>
+              <View style={s.personDots} />
+              <Text style={[s.personAmount, { color: ACCENT_DARK }]}>
+                {fmt(perPerson.reduce((sum, p) => sum + p.total, 0))}
+              </Text>
             </View>
           </View>
         </>}
 
-        {/* Items */}
+        {/* Item Information */}
         {items.length > 0 && <>
-          <Text style={s.sectionHeader}>item breakdown</Text>
-          <View style={s.listBlock}>
+          <Text style={s.sectionHeader}>item information</Text>
+          <View style={{ gap: 8, marginBottom: 8 }}>
             {items.map((item, ii) => {
               const subs: any[] = item.subitems ?? [];
               const itemPeople: any[] = item.people ?? [];
@@ -229,33 +221,33 @@ export default function SplitSharePage() {
               return (
                 <View key={ii} style={s.itemCard}>
                   <View style={s.itemHeader}>
-                    <View style={s.rowIconWrap}>
-                      <Ionicons name="pricetag-outline" size={15} color={deduct ? PEACH : ACCENT_DARK} />
-                    </View>
-                    <Text style={s.rowName}>{String(item.name ?? '').toLowerCase()}</Text>
-                    <Text style={[s.rowAmount, { color: deduct ? PEACH : ACCENT_DARK }]}>
+                    <Text style={s.itemName}>{String(item.name ?? '').toLowerCase()}</Text>
+                    <Text style={[s.itemCost, { color: deduct ? PEACH : ACCENT_DARK }]}>
                       {deduct ? '-' : '+'}{fmt(Number(item.cost ?? 0))}
                     </Text>
                   </View>
-                  {subs.length === 0 && itemPeople.length > 0 && (
-                    <View style={s.itemMeta}>
-                      <Text style={s.splitMeta}>
-                        {fmt(Number(item.cost ?? 0) / itemPeople.length)} each · {itemPeople.join(', ')}
-                      </Text>
+                  {subs.length === 0 && itemPeople.length > 0 ? (
+                    <View style={{ gap: 4 }}>
+                      <Text style={s.splitMeta}>{itemPeople.length} {itemPeople.length === 1 ? 'person' : 'people'} · {fmt(Number(item.cost ?? 0) / itemPeople.length)} each</Text>
+                      <View style={s.chips}>
+                        {itemPeople.map((p, pi) => <View key={pi} style={s.chip}><Text style={s.chipText}>{p}</Text></View>)}
+                      </View>
                     </View>
-                  )}
-                  {subs.map((sub, si) => {
+                  ) : subs.map((sub, si) => {
                     const subPeople: any[] = sub.people ?? [];
                     const pp = subPeople.length > 0 ? Number(sub.cost ?? 0) / subPeople.length : Number(sub.cost ?? 0);
                     return (
                       <View key={si} style={s.subRow}>
                         <Text style={s.arrow}>↳</Text>
-                        <View style={{ flex: 1 }}>
-                          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                        <View style={{ flex: 1, gap: 4 }}>
+                          <View style={s.subTop}>
                             <Text style={s.subName}>{String(sub.name ?? '').toLowerCase()}</Text>
                             <Text style={s.subCost}>{fmt(Number(sub.cost ?? 0))}</Text>
                           </View>
-                          <Text style={s.splitMeta}>{fmt(pp)} each · {subPeople.join(', ')}</Text>
+                          <Text style={s.splitMeta}>{subPeople.length} {subPeople.length === 1 ? 'person' : 'people'} · {fmt(pp)} each</Text>
+                          <View style={s.chips}>
+                            {subPeople.map((p, pi) => <View key={pi} style={s.chip}><Text style={s.chipText}>{p}</Text></View>)}
+                          </View>
                         </View>
                       </View>
                     );
@@ -269,34 +261,31 @@ export default function SplitSharePage() {
         {/* Receipt */}
         {receiptId && <>
           <Text style={s.sectionHeader}>receipt</Text>
-          <TouchableOpacity style={s.actionBtn} onPress={openReceipt} activeOpacity={0.8}>
+          <TouchableOpacity style={s.receiptBtn} onPress={openReceipt}>
             <Ionicons name="receipt-outline" size={15} color={ACCENT_DARK} />
-            <Text style={s.actionBtnText}>view receipt photos</Text>
-            <Ionicons name="chevron-forward" size={13} color={ACCENT_DARK} />
+            <Text style={s.receiptBtnText}>tap to view receipt photos</Text>
+            <Ionicons name="arrow-forward" size={13} color={ACCENT_DARK} />
           </TouchableOpacity>
         </>}
 
-        {/* Payment info */}
+        {/* Payment Information */}
         {payments.length > 0 && <>
           <Text style={s.sectionHeader}>payment information</Text>
-          <View style={s.listBlock}>
+          <View style={{ gap: 8, marginBottom: 8 }}>
             {payments.map((acc: any, i: number) => (
-              <View key={i} style={s.payRow}>
-                <View style={[s.rowIconWrap, { backgroundColor: ACCENT }]}>
-                  <Ionicons name="card-outline" size={15} color={ACCENT_DARK} />
-                </View>
+              <View key={i} style={s.payCard}>
                 <View style={{ flex: 1, gap: 2 }}>
                   <Text style={s.payBank}>{acc.bank || ''}</Text>
                   <Text style={s.payHolder}>{acc.holder_name || acc.account_name || ''}</Text>
                   <TouchableOpacity style={s.copyRow} onPress={() => copyAccountNumber(acc.account_number ?? '', i)} activeOpacity={0.7}>
                     <Text style={s.payNumber}>{acc.account_number ?? ''}</Text>
-                    <Ionicons name={copiedAccIdx === i ? 'checkmark' : 'copy-outline'} size={12} color={copiedAccIdx === i ? ACCENT_DARK : Colors.muted} />
+                    <Ionicons name={copiedAccIdx === i ? 'checkmark' : 'copy-outline'} size={13} color={copiedAccIdx === i ? ACCENT_DARK : Colors.muted} />
                   </TouchableOpacity>
                 </View>
                 {acc.qr_code && (
                   <TouchableOpacity onPress={() => { setQrModalAcc(acc); setQrModal(true); }}>
                     <Image source={{ uri: acc.qr_code }} style={s.qr} resizeMode="contain" />
-                    <Text style={s.qrHint}>tap to enlarge</Text>
+                    <Text style={s.qrHint}>tap to expand</Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -357,54 +346,55 @@ export default function SplitSharePage() {
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.white },
-  scroll:    { paddingHorizontal: PAGE, paddingTop: 48, paddingBottom: 60 },
+  scroll:    { paddingHorizontal: PAGE, paddingTop: 52, paddingBottom: 60 },
   center:    { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.white, gap: 12 },
-  emptyText: { fontFamily: Brand.font.mono, fontSize: 13, color: Colors.muted },
 
-  appLabel:  { fontFamily: Brand.font.appLabel, fontSize: 16, color: ACCENT_DARK, marginBottom: 16, letterSpacing: 1 },
-  recName:   { fontFamily: Brand.font.display, fontSize: 30, color: Colors.text, letterSpacing: -0.5, marginBottom: 8 },
-  metaRow:   { flexDirection: 'row', alignItems: 'baseline', gap: 12, marginBottom: 8 },
-  recAmount: { fontFamily: Brand.font.monoBold, fontSize: 22 },
-  recDate:   { fontFamily: Brand.font.mono, fontSize: 11, color: Colors.muted },
+  appLabel:  { fontFamily: Brand.font.appLabel, fontSize: 18, color: ACCENT_DARK, marginBottom: 20 },
+  recName:   { fontFamily: Brand.font.display, fontSize: 32, color: Colors.text, letterSpacing: -0.5, marginBottom: 6 },
+  recAmount: { fontFamily: Brand.font.monoBold, fontSize: 24, marginBottom: 4 },
+  recDate:   { fontFamily: Brand.font.mono, fontSize: 11, color: Colors.muted, marginBottom: 32 },
 
-  sectionHeader: { ...Brand.type.sectionHeader, marginTop: 28, marginBottom: 10 },
+  sectionHeader: { ...Brand.type.sectionHeader, marginBottom: 10, marginTop: 24 },
 
-  listBlock: { borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.border, overflow: 'hidden', marginBottom: 4 },
+  personRow:    { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surface, borderRadius: Radius.pill, paddingVertical: 12, paddingHorizontal: 16, borderWidth: 1, borderColor: Colors.border },
+  personName:   { ...Brand.type.cardTitle, flexShrink: 0 },
+  personDots:   { flex: 1, borderBottomWidth: 1, borderStyle: 'dotted', borderColor: Colors.faint, marginHorizontal: 10 },
+  personAmount: { fontFamily: Brand.font.monoBold, fontSize: 13, color: Colors.text, flexShrink: 0 },
 
-  row:        { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  rowIconWrap:{ width: 32, height: 32, borderRadius: 16, backgroundColor: ACCENT + '44', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  rowName:    { flex: 1, fontFamily: Brand.font.heading, fontSize: 13, color: Colors.text },
-  rowAmount:  { fontFamily: Brand.font.monoBold, fontSize: 14, letterSpacing: -0.3 },
-
-  itemCard:   { borderBottomWidth: 1, borderBottomColor: Colors.border },
-  itemHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 14 },
-  itemMeta:   { paddingHorizontal: 14, paddingBottom: 10, paddingLeft: 60 },
-  subRow:     { flexDirection: 'row', gap: 8, paddingHorizontal: 14, paddingBottom: 8, paddingLeft: 60 },
+  itemCard:   { backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: 14, borderWidth: 1, borderColor: Colors.border, gap: 8 },
+  itemHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  itemName:   { ...Brand.type.cardTitle },
+  itemCost:   { fontFamily: Brand.font.monoBold, fontSize: 13 },
+  subRow:     { flexDirection: 'row', gap: 8 },
   arrow:      { fontSize: 12, color: Colors.faint, marginTop: 2 },
-  subName:    { fontFamily: Brand.font.heading, fontSize: 12, color: Colors.text },
+  subTop:     { flexDirection: 'row', justifyContent: 'space-between' },
+  subName:    { ...Brand.type.cardTitle, fontSize: 12 },
   subCost:    { fontFamily: Brand.font.mono, fontSize: 11, color: Colors.muted },
-  splitMeta:  { fontFamily: Brand.font.mono, fontSize: 10, color: Colors.muted, marginTop: 2 },
+  splitMeta:  { ...Brand.type.cardMeta },
+  chips:      { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
+  chip:       { backgroundColor: ACCENT + '44', borderRadius: Radius.pill, paddingVertical: 3, paddingHorizontal: 10 },
+  chipText:   { fontFamily: Brand.font.mono, fontSize: 10, color: ACCENT_DARK },
 
-  payRow:    { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  payBank:   { fontFamily: Brand.font.heading, fontSize: 14, color: Colors.text },
+  receiptBtn:     { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: Radius.pill, paddingVertical: 12, paddingHorizontal: 16, borderWidth: 1, borderColor: ACCENT, backgroundColor: ACCENT + '44' },
+  receiptBtnText: { fontFamily: Brand.font.heading, fontSize: 13, color: ACCENT_DARK, flex: 1 },
+
+  payCard:   { flexDirection: 'row', alignItems: 'center', backgroundColor: ACCENT + '44', borderRadius: Radius.lg, padding: 16, gap: 12, borderWidth: 1, borderColor: ACCENT },
+  payBank:   { fontFamily: Brand.font.heading, fontSize: 15, color: Colors.text },
   payHolder: { fontFamily: Brand.font.mono, fontSize: 10, color: Colors.muted },
   payNumber: { fontFamily: Brand.font.monoBold, fontSize: 13, color: Colors.text },
   copyRow:   { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
-  qr:        { width: 64, height: 64, borderRadius: Radius.md },
-  qrHint:    { fontFamily: Brand.font.mono, fontSize: 9, color: Colors.muted, textAlign: 'center', marginTop: 2 },
+  qr:        { width: 68, height: 68, borderRadius: Radius.md },
+  qrHint:    { fontFamily: Brand.font.mono, fontSize: 9, color: Colors.muted, textAlign: 'center', marginTop: 3 },
 
-  actionBtn:     { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: Radius.lg, paddingVertical: 12, paddingHorizontal: 14, borderWidth: 1, borderColor: ACCENT, backgroundColor: ACCENT + '44' },
-  actionBtnText: { flex: 1, fontFamily: Brand.font.heading, fontSize: 13, color: ACCENT_DARK },
-
-  shareBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: Radius.pill, paddingVertical: 12, borderWidth: 1, borderColor: ACCENT, backgroundColor: ACCENT + '44', marginTop: 24, marginBottom: 16 },
+  shareBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: Radius.pill, paddingVertical: 12, paddingHorizontal: 24, borderWidth: 1, borderColor: ACCENT, backgroundColor: ACCENT + '44', marginTop: 24, marginBottom: 16 },
   shareBtnText: { fontFamily: Brand.font.heading, fontSize: 13, color: ACCENT_DARK },
 
-  urlBar:   { flexDirection: 'row', alignItems: 'center', borderRadius: Radius.md, borderWidth: 1, borderColor: ACCENT, backgroundColor: ACCENT + '22', paddingHorizontal: 12, marginTop: 16, marginBottom: 16, gap: 8 },
+  urlBar:   { flexDirection: 'row', alignItems: 'center', borderRadius: Radius.md, borderWidth: 1, borderColor: ACCENT, backgroundColor: ACCENT + '22', paddingHorizontal: 12, marginBottom: 16, gap: 8 },
   urlInput: { flex: 1, fontFamily: Brand.font.mono, fontSize: 12, color: Colors.text, paddingVertical: 10 },
 
-  footer: { fontFamily: Brand.font.mono, fontSize: 10, color: Colors.faint, textAlign: 'center', marginTop: 8 },
+  footer: { ...Brand.type.footer, marginTop: 8 },
 
-  overlay: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  qrLarge: { width: 260, height: 260, borderRadius: Radius.lg },
-  qrTap:   { fontFamily: Brand.font.mono, fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 16 },
+  overlay:  { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  qrLarge:  { width: 260, height: 260, borderRadius: Radius.lg },
+  qrTap:    { fontFamily: Brand.font.mono, fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 16 },
 });

@@ -7,27 +7,18 @@ import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../src/lib/supabase';
-import pageStyles from '@/components/ui/pageStyles';
-import { Colors, Fonts, Radius, Spacing } from '@/components/ui/theme';
+import { Colors, Radius } from '@/components/ui/theme';
+import { Brand } from '../../src/lib/brand';
 
 const { width } = Dimensions.get('window');
+const PAGE = 25;
+const ACCENT      = Brand.color.accent;
+const ACCENT_DARK = Brand.color.accentDark;
+const PEACH       = '#FFAB91';
 
-function recordingColor(type: string, status: string): string {
-  if (type === 'expense') return Colors.expense;
-  if (type === 'income' || type === 'savings') return Colors.cyan;
-  if (type === 'payable') return status === 'paid' ? Colors.paid : Colors.pending;
-  if (type === 'receivable') return status === 'received' ? Colors.paid : Colors.pending;
-  return Colors.cyan;
-}
-
-function recordingBg(type: string, status: string): string {
-  if (type === 'expense') return '#fdeded';
-  if (type === 'income' || type === 'savings') return '#f6fded';
-  if (type === 'payable' || type === 'receivable') {
-    if (status === 'paid' || status === 'received') return '#f8f8f8';
-    return '#f8edfd';
-  }
-  return '#f6fded';
+function recordingColor(type: string): string {
+  if (type === 'expense' || type === 'payable') return PEACH;
+  return ACCENT_DARK;
 }
 
 function dateKey(d: Date) { return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`; }
@@ -46,30 +37,29 @@ export default function AccountDetailScreen() {
     queryFn: async () => {
       const { data } = await supabase
         .from('recordings')
-        .select('*, categories:category_id(name, color, icon), account:account_id(account_name, bank)')
+        .select('*, categories:category_id(name, color, icon)')
         .eq('account_id', accountId)
         .order('transaction_date', { ascending: false });
       return (data ?? []).map((r: any) => ({
         ...r,
         categories: Array.isArray(r.categories) ? r.categories[0] : r.categories,
-        account: Array.isArray(r.account) ? r.account[0] : r.account,
       }));
     },
     enabled: !!accountId,
   });
 
-  const totalExpenses = recordings.filter(r => r.type === 'expense').reduce((s, r) => s + Number(r.amount), 0);
-  const totalIncome = recordings.filter(r => r.type === 'income' || r.type === 'savings').reduce((s, r) => s + Number(r.amount), 0);
-  const countPayables = recordings.filter(r => r.type === 'payable' && r.status !== 'paid').length;
+  const totalExpenses    = recordings.filter(r => r.type === 'expense').reduce((s, r) => s + Number(r.amount), 0);
+  const totalIncome      = recordings.filter(r => r.type === 'income' || r.type === 'savings').reduce((s, r) => s + Number(r.amount), 0);
+  const countPayables    = recordings.filter(r => r.type === 'payable' && r.status !== 'paid').length;
   const countReceivables = recordings.filter(r => r.type === 'receivable' && r.status === 'pending').length;
 
-  const shortAmount = (n: number) => {
-    if (n >= 1_000_000) return (n / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
-    if (n >= 1_000) return (n / 1_000).toFixed(1).replace(/\.0$/, '') + 'K';
+  const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2 });
+  const fmtAbbr = (n: number) => {
+    if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
+    if (n >= 1_000)     return (n / 1_000).toFixed(1) + 'K';
     return n.toFixed(0);
   };
 
-  // Group by date
   const grouped: { dateLabel: string; dateObj: Date; items: any[] }[] = [];
   recordings.forEach(r => {
     const parts = r.transaction_date.split('-');
@@ -82,27 +72,29 @@ export default function AccountDetailScreen() {
   grouped.sort((a, b) => b.dateObj.getTime() - a.dateObj.getTime());
 
   return (
-    <Animated.View style={[pageStyles.container, { transform: [{ translateX: slideAnim }] }]}>
-      <SafeAreaView style={pageStyles.inner}>
-        <TouchableOpacity onPress={() => {
-          Animated.timing(slideAnim, { toValue: width, duration: 250, useNativeDriver: false }).start(() => router.back());
-        }} style={pageStyles.backBtn}>
-          <Ionicons name="arrow-back" size={22} color={Colors.muted} />
-        </TouchableOpacity>
+    <Animated.View style={[{ flex: 1, backgroundColor: Colors.white }, { transform: [{ translateX: slideAnim }] }]}>
+      <SafeAreaView style={{ flex: 1 }}>
 
         {/* Header */}
-        <View style={{ paddingHorizontal: Spacing.page, marginBottom: 16 }}>
-          <Text style={s.pageTitle}>{(accountName ?? '').toLowerCase()}</Text>
-          <Text style={s.pageSubtitle}>{(bankName ?? '').toLowerCase()}</Text>
+        <View style={s.header}>
+          <TouchableOpacity onPress={() => {
+            Animated.timing(slideAnim, { toValue: width, duration: 250, useNativeDriver: false }).start(() => router.back());
+          }} style={s.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name="arrow-back" size={20} color={Colors.text} />
+          </TouchableOpacity>
+          <View style={{ flex: 1 }}>
+            <Text style={s.title} numberOfLines={1}>{(accountName ?? '').toLowerCase()}</Text>
+            <Text style={s.subtitle}>{(bankName ?? '').toLowerCase()}</Text>
+          </View>
         </View>
 
         {/* Stats */}
-        <View style={{ flexDirection: 'row', gap: 8, marginHorizontal: Spacing.page, marginBottom: 16 }}>
+        <View style={s.statsRow}>
           {[
-            { label: 'expenses', value: shortAmount(totalExpenses), color: Colors.expense },
-            { label: 'income', value: shortAmount(totalIncome), color: Colors.income },
-            { label: 'payables', value: String(countPayables), color: Colors.muted },
-            { label: 'receivables', value: String(countReceivables), color: Colors.muted },
+            { label: 'expenses',    value: fmtAbbr(totalExpenses),    color: PEACH       },
+            { label: 'income',      value: fmtAbbr(totalIncome),      color: ACCENT_DARK },
+            { label: 'payables',    value: String(countPayables),     color: Colors.muted },
+            { label: 'receivables', value: String(countReceivables),  color: Colors.muted },
           ].map((st, i) => (
             <View key={i} style={s.statCard}>
               <Text style={[s.statValue, { color: st.color }]}>{st.value}</Text>
@@ -113,50 +105,46 @@ export default function AccountDetailScreen() {
 
         {/* Recordings */}
         {isLoading ? (
-          <ActivityIndicator color={Colors.income} style={{ marginTop: 40 }} />
+          <ActivityIndicator color={ACCENT_DARK} style={{ marginTop: 40 }} />
         ) : grouped.length === 0 ? (
-          <View style={[pageStyles.emptyBox, { borderWidth: 0, backgroundColor: 'transparent', marginTop: 40 }]}>
-            <Ionicons name="receipt-outline" size={40} color={Colors.borderMid} />
-            <Text style={pageStyles.emptyText}>no recordings for this account</Text>
+          <View style={{ alignItems: 'center', marginTop: 60, gap: 8 }}>
+            <Ionicons name="receipt-outline" size={36} color={Colors.borderMid} />
+            <Text style={Brand.type.emptyText}>no recordings for this account</Text>
           </View>
         ) : (
           <ScrollView contentContainerStyle={s.list} showsVerticalScrollIndicator={false}>
             {grouped.map(group => (
               <View key={group.dateLabel}>
-                <View style={s.dateGroupRow}>
-                  <View style={s.dateGroupLine} />
-                  <Text style={s.dateGroupLabel}>{group.dateLabel}</Text>
-                  <View style={s.dateGroupLine} />
+                <View style={s.dateRow}>
+                  <View style={s.dateLine} />
+                  <Text style={s.dateLabel}>{group.dateLabel}</Text>
+                  <View style={s.dateLine} />
                 </View>
-                <View style={{ gap: 10 }}>
-                  {group.items.map(item => {
-                    const amountColor = recordingColor(item.type, item.status);
-                    const statusLabel = item.type === 'payable'
-                      ? (item.status === 'paid' ? 'Paid' : item.status === 'partial' ? 'Partial' : 'Unpaid')
-                      : item.type === 'receivable'
-                        ? (item.status === 'received' ? 'Received' : item.status === 'partial' ? 'Partial' : 'Pending')
-                        : '';
-                    return (
-                      <TouchableOpacity
-                        key={item.id}
-                        style={[s.recordingCard, { backgroundColor: recordingBg(item.type, item.status) }]}
-                        activeOpacity={0.85}
-                        onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: item.id } } as any)}
-                      >
-                        <Ionicons name={item.categories?.icon ?? 'ellipse-outline'} size={22} color={amountColor} style={{ flexShrink: 0 }} />
-                        <View style={s.recordingMiddle}>
-                          <Text style={s.recordingName} numberOfLines={1}>{item.name}</Text>
-                          <Text style={[s.recordingMeta, { fontFamily: Fonts.monoBold }]} numberOfLines={1}>
-                            {statusLabel || item.categories?.name || item.type}
-                          </Text>
-                        </View>
-                        <Text style={[s.recordingAmount, { color: amountColor }]}>
-                          {Number(item.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
+                {group.items.map(item => {
+                  const color = recordingColor(item.type);
+                  const statusLabel = item.type === 'payable'
+                    ? (item.status === 'paid' ? 'paid' : item.status === 'partial' ? 'partial' : 'unpaid')
+                    : item.type === 'receivable'
+                      ? (item.status === 'received' ? 'received' : item.status === 'partial' ? 'partial' : 'pending')
+                      : '';
+                  return (
+                    <TouchableOpacity
+                      key={item.id}
+                      style={s.row}
+                      activeOpacity={0.85}
+                      onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: item.id } } as any)}
+                    >
+                      <View style={s.rowIconWrap}>
+                        <Ionicons name={item.categories?.icon ?? 'ellipse-outline'} size={18} color={ACCENT_DARK} />
+                      </View>
+                      <View style={{ flex: 1, gap: 2 }}>
+                        <Text style={s.rowName} numberOfLines={1}>{item.name}</Text>
+                        <Text style={s.rowMeta}>{statusLabel || item.categories?.name || item.type}</Text>
+                      </View>
+                      <Text style={[s.rowAmount, { color }]}>{fmt(Number(item.amount))}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             ))}
           </ScrollView>
@@ -167,18 +155,25 @@ export default function AccountDetailScreen() {
 }
 
 const s = StyleSheet.create({
-  pageTitle: { fontFamily: Fonts.calSans, fontSize: 32, color: '#425252', letterSpacing: -0.5 },
-  pageSubtitle: { fontFamily: 'ChillaxRegular', fontSize: 13, color: Colors.muted, marginTop: 2 },
-  statCard: { flex: 1, backgroundColor: Colors.surface, borderRadius: Radius.lg, paddingHorizontal: 8, paddingVertical: 10, borderWidth: 1, borderColor: Colors.border, alignItems: 'center' },
-  statValue: { fontFamily: 'ChillaxMedium', fontSize: 13, marginBottom: 2 },
-  statLabel: { fontFamily: 'ChillaxLight', fontSize: 9, color: Colors.muted, textAlign: 'center' },
-  list: { paddingHorizontal: Spacing.page, paddingBottom: 100, gap: 16, paddingTop: 16 },
-  dateGroupRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8, marginTop: 16 },
-  dateGroupLine: { flex: 1, height: 1, backgroundColor: Colors.borderMid },
-  dateGroupLabel: { fontFamily: Fonts.calSans, fontSize: 11, color: '#555555', textAlign: 'center' },
-  recordingCard: { flexDirection: 'row', alignItems: 'center', borderRadius: Radius.pill, paddingVertical: 10, paddingHorizontal: 14, gap: 10 },
-  recordingMiddle: { flex: 1, gap: 2, overflow: 'hidden' },
-  recordingName: { fontFamily: 'ChillaxMedium', fontSize: 13, color: '#292929' },
-  recordingMeta: { fontFamily: Fonts.mono, fontSize: 10, color: '#292929' },
-  recordingAmount: { fontFamily: Fonts.monoBold, fontSize: 14 },
+  header:   { flexDirection: 'row', alignItems: 'center', paddingHorizontal: PAGE, paddingTop: 16, paddingBottom: 12, gap: 12, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  backBtn:  { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center' },
+  title:    { fontFamily: Brand.font.display, fontSize: 22, color: Colors.text, letterSpacing: -0.3 },
+  subtitle: { fontFamily: Brand.font.mono, fontSize: 11, color: Colors.muted, marginTop: 1 },
+
+  statsRow: { flexDirection: 'row', gap: 8, paddingHorizontal: PAGE, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  statCard: { flex: 1, backgroundColor: Colors.surface, borderRadius: Radius.lg, paddingVertical: 10, alignItems: 'center', borderWidth: 1, borderColor: Colors.border },
+  statValue:{ fontFamily: Brand.font.monoBold, fontSize: 13, marginBottom: 2 },
+  statLabel:{ fontFamily: Brand.font.mono, fontSize: 9, color: Colors.muted, textAlign: 'center' },
+
+  list:     { paddingHorizontal: PAGE, paddingBottom: 100, paddingTop: 8 },
+
+  dateRow:  { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 20, marginBottom: 10 },
+  dateLine: { flex: 1, height: 1, backgroundColor: Colors.border },
+  dateLabel:{ fontFamily: Brand.font.mono, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase' },
+
+  row:        { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  rowIconWrap:{ width: 36, height: 36, borderRadius: 18, backgroundColor: ACCENT + '44', alignItems: 'center', justifyContent: 'center' },
+  rowName:    { ...Brand.type.cardTitle },
+  rowMeta:    { ...Brand.type.cardMeta },
+  rowAmount:  { fontFamily: Brand.font.monoBold, fontSize: 14, letterSpacing: -0.3 },
 });

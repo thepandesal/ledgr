@@ -9,8 +9,8 @@ import { useUser } from '../../../src/hooks/useUser';
 import type { Category } from '../../../src/types';
 import BottomSheet from '@/components/ui/BottomSheet';
 import ConfirmModal from '@/components/ui/ConfirmModal';
-import formStyles from '@/components/ui/formStyles';
-import { Colors, Fonts, Radius, Spacing } from '@/components/ui/theme';
+import { Colors, Radius, Spacing } from '@/components/ui/theme';
+import { Brand } from '../../../src/lib/brand';
 
 const PASTEL_COLORS = ['#FFB3B3', '#FFD9B3', '#FFFAB3', '#B3FFB3', '#B3FFE0', '#B3F0FF', '#B3C6FF', '#D9B3FF', '#FFB3F0', '#FFB3C6'];
 const SUGGESTED_ICONS = ['fast-food-outline', 'car-outline', 'flash-outline', 'home-outline', 'musical-notes-outline', 'heart-outline', 'cart-outline', 'save-outline', 'airplane-outline', 'briefcase-outline', 'cafe-outline', 'fitness-outline', 'gift-outline', 'school-outline', 'phone-portrait-outline', 'ellipsis-horizontal-outline'];
@@ -27,7 +27,7 @@ export default function CategoriesScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-const { data: categories = [] } = useQuery<Category[]>({
+  const { data: categories = [] } = useQuery<Category[]>({
     queryKey: ['categories', userId],
     queryFn: async () => {
       const { data } = await supabase.from('categories').select().eq('user_id', userId).order('created_at');
@@ -55,16 +55,12 @@ const { data: categories = [] } = useQuery<Category[]>({
 
   return (
     <SafeAreaView style={s.container}>
-      <View style={s.header}>
-        <Text style={s.title}>categories</Text>
-        <Text style={s.subtitle}>organize your recordings.</Text>
-      </View>
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
         <View style={s.list}>
           {categories.map(cat => (
-            <View key={cat.id} style={s.catBtn}>
-              <View style={[s.catIcon, { backgroundColor: Colors.cyan + '22' }]}>
-                <Ionicons name={cat.icon as any} size={16} color={Colors.cyan} />
+            <View key={cat.id} style={s.catRow}>
+              <View style={[s.catIcon, { backgroundColor: Brand.color.headerBg }]}>
+                <Ionicons name={cat.icon as any} size={16} color={Brand.color.headerText} />
               </View>
               <Text style={s.catName}>{cat.name}</Text>
               {cat.is_default && <Text style={s.defaultBadge}>default</Text>}
@@ -74,61 +70,58 @@ const { data: categories = [] } = useQuery<Category[]>({
             </View>
           ))}
           {categories.length === 0 && (
-            <View style={s.emptyBox}>
+            <View style={s.emptyWrap}>
               <Ionicons name="pricetag-outline" size={32} color={Colors.faint} />
-              <Text style={s.emptyText}>no categories yet</Text>
+              <Text style={Brand.type.emptyText}>no categories yet</Text>
             </View>
           )}
-          <TouchableOpacity style={s.addBtn} onPress={openAdd} activeOpacity={0.8}>
-            <Ionicons name="add" size={14} color={Colors.muted} />
-            <Text style={s.addBtnText}>add a category</Text>
-          </TouchableOpacity>
         </View>
+
+        <Text style={[Brand.type.footer, { marginTop: 32 }]}>managed by LEDGR</Text>
       </ScrollView>
 
-      <BottomSheet visible={modal} onClose={() => setModal(false)} sub="categories" title="new category">
-        {error ? <Text style={formStyles.errorText}>{error}</Text> : null}
-        <Text style={formStyles.sectionLabel}>category name</Text>
+      <TouchableOpacity style={s.fab} onPress={openAdd} activeOpacity={0.8}>
+        <Ionicons name="add" size={22} color={Brand.color.accentText} />
+      </TouchableOpacity>
+
+      <BottomSheet visible={modal} onClose={() => setModal(false)} title="new category">
+        {error ? <Text style={s.error}>{error}</Text> : null}
+        <Text style={s.label}>category name</Text>
         <TextInput
-          style={formStyles.input}
+          style={s.input}
           placeholder="e.g. Groceries"
           placeholderTextColor={Colors.faint}
           value={name}
           onChangeText={v => { setName(v); setError(''); }}
           autoFocus
         />
-        <Text style={formStyles.sectionLabel}>color</Text>
+        <Text style={s.label}>color</Text>
         <View style={s.colorRow}>
           {PASTEL_COLORS.map(c => (
             <TouchableOpacity key={c} style={[s.colorDot, { backgroundColor: c }, color === c && s.colorDotSelected]} onPress={() => setColor(c)} />
           ))}
         </View>
-        <Text style={formStyles.sectionLabel}>icon</Text>
+        <Text style={s.label}>icon</Text>
         <View style={s.iconRow}>
           {SUGGESTED_ICONS.map(i => (
             <TouchableOpacity key={i} style={[s.iconBtn, icon === i && s.iconBtnSelected]} onPress={() => setIcon(i)}>
-              <Ionicons name={i as any} size={20} color={icon === i ? Colors.white : Colors.muted} />
+              <Ionicons name={i as any} size={20} color={icon === i ? Brand.color.accentText : Colors.muted} />
             </TouchableOpacity>
           ))}
         </View>
-        <Text style={formStyles.sectionLabel}>preview</Text>
+        <Text style={s.label}>preview</Text>
         <View style={[s.preview, { backgroundColor: color }]}>
           <Ionicons name={icon as any} size={16} color={Colors.text} />
           <Text style={s.previewText}>{name || 'my category'}</Text>
         </View>
-        <View style={formStyles.actions}>
-          <TouchableOpacity style={formStyles.cancelBtn} onPress={() => setModal(false)}>
-            <Text style={formStyles.cancelBtnText}>cancel</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[formStyles.primaryBtn, (!name.trim() || loading) && { opacity: 0.4 }]}
-            onPress={handleSave}
-            disabled={loading || !name.trim()}
-            activeOpacity={0.8}
-          >
-            {loading ? <ActivityIndicator color={Colors.white} /> : <Text style={formStyles.primaryBtnText}>add category</Text>}
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity
+          style={[s.saveBtn, (!name.trim() || loading) && { opacity: 0.4 }]}
+          onPress={handleSave}
+          disabled={loading || !name.trim()}
+          activeOpacity={0.8}
+        >
+          {loading ? <ActivityIndicator color={Brand.color.accentText} /> : <Text style={s.saveBtnText}>add category</Text>}
+        </TouchableOpacity>
       </BottomSheet>
 
       <ConfirmModal
@@ -145,36 +138,37 @@ const { data: categories = [] } = useQuery<Category[]>({
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F7F8FA' },
-  header: { paddingHorizontal: Spacing.page, paddingTop: 32, paddingBottom: 8 },
-  title: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 28, color: '#1A1A2E', letterSpacing: -0.8, marginBottom: 4 },
-  subtitle: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 13, color: '#9A9DB0' },
-  scroll: { paddingHorizontal: Spacing.page, paddingBottom: 40, paddingTop: 16 },
-  list: { gap: 10 },
-  catBtn: {
-    borderRadius: 20, paddingVertical: 14, paddingHorizontal: 16,
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#ECECEC',
+  container: { flex: 1, backgroundColor: Colors.white },
+  scroll:    { paddingHorizontal: Spacing.page, paddingTop: 20, paddingBottom: 80 },
+
+  list:    { gap: Brand.spacing.gap },
+  emptyWrap: { alignItems: 'center', gap: 12, paddingVertical: 48 },
+
+  catRow:   { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: Brand.spacing.card, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  catIcon:  { width: 32, height: 32, borderRadius: Brand.radius.avatar, justifyContent: 'center', alignItems: 'center' },
+  catName:  { ...Brand.type.cardTitle, flex: 1 },
+  defaultBadge: { ...Brand.type.cardMeta, backgroundColor: Colors.surface, paddingHorizontal: 8, paddingVertical: 2, borderRadius: Brand.radius.btn },
+  menuBtn:  { padding: 4 },
+
+  fab: {
+    position: 'absolute', bottom: 24, right: 24,
+    width: 52, height: 52, borderRadius: 26,
+    backgroundColor: Brand.color.accent,
+    alignItems: 'center', justifyContent: 'center',
   },
-  catIcon: { width: 32, height: 32, borderRadius: Radius.pill, justifyContent: 'center', alignItems: 'center' },
-  catName: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 14, color: '#1A1A2E', flex: 1 },
-  defaultBadge: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted, backgroundColor: Colors.input, paddingHorizontal: 8, paddingVertical: 2, borderRadius: Radius.pill },
-  menuBtn: { padding: 4 },
-  emptyBox: { alignItems: 'center', gap: 8, paddingVertical: 32 },
-  emptyText: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 13, color: '#9A9DB0' },
-  addBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-    paddingVertical: 12, paddingHorizontal: 20,
-    borderRadius: 999, borderWidth: 1, borderColor: '#4ECDC4', backgroundColor: '#E0F5F4', alignSelf: 'flex-start',
-  },
-  addBtnText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, color: '#4ECDC4' },
-  colorRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+
+  error:    { ...Brand.type.cardMeta, color: Colors.expense, marginBottom: 8 },
+  label:    { ...Brand.type.modalLabel, marginBottom: 6, marginTop: 14 },
+  input:    { ...Brand.type.modalInput, backgroundColor: Colors.white, borderRadius: Brand.radius.input, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1, borderColor: Colors.borderMid },
+  saveBtn:  { backgroundColor: Brand.color.accent, borderRadius: Brand.radius.btn, paddingVertical: 14, alignItems: 'center', marginTop: 20 },
+  saveBtnText: { ...Brand.type.modalBtn },
+
+  colorRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 4 },
   colorDot: { width: 30, height: 30, borderRadius: 15 },
   colorDotSelected: { borderWidth: 3, borderColor: Colors.text },
-  iconRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  iconBtn: { width: 44, height: 44, borderRadius: Radius.md, backgroundColor: Colors.input, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: Colors.borderMid },
-  iconBtnSelected: { backgroundColor: Colors.text, borderColor: Colors.text },
-  preview: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: Radius.pill, paddingVertical: 14, paddingHorizontal: 16, marginTop: 4 },
-  previewText: { fontFamily: Fonts.sansBold, fontSize: 14, color: Colors.text },
+  iconRow:  { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 4 },
+  iconBtn:  { width: 44, height: 44, borderRadius: Radius.md, backgroundColor: Colors.input, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: Colors.borderMid },
+  iconBtnSelected: { backgroundColor: Brand.color.accent, borderColor: Brand.color.accent },
+  preview:  { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: Brand.radius.btn, paddingVertical: 14, paddingHorizontal: 16, marginTop: 4 },
+  previewText: { ...Brand.type.cardTitle },
 });
-
