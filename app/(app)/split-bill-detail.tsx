@@ -25,6 +25,17 @@ export default function SplitBillDetailScreen() {
     Animated.timing(slideAnim, { toValue: 0, duration: 280, useNativeDriver: false }).start();
   }, []);
 
+  const [editNameModal, setEditNameModal] = useState(false);
+  const [editNameVal, setEditNameVal]     = useState('');
+
+  const openEditName = () => { setEditNameVal(String(name)); setEditNameModal(true); };
+  const saveEditName = async () => {
+    if (!editNameVal.trim()) return;
+    await supabase.from('split_bills').update({ name: editNameVal.trim() }).eq('id', splitBillId);
+    setEditNameModal(false);
+    router.setParams({ name: editNameVal.trim() });
+  };
+
   const handleBack = () => {
     Animated.timing(slideAnim, { toValue: width, duration: 250, useNativeDriver: false }).start(() => router.back());
   };
@@ -626,6 +637,9 @@ export default function SplitBillDetailScreen() {
             <Ionicons name="arrow-back" size={22} color={Colors.muted} />
           </TouchableOpacity>
           <Text style={s.title} numberOfLines={1}>{name}</Text>
+          <TouchableOpacity onPress={openEditName} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ padding: 4 }}>
+            <Ionicons name="create-outline" size={16} color={Colors.muted} />
+          </TouchableOpacity>
           <View style={s.totalBadge}>
             <Text style={s.totalBadgeText}>{fmt(totalAmount)}</Text>
           </View>
@@ -1335,6 +1349,30 @@ export default function SplitBillDetailScreen() {
             </>
           );
         })()}
+      </BottomSheet>
+
+      {/* Edit name modal */}
+      <BottomSheet visible={editNameModal} onClose={() => setEditNameModal(false)} title="rename split bill" height="30%">
+        <TextInput
+          style={s.itemFormInput}
+          value={editNameVal}
+          onChangeText={setEditNameVal}
+          autoFocus
+          returnKeyType="done"
+          onSubmitEditing={saveEditName}
+        />
+        <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+          <TouchableOpacity style={[s.doneBtn, { flex: 1, backgroundColor: Colors.surface, marginTop: 0 }]} onPress={() => setEditNameModal(false)}>
+            <Text style={[s.doneBtnText, { color: Colors.muted }]}>cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[s.doneBtn, { flex: 2, marginTop: 0, opacity: editNameVal.trim() ? 1 : 0.4 }]}
+            onPress={saveEditName}
+            disabled={!editNameVal.trim()}
+          >
+            <Text style={s.doneBtnText}>save</Text>
+          </TouchableOpacity>
+        </View>
       </BottomSheet>
 
     </Animated.View>
