@@ -142,12 +142,12 @@ export default function SplitBillDetailScreen() {
         user_id: userId,
         name: r.name.trim(),
         cost: parseFloat(r.cost),
-        people: null,
         recording_type: recType,
       }))
     );
     setSavingItem(false);
-    if (!error) { setAddItemModal(false); refetchItems(); }
+    if (error) { console.error('split_items insert error:', JSON.stringify(error)); return; }
+    setAddItemModal(false); refetchItems();
   };
 
   const openAssign = (item: any) => {
