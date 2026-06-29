@@ -108,7 +108,7 @@ export default function SplitBillDetailScreen() {
     const linkedIds = linkedRecordings.map((lr: any) => lr.recording?.id);
     const { data } = await supabase
       .from('recordings')
-      .select('id, name, amount, type, transaction_date')
+      .select('id, name, amount, type, transaction_date, status')
       .eq('user_id', userId)
       .in('type', ['expense', 'receivable', 'payable', 'income'])
       .order('transaction_date', { ascending: false })
@@ -895,6 +895,11 @@ export default function SplitBillDetailScreen() {
                       <View style={s.recMid}>
                         <Text style={s.recName} numberOfLines={1}>{rec.name}</Text>
                         <Text style={s.recDate}>{rec.transaction_date ? new Date(rec.transaction_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</Text>
+                      {(rec.type === 'payable' || rec.type === 'receivable') && rec.status && (
+                        <View style={{ backgroundColor: rec.status === 'paid' || rec.status === 'received' ? Colors.cyan + '22' : rec.status === 'partial' ? '#FFAB9122' : Colors.border, borderRadius: Radius.pill, paddingHorizontal: 6, paddingVertical: 1, marginTop: 3, alignSelf: 'flex-start' }}>
+                          <Text style={{ fontFamily: Fonts.monoBold, fontSize: 9, color: rec.status === 'paid' || rec.status === 'received' ? Colors.cyan : rec.status === 'partial' ? '#FFAB91' : Colors.muted }}>{rec.status}</Text>
+                        </View>
+                      )}
                       </View>
                       <Text style={[s.recAmount, { color: deduct ? Colors.cyan : '#FFAB91' }]}>{fmt(Number(rec.amount))}</Text>
                     </TouchableOpacity>

@@ -90,6 +90,9 @@ export default function AddRecordingScreen() {
   const [receiveToAccount, setReceiveToAccount]         = useState<any>(null);
   const [showDecreasedFromModal, setShowDecreasedFromModal] = useState(false);
   const [showReceiveToModal, setShowReceiveToModal]         = useState(false);
+  const [linkedExpense, setLinkedExpense]               = useState<any>(null);
+  const [showExpenseModal, setShowExpenseModal]         = useState(false);
+  const [expenseList, setExpenseList]                   = useState<any[]>([]);
 
   // ── Derived ──────────────────────────────────────────────────────────────
   const isLoanType   = type === 'receivable' || type === 'payable';
@@ -223,6 +226,7 @@ export default function AddRecordingScreen() {
           recurring_days: isLoanType && isRecurring && frequency === 'weekly' ? recurringDays : null,
           recurring_date: isLoanType && isRecurring && ['monthly', 'yearly'].includes(frequency)
             ? parseInt(recurringDate) : null,
+          linked_recording_id: type === 'receivable' && linkedExpense ? linkedExpense.id : null,
           decreased_from_account_id: type === 'receivable' ? decreasedFromAccount?.id || null : null,
           receive_to_account_id: type === 'receivable' ? receiveToAccount?.id || null : null,
         }).select('id').single();
@@ -260,6 +264,19 @@ export default function AddRecordingScreen() {
       setError(e.message);
       setLoading(false);
     }
+  };
+
+  const openExpensePicker = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data } = await supabase.from('recordings')
+      .select('id, name, amount, transaction_date')
+      .eq('user_id', user.id)
+      .eq('type', 'expense')
+      .order('transaction_date', { ascending: false })
+      .limit(50);
+    setExpenseList(data ?? []);
+    setShowExpenseModal(true);
   };
 
   const toggleDay = (day: number) =>
@@ -391,9 +408,29 @@ export default function AddRecordingScreen() {
         </>
       )}
 
-      {/* ── Receivable: decreased from + receive to ── */}
+      {/* ── Receivable: link to expense + decreased from + receive to ── */}
       {type === 'receivable' && (
         <>
+          <FormLabel optional>linked expense (optional shortcut)</FormLabel>
+          <SelectorButton
+            placeholder="pick an expense to link"
+            onPress={openExpensePicker}
+            hasValue={!!linkedExpense}
+            onClear={() => { setLinkedExpense(null); }}
+          >
+            {linkedExpense && (
+              <View style={s.selectedItem}>
+                <Ionicons name="receipt-outline" size={14} color={Colors.expense} />
+                <View>
+                  <Text style={s.selectedItemText}>{linkedExpense.name}</Text>
+                  <Text style={s.selectedItemSub}>
+                    {Number(linkedExpense.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })} · {linkedExpense.transaction_date}
+                  </Text>
+                </View>
+              </View>
+            )}
+          </SelectorButton>
+          {linkedExpense && <Text style={s.hint}>this receivable will be linked to that expense</Text>}
           <FormLabel optional>decreased from (where you lent from)</FormLabel>
           <SelectorButton
             placeholder="select account"
@@ -595,6 +632,26 @@ export default function AddRecordingScreen() {
           emptyText="no accounts found"
         />
         <FormActions onCancel={() => setShowReceiveToModal(false)} onConfirm={() => setShowReceiveToModal(false)} cancelLabel="cancel" confirmLabel="done" />
+      </BottomSheet>
+
+      {/* ── Expense picker modal ── */}
+      <BottomSheet visible={showExpenseModal} onClose={() => setShowExpenseModal(false)} sub="receivable" title="link to expense">
+        <SearchableList
+          items={expenseList}
+          selected={linkedExpense}
+          onSelect={e => {
+            setLinkedExpense(e);
+            if (!recName.trim()) setRecName(e.name);
+            if (!amount) setAmount(String(e.amount));
+            setShowExpenseModal(false);
+          }}
+          keyExtractor={e => e.id}
+          labelExtractor={e => e.name}
+          subLabelExtractor={e => `${Number(e.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })} · ${e.transaction_date}`}
+          renderLeft={() => <Ionicons name="receipt-outline" size={14} color={Colors.expense} />}
+          emptyText="no expenses found"
+        />
+        <FormActions onCancel={() => setShowExpenseModal(false)} onConfirm={() => setShowExpenseModal(false)} cancelLabel="cancel" confirmLabel="done" />
       </BottomSheet>
 
     </BottomSheet>
