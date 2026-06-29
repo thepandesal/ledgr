@@ -124,7 +124,6 @@ export default function SplitBillDetailScreen() {
   const linkRecording = async (rec: any) => {
     await supabase.from('split_bill_recordings').insert({
       split_bill_id: splitBillId,
-      user_id: userId,
       recording_id: rec.id,
       amount_contributed: rec.amount,
     });
