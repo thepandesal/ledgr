@@ -70,18 +70,21 @@ export default function SplitSharePage() {
       const people = (splitsRes.data ?? []).map((r: any) => r.person_name);
       const adjs = adjRes.data ?? [];
 
+      const isDeduct = (type: string) => type === 'payable' || type === 'income' || type === 'savings';
+
       // Build per-person totals
       const perPersonMap: Record<string, number> = {};
       people.forEach(p => { perPersonMap[p] = 0; });
       loadedItems.forEach((item: any) => {
+        const deduct = isDeduct(item.recording_type ?? '');
         const subs = item.subitems ?? [];
         if (subs.length === 0) {
           const pp = (item.people ?? []).length > 0 ? Number(item.cost) / item.people.length : 0;
-          (item.people ?? []).forEach((p: string) => { if (perPersonMap[p] !== undefined) perPersonMap[p] += pp; });
+          (item.people ?? []).forEach((p: string) => { if (perPersonMap[p] !== undefined) perPersonMap[p] += deduct ? -pp : pp; });
         } else {
           subs.forEach((sub: any) => {
             const pp = (sub.people ?? []).length > 0 ? Number(sub.cost) / sub.people.length : 0;
-            (sub.people ?? []).forEach((p: string) => { if (perPersonMap[p] !== undefined) perPersonMap[p] += pp; });
+            (sub.people ?? []).forEach((p: string) => { if (perPersonMap[p] !== undefined) perPersonMap[p] += deduct ? -pp : pp; });
           });
         }
       });
