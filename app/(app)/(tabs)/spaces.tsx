@@ -10,10 +10,10 @@ import { useState } from 'react';
 import { useUser } from '../../../src/hooks/useUser';
 import BottomSheet from '@/components/ui/BottomSheet';
 import ConfirmModal from '@/components/ui/ConfirmModal';
-import { Shadow } from '@/components/ui/theme';
 
-// ── Design tokens (B&W Inter theme) ──────────────────────────────────────────
+// ── Strict B&W design tokens ──────────────────────────────────────────────────
 const BLACK   = '#000000';
+const NEAR_BK = '#111827';
 const DARK    = '#1F2937';
 const MUTED   = '#6B7280';
 const BORDER  = '#E5E7EB';
@@ -24,19 +24,25 @@ const FONT    = 'Inter_400Regular';
 const FONT_SB = 'Inter_600SemiBold';
 const FONT_B  = 'Inter_700Bold';
 
+const SHADOW = {
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.06,
+  shadowRadius: 8,
+  elevation: 3,
+};
+
 interface SpaceData {
   id: string; name: string; color: string; icon: string;
   budget?: number | null; spent?: number; saved?: number; count?: number;
   space_type?: string; savings_target_date?: string | null;
 }
 
-function getInitials(name: string) {
-  return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) || '?';
-}
-
 function todayLabel() {
   return new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 }
+
+const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export default function SpacesScreen() {
   const router = useRouter();
@@ -117,7 +123,6 @@ export default function SpacesScreen() {
     queryClient.invalidateQueries({ queryKey: ['spaces', userId] });
   };
 
-  const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const firstName = userName?.split(' ')[0] || 'there';
   const expenseSpaces = spaces.filter(sp => (sp.space_type ?? 'expense') === 'expense');
   const savingsSpaces = spaces.filter(sp => sp.space_type === 'savings');
@@ -128,22 +133,22 @@ export default function SpacesScreen() {
 
         {/* ── Header ── */}
         <View style={s.header}>
-          <View>
+          <View style={{ flex: 1 }}>
             <Text style={s.greeting}>Hi, {firstName} 👋</Text>
             <Text style={s.date}>{todayLabel()}</Text>
           </View>
-          <TouchableOpacity style={s.addBtn} onPress={openCreate} activeOpacity={0.8}>
-            <Ionicons name="add" size={20} color={WHITE} />
+          <TouchableOpacity style={s.addBtn} onPress={openCreate} activeOpacity={0.75}>
+            <Ionicons name="add" size={22} color={WHITE} />
           </TouchableOpacity>
         </View>
 
-        {/* ── All spaces shortcut ── */}
+        {/* ── View all shortcut ── */}
         <TouchableOpacity
           style={s.allCard}
-          activeOpacity={0.85}
+          activeOpacity={0.82}
           onPress={() => router.push({ pathname: '/(app)/space-detail', params: { spaceId: 'all', name: 'all spaces' } })}
         >
-          <View style={s.allCardIconWrap}>
+          <View style={s.allIconWrap}>
             <Ionicons name="layers-outline" size={16} color={BLACK} />
           </View>
           <Text style={s.allCardText}>View all spaces</Text>
@@ -153,7 +158,7 @@ export default function SpacesScreen() {
         {/* ── Empty state ── */}
         {spaces.length === 0 ? (
           <View style={s.emptyWrap}>
-            <Ionicons name="layers-outline" size={32} color={BORDER} />
+            <Ionicons name="layers-outline" size={36} color={BORDER} />
             <Text style={s.emptyText}>No spaces yet — tap + to create one</Text>
           </View>
         ) : (
@@ -166,32 +171,29 @@ export default function SpacesScreen() {
                   <Text style={s.sectionCount}>{expenseSpaces.length} space{expenseSpaces.length !== 1 ? 's' : ''}</Text>
                 </View>
                 {expenseSpaces.map(space => {
-                  const value = space.spent ?? 0;
-                  const budget = space.budget ?? 0;
-                  const overBudget = budget > 0 && value > budget;
-                  const pct = budget > 0 ? Math.min(value / budget, 1) : 0;
+                  const value   = space.spent ?? 0;
+                  const budget  = space.budget ?? 0;
+                  const over    = budget > 0 && value > budget;
+                  const pct     = budget > 0 ? Math.min(value / budget, 1) : 0;
                   return (
                     <TouchableOpacity
                       key={space.id}
                       style={s.card}
-                      activeOpacity={0.85}
+                      activeOpacity={0.82}
                       onPress={() => router.push({ pathname: '/(app)/space-detail', params: { spaceId: space.id, name: space.name, color: space.color } })}
                     >
-                      <View style={s.cardTop}>
-                        <View style={s.cardIconWrap}>
-                          <Ionicons name="wallet-outline" size={18} color={overBudget ? RED : BLACK} />
-                        </View>
-                        <View style={s.cardMid}>
+                      {/* Row 1 — title left, badge right */}
+                      <View style={s.cardRow}>
+                        <View style={s.cardTitleRow}>
+                          <View style={s.cardIconWrap}>
+                            <Ionicons name="wallet-outline" size={16} color={over ? RED : BLACK} />
+                          </View>
                           <Text style={s.cardTitle} numberOfLines={1}>{space.name}</Text>
-                          <Text style={s.cardDetail}>{space.count ?? 0} transaction{(space.count ?? 0) !== 1 ? 's' : ''}</Text>
                         </View>
-                        <View style={s.cardRight}>
-                          <Text style={[s.cardAmount, overBudget && { color: RED }]}>{fmt(value)}</Text>
-                          {budget > 0 && (
-                            <Text style={[s.cardStatus, overBudget && s.cardStatusRed]}>
-                              {overBudget ? `${fmt(value - budget)} OVER` : `${fmt(budget - value)} LEFT`}
-                            </Text>
-                          )}
+                        <View style={[s.badge, over && s.badgeRed]}>
+                          <Text style={[s.badgeText, over && s.badgeTextRed]}>
+                            {over ? 'OVER BUDGET' : 'ON TRACK'}
+                          </Text>
                         </View>
                         <TouchableOpacity
                           onPress={() => { setSelectedSpace(space); setMenuModal(true); }}
@@ -201,11 +203,26 @@ export default function SpacesScreen() {
                           <Ionicons name="ellipsis-vertical" size={14} color={MUTED} />
                         </TouchableOpacity>
                       </View>
+
+                      {/* Row 2 — detail */}
+                      <Text style={s.cardDetail}>{space.count ?? 0} transaction{(space.count ?? 0) !== 1 ? 's' : ''}</Text>
+
+                      {/* Row 3 — progress bar */}
                       {budget > 0 && (
                         <View style={s.progressTrack}>
-                          <View style={[s.progressFill, { width: `${pct * 100}%` as any, backgroundColor: overBudget ? RED : BLACK }]} />
+                          <View style={[s.progressFill, { width: `${pct * 100}%` as any, backgroundColor: over ? RED : BLACK }]} />
                         </View>
                       )}
+
+                      {/* Row 4 — totals bottom-aligned */}
+                      <View style={s.cardFooter}>
+                        <Text style={[s.cardAmount, over && { color: RED }]}>{fmt(value)}</Text>
+                        {budget > 0 && (
+                          <Text style={[s.cardSub, over && { color: RED }]}>
+                            {over ? `${fmt(value - budget)} over limit` : `${fmt(budget - value)} remaining`}
+                          </Text>
+                        )}
+                      </View>
                     </TouchableOpacity>
                   );
                 })}
@@ -214,38 +231,35 @@ export default function SpacesScreen() {
 
             {/* ── Savings Trackers ── */}
             {savingsSpaces.length > 0 && (
-              <View style={s.section}>
+              <View style={[s.section, { marginTop: 20 }]}>
                 <View style={s.sectionHeader}>
                   <Text style={s.sectionTitle}>Savings Trackers</Text>
                   <Text style={s.sectionCount}>{savingsSpaces.length} space{savingsSpaces.length !== 1 ? 's' : ''}</Text>
                 </View>
                 {savingsSpaces.map(space => {
-                  const value = space.saved ?? 0;
+                  const value  = space.saved ?? 0;
                   const budget = space.budget ?? 0;
-                  const pct = budget > 0 ? Math.min(value / budget, 1) : 0;
+                  const pct    = budget > 0 ? Math.min(value / budget, 1) : 0;
                   return (
                     <TouchableOpacity
                       key={space.id}
                       style={s.card}
-                      activeOpacity={0.85}
+                      activeOpacity={0.82}
                       onPress={() => router.push({ pathname: '/(app)/space-detail', params: { spaceId: space.id, name: space.name, color: space.color } })}
                     >
-                      <View style={s.cardTop}>
-                        <View style={s.cardIconWrap}>
-                          <Ionicons name="trending-up-outline" size={18} color={BLACK} />
-                        </View>
-                        <View style={s.cardMid}>
+                      {/* Row 1 — title left, badge right */}
+                      <View style={s.cardRow}>
+                        <View style={s.cardTitleRow}>
+                          <View style={s.cardIconWrap}>
+                            <Ionicons name="trending-up-outline" size={16} color={BLACK} />
+                          </View>
                           <Text style={s.cardTitle} numberOfLines={1}>{space.name}</Text>
-                          <Text style={s.cardDetail}>
-                            {budget > 0 ? `Goal: ${fmt(budget)}` : `${space.count ?? 0} transaction${(space.count ?? 0) !== 1 ? 's' : ''}`}
-                          </Text>
                         </View>
-                        <View style={s.cardRight}>
-                          <Text style={s.cardAmount}>{fmt(value)}</Text>
-                          {budget > 0 && (
-                            <Text style={s.cardStatus}>{Math.round(pct * 100)}% OF GOAL</Text>
-                          )}
-                        </View>
+                        {budget > 0 && (
+                          <View style={s.badge}>
+                            <Text style={s.badgeText}>{Math.round(pct * 100)}% SAVED</Text>
+                          </View>
+                        )}
                         <TouchableOpacity
                           onPress={() => { setSelectedSpace(space); setMenuModal(true); }}
                           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -254,11 +268,26 @@ export default function SpacesScreen() {
                           <Ionicons name="ellipsis-vertical" size={14} color={MUTED} />
                         </TouchableOpacity>
                       </View>
+
+                      {/* Row 2 — goal detail */}
+                      <Text style={s.cardDetail}>
+                        {budget > 0 ? `Goal: ${fmt(budget)}` : `${space.count ?? 0} transaction${(space.count ?? 0) !== 1 ? 's' : ''}`}
+                      </Text>
+
+                      {/* Row 3 — progress bar */}
                       {budget > 0 && (
                         <View style={s.progressTrack}>
                           <View style={[s.progressFill, { width: `${pct * 100}%` as any, backgroundColor: BLACK }]} />
                         </View>
                       )}
+
+                      {/* Row 4 — totals bottom-aligned */}
+                      <View style={s.cardFooter}>
+                        <Text style={s.cardGoalAmount}>{fmt(value)}</Text>
+                        {budget > 0 && (
+                          <Text style={s.cardSub}>{fmt(budget - value > 0 ? budget - value : 0)} to go</Text>
+                        )}
+                      </View>
                     </TouchableOpacity>
                   );
                 })}
@@ -289,7 +318,7 @@ export default function SpacesScreen() {
             <TextInput style={s.qaInput} placeholder="YYYY-MM-DD" placeholderTextColor={MUTED} value={spaceTargetDate} onChangeText={setSpaceTargetDate} />
           </>
         )}
-        <TouchableOpacity style={[s.saveBtn, (!spaceName.trim() || loading) && { opacity: 0.4 }]} onPress={handleCreate} disabled={loading || !spaceName.trim()} activeOpacity={0.8}>
+        <TouchableOpacity style={[s.saveBtn, (!spaceName.trim() || loading) && { opacity: 0.4 }]} onPress={handleCreate} disabled={loading || !spaceName.trim()} activeOpacity={0.75}>
           {loading ? <ActivityIndicator color={WHITE} /> : <Text style={s.saveBtnText}>{editMode ? 'Save Changes' : 'Create Space'}</Text>}
         </TouchableOpacity>
       </BottomSheet>
@@ -310,42 +339,42 @@ export default function SpacesScreen() {
 
 const s = StyleSheet.create({
   root:   { flex: 1, backgroundColor: WHITE },
-  scroll: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 80 },
+  scroll: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 80 },
 
-  // ── Header ───────────────────────────────────────────────────────────────
+  // ── Header ──────────────────────────────────────────────────────────────
   header: {
     flexDirection: 'row', alignItems: 'flex-start',
-    justifyContent: 'space-between', marginBottom: 24,
+    justifyContent: 'space-between',
+    paddingVertical: 16, gap: 12,
   },
-  greeting: { fontFamily: FONT_B,  fontSize: 24, color: BLACK, letterSpacing: -0.4 },
-  date:     { fontFamily: FONT,    fontSize: 16, color: DARK, marginTop: 2 },
+  greeting: { fontFamily: FONT_B,  fontSize: 24, color: BLACK, letterSpacing: -0.3 },
+  date:     { fontFamily: FONT,    fontSize: 16, color: DARK,  marginTop: 3 },
   addBtn:   {
-    width: 40, height: 40, borderRadius: 10,
+    width: 42, height: 42, borderRadius: 10,
     backgroundColor: BLACK, alignItems: 'center', justifyContent: 'center',
-    ...Shadow.card,
+    marginTop: 2, ...SHADOW,
   },
 
-  // ── All spaces shortcut ──────────────────────────────────────────────────
+  // ── All card ────────────────────────────────────────────────────────────
   allCard: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     backgroundColor: WHITE, borderRadius: 12,
     borderWidth: 1, borderColor: BORDER,
     paddingHorizontal: 16, paddingVertical: 14,
-    marginBottom: 24,
-    ...Shadow.card,
+    marginBottom: 24, ...SHADOW,
   },
-  allCardIconWrap: {
+  allIconWrap: {
     width: 32, height: 32, borderRadius: 8,
     backgroundColor: SURFACE, justifyContent: 'center', alignItems: 'center',
   },
   allCardText: { fontFamily: FONT_SB, fontSize: 14, color: BLACK },
 
-  // ── Empty ────────────────────────────────────────────────────────────────
-  emptyWrap: { alignItems: 'center', gap: 12, paddingVertical: 64 },
+  // ── Empty ───────────────────────────────────────────────────────────────
+  emptyWrap: { alignItems: 'center', gap: 12, paddingVertical: 72 },
   emptyText: { fontFamily: FONT, fontSize: 14, color: MUTED },
 
-  // ── Section ──────────────────────────────────────────────────────────────
-  section: { marginBottom: 24 },
+  // ── Section ─────────────────────────────────────────────────────────────
+  section: { marginBottom: 8 },
   sectionHeader: {
     flexDirection: 'row', alignItems: 'center',
     justifyContent: 'space-between', marginBottom: 12,
@@ -353,46 +382,52 @@ const s = StyleSheet.create({
   sectionTitle: { fontFamily: FONT_SB, fontSize: 18, color: BLACK },
   sectionCount: { fontFamily: FONT,    fontSize: 12, color: MUTED },
 
-  // ── Space card ───────────────────────────────────────────────────────────
+  // ── Card ────────────────────────────────────────────────────────────────
   card: {
     backgroundColor: WHITE,
     borderRadius: 12,
     borderWidth: 1, borderColor: BORDER,
-    paddingHorizontal: 16, paddingVertical: 16,
-    marginBottom: 10,
-    ...Shadow.card,
-  },
-  cardTop: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-
-  cardIconWrap: {
-    width: 40, height: 40, borderRadius: 10,
-    backgroundColor: SURFACE, justifyContent: 'center', alignItems: 'center',
+    padding: 16,
+    marginBottom: 16, ...SHADOW,
   },
 
-  cardMid:    { flex: 1, gap: 2 },
-  cardTitle:  { fontFamily: FONT_SB, fontSize: 18, color: BLACK },
-  cardDetail: { fontFamily: FONT,    fontSize: 14, color: DARK },
+  // Row 1: title + badge + menu
+  cardRow:     { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
+  cardTitleRow:{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
+  cardIconWrap:{ width: 28, height: 28, borderRadius: 6, backgroundColor: SURFACE, justifyContent: 'center', alignItems: 'center' },
+  cardTitle:   { fontFamily: FONT_SB, fontSize: 18, color: BLACK, flex: 1 },
 
-  cardRight:  { alignItems: 'flex-end', gap: 3 },
-  cardAmount: { fontFamily: FONT_B,  fontSize: 16, color: BLACK, letterSpacing: -0.4 },
-  cardStatus: { fontFamily: FONT_B,  fontSize: 14, color: BLACK, letterSpacing: 0.2 },
-  cardStatusRed: { color: RED },
+  // Badge top-right
+  badge:        { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, backgroundColor: SURFACE, borderWidth: 1, borderColor: BORDER },
+  badgeRed:     { backgroundColor: '#FEF2F2', borderColor: '#FECACA' },
+  badgeText:    { fontFamily: FONT_B, fontSize: 10, color: DARK,  letterSpacing: 0.5 },
+  badgeTextRed: { color: RED },
 
   menuBtn: { padding: 4 },
 
-  progressTrack: { height: 3, backgroundColor: BORDER, borderRadius: 2, overflow: 'hidden', marginTop: 12 },
-  progressFill:  { height: 3, borderRadius: 2 },
+  // Row 2: detail
+  cardDetail: { fontFamily: FONT, fontSize: 14, color: DARK, marginBottom: 10 },
+
+  // Row 3: progress bar
+  progressTrack: { height: 6, backgroundColor: BORDER, borderRadius: 3, overflow: 'hidden', marginBottom: 12 },
+  progressFill:  { height: 6, borderRadius: 3 },
+
+  // Row 4: footer totals
+  cardFooter:    { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
+  cardAmount:    { fontFamily: FONT_B,  fontSize: 20, color: BLACK, letterSpacing: -0.5 },
+  cardGoalAmount:{ fontFamily: FONT_B,  fontSize: 20, color: BLACK, letterSpacing: -0.5 },
+  cardSub:       { fontFamily: FONT,    fontSize: 14, color: MUTED },
 
   // ── Modal ────────────────────────────────────────────────────────────────
   typeRow:           { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  typeBtn:           { paddingHorizontal: 16, paddingVertical: 9, borderRadius: 9, borderWidth: 1, borderColor: BORDER, backgroundColor: WHITE },
+  typeBtn:           { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, borderWidth: 1, borderColor: BORDER, backgroundColor: WHITE },
   typeBtnActive:     { backgroundColor: BLACK, borderColor: BLACK },
   typeBtnText:       { fontFamily: FONT,   fontSize: 14, color: MUTED },
   typeBtnTextActive: { fontFamily: FONT_B, fontSize: 14, color: WHITE },
 
   qaLabel: {
     fontFamily: FONT_B, fontSize: 14, color: BLACK,
-    letterSpacing: 0.4, textTransform: 'uppercase',
+    letterSpacing: 0.5, textTransform: 'uppercase',
     marginBottom: 6, marginTop: 16,
   },
   qaInput: {
@@ -403,6 +438,6 @@ const s = StyleSheet.create({
   },
   qaError: { fontFamily: FONT, fontSize: 12, color: RED, marginBottom: 8 },
 
-  saveBtn:     { backgroundColor: BLACK, borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 24 },
-  saveBtnText: { fontFamily: FONT_B, fontSize: 16, color: WHITE },
+  saveBtn:     { backgroundColor: BLACK, borderRadius: 10, paddingVertical: 15, alignItems: 'center', marginTop: 24 },
+  saveBtnText: { fontFamily: FONT_B, fontSize: 16, color: WHITE, letterSpacing: 0.2 },
 });

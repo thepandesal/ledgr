@@ -96,7 +96,7 @@ function ProfileScreen() {
         {/* Info card */}
         <View style={p.card}>
           <View style={p.row}>
-            <View style={p.rowIcon}><Ionicons name="person-outline" size={16} color='#4ECDC4' /></View>
+            <View style={p.rowIcon}><Ionicons name="person-outline" size={16} color='#000000' /></View>
             <View style={p.rowBody}>
               <Text style={p.rowLabel}>Full Name</Text>
               <Text style={p.rowValue}>{userName || '—'}</Text>
@@ -104,7 +104,7 @@ function ProfileScreen() {
           </View>
           <View style={p.divider} />
           <View style={p.row}>
-            <View style={p.rowIcon}><Ionicons name="mail-outline" size={16} color='#4ECDC4' /></View>
+            <View style={p.rowIcon}><Ionicons name="mail-outline" size={16} color='#000000' /></View>
             <View style={p.rowBody}>
               <Text style={p.rowLabel}>Email</Text>
               <Text style={p.rowValue}>{email || '—'}</Text>
@@ -112,7 +112,7 @@ function ProfileScreen() {
           </View>
           <View style={p.divider} />
           <View style={p.row}>
-            <View style={p.rowIcon}><Ionicons name="calendar-outline" size={16} color='#4ECDC4' /></View>
+            <View style={p.rowIcon}><Ionicons name="calendar-outline" size={16} color='#000000' /></View>
             <View style={p.rowBody}>
               <Text style={p.rowLabel}>Member Since</Text>
               <Text style={p.rowValue}>{joinedDate || '—'}</Text>
@@ -120,10 +120,10 @@ function ProfileScreen() {
           </View>
           <View style={p.divider} />
           <View style={p.row}>
-            <View style={p.rowIcon}><Ionicons name="shield-checkmark-outline" size={16} color='#4ECDC4' /></View>
+            <View style={p.rowIcon}><Ionicons name="shield-checkmark-outline" size={16} color='#000000' /></View>
             <View style={p.rowBody}>
               <Text style={p.rowLabel}>Account Status</Text>
-              <Text style={[p.rowValue, { color: '#4ECDC4' }]}>Active</Text>
+              <Text style={[p.rowValue, { color: '#000000' }]}>Active</Text>
             </View>
           </View>
         </View>
@@ -263,7 +263,7 @@ export default function TabsLayout() {
           return (
             <TouchableOpacity key={tab.key} style={s.navItem} onPress={() => handleNavPress(tab.key)} activeOpacity={0.7}>
               <View style={[s.navIconWrap, isActive && s.navIconWrapActive]}>
-                <Ionicons name={tab.icon as any} size={20} color={isActive ? '#FFFFFF' : '#9A9DB0'} />
+                <Ionicons name={tab.icon as any} size={22} color={isActive ? '#000000' : '#9CA3AF'} />
               </View>
               <Text style={[s.navLabel, isActive && s.navLabelActive]}>{tab.label}</Text>
             </TouchableOpacity>
@@ -311,19 +311,20 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
-    borderTopColor: '#ECECEC',
-    paddingTop: 10,
-    paddingBottom: 16,
-    paddingHorizontal: 8,
+    borderTopColor: '#E5E7EB',
+    height: 64,
+    paddingBottom: 8,
+    paddingTop: 8,
+    paddingHorizontal: 0,
   },
-  navItem: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 4 },
+  navItem: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 3 },
   navIconWrap: {
-    width: 40, height: 40, borderRadius: 20,
+    width: 28, height: 28,
     alignItems: 'center', justifyContent: 'center',
   },
-  navIconWrapActive: { backgroundColor: '#4ECDC4' },
-  navLabel: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 10, color: '#9A9DB0', letterSpacing: 0.2 },
-  navLabelActive: { fontFamily: 'PlusJakartaSans_600SemiBold', color: '#4ECDC4' },
+  navIconWrapActive: {},
+  navLabel: { fontFamily: 'Inter_400Regular', fontSize: 10, color: '#9CA3AF', letterSpacing: 0.6, textTransform: 'uppercase' },
+  navLabelActive: { fontFamily: 'Inter_700Bold', color: '#000000' },
 
   // Bubble
   bubbleWrap: {
@@ -364,9 +365,9 @@ const s = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  bubbleIconWrapActive: { backgroundColor: '#D1E6E0' },
-  bubbleItemLabel: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 14, color: Colors.text },
-  bubbleItemLabelActive: { color: '#1A1A1A' },
+  bubbleIconWrapActive: { backgroundColor: '#F3F4F6' },
+  bubbleItemLabel: { fontFamily: 'Inter_400Regular', fontSize: 14, color: Colors.text },
+  bubbleItemLabelActive: { color: '#000000' },
 });
 
 const p = StyleSheet.create({
@@ -376,7 +377,7 @@ const p = StyleSheet.create({
   avatarSection: { alignItems: 'center', gap: 8, marginBottom: 8 },
   avatar: {
     width: 80, height: 80, borderRadius: 40,
-    backgroundColor: '#4ECDC4',
+    backgroundColor: '#000000',
     justifyContent: 'center', alignItems: 'center',
     marginBottom: 4,
   },
@@ -390,7 +391,7 @@ const p = StyleSheet.create({
     paddingHorizontal: 16,
   },
   row:     { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 16 },
-  rowIcon: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#E0F5F4', justifyContent: 'center', alignItems: 'center' },
+  rowIcon: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#F3F4F6', justifyContent: 'center', alignItems: 'center' },
   rowBody: { flex: 1, gap: 2 },
   rowLabel: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 11, color: '#9A9DB0', letterSpacing: 0.3 },
   rowValue: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 14, color: '#1A1A2E' },
