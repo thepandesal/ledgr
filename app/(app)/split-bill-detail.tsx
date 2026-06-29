@@ -84,18 +84,38 @@ export default function SplitBillDetailScreen() {
   // ── Add recording state ──────────────────────────────────────────────────
   const [addRecModal, setAddRecModal] = useState(false);
   const [allRecordings, setAllRecordings] = useState<any[]>([]);
+  const [recTab, setRecTab] = useState<'payable' | 'receivable' | 'expense' | 'income'>('expense');
+  const [recSearch, setRecSearch] = useState('');
+  const [recDays, setRecDays] = useState<30 | 60 | 180 | 365 | null>(30);
+
+  const REC_TABS: { key: 'payable' | 'receivable' | 'expense' | 'income'; label: string }[] = [
+    { key: 'expense', label: 'expense' },
+    { key: 'receivable', label: 'receivable' },
+    { key: 'payable', label: 'loan' },
+    { key: 'income', label: 'income' },
+  ];
+
+  const REC_RANGES: { value: 30 | 60 | 180 | 365 | null; label: string }[] = [
+    { value: 30, label: 'this month' },
+    { value: 60, label: '60 days' },
+    { value: 180, label: '180 days' },
+    { value: 365, label: '1 year' },
+    { value: null, label: 'all time' },
+  ];
 
   const openAddRecording = async () => {
+    const linkedIds = linkedRecordings.map((lr: any) => lr.recording?.id);
     const { data } = await supabase
       .from('recordings')
       .select('id, name, amount, type, transaction_date')
       .eq('user_id', userId)
-      .not('type', 'in', '(expense,income,savings,return)')
+      .in('type', ['expense', 'receivable', 'payable', 'income'])
       .order('transaction_date', { ascending: false })
-      .limit(50);
-    // exclude already linked
-    const linkedIds = linkedRecordings.map((lr: any) => lr.recording?.id);
+      .limit(200);
     setAllRecordings((data ?? []).filter((r: any) => !linkedIds.includes(r.id)));
+    setRecTab('expense');
+    setRecSearch('');
+    setRecDays(30);
     setAddRecModal(true);
   };
 
@@ -641,25 +661,66 @@ export default function SplitBillDetailScreen() {
       </BottomSheet>
 
       {/* Add recording modal */}
-      <BottomSheet visible={addRecModal} onClose={() => setAddRecModal(false)} title="link a recording" height="60%">
+      <BottomSheet visible={addRecModal} onClose={() => setAddRecModal(false)} title="link a recording" height="70%">
+        {/* Tabs */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }} contentContainerStyle={{ gap: 6 }}>
+          {REC_TABS.map(t => (
+            <TouchableOpacity key={t.key} style={[s.modeBtn, recTab === t.key && s.modeBtnActive]} onPress={() => { setRecTab(t.key); setRecSearch(''); }}>
+              <Text style={[s.modeBtnText, recTab === t.key && s.modeBtnTextActive]}>{t.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+        {/* Date range */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }} contentContainerStyle={{ gap: 6 }}>
+          {REC_RANGES.map(r => (
+            <TouchableOpacity key={String(r.value)} style={[s.modeBtn, { paddingHorizontal: 10, paddingVertical: 5 }, recDays === r.value && s.modeBtnActive]} onPress={() => setRecDays(r.value)}>
+              <Text style={[s.modeBtnText, { fontSize: 11 }, recDays === r.value && s.modeBtnTextActive]}>{r.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+        {/* Search */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: Colors.borderMid, borderRadius: Radius.md, paddingHorizontal: 10, marginBottom: 10, gap: 6 }}>
+          <Ionicons name="search-outline" size={14} color={Colors.faint} />
+          <TextInput
+            style={{ flex: 1, fontFamily: Fonts.mono, fontSize: 13, color: Colors.text, paddingVertical: 8 }}
+            placeholder="search..."
+            placeholderTextColor={Colors.faint}
+            value={recSearch}
+            onChangeText={setRecSearch}
+          />
+          {recSearch.length > 0 && (
+            <TouchableOpacity onPress={() => setRecSearch('')}>
+              <Ionicons name="close" size={13} color={Colors.faint} />
+            </TouchableOpacity>
+          )}
+        </View>
+        {/* List */}
         <ScrollView showsVerticalScrollIndicator={false}>
-          {allRecordings.length === 0 ? (
-            <Text style={{ fontFamily: Fonts.mono, fontSize: 12, color: Colors.faint }}>no recordings available</Text>
-          ) : allRecordings.map((rec: any) => {
-            const deduct = isDeductType(rec.type);
-            return (
-              <TouchableOpacity key={rec.id} style={s.recPickRow} onPress={() => linkRecording(rec)}>
-                <View style={[s.recIconWrap, { backgroundColor: deduct ? Colors.cyan + '22' : '#FFAB9122' }]}>
-                  <Ionicons name={rec.type === 'payable' ? 'cash-outline' : deduct ? 'arrow-down-circle-outline' : 'arrow-up-circle-outline'} size={16} color={deduct ? Colors.cyan : '#FFAB91'} />
-                </View>
-                <View style={s.recMid}>
-                  <Text style={s.recName} numberOfLines={1}>{rec.name}</Text>
-                  <Text style={s.recDate}>{rec.type} · {rec.transaction_date ? new Date(rec.transaction_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</Text>
-                </View>
-                <Text style={[s.recAmount, { color: deduct ? Colors.cyan : '#FFAB91' }]}>{fmt(Number(rec.amount))}</Text>
-              </TouchableOpacity>
+          {(() => {
+            const cutoff = recDays ? new Date(Date.now() - recDays * 86400000).toISOString().split('T')[0] : null;
+            const filtered = allRecordings.filter(r =>
+              r.type === recTab &&
+              r.name.toLowerCase().includes(recSearch.toLowerCase()) &&
+              (!cutoff || (r.transaction_date ?? '') >= cutoff)
             );
-          })}
+            if (filtered.length === 0)
+              return <Text style={{ fontFamily: Fonts.mono, fontSize: 12, color: Colors.faint }}>no recordings found</Text>;
+            return filtered.map((rec: any) => {
+              const deduct = isDeductType(rec.type);
+              return (
+                <TouchableOpacity key={rec.id} style={s.recPickRow} onPress={() => linkRecording(rec)}>
+                  <View style={[s.recIconWrap, { backgroundColor: deduct ? Colors.cyan + '22' : '#FFAB9122' }]}>
+                    <Ionicons name={rec.type === 'payable' ? 'cash-outline' : deduct ? 'arrow-down-circle-outline' : 'arrow-up-circle-outline'} size={16} color={deduct ? Colors.cyan : '#FFAB91'} />
+                  </View>
+                  <View style={s.recMid}>
+                    <Text style={s.recName} numberOfLines={1}>{rec.name}</Text>
+                    <Text style={s.recDate}>{rec.transaction_date ? new Date(rec.transaction_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</Text>
+                  </View>
+                  <Text style={[s.recAmount, { color: deduct ? Colors.cyan : '#FFAB91' }]}>{fmt(Number(rec.amount))}</Text>
+                </TouchableOpacity>
+              );
+            });
+          })()}
         </ScrollView>
       </BottomSheet>
 
