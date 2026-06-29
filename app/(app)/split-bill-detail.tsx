@@ -178,7 +178,7 @@ export default function SplitBillDetailScreen() {
     if (!valid.length) return;
     const recTotal = Number(selectedRecording.amount_contributed);
     const alreadyUsed = items
-      .filter((i: any) => i.recording_type === (selectedRecording.recording?.type ?? 'expense'))
+      .filter((i: any) => i.recording_id === selectedRecording.recording?.id)
       .reduce((s: number, i: any) => s + Number(i.cost), 0);
     const newTotal = valid.reduce((s, r) => s + parseFloat(r.cost || '0'), 0);
     if (alreadyUsed + newTotal > recTotal + 0.01) return;
@@ -905,7 +905,7 @@ export default function SplitBillDetailScreen() {
             {(() => {
               const recTotal = Number(selectedRecording?.amount_contributed ?? 0);
               const alreadyUsed = items
-                .filter((i: any) => i.recording_type === (selectedRecording?.recording?.type ?? 'expense'))
+                .filter((i: any) => i.recording_id === selectedRecording?.recording?.id)
                 .reduce((s: number, i: any) => s + Number(i.cost), 0);
               const newTotal = itemRows.reduce((s, r) => s + parseFloat(r.cost || '0'), 0);
               const used = alreadyUsed + newTotal;
@@ -928,7 +928,7 @@ export default function SplitBillDetailScreen() {
             {itemRows.map((row, i) => {
               const recTotal = Number(selectedRecording?.amount_contributed ?? 0);
               const alreadyUsed = items
-                .filter((i2: any) => i2.recording_type === (selectedRecording?.recording?.type ?? 'expense'))
+                .filter((i2: any) => i2.recording_id === selectedRecording?.recording?.id)
                 .reduce((s: number, i2: any) => s + Number(i2.cost), 0);
               const runningTotal = itemRows.slice(0, i + 1).reduce((s, r) => s + parseFloat(r.cost || '0'), 0);
               const rowOver = recTotal > 0 && alreadyUsed + runningTotal > recTotal + 0.01;
@@ -965,7 +965,7 @@ export default function SplitBillDetailScreen() {
             {(() => {
               const recTotal = Number(selectedRecording?.amount_contributed ?? 0);
               const alreadyUsed = items
-                .filter((i: any) => i.recording_type === (selectedRecording?.recording?.type ?? 'expense'))
+                .filter((i: any) => i.recording_id === selectedRecording?.recording?.id)
                 .reduce((s: number, i: any) => s + Number(i.cost), 0);
               const newTotal = itemRows.reduce((s, r) => s + parseFloat(r.cost || '0'), 0);
               const over = recTotal > 0 && alreadyUsed + newTotal > recTotal + 0.01;
