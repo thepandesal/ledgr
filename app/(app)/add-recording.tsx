@@ -36,14 +36,36 @@ import formStyles from '@/components/ui/formStyles';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const TYPES = [
-  { key: 'expense',             label: 'expense',            color: Colors.expense, icon: 'arrow-down-outline' },
-  { key: 'income',              label: 'income',             color: Colors.income,  icon: 'arrow-up-outline' },
-  { key: 'savings',             label: 'savings',            color: Colors.income,  icon: 'save-outline' },
-  { key: 'receivable',          label: 'receivable',         color: Colors.text,    icon: 'arrow-undo-outline' },
-  { key: 'payable',             label: 'payable',            color: Colors.text,    icon: 'ellipsis-horizontal-outline' },
-  { key: 'expense_receivable',  label: 'expense + receivable', color: Colors.cyan,  icon: 'git-branch-outline' },
+const TYPE_GROUPS = [
+  {
+    label: 'money out',
+    types: [
+      { key: 'expense',            label: 'expense',            color: Colors.expense, icon: 'arrow-down-outline' },
+    ],
+  },
+  {
+    label: 'money in',
+    types: [
+      { key: 'income',             label: 'income',             color: Colors.income,  icon: 'arrow-up-outline' },
+      { key: 'savings',            label: 'savings',            color: Colors.income,  icon: 'save-outline' },
+    ],
+  },
+  {
+    label: 'loan',
+    types: [
+      { key: 'payable',            label: 'payable',            color: Colors.text,    icon: 'ellipsis-horizontal-outline' },
+    ],
+  },
+  {
+    label: 'receivable',
+    types: [
+      { key: 'receivable',         label: 'receivable',         color: Colors.text,    icon: 'arrow-undo-outline' },
+      { key: 'expense_receivable', label: 'expense + receivable', color: Colors.cyan,  icon: 'git-branch-outline' },
+    ],
+  },
 ] as const;
+
+const TYPES = TYPE_GROUPS.flatMap(g => g.types);
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const FREQUENCIES = ['daily', 'weekly', 'monthly', 'yearly'];
@@ -338,18 +360,25 @@ export default function AddRecordingScreen() {
 
       {/* ── Type selector ── */}
       <FormLabel>type</FormLabel>
-      <View style={s.typeRow}>
-        {TYPES.map(t => (
-          <TouchableOpacity
-            key={t.key}
-            style={[s.typeBtn, type === t.key && { backgroundColor: t.color, borderColor: t.color }]}
-            onPress={() => { setType(t.key); setIsRecurring(false); }}
-          >
-            <Ionicons name={t.icon as any} size={12} color={type === t.key ? Colors.white : Colors.muted} />
-            <Text style={[s.typeBtnText, type === t.key && { color: Colors.white, fontFamily: Fonts.monoBold }]}>
-              {t.label}
-            </Text>
-          </TouchableOpacity>
+      <View style={{ gap: 6 }}>
+        {TYPE_GROUPS.map(group => (
+          <View key={group.label}>
+            <Text style={{ fontFamily: Fonts.monoBold, fontSize: 9, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 4 }}>{group.label}</Text>
+            <View style={s.typeRow}>
+              {group.types.map(t => (
+                <TouchableOpacity
+                  key={t.key}
+                  style={[s.typeBtn, type === t.key && { backgroundColor: t.color, borderColor: t.color }]}
+                  onPress={() => { setType(t.key); setIsRecurring(false); }}
+                >
+                  <Ionicons name={t.icon as any} size={12} color={type === t.key ? Colors.white : Colors.muted} />
+                  <Text style={[s.typeBtnText, type === t.key && { color: Colors.white, fontFamily: Fonts.monoBold }]}>
+                    {t.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
         ))}
       </View>
 
