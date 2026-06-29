@@ -523,34 +523,15 @@ export default function RecordingDetailScreen() {
 
   const confirmCreateReceivable = async () => {
     if (!recording) return;
-    const amount = getReceivableAmount();
-    if (!amount || amount <= 0) return;
     setReceivableLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const personLabel = receivableMode === 'split' && receivableSelectedPeople.length > 0
-        ? receivableSelectedPeople.join(', ') : null;
-      const { data: newRec } = await supabase.from('recordings').insert({
-        space_id: recording.space_id,
-        user_id: user.id,
-        name: recording.name,
-        type: 'due',
-        amount,
-        transaction_date: recording.transaction_date,
-        status: 'unpaid',
-        account_id: recording.account_id ?? null,
-        category_id: recording.category_id ?? null,
-        linked_recording_id: recordingId,
-      }).select('id').single();
-      // Tag the parent expense as is_due
+      // Just tag the expense as due — no separate recording created
       await supabase.from('recordings').update({ is_due: true }).eq('id', recordingId);
       setRecording((prev: any) => ({ ...prev, is_due: true }));
       setReceivableModal(false);
       setReceivableMode('full');
       setReceivableManualAmount('');
       setReceivableSelectedPeople([]);
-      if (newRec?.id) router.push({ pathname: '/(app)/recording-detail', params: { recordingId: newRec.id } } as any);
     } catch (e) { console.log(e); }
     finally { setReceivableLoading(false); }
   };
