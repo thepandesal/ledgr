@@ -4,6 +4,7 @@ import { RobotoMono_400Regular, RobotoMono_700Bold } from '@expo-google-fonts/ro
 import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
 import { Fraunces_400Regular, Fraunces_600SemiBold, Fraunces_700Bold, Fraunces_900Black } from '@expo-google-fonts/fraunces';
 import { PlusJakartaSans_400Regular, PlusJakartaSans_500Medium, PlusJakartaSans_600SemiBold, PlusJakartaSans_700Bold } from '@expo-google-fonts/plus-jakarta-sans';
+import { Outfit_400Regular, Outfit_600SemiBold, Outfit_700Bold } from '@expo-google-fonts/outfit';
 import { View, ActivityIndicator } from 'react-native';
 import { useEffect, useState } from 'react';
 import { supabase } from '../src/lib/supabase';
@@ -35,6 +36,9 @@ export default function RootLayout() {
     Inter_500Medium,
     Inter_600SemiBold,
     Inter_700Bold,
+    Outfit_400Regular,
+    Outfit_600SemiBold,
+    Outfit_700Bold,
     Fraunces_400Regular,
     Fraunces_600SemiBold,
     Fraunces_700Bold,
