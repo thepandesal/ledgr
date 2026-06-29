@@ -234,7 +234,9 @@ export default function SplitBillDetailScreen() {
   const [shareAccounts, setShareAccounts] = useState<any[]>([]);
   const [shareSelectedIds, setShareSelectedIds] = useState<string[]>([]);
   const [shareLoading, setShareLoading] = useState(false);
-  const [shareConfirmed, setShareConfirmed] = useState(false); // whether user clicked "no account"
+  const [shareConfirmed, setShareConfirmed] = useState(false);
+  const [shareLinkModal, setShareLinkModal] = useState(false);
+  const [shareLink, setShareLink] = useState('');
 
   const openShareModal = async () => {
     setShareConfirmed(false);
@@ -269,19 +271,40 @@ export default function SplitBillDetailScreen() {
       await supabase.from('split_shares').update({ data: { account_ids: shareSelectedIds } }).eq('id', shareId);
     }
     setShareLoading(false);
-    setShareModal(false);
     if (!shareId) return;
-    const url = `https://ledgr.art/split/${shareId}`;
+    setShareLink(`https://ledgr.art/split/${shareId}`);
+    setShareModal(false);
+    setShareCopied(false);
+    setShareLinkModal(true);
+  };
+
+  const copyShareLink = () => {
     if (Platform.OS !== 'web') {
-      Share.share({ message: url, url });
-    } else if (typeof navigator !== 'undefined' && navigator.clipboard) {
-      navigator.clipboard.writeText(url).then(() => {
-        setShareCopied(true);
-        setTimeout(() => setShareCopied(false), 3000);
-      });
-    } else if (typeof window !== 'undefined') {
-      window.prompt('Copy this link:', url);
+      Share.share({ message: shareLink, url: shareLink });
+      return;
     }
+    // Mobile Safari / Chrome fallback: use execCommand if clipboard API unavailable
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(shareLink).then(() => {
+        setShareCopied(true);
+        setTimeout(() => setShareCopied(false), 2000);
+      }).catch(() => fallbackCopy());
+    } else {
+      fallbackCopy();
+    }
+  };
+
+  const fallbackCopy = () => {
+    if (typeof document === 'undefined') return;
+    const el = document.createElement('textarea');
+    el.value = shareLink;
+    el.style.position = 'fixed';
+    el.style.opacity = '0';
+    document.body.appendChild(el);
+    el.focus();
+    el.select();
+    try { document.execCommand('copy'); setShareCopied(true); setTimeout(() => setShareCopied(false), 2000); } catch (_) {}
+    document.body.removeChild(el);
   };
 
   const { data: linkedRecordings = [], isLoading: loadingRecs } = useQuery({
@@ -820,6 +843,32 @@ export default function SplitBillDetailScreen() {
         >
           <Text style={s.doneBtnText}>{shareLoading ? 'generating...' : 'generate link'}</Text>
         </TouchableOpacity>
+      </BottomSheet>
+
+      {/* Share link modal */}
+      <BottomSheet visible={shareLinkModal} onClose={() => setShareLinkModal(false)} title="your split bill link" height="35%">
+        <Text style={{ fontFamily: Fonts.mono, fontSize: 11, color: Colors.muted, marginBottom: 10 }}>
+          share this link with your group.
+        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: Colors.borderMid, borderRadius: Radius.md, paddingHorizontal: 12, gap: 8, marginBottom: 16 }}>
+          <Text style={{ flex: 1, fontFamily: Fonts.mono, fontSize: 12, color: Colors.text, paddingVertical: 12 }} numberOfLines={1}>
+            {shareLink}
+          </Text>
+        </View>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <TouchableOpacity
+            style={[s.doneBtn, { flex: 1, backgroundColor: Colors.surface, marginTop: 0 }]}
+            onPress={() => setShareLinkModal(false)}
+          >
+            <Text style={[s.doneBtnText, { color: Colors.muted }]}>close</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[s.doneBtn, { flex: 2, marginTop: 0, backgroundColor: shareCopied ? Colors.income : Colors.cyan }]}
+            onPress={copyShareLink}
+          >
+            <Text style={s.doneBtnText}>{shareCopied ? 'copied!' : 'copy link'}</Text>
+          </TouchableOpacity>
+        </View>
       </BottomSheet>
 
     </Animated.View>
