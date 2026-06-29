@@ -429,7 +429,7 @@ export default function SplitBillDetailScreen() {
     queryFn: async () => {
       const { data } = await supabase
         .from('split_bill_recordings')
-        .select('id, amount_contributed, recording:recording_id(id, name, amount, type, transaction_date)')
+        .select('id, amount_contributed, recording:recording_id(id, name, amount, type, transaction_date, status, space_id, category_id, linked_recording_id)')
         .eq('split_bill_id', splitBillId)
         .order('created_at');
       return (data ?? []).map((r: any) => ({
@@ -439,6 +439,86 @@ export default function SplitBillDetailScreen() {
     },
     enabled: !!splitBillId,
   });
+
+  // ── Mark as paid ───────────────────────────────────────────────────────
+  const [markPaidRec, setMarkPaidRec]     = useState<any>(null);
+  const [markPaidAccounts, setMarkPaidAccounts] = useState<any[]>([]);
+  const [markPaidAccount, setMarkPaidAccount]   = useState<any>(null);
+  const [markPaidLoading, setMarkPaidLoading]   = useState(false);
+
+  const openMarkPaid = async (lr: any) => {
+    const rec = lr.recording;
+    if (!rec) return;
+    const alreadyDone =
+      (rec.type === 'expense'    && rec.status === 'paid') ||
+      (rec.type === 'receivable' && rec.status === 'received') ||
+      (rec.type === 'payable'    && rec.status === 'paid');
+    if (alreadyDone) return;
+    const { data: accs } = await supabase
+      .from('accounts').select('id, account_name, bank, account_number')
+      .eq('user_id', userId).order('account_name');
+    setMarkPaidAccounts(accs ?? []);
+    setMarkPaidAccount(accs?.[0] ?? null);
+    setMarkPaidRec(lr);
+  };
+
+  const confirmMarkPaid = async () => {
+    if (!markPaidRec) return;
+    setMarkPaidLoading(true);
+    const rec = markPaidRec.recording;
+    const today = new Date().toISOString().split('T')[0];
+    const accId = markPaidAccount?.id ?? null;
+
+    if (rec.type === 'expense') {
+      // Create income linked to this expense
+      await supabase.from('recordings').insert({
+        user_id: userId, space_id: rec.space_id,
+        name: rec.name, type: 'income',
+        amount: rec.amount, transaction_date: today,
+        status: 'received', account_id: accId,
+        category_id: rec.category_id ?? null,
+        linked_recording_id: rec.id,
+      });
+      await supabase.from('recordings').update({ status: 'paid' }).eq('id', rec.id);
+    } else if (rec.type === 'receivable') {
+      // Create income linked to receivable
+      await supabase.from('recordings').insert({
+        user_id: userId, space_id: rec.space_id,
+        name: rec.name, type: 'income',
+        amount: rec.amount, transaction_date: today,
+        status: 'received', account_id: accId,
+        category_id: rec.category_id ?? null,
+        linked_recording_id: rec.id,
+      });
+      // If receivable has a linked expense, also create expense linked back
+      if (rec.linked_recording_id) {
+        await supabase.from('recordings').insert({
+          user_id: userId, space_id: rec.space_id,
+          name: rec.name, type: 'expense',
+          amount: rec.amount, transaction_date: today,
+          status: 'paid', account_id: accId,
+          category_id: rec.category_id ?? null,
+          linked_recording_id: rec.linked_recording_id,
+        });
+      }
+      await supabase.from('recordings').update({ status: 'received', paid_amount: rec.amount }).eq('id', rec.id);
+    } else if (rec.type === 'payable') {
+      // Create expense payment linked to loan
+      await supabase.from('recordings').insert({
+        user_id: userId, space_id: rec.space_id,
+        name: rec.name, type: 'expense',
+        amount: rec.amount, transaction_date: today,
+        status: 'paid', account_id: accId,
+        category_id: rec.category_id ?? null,
+        linked_recording_id: rec.id,
+      });
+      await supabase.from('recordings').update({ status: 'paid', paid_amount: rec.amount }).eq('id', rec.id);
+    }
+
+    setMarkPaidLoading(false);
+    setMarkPaidRec(null);
+    queryClient.invalidateQueries({ queryKey: ['split-bill-recordings', splitBillId] });
+  };
 
   const totalAmount = linkedRecordings.reduce((s: number, r: any) => s + Number(r.amount_contributed), 0);
   const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -481,7 +561,14 @@ export default function SplitBillDetailScreen() {
             </View>
           ) : (
             <View style={s.list}>
-              {linkedRecordings.map((lr: any) => (
+              {linkedRecordings.map((lr: any) => {
+                  const rec = lr.recording;
+                  const isDone =
+                    (rec?.type === 'expense'    && rec?.status === 'paid') ||
+                    (rec?.type === 'receivable' && rec?.status === 'received') ||
+                    (rec?.type === 'payable'    && rec?.status === 'paid');
+                  const actionable = rec?.type === 'expense' || rec?.type === 'receivable' || rec?.type === 'payable';
+                  return (
                 <TouchableOpacity
                   key={lr.id}
                   style={s.recRow}
@@ -493,15 +580,33 @@ export default function SplitBillDetailScreen() {
                   </View>
                   <View style={s.recMid}>
                     <Text style={s.recName} numberOfLines={1}>{lr.recording?.name ?? '—'}</Text>
-                    <Text style={s.recDate}>
-                      {lr.recording?.transaction_date
-                        ? new Date(lr.recording.transaction_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-                        : '—'}
-                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={s.recDate}>
+                        {lr.recording?.transaction_date
+                          ? new Date(lr.recording.transaction_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                          : '—'}
+                      </Text>
+                      {isDone && (
+                        <View style={{ backgroundColor: Colors.cyan + '22', borderRadius: Radius.pill, paddingHorizontal: 6, paddingVertical: 1 }}>
+                          <Text style={{ fontFamily: Fonts.monoBold, fontSize: 9, color: Colors.cyan }}>
+                            {rec?.type === 'receivable' ? 'received' : 'paid'}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
                   </View>
                   <Text style={[s.recAmount, { color: typeColor(lr.recording?.type ?? '') }]}>
                     {fmt(Number(lr.amount_contributed))}
                   </Text>
+                  {actionable && !isDone && (
+                    <TouchableOpacity
+                      onPress={() => openMarkPaid(lr)}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      style={{ padding: 4 }}
+                    >
+                      <Ionicons name="checkmark-circle-outline" size={18} color={Colors.cyan} />
+                    </TouchableOpacity>
+                  )}
                   <TouchableOpacity
                     onPress={async () => {
                       await supabase.from('split_bill_recordings').delete().eq('id', lr.id);
@@ -512,7 +617,8 @@ export default function SplitBillDetailScreen() {
                     <Ionicons name="close" size={14} color={Colors.faint} />
                   </TouchableOpacity>
                 </TouchableOpacity>
-              ))}
+                  );
+                })}
             </View>
           )}
 
@@ -1001,6 +1107,49 @@ export default function SplitBillDetailScreen() {
           <Ionicons name="image-outline" size={15} color={Colors.text} />
           <Text style={[s.doneBtnText, { color: Colors.text }]}>{saveImgLoading ? 'generating...' : 'save as image'}</Text>
         </TouchableOpacity>
+      </BottomSheet>
+
+      {/* Mark as paid modal */}
+      <BottomSheet visible={!!markPaidRec} onClose={() => setMarkPaidRec(null)} title="mark as paid" height="55%">
+        {markPaidRec && (() => {
+          const rec = markPaidRec.recording;
+          const label = rec?.type === 'receivable' ? 'mark as received' : 'mark as paid';
+          const hint = rec?.type === 'expense'
+            ? 'creates an income linked to this expense'
+            : rec?.type === 'receivable'
+            ? `creates an income linked to this receivable${rec?.linked_recording_id ? ' + expense for the linked loan' : ''}`
+            : 'creates an expense payment linked to this loan';
+          return (
+            <>
+              <Text style={[s.recDate, { marginBottom: 12 }]}>{rec?.name} · {fmt(Number(rec?.amount))}</Text>
+              <Text style={{ fontFamily: Fonts.mono, fontSize: 11, color: Colors.muted, marginBottom: 16 }}>{hint}</Text>
+              <Text style={{ fontFamily: Fonts.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 6 }}>account</Text>
+              <ScrollView style={{ maxHeight: 180 }} showsVerticalScrollIndicator={false}>
+                {markPaidAccounts.map((acc: any) => (
+                  <TouchableOpacity
+                    key={acc.id}
+                    style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 10 }}
+                    onPress={() => setMarkPaidAccount(acc)}
+                  >
+                    <Ionicons name={markPaidAccount?.id === acc.id ? 'checkmark-circle' : 'ellipse-outline'} size={18} color={markPaidAccount?.id === acc.id ? Colors.cyan : Colors.faint} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontFamily: Fonts.monoBold, fontSize: 13, color: Colors.text }}>{acc.account_name}</Text>
+                      <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted }}>{acc.bank} · {acc.account_number}</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+                {markPaidAccounts.length === 0 && <Text style={{ fontFamily: Fonts.mono, fontSize: 12, color: Colors.faint }}>no accounts found</Text>}
+              </ScrollView>
+              <TouchableOpacity
+                style={[s.doneBtn, { opacity: markPaidLoading ? 0.5 : 1 }]}
+                onPress={confirmMarkPaid}
+                disabled={markPaidLoading}
+              >
+                <Text style={s.doneBtnText}>{markPaidLoading ? 'saving...' : label}</Text>
+              </TouchableOpacity>
+            </>
+          );
+        })()}
       </BottomSheet>
 
     </Animated.View>
