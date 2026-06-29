@@ -520,7 +520,93 @@ export default function SplitBillDetailScreen() {
     queryClient.invalidateQueries({ queryKey: ['split-bill-recordings', splitBillId] });
   };
 
-  const totalAmount = linkedRecordings.reduce((s: number, r: any) => s + Number(r.amount_contributed), 0);
+  // ── Payment history ────────────────────────────────────────────────────────────
+  const { data: payments = [], refetch: refetchPayments } = useQuery({
+    queryKey: ['split-bill-payments', splitBillId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('split_bill_payments')
+        .select('*')
+        .eq('split_bill_id', splitBillId)
+        .order('created_at');
+      return data ?? [];
+    },
+    enabled: !!splitBillId,
+  });
+
+  const [paymentModal, setPaymentModal]     = useState(false);
+  const [paymentPerson, setPaymentPerson]   = useState('');
+  const [paymentMode, setPaymentMode]       = useState<'full' | 'manual'>('full');
+  const [paymentAmount, setPaymentAmount]   = useState('');
+  const [paymentSaving, setPaymentSaving]   = useState(false);
+
+  // compute per-person totals (reuse across summary + payment)
+  const computeTotals = () => {
+    const totals: Record<string, number> = {};
+    filledPeople.forEach(p => { totals[p] = 0; });
+    items.forEach((item: any) => {
+      const deduct = isDeductType(item.recording_type);
+      const pp = (item.people ?? []).length > 0 ? Number(item.cost) / item.people.length : 0;
+      (item.people ?? []).forEach((p: string) => {
+        if (totals[p] !== undefined) totals[p] += deduct ? -pp : pp;
+      });
+    });
+    return totals;
+  };
+
+  const openPaymentModal = (person: string) => {
+    setPaymentPerson(person);
+    setPaymentMode('full');
+    setPaymentAmount('');
+    setPaymentModal(true);
+  };
+
+  const savePayment = async () => {
+    const totals = computeTotals();
+    const owed = Math.abs(totals[paymentPerson] ?? 0);
+    const isNegative = (totals[paymentPerson] ?? 0) < 0; // they owe you money = positive, you owe them = negative
+    const paidSoFar = payments
+      .filter((p: any) => p.person_name === paymentPerson)
+      .reduce((s: number, p: any) => s + Number(p.amount), 0);
+    const amount = paymentMode === 'full' ? owed - paidSoFar : parseFloat(paymentAmount || '0');
+    if (!amount || amount <= 0) return;
+    setPaymentSaving(true);
+
+    await supabase.from('split_bill_payments').insert({
+      split_bill_id: splitBillId,
+      person_name: paymentPerson,
+      amount,
+    });
+
+    const newTotal = paidSoFar + amount;
+    // If fully settled, create income or expense recording
+    if (Math.abs(newTotal - owed) < 0.01) {
+      const spaceId = linkedRecordings[0]?.recording?.space_id ?? null;
+      if (isNegative) {
+        // You owe them — create expense
+        await supabase.from('recordings').insert({
+          user_id: userId, space_id: spaceId,
+          name: `${name} · ${paymentPerson}`,
+          type: 'expense', amount: owed,
+          transaction_date: new Date().toISOString().split('T')[0],
+          status: 'paid',
+        });
+      } else {
+        // They owe you — create income
+        await supabase.from('recordings').insert({
+          user_id: userId, space_id: spaceId,
+          name: `${name} · ${paymentPerson}`,
+          type: 'income', amount: owed,
+          transaction_date: new Date().toISOString().split('T')[0],
+          status: 'received',
+        });
+      }
+    }
+
+    setPaymentSaving(false);
+    setPaymentModal(false);
+    refetchPayments();
+  };
   const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   const typeColor = (type: string) => {
@@ -696,40 +782,84 @@ export default function SplitBillDetailScreen() {
             </View>
           )}
 
-          {/* Per-person summary */}
-          <Text style={s.sectionHeader}>per person summary</Text>
+          {/* Payment history */}
+          <View style={s.sectionRow}>
+            <Text style={s.sectionHeader}>payment history</Text>
+          </View>
           {filledPeople.length === 0 || items.length === 0 ? (
             <View style={pageStyles.emptyBox}>
-              <Text style={pageStyles.emptyText}>add people and items to see summary</Text>
+              <Text style={pageStyles.emptyText}>add people and items to see payment history</Text>
             </View>
           ) : (() => {
-            // build per-person totals from items
-            const totals: Record<string, number> = {};
-            filledPeople.forEach(p => { totals[p] = 0; });
-            items.forEach((item: any) => {
-              const deduct = isDeductType(item.recording_type);
-              const pp = item.people?.length > 0 ? Number(item.cost) / item.people.length : 0;
-              (item.people ?? []).forEach((p: string) => {
-                if (totals[p] !== undefined) totals[p] += deduct ? -pp : pp;
-              });
-            });
-            const grandTotal = Object.values(totals).reduce((s, v) => s + v, 0);
+            const totals = computeTotals();
             return (
               <View style={s.list}>
-                {filledPeople.map(p => (
-                  <View key={p} style={s.summaryRow}>
-                    <Text style={s.summaryName}>{p}</Text>
-                    <View style={s.summaryDots} />
-                    <Text style={[s.summaryAmount, totals[p] < 0 && { color: Colors.cyan }]}>
-                      {totals[p] < 0 ? '-' : ''}{fmt(Math.abs(totals[p]))}
-                    </Text>
-                  </View>
-                ))}
-                <View style={[s.summaryRow, { backgroundColor: Colors.cyan + '18', borderColor: Colors.cyan }]}>
-                  <Text style={[s.summaryName, { fontFamily: Fonts.monoBold, color: Colors.cyan }]}>total</Text>
-                  <View style={s.summaryDots} />
-                  <Text style={[s.summaryAmount, { color: Colors.cyan }]}>{fmt(grandTotal)}</Text>
-                </View>
+                {filledPeople.map(p => {
+                  const owed = totals[p] ?? 0;
+                  const isNegative = owed < 0; // you owe them
+                  const absOwed = Math.abs(owed);
+                  const paid = payments
+                    .filter((pay: any) => pay.person_name === p)
+                    .reduce((s: number, pay: any) => s + Number(pay.amount), 0);
+                  const remaining = Math.max(0, absOwed - paid);
+                  const fullyPaid = absOwed > 0 && paid >= absOwed - 0.01;
+                  const pct = absOwed > 0 ? Math.min(paid / absOwed, 1) : 0;
+                  return (
+                    <View key={p} style={[s.recRow, { flexDirection: 'column', alignItems: 'stretch', gap: 8 }]}>
+                      {/* Name row */}
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Text style={[s.recName, { flex: 1 }]}>{p}</Text>
+                        <Text style={{ fontFamily: Fonts.monoBold, fontSize: 13, color: isNegative ? Colors.cyan : '#FFAB91' }}>
+                          {isNegative ? '-' : '+'}{fmt(absOwed)}
+                        </Text>
+                        {!fullyPaid && absOwed > 0 && (
+                          <TouchableOpacity
+                            onPress={() => openPaymentModal(p)}
+                            style={{ marginLeft: 10, paddingHorizontal: 10, paddingVertical: 5, backgroundColor: Colors.cyan + '22', borderRadius: Radius.pill }}
+                          >
+                            <Text style={{ fontFamily: Fonts.monoBold, fontSize: 10, color: Colors.cyan }}>add payment</Text>
+                          </TouchableOpacity>
+                        )}
+                        {fullyPaid && (
+                          <View style={{ marginLeft: 10, paddingHorizontal: 10, paddingVertical: 5, backgroundColor: Colors.cyan + '22', borderRadius: Radius.pill }}>
+                            <Text style={{ fontFamily: Fonts.monoBold, fontSize: 10, color: Colors.cyan }}>settled ✓</Text>
+                          </View>
+                        )}
+                      </View>
+                      {/* Progress bar */}
+                      {absOwed > 0 && (
+                        <>
+                          <View style={{ height: 3, backgroundColor: Colors.border, borderRadius: 2, overflow: 'hidden' }}>
+                            <View style={{ height: 3, width: `${pct * 100}%` as any, backgroundColor: fullyPaid ? Colors.cyan : '#FFAB91', borderRadius: 2 }} />
+                          </View>
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                            <Text style={{ fontFamily: Fonts.mono, fontSize: 9, color: Colors.muted }}>{fmt(paid)} paid</Text>
+                            {!fullyPaid && <Text style={{ fontFamily: Fonts.mono, fontSize: 9, color: Colors.muted }}>{fmt(remaining)} left</Text>}
+                          </View>
+                        </>
+                      )}
+                      {/* Payment history rows */}
+                      {payments.filter((pay: any) => pay.person_name === p).map((pay: any) => (
+                        <View key={pay.id} style={{ flexDirection: 'row', alignItems: 'center', paddingTop: 4, borderTopWidth: 1, borderTopColor: Colors.border }}>
+                          <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted, flex: 1 }}>
+                            {new Date(pay.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                          </Text>
+                          <Text style={{ fontFamily: Fonts.monoBold, fontSize: 11, color: Colors.cyan }}>{fmt(Number(pay.amount))}</Text>
+                          <TouchableOpacity
+                            onPress={async () => {
+                              await supabase.from('split_bill_payments').delete().eq('id', pay.id);
+                              refetchPayments();
+                            }}
+                            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                            style={{ marginLeft: 8 }}
+                          >
+                            <Ionicons name="close" size={12} color={Colors.faint} />
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                    </View>
+                  );
+                })}
               </View>
             );
           })()}
@@ -1146,6 +1276,59 @@ export default function SplitBillDetailScreen() {
                 disabled={markPaidLoading}
               >
                 <Text style={s.doneBtnText}>{markPaidLoading ? 'saving...' : label}</Text>
+              </TouchableOpacity>
+            </>
+          );
+        })()}
+      </BottomSheet>
+
+      {/* Payment modal */}
+      <BottomSheet visible={paymentModal} onClose={() => setPaymentModal(false)} title="add payment" height="45%">
+        {paymentModal && (() => {
+          const totals = computeTotals();
+          const owed = Math.abs(totals[paymentPerson] ?? 0);
+          const paid = payments
+            .filter((p: any) => p.person_name === paymentPerson)
+            .reduce((s: number, p: any) => s + Number(p.amount), 0);
+          const remaining = Math.max(0, owed - paid);
+          return (
+            <>
+              <Text style={[s.recDate, { marginBottom: 12 }]}>
+                {paymentPerson} · {fmt(remaining)} remaining
+              </Text>
+              <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
+                {(['full', 'manual'] as const).map(m => (
+                  <TouchableOpacity
+                    key={m}
+                    style={[s.modeBtn, paymentMode === m && s.modeBtnActive]}
+                    onPress={() => setPaymentMode(m)}
+                  >
+                    <Text style={[s.modeBtnText, paymentMode === m && s.modeBtnTextActive]}>
+                      {m === 'full' ? 'full payment' : 'manual amount'}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              {paymentMode === 'manual' && (
+                <TextInput
+                  style={s.itemFormInput}
+                  placeholder="0.00"
+                  placeholderTextColor={Colors.faint}
+                  value={paymentAmount}
+                  onChangeText={setPaymentAmount}
+                  keyboardType="decimal-pad"
+                  autoFocus
+                />
+              )}
+              {paymentMode === 'full' && (
+                <Text style={{ fontFamily: Fonts.monoBold, fontSize: 15, color: Colors.cyan, marginBottom: 8 }}>{fmt(remaining)}</Text>
+              )}
+              <TouchableOpacity
+                style={[s.doneBtn, { opacity: paymentSaving ? 0.5 : 1 }]}
+                onPress={savePayment}
+                disabled={paymentSaving}
+              >
+                <Text style={s.doneBtnText}>{paymentSaving ? 'saving...' : 'confirm payment'}</Text>
               </TouchableOpacity>
             </>
           );

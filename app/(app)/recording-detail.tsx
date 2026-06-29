@@ -81,6 +81,7 @@ export default function RecordingDetailScreen() {
   const [payLoading, setPayLoading] = useState(false);
   const [linkedPayments, setLinkedPayments] = useState<any[]>([]);
   const [linkedPayable, setLinkedPayable] = useState<any>(null);
+  const [linkedReceivable, setLinkedReceivable] = useState<any>(null);
   const [payablePerPerson, setPayablePerPerson] = useState<{ map: Record<string, number>; paidFor: string[] }>({ map: {}, paidFor: [] });
   const [personPayStatus, setPersonPayStatus] = useState<{ person: string; paid: number; total: number }[]>([]);
   const [collectModal, setCollectModal] = useState(false);
@@ -287,6 +288,10 @@ export default function RecordingDetailScreen() {
         });
         setPayablePerPerson({ map: perPersonMap, paidFor });
       }
+    } else if (rec.type === 'expense') {
+      // check if a receivable points to this expense
+      const { data: recv } = await supabase.from('recordings').select('id, name').eq('linked_recording_id', recordingId).eq('type', 'receivable').maybeSingle();
+      if (recv) setLinkedReceivable(recv);
     }
   };
 
@@ -1122,7 +1127,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
 
           {/* Action buttons */}
           <View style={pageStyles.actionRow}>
-            {recording?.type === 'expense' && (
+            {recording?.type === 'expense' && !linkedPayable && !linkedReceivable && (
               <TouchableOpacity style={pageStyles.actionBtn} onPress={() => {
                 setReceivableMode('full');
                 setReceivableManualAmount('');
@@ -1217,11 +1222,24 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                 <InfoRow label={recording?.type === 'return' ? 'linked receivable' : 'linked payable'} value={truncate(linkedPayable.name, 16)} />
               </>
             )}
+            {linkedReceivable && (
+              <>
+                <View style={{ height: 1, backgroundColor: Colors.border, marginVertical: 2 }} />
+                <InfoRow label="linked receivable" value={truncate(linkedReceivable.name, 16)} />
+              </>
+            )}
           </View>
           {linkedPayable && (
             <TouchableOpacity style={pageStyles.linkedBtn} onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: linkedPayable.id } } as any)}>
               <Ionicons name="link-outline" size={12} color={Colors.muted} />
               <Text style={pageStyles.linkedBtnText}>{recording?.type === 'return' ? 'view receivable' : 'view payable'}</Text>
+              <Ionicons name="arrow-forward" size={11} color={Colors.muted} />
+            </TouchableOpacity>
+          )}
+          {linkedReceivable && (
+            <TouchableOpacity style={pageStyles.linkedBtn} onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: linkedReceivable.id } } as any)}>
+              <Ionicons name="link-outline" size={12} color={Colors.muted} />
+              <Text style={pageStyles.linkedBtnText}>view receivable</Text>
               <Ionicons name="arrow-forward" size={11} color={Colors.muted} />
             </TouchableOpacity>
           )}

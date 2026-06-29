@@ -448,17 +448,36 @@ export default function DashboardScreen() {
         expense: 'paid', income: 'received', savings: 'saved', return: 'received',
         payment: 'paid', transfer: 'paid', payable: 'unpaid', receivable: 'pending',
       };
-      await supabase.from('recordings').insert({
-        user_id: userId,
-        space_id: qaSpaceId || null,
-        name: qaName.trim(),
-        type: qaType,
-        amount: parseFloat(qaAmount),
-        transaction_date: `${qaYear}-${_pad(parseInt(qaMonth))}-${_pad(parseInt(qaDay))}`,
+      const txDate = `${qaYear}-${_pad(parseInt(qaMonth))}-${_pad(parseInt(qaDay))}`;
 
-        category_id: qaCatId || null,
-        status: statusMap[qaType] ?? 'paid',
-      });
+      if (qaType === 'expense_receivable') {
+        const { data: expRec } = await supabase.from('recordings').insert({
+          user_id: userId, space_id: qaSpaceId || null,
+          name: qaName.trim(), type: 'expense',
+          amount: parseFloat(qaAmount), transaction_date: txDate,
+          category_id: qaCatId || null, status: 'paid',
+        }).select('id').single();
+        if (expRec?.id) {
+          await supabase.from('recordings').insert({
+            user_id: userId, space_id: qaSpaceId || null,
+            name: qaName.trim(), type: 'receivable',
+            amount: parseFloat(qaAmount), transaction_date: txDate,
+            category_id: qaCatId || null, status: 'pending',
+            linked_recording_id: expRec.id,
+          });
+        }
+      } else {
+        await supabase.from('recordings').insert({
+          user_id: userId,
+          space_id: qaSpaceId || null,
+          name: qaName.trim(),
+          type: qaType,
+          amount: parseFloat(qaAmount),
+          transaction_date: txDate,
+          category_id: qaCatId || null,
+          status: statusMap[qaType] ?? 'paid',
+        });
+      }
       queryClient.invalidateQueries({ queryKey: ['dashboard-activities', userId] });
       setShowAddModal(false);
       setQaName(''); setQaAmount(''); setQaType('expense'); setQaSpaceId(null); setQaCatId(null); setQaError('');
@@ -591,13 +610,23 @@ export default function DashboardScreen() {
 
         {/* Type */}
         <Text style={s.qaLabel}>type</Text>
-        <View style={s.qaTypeRow}>
-          {['income','return','expense','payment','transfer','payable','receivable'].map(t => (
-            <TouchableOpacity key={t} style={[s.qaTypeBtn, qaType === t && s.qaTypeBtnActive]} onPress={() => setQaType(t)} activeOpacity={0.75}>
-              <Text style={[s.qaTypeBtnText, qaType === t && s.qaTypeBtnTextActive]}>{t}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+        {[
+          { label: 'money out',  types: [{ key: 'expense', label: 'expense' }] },
+          { label: 'money in',   types: [{ key: 'income', label: 'income' }, { key: 'savings', label: 'savings' }] },
+          { label: 'loan',       types: [{ key: 'payable', label: 'payable' }] },
+          { label: 'receivable', types: [{ key: 'receivable', label: 'receivable' }, { key: 'expense_receivable', label: 'expense + receivable' }] },
+        ].map(group => (
+          <View key={group.label} style={{ marginBottom: 6 }}>
+            <Text style={{ fontFamily: Fonts.monoBold, fontSize: 9, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 4 }}>{group.label}</Text>
+            <View style={s.qaTypeRow}>
+              {group.types.map(t => (
+                <TouchableOpacity key={t.key} style={[s.qaTypeBtn, qaType === t.key && s.qaTypeBtnActive]} onPress={() => setQaType(t.key)} activeOpacity={0.75}>
+                  <Text style={[s.qaTypeBtnText, qaType === t.key && s.qaTypeBtnTextActive]}>{t.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        ))}
 
         {/* Name */}
         <Text style={s.qaLabel}>name</Text>
