@@ -66,11 +66,19 @@ export default function SpacesScreen() {
     queryFn: async () => {
       const { data } = await supabase.from('spaces').select().eq('user_id', userId).order('created_at');
       if (!data) return [];
-      const { data: expRecs } = await supabase.from('recordings').select('space_id, amount').eq('user_id', userId).in('type', ['expense','payment','transfer']);
+      const { data: expRecs } = await supabase.from('recordings').select('space_id, amount, type').eq('user_id', userId).in('type', ['expense','payment','transfer','return']);
       const spentMap: Record<string, number> = {};
       const countMap: Record<string, number> = {};
-      (expRecs ?? []).forEach((r: any) => { spentMap[r.space_id] = (spentMap[r.space_id] || 0) + Number(r.amount); countMap[r.space_id] = (countMap[r.space_id] || 0) + 1; });
-      const { data: savRecs } = await supabase.from('recordings').select('space_id, amount').eq('user_id', userId).in('type', ['income','savings','return']);
+      (expRecs ?? []).forEach((r: any) => {
+        if (r.type === 'return') {
+          // return reduces expense spend
+          spentMap[r.space_id] = (spentMap[r.space_id] || 0) - Number(r.amount);
+        } else {
+          spentMap[r.space_id] = (spentMap[r.space_id] || 0) + Number(r.amount);
+          countMap[r.space_id] = (countMap[r.space_id] || 0) + 1;
+        }
+      });
+      const { data: savRecs } = await supabase.from('recordings').select('space_id, amount').eq('user_id', userId).in('type', ['income','savings']);
       const savedMap: Record<string, number> = {};
       (savRecs ?? []).forEach((r: any) => { savedMap[r.space_id] = (savedMap[r.space_id] || 0) + Number(r.amount); countMap[r.space_id] = (countMap[r.space_id] || 0) + 1; });
       return data.map((s: any) => ({ ...s, spent: spentMap[s.id] ?? 0, saved: savedMap[s.id] ?? 0, count: countMap[s.id] ?? 0 })) as SpaceData[];
