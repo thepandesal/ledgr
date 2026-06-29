@@ -294,6 +294,14 @@ export default function RecordingDetailScreen() {
         setPayablePerPerson({ map: perPersonMap, paidFor });
       }
     } else if (rec.type === 'expense') {
+      const { data: incomePayments } = await supabase.from('recordings')
+        .select('id, name, amount, transaction_date, payment_to, payment_from_account_id, accounts:payment_from_account_id(account_name, bank)')
+        .eq('linked_recording_id', recordingId).eq('type', 'income').order('transaction_date', { ascending: false });
+      if (incomePayments && incomePayments.length > 0) {
+        setLinkedPayments(incomePayments);
+        const totalCollected = incomePayments.reduce((s: number, p: any) => s + Number(p.amount), 0);
+        setRecording((prev: any) => prev ? { ...prev, paid_amount: totalCollected } : prev);
+      }
       const { data: recv } = await supabase.from('recordings').select('id, name').eq('linked_recording_id', recordingId).eq('type', 'due').maybeSingle();
       if (recv) setLinkedReceivable(recv);
     }
@@ -1081,9 +1089,23 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
 
   const amountColor = () => {
     if (!recording) return Colors.muted;
-    if (recording.type === 'expense' || recording.type === 'debt') return PEACH;
-    if (recording.type === 'income' || recording.type === 'return' || recording.type === 'due') return ACCENT_DARK;
+    if (recording.type === 'expense' && !recording.is_due) return PEACH;
+    if (recording.type === 'debt') return PEACH;
+    if (recording.type === 'income' || recording.type === 'return') return ACCENT_DARK;
+    if (recording.type === 'due' || (recording.type === 'expense' && recording.is_due)) {
+      const remaining = Number(recording.amount) - Number(recording.paid_amount ?? 0);
+      return remaining <= 0 ? ACCENT_DARK : PEACH;
+    }
     return Colors.text;
+  };
+
+  const displayAmount = () => {
+    if (!recording) return '—';
+    if (recording.is_due || recording.type === 'due') {
+      const remaining = Math.max(0, Number(recording.amount) - Number(recording.paid_amount ?? 0));
+      return remaining.toLocaleString('en-US', { minimumFractionDigits: 2 });
+    }
+    return Number(recording.amount).toLocaleString('en-US', { minimumFractionDigits: 2 });
   };
 
   const formatDate = (d: string) => {
@@ -1126,11 +1148,38 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
               {truncate(recording?.name ?? '', MAX_NAME_CHARS).toLowerCase()}
             </Text>
             <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 22, color: amountColor(), marginTop: 4 }}>
-              {recording ? Number(recording.amount).toLocaleString('en-US', { minimumFractionDigits: 2 }) : '—'}
+              {displayAmount()}
             </Text>
+            {recording?.is_due && Number(recording?.paid_amount ?? 0) > 0 && (
+              <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: Colors.muted, marginTop: 2 }}>
+                original: {Number(recording.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })} · collected: {Number(recording.paid_amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              </Text>
+            )}
             <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: Colors.muted, marginTop: 4 }}>
               {formatDate(recording?.transaction_date)} · {typeLabel(recording?.type ?? '', recording?.status ?? '')}
             </Text>
+            {recording?.is_due && Number(recording?.amount) > 0 && (() => {
+              const total = Number(recording.amount);
+              const paid = Number(recording.paid_amount ?? 0);
+              const pct = Math.min(paid / total, 1);
+              const fullyCollected = paid >= total - 0.01;
+              return (
+                <View style={{ marginTop: 10, gap: 4 }}>
+                  <View style={{ height: 4, backgroundColor: Colors.border, borderRadius: 2, overflow: 'hidden' }}>
+                    <View style={{ height: 4, width: `${pct * 100}%` as any, backgroundColor: fullyCollected ? ACCENT_DARK : PEACH, borderRadius: 2 }} />
+                  </View>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: Colors.muted }}>
+                      {paid.toLocaleString('en-US', { minimumFractionDigits: 2 })} collected
+                    </Text>
+                    {fullyCollected
+                      ? <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: ACCENT_DARK }}>fully collected ✓</Text>
+                      : <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: Colors.muted }}>{Math.max(0, total - paid).toLocaleString('en-US', { minimumFractionDigits: 2 })} remaining</Text>
+                    }
+                  </View>
+                </View>
+              );
+            })()}
           </View>
 
           {/* Action buttons */}
@@ -1253,9 +1302,9 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
           )}
 
           {/* Payment/collection history */}
-          {(recording?.type === 'debt' || recording?.type === 'due') && linkedPayments.length > 0 && (
+          {(recording?.type === 'debt' || recording?.type === 'due' || (recording?.type === 'expense' && linkedPayments.length > 0)) && linkedPayments.length > 0 && (
             <>
-              <Text style={[pageStyles.sectionHeader, { fontFamily: Brand.font.display }]}>{recording.type === 'due' ? 'collections' : 'payments'}</Text>
+              <Text style={[pageStyles.sectionHeader, { fontFamily: Brand.font.display }]}>{recording.type === 'due' ? 'collections' : recording.type === 'expense' ? 'collections' : 'payments'}</Text>
               <View style={pageStyles.infoBlock}>
                 {linkedPayments.map((p: any, i: number) => (
                   <TouchableOpacity key={p.id} onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: p.id } } as any)}>
