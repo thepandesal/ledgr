@@ -11,7 +11,7 @@ import { supabase } from '../../src/lib/supabase';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import BottomSheet from '@/components/ui/BottomSheet';
 import { Colors, Fonts, Radius } from '@/components/ui/theme';
-import pageStyles from '@/components/ui/pageStyles';
+import { Brand } from '../../src/lib/brand';
 
 // ── Module-level pending focus date ─────────────────────────────────────────
 export let pendingFocusDate: string | null = null;
@@ -134,10 +134,6 @@ export default function SpaceDetailScreen() {
 
   // Slide animation
   const slideAnim = useRef(new Animated.Value(width)).current;
-
-  // Menu hide/show on scroll
-  const menuAnim    = useRef(new Animated.Value(1)).current;
-  const lastScrollY = useRef(0);
 
   // Date range state
   const [activePreset, setActivePreset] = useState<Preset>('this-month');
@@ -300,6 +296,34 @@ export default function SpaceDetailScreen() {
   // ── Event handlers ─────────────────────────────────────────────────────────
   useEffect(() => {
     Animated.timing(slideAnim, { toValue: 0, duration: 280, useNativeDriver: false }).start();
+    // Push a history entry on web so minimize/restore keeps us here
+    if (typeof window !== 'undefined' && window.history) {
+      window.history.pushState(null, '', window.location.href);
+    }
+  }, []);
+
+  // Prevent Chrome minimize/restore from popping back to spaces on web
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        if (typeof window !== 'undefined' && window.history) {
+          window.history.pushState(null, '', window.location.href);
+        }
+      }
+    };
+    const onPopState = (e: PopStateEvent) => {
+      // Re-push so the page doesn't navigate away on restore
+      if (typeof window !== 'undefined' && document.visibilityState === 'hidden') {
+        window.history.pushState(null, '', window.location.href);
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('popstate', onPopState);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('popstate', onPopState);
+    };
   }, []);
 
   useFocusEffect(useCallback(() => {
@@ -307,16 +331,6 @@ export default function SpaceDetailScreen() {
     queryClient.invalidateQueries({ queryKey: ['recordings', spaceId] });
     setPendingFocusDate(null);
   }, [spaceId]));
-
-  const onScroll = (e: any) => {
-    const y    = e.nativeEvent.contentOffset.y;
-    const diff = y - lastScrollY.current;
-    if (diff > 6 && y > 30)
-      Animated.timing(menuAnim, { toValue: 0, duration: 180, useNativeDriver: false }).start();
-    else if (diff < -6)
-      Animated.timing(menuAnim, { toValue: 1, duration: 180, useNativeDriver: false }).start();
-    lastScrollY.current = y;
-  };
 
   const handleBack = () => {
     Animated.timing(slideAnim, { toValue: width, duration: 250, useNativeDriver: false }).start(() => router.back());
@@ -374,8 +388,8 @@ export default function SpaceDetailScreen() {
 
         {/* Header */}
         <View style={s.header}>
-          <TouchableOpacity onPress={handleBack} style={pageStyles.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="arrow-back" size={22} color={Colors.muted} />
+          <TouchableOpacity onPress={handleBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={s.backBtn}>
+            <Ionicons name="arrow-back" size={20} color={Colors.text} />
           </TouchableOpacity>
           <Text style={s.title} numberOfLines={1}>{name}</Text>
           {spaceId !== 'all' && (
@@ -389,129 +403,93 @@ export default function SpaceDetailScreen() {
           )}
         </View>
 
-        {/* Stats card */}
-        <View style={[pageStyles.infoBlock, { marginHorizontal: 25, marginBottom: 10 }]}>
-          <View style={s.statsRow}>
-            <View style={s.statItem}>
-              <Text style={s.statValue}>{fmtAbbr(moneyIn)}</Text>
-              <Text style={s.statLabel}>Money In</Text>
-            </View>
-            <View style={s.statDivider} />
-            <View style={s.statItem}>
-              <Text style={[s.statValue, { color: PEACH }]}>{fmtAbbr(moneyOut)}</Text>
-              <Text style={s.statLabel}>Money Out</Text>
-            </View>
-            {budget && (
-              <>
-                <View style={s.statDivider} />
-                <View style={s.statItem}>
-                  <Text style={[s.statValue, { color: overBudget ? PEACH : Colors.cyan }]}>{fmtAbbr(Math.abs(budget - mainValue))}</Text>
-                  <Text style={s.statLabel}>{overBudget ? 'Over' : 'Left'}</Text>
-                </View>
-              </>
-            )}
+        {/* Main scroll */}
+        <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+
+          {/* Tab circles — dashboard style */}
+          <View style={s.tabRow}>
+            {ACTIVITY_TABS.map(tab => {
+              const isActive = selectedTabs.has(tab.key);
+              return (
+                <TouchableOpacity key={tab.key} style={s.tabWrap} onPress={() => handleTabToggle(tab.key)} activeOpacity={0.75}>
+                  <View style={[s.tabCircle, isActive && s.tabCircleActive]}>
+                    <Text style={[s.tabCircleValue, isActive && s.tabCircleValueActive]}>{tabValue(tab.key)}</Text>
+                  </View>
+                  <Text style={[s.tabLabel, isActive && s.tabLabelActive]}>{tab.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
-          {budget && (
-            <View style={s.budgetTrack}>
-              <View style={[s.budgetFill, { width: `${pct * 100}%` as any, backgroundColor: overBudget ? PEACH : Colors.cyan }]} />
-            </View>
-          )}
-        </View>
 
-        {/* Sheet with floating menu */}
-        <View style={{ flex: 1 }}>
-
-          {/* Sticky menu card */}
-          <Animated.View style={[s.menuCard, {
-            opacity: menuAnim,
-            transform: [{ translateY: menuAnim.interpolate({ inputRange: [0, 1], outputRange: [-220, 0] }) }],
-          }]}>
-            {/* Tab circles */}
-            <View style={s.tabRow}>
-              {ACTIVITY_TABS.map(tab => {
-                const isActive = selectedTabs.has(tab.key);
-                return (
-                  <TouchableOpacity key={tab.key} style={s.tabWrap} onPress={() => handleTabToggle(tab.key)} activeOpacity={0.75}>
-                    <View style={[s.tabCircle, isActive && s.tabCircleActive]}>
-                      <Text style={[s.tabCircleValue, isActive && s.tabCircleValueActive]}>{tabValue(tab.key)}</Text>
-                    </View>
-                    <Text style={[s.tabLabel, isActive && s.tabLabelActive]}>{tab.label}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            {/* Filter row: date nav + filter button */}
-            <View style={s.filterRow}>
-              <View style={s.dateNavRow}>
-                <TouchableOpacity style={s.dateNavArrow} onPress={() => navigateRange(-1)} activeOpacity={0.7}>
-                  <Ionicons name="chevron-back" size={14} color={Colors.cyan} />
-                </TouchableOpacity>
-                <TouchableOpacity style={s.filterBtn} onPress={() => setShowDateModal(true)} activeOpacity={0.75}>
-                  <Ionicons name="calendar-outline" size={13} color={Colors.cyan} />
-                  <Text style={s.filterBtnText}>{rangeLabel}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={s.dateNavArrow} onPress={() => navigateRange(1)} activeOpacity={0.7}>
-                  <Ionicons name="chevron-forward" size={14} color={Colors.cyan} />
-                </TouchableOpacity>
-              </View>
-              <TouchableOpacity style={s.filterBtn} onPress={() => setShowFilterModal(true)} activeOpacity={0.75}>
-                <Ionicons name="options-outline" size={13} color={!isAllCats ? Colors.cyan : Colors.muted} />
-                <Text style={[s.filterBtnText, !isAllCats && { color: Colors.cyan }]}>Filter</Text>
+          {/* Filter controls row */}
+          <View style={s.filterControlsRow}>
+            <View style={s.dateNavRow}>
+              <TouchableOpacity style={s.dateNavArrow} onPress={() => navigateRange(-1)} activeOpacity={0.7}>
+                <Ionicons name="chevron-back" size={14} color={Colors.cyan} />
+              </TouchableOpacity>
+              <TouchableOpacity style={s.filterBtn} onPress={() => setShowDateModal(true)} activeOpacity={0.75}>
+                <Ionicons name="calendar-outline" size={13} color={Colors.cyan} />
+                <Text style={s.filterBtnText}>{rangeLabel}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.dateNavArrow} onPress={() => navigateRange(1)} activeOpacity={0.7}>
+                <Ionicons name="chevron-forward" size={14} color={Colors.cyan} />
               </TouchableOpacity>
             </View>
-          </Animated.View>
+            <TouchableOpacity style={s.filterBtn} onPress={() => setShowFilterModal(true)} activeOpacity={0.75}>
+              <Ionicons name="options-outline" size={13} color={!isAllCats ? Colors.cyan : Colors.muted} />
+              <Text style={[s.filterBtnText, !isAllCats && { color: Colors.cyan }]}>Filter</Text>
+            </TouchableOpacity>
+          </View>
 
-          {/* Recordings */}
+          <View style={s.divider} />
+
+          {/* Recordings section */}
+          <View style={s.sectionRow}>
+            <Text style={s.sectionHeader}>recordings</Text>
+          </View>
+
           {isLoading ? (
-            <ActivityIndicator color={Colors.cyan} style={{ marginTop: 48 }} />
+            <ActivityIndicator color={Colors.cyan} style={{ marginTop: 24 }} />
           ) : filtered.length === 0 ? (
-            <View style={pageStyles.emptyBox}>
-              <Text style={pageStyles.emptyText}>no recordings found for this period</Text>
+            <View style={s.emptyWrap}>
+              <Text style={s.emptyText}>no recordings found for this period</Text>
             </View>
           ) : (
-            <ScrollView
-              contentContainerStyle={s.list}
-              showsVerticalScrollIndicator={false}
-              onScroll={onScroll}
-              scrollEventThrottle={16}
-            >
-              {grouped.map(group => (
-                <View key={group.key}>
-                  <View style={s.dateHeaderRow}>
-                    <Text style={s.dateHeaderText}>{group.label}</Text>
-                  </View>
-                  {group.items.map(item => {
-                    const tl = getTypeLabel(item.type, item.status, item.is_due, item.paid_amount, item.amount);
-                    return (
-                      <TouchableOpacity
-                        key={item.id}
-                        style={s.row}
-                        activeOpacity={0.85}
-                        onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: item.id } } as any)}
-                        onLongPress={() => { setPendingDeleteId(item.id); setPendingDeleteName(item.name); setConfirmModal(true); }}
-                      >
-                        <View style={s.rowIconWrap}>
-                          <Ionicons name={(item.categories?.icon ?? 'ellipse-outline') as any} size={18} color={Colors.cyan} />
-                        </View>
-                        <View style={s.rowMid}>
-                          <Text style={s.rowType}>{tl.label}</Text>
-                          <Text style={s.rowName} numberOfLines={1}>{item.name}</Text>
-                        </View>
-                        <Text style={[s.rowAmount, { color: tl.color }]}>
-                          {item.is_due
-                            ? Math.max(0, Number(item.amount) - Number(item.paid_amount ?? 0)).toLocaleString('en-US', { minimumFractionDigits: 2 })
-                            : fmtAmount(Number(item.amount))}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
+            grouped.map(group => (
+              <View key={group.key}>
+                <View style={s.dateHeaderRow}>
+                  <Text style={s.dateHeaderText}>{group.label}</Text>
                 </View>
-              ))}
-              <View style={{ height: 80 }} />
-            </ScrollView>
+                {group.items.map(item => {
+                  const tl = getTypeLabel(item.type, item.status, item.is_due, item.paid_amount, item.amount);
+                  return (
+                    <TouchableOpacity
+                      key={item.id}
+                      style={s.row}
+                      activeOpacity={0.85}
+                      onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: item.id } } as any)}
+                      onLongPress={() => { setPendingDeleteId(item.id); setPendingDeleteName(item.name); setConfirmModal(true); }}
+                    >
+                      <View style={s.rowIconWrap}>
+                        <Ionicons name={(item.categories?.icon ?? 'ellipse-outline') as any} size={18} color={Colors.cyan} />
+                      </View>
+                      <View style={s.rowMid}>
+                        <Text style={s.rowType}>{tl.label}</Text>
+                        <Text style={s.rowName} numberOfLines={1}>{item.name}</Text>
+                      </View>
+                      <Text style={[s.rowAmount, { color: tl.color }]}>
+                        {item.is_due
+                          ? Math.max(0, Number(item.amount) - Number(item.paid_amount ?? 0)).toLocaleString('en-US', { minimumFractionDigits: 2 })
+                          : fmtAmount(Number(item.amount))}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            ))
           )}
-        </View>
+          <View style={{ height: 80 }} />
+        </ScrollView>
       </SafeAreaView>
 
       {/* Date modal */}
@@ -622,55 +600,52 @@ export default function SpaceDetailScreen() {
 
 const s = StyleSheet.create({
   // Header
-  header:  { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 25, paddingTop: 20, paddingBottom: 4, gap: 12 },
-  title:   { flex: 1, fontFamily: Fonts.display, fontSize: 28, color: Colors.text, letterSpacing: -0.8 },
+  header:  { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 25, paddingTop: 16, paddingBottom: 8, gap: 10, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center' },
+  title:   { flex: 1, fontFamily: Brand.font.display, fontSize: 20, color: Colors.text, letterSpacing: -0.3 },
   addBtn:  { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.cyan, alignItems: 'center', justifyContent: 'center' },
 
-  // Stats card
-  statsRow:    { flexDirection: 'row', alignItems: 'center', paddingVertical: 8 },
-  statItem:    { flex: 1, alignItems: 'center', gap: 4 },
-  statValue:   { fontFamily: Fonts.monoBold, fontSize: 16, color: Colors.text, letterSpacing: -0.4 },
-  statLabel:   { fontFamily: Fonts.mono,     fontSize: 10, color: Colors.muted, letterSpacing: 0.2 },
-  statDivider: { width: 1, height: 28, backgroundColor: Colors.border },
-  budgetTrack: { height: 4, backgroundColor: Colors.border, borderRadius: 2, overflow: 'hidden', marginTop: 4 },
-  budgetFill:  { height: 4, borderRadius: 2 },
+  // Scroll
+  scroll: { paddingHorizontal: 25, paddingBottom: 80 },
+  divider: { height: 8, backgroundColor: Colors.surface, marginHorizontal: -25, marginVertical: 8 },
 
-  // Menu card
-  menuCard: {
-    position: 'absolute', top: 0, left: 25, right: 25, zIndex: 10,
-    backgroundColor: Colors.white, borderRadius: Radius.xl,
-    paddingTop: 12, paddingBottom: 8, gap: 8,
-  },
+  // Section row (recordings only)
+  sectionRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 16, paddingBottom: 8 },
+  sectionHeader: { ...Brand.type.sectionHeader },
 
-  // Tab circles
-  tabRow:  { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 25, paddingVertical: 4 },
-  tabWrap: { flex: 1, alignItems: 'center' },
-  tabCircle:            { width: 56, height: 56, borderRadius: 28, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.surface },
-  tabCircleActive:      { backgroundColor: Colors.cyan },
-  tabCircleValue:       { fontFamily: Fonts.monoBold, fontSize: 11, color: Colors.muted, letterSpacing: -0.3 },
-  tabCircleValueActive: { color: Colors.white },
-  tabLabel:             { fontFamily: Fonts.mono, fontSize: 9, color: Colors.muted, marginTop: 5, letterSpacing: 0.2 },
-  tabLabelActive:       { fontFamily: Fonts.monoBold, fontSize: 9, color: Colors.cyan },
-
-  // Filter row
-  filterRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingHorizontal: 25, paddingBottom: 8 },
+  // Filter controls row
+  filterControlsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingTop: 16, paddingBottom: 4 },
+  filterRow:    { flexDirection: 'row', alignItems: 'center', gap: 4 },
   dateNavRow:   { flexDirection: 'row', alignItems: 'center', gap: 4 },
   dateNavArrow: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.surface },
   filterBtn:    { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: Colors.white, borderWidth: 1, borderColor: Colors.borderMid },
   filterBtnText: { fontFamily: Fonts.mono, fontSize: 11, color: Colors.text },
 
-  // List
-  list:           { paddingHorizontal: 25, paddingTop: 155, paddingBottom: 20, gap: 12 },
-  dateHeaderRow:  { marginTop: 16, marginBottom: 8, paddingHorizontal: 4, borderTopWidth: 1, borderTopColor: Colors.border, paddingTop: 16 },
+  // Tab circles — dashboard style
+  tabRow:               { flexDirection: 'row', justifyContent: 'space-between', paddingTop: 16, paddingBottom: 4 },
+  tabWrap:              { flex: 1, alignItems: 'center' },
+  tabCircle:            { width: 56, height: 56, borderRadius: 28, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.surface },
+  tabCircleActive:      { backgroundColor: Colors.cyan },
+  tabCircleValue:       { fontFamily: Fonts.monoBold, fontSize: 11, color: Colors.muted, letterSpacing: -0.3 },
+  tabCircleValueActive: { color: Colors.white },
+  tabLabel:             { fontFamily: Fonts.mono,     fontSize: 9,  color: Colors.muted, marginTop: 5, letterSpacing: 0.2 },
+  tabLabelActive:       { fontFamily: Fonts.monoBold, fontSize: 9,  color: Colors.cyan },
+
+  // Empty
+  emptyWrap: { alignItems: 'center', paddingVertical: 24 },
+  emptyText: { ...Brand.type.emptyText },
+
+  // Date groups
+  dateHeaderRow:  { marginTop: 12, marginBottom: 6, borderTopWidth: 1, borderTopColor: Colors.border, paddingTop: 12 },
   dateHeaderText: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted, letterSpacing: 1.4, textTransform: 'uppercase' },
 
   // Recording row
-  row:         { backgroundColor: Colors.white, borderRadius: Radius.xl, flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 25, paddingVertical: 14 },
-  rowIconWrap: { width: 46, height: 46, borderRadius: 23, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.surface },
+  row:         { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  rowIconWrap: { width: 34, height: 34, borderRadius: 17, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.surface },
   rowMid:      { flex: 1, gap: 2 },
   rowType:     { fontFamily: Fonts.mono,     fontSize: 10, color: Colors.muted, letterSpacing: 0.4, textTransform: 'uppercase' },
-  rowName:     { fontFamily: Fonts.monoBold, fontSize: 14, color: Colors.text,  letterSpacing: 0.1, lineHeight: 20 },
-  rowAmount:   { fontFamily: Fonts.monoBold, fontSize: 15, letterSpacing: -0.4 },
+  rowName:     { ...Brand.type.cardTitle },
+  rowAmount:   { fontFamily: Fonts.monoBold, fontSize: 14, letterSpacing: -0.3 },
 
   // Modal chips
   chipRow:        { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
