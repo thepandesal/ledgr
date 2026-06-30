@@ -54,6 +54,8 @@ export interface Recording {
   account_id?: string | null;
   linked_recording_id?: string | null;
   paid_amount?: number | null;
+  split_bill_id?: string | null;
+  split_bill_payment_id?: string | null;
   payment_to?: string | null;
   payment_from_account_id?: string | null;
   receive_to_account_id?: string | null;

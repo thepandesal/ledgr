@@ -717,6 +717,9 @@ export default function SplitBillDetailScreen() {
       amount: manualReturnAmount,
       transaction_date: new Date().toISOString().split('T')[0],
       status: manualReturnType === 'return' ? 'received' : 'paid',
+      // FIX 1: tag with split_bill_id so future payments can find this
+      // recording by ID instead of name, making the dedup rename-safe.
+      split_bill_id: splitBillId,
     });
     setManualReturnSaving(false);
     setManualReturnModal(false);
@@ -733,11 +736,13 @@ export default function SplitBillDetailScreen() {
     setPaymentSaving(true);
 
     // 1. Record the payment in split_bill_payments
-    await supabase.from('split_bill_payments').insert({
+    const { data: paymentRow } = await supabase.from('split_bill_payments').insert({
       split_bill_id: splitBillId,
       person_name: paymentPerson,
       amount,
-    });
+    }).select('id').single();
+    // FIX 2: keep the id so we can tag every return recording with it
+    const paymentRowId = paymentRow?.id ?? null;
 
     // 2. Compute per-recording and manual breakdown for this person
     // Build: { recordingId -> amount_owed_by_person } and manual total
@@ -770,7 +775,8 @@ export default function SplitBillDetailScreen() {
       const credit = Math.min(remaining, itemAmount);
       remaining -= credit;
 
-      // Create a return linked to this recording
+      // FIX 2: store split_bill_payment_id so this return can be reversed
+      // if the payment row is later deleted from history.
       await supabase.from('recordings').insert({
         user_id: userId,
         space_id: rec.space_id,
@@ -780,6 +786,8 @@ export default function SplitBillDetailScreen() {
         transaction_date: today,
         status: 'received',
         linked_recording_id: rid,
+        split_bill_id: splitBillId,
+        split_bill_payment_id: paymentRowId,
       });
 
       // Update paid_amount on the parent recording
@@ -800,14 +808,14 @@ export default function SplitBillDetailScreen() {
     // 4. Handle manual portion
     if (remaining > 0 && manualOwed > 0) {
       const manualCredit = Math.min(remaining, manualOwed);
-      // Check if this split bill already has a manual return/income recording
+      // FIX 1: check by split_bill_id instead of name so renames don't
+      // break the dedup and a new prompt isn't shown after every payment.
       const { data: existingManual } = await supabase
         .from('recordings')
         .select('id')
         .eq('user_id', userId)
-        .in('type', ['return', 'income', 'expense'])
+        .eq('split_bill_id', splitBillId)
         .is('linked_recording_id', null)
-        .eq('name', String(name))
         .limit(1);
 
       if (!existingManual || existingManual.length === 0) {
@@ -1090,8 +1098,54 @@ export default function SplitBillDetailScreen() {
                           <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 11, color: ACCENT_DARK }}>{fmt(Number(pay.amount))}</Text>
                           <TouchableOpacity
                             onPress={async () => {
+                              // FIX 2: reverse the return recordings that were
+                              // created when this payment was saved, then
+                              // recompute paid_amount on each parent recording.
+                              const { data: linkedReturns } = await supabase
+                                .from('recordings')
+                                .select('id, amount, linked_recording_id')
+                                .eq('split_bill_payment_id', pay.id);
+
+                              if (linkedReturns && linkedReturns.length > 0) {
+                                // Group total credit to reverse per parent recording
+                                const creditByParent: Record<string, number> = {};
+                                for (const ret of linkedReturns) {
+                                  if (ret.linked_recording_id) {
+                                    creditByParent[ret.linked_recording_id] =
+                                      (creditByParent[ret.linked_recording_id] ?? 0) + Number(ret.amount);
+                                  }
+                                }
+
+                                // Delete the return recordings first
+                                await supabase
+                                  .from('recordings')
+                                  .delete()
+                                  .eq('split_bill_payment_id', pay.id);
+
+                                // Reverse paid_amount on each parent and restore status if needed
+                                for (const [parentId, creditToReverse] of Object.entries(creditByParent)) {
+                                  const { data: parent } = await supabase
+                                    .from('recordings')
+                                    .select('paid_amount, amount, status')
+                                    .eq('id', parentId)
+                                    .single();
+                                  if (parent) {
+                                    const newPaid = Math.max(0, Number(parent.paid_amount ?? 0) - creditToReverse);
+                                    const wasFullyPaid = parent.status === 'paid';
+                                    const stillFullyPaid = newPaid >= Number(parent.amount) - 0.01;
+                                    await supabase.from('recordings').update({
+                                      paid_amount: newPaid,
+                                      // Revert status back to unpaid only if it was
+                                      // flipped to paid and is no longer fully covered
+                                      ...(wasFullyPaid && !stillFullyPaid ? { status: 'unpaid' } : {}),
+                                    }).eq('id', parentId);
+                                  }
+                                }
+                              }
+
                               await supabase.from('split_bill_payments').delete().eq('id', pay.id);
                               refetchPayments();
+                              queryClient.invalidateQueries({ queryKey: ['split-bill-recordings', splitBillId] });
                             }}
                             hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                             style={{ marginLeft: 8 }}
