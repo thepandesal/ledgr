@@ -920,6 +920,21 @@ export default function SplitBillDetailScreen() {
                       <Ionicons name="checkmark-circle-outline" size={18} color={ACCENT_DARK} />
                     </TouchableOpacity>
                   )}
+                  {rec?.type === 'expense' && rec?.is_due && rec?.status !== 'paid' && (
+                    <TouchableOpacity
+                      onPress={async () => {
+                        await supabase.from('recordings').update({
+                          paid_amount: rec.amount,
+                          status: 'paid',
+                        }).eq('id', rec.id);
+                        queryClient.invalidateQueries({ queryKey: ['split-bill-recordings', splitBillId] });
+                      }}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      style={{ padding: 4 }}
+                    >
+                      <Ionicons name="checkmark-done-circle-outline" size={18} color={ACCENT_DARK} />
+                    </TouchableOpacity>
+                  )}
                   <TouchableOpacity
                     onPress={async () => {
                       await supabase.from('split_bill_recordings').delete().eq('id', lr.id);

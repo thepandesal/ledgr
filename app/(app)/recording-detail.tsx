@@ -1159,12 +1159,34 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
           {/* Actions */}
           <View style={rd.divider} />
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ paddingVertical: 12 }} contentContainerStyle={{ paddingHorizontal: PAGE, gap: 8 }}>
-            {recording?.type === 'expense' && !linkedPayable && !linkedReceivable && (
+            {recording?.type === 'expense' && !linkedPayable && !linkedReceivable && !recording?.is_due && (
               <TouchableOpacity style={rd.actionChip} onPress={() => { setReceivableMode('full'); setReceivableManualAmount(''); setReceivableSelectedPeople([]); setReceivableModal(true); }}>
                 <Ionicons name="arrow-undo-outline" size={13} color={ACCENT_DARK} />
                 <Text style={rd.actionChipText}>tag as due</Text>
               </TouchableOpacity>
             )}
+            {recording?.type === 'expense' && recording?.is_due && (() => {
+              const total = Number(recording.amount);
+              const paid  = Number(recording.paid_amount ?? 0);
+              const fullyCollected = paid >= total - 0.01;
+              return fullyCollected ? (
+                <View style={[rd.actionChip, { backgroundColor: Colors.successBg }]}>
+                  <Ionicons name="checkmark-circle" size={13} color={Colors.success} />
+                  <Text style={[rd.actionChipText, { color: Colors.success }]}>fully collected</Text>
+                </View>
+              ) : (
+                <TouchableOpacity style={rd.actionChip} onPress={async () => {
+                  await supabase.from('recordings').update({
+                    paid_amount: total,
+                    status: 'paid',
+                  }).eq('id', recordingId);
+                  setRecording((prev: any) => ({ ...prev, paid_amount: total, status: 'paid' }));
+                }}>
+                  <Ionicons name="checkmark-circle-outline" size={13} color={ACCENT_DARK} />
+                  <Text style={rd.actionChipText}>mark collected</Text>
+                </TouchableOpacity>
+              );
+            })()}
             {recording?.type === 'debt' && recording?.status !== 'paid' && (
               <TouchableOpacity style={rd.actionChip} onPress={openPayModal}>
                 <Ionicons name="cash-outline" size={13} color={ACCENT_DARK} />
