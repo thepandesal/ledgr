@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../src/lib/supabase';
+import { useSlideScreen } from '../../src/hooks/useSlideScreen';
 import { Colors, Radius } from '@/components/ui/theme';
 import { Brand } from '../../src/lib/brand';
 
@@ -26,11 +27,7 @@ function dateKey(d: Date) { return `${d.getFullYear()}-${d.getMonth()}-${d.getDa
 export default function AccountDetailScreen() {
   const { accountId, accountName, bankName } = useLocalSearchParams<{ accountId: string; accountName: string; bankName: string }>();
   const router = useRouter();
-  const slideAnim = useRef(new Animated.Value(width)).current;
-
-  useEffect(() => {
-    Animated.timing(slideAnim, { toValue: 0, duration: 280, useNativeDriver: false }).start();
-  }, []);
+  const { slideAnim, handleBack } = useSlideScreen();
 
   const { data: recordings = [], isLoading } = useQuery({
     queryKey: ['account-recordings', accountId],
@@ -77,9 +74,7 @@ export default function AccountDetailScreen() {
 
         {/* Header */}
         <View style={s.header}>
-          <TouchableOpacity onPress={() => {
-            Animated.timing(slideAnim, { toValue: width, duration: 250, useNativeDriver: false }).start(() => router.back());
-          }} style={s.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <TouchableOpacity onPress={() => handleBack()} style={s.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
             <Ionicons name="arrow-back" size={20} color={Colors.text} />
           </TouchableOpacity>
           <View style={{ flex: 1 }}>

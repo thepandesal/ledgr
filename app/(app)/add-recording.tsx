@@ -176,10 +176,12 @@ export default function AddRecordingScreen() {
   };
 
   const loadReceiptPhotos = async () => {
-    const { data } = await supabase.from('receipt_photos').select('storage_path').eq('receipt_id', receiptId);
+    // Load photos from the existing receipt entry so they display as a preview
+    const { data } = await supabase.from('receipt_photos').select('storage_path, url').eq('entry_id', receiptId);
     if (data) {
       const urls = await Promise.all(data.map(async (p: any) => {
-        const { data: signed } = await supabase.storage.from('receipt_entries').createSignedUrl(p.storage_path, 3600);
+        if (p.url) return p.url;
+        const { data: signed } = await supabase.storage.from('receipts').createSignedUrl(p.storage_path, 3600);
         return signed?.signedUrl ?? '';
       }));
       setReceiptPhotos(urls.filter(Boolean));
@@ -296,17 +298,23 @@ export default function AddRecordingScreen() {
           });
         }
 
-        // Upload receipt photos after saving
-        if (receiptPhotos.length > 0 && newRec?.id) {
-          const { data: { user: u } } = await supabase.auth.getUser();
-          const note = recName.trim();
-          const { data: entry } = await supabase.from('receipt_entries')
-            .insert({ user_id: u!.id, note, recording_id: newRec.id })
-            .select().single();
-          if (entry?.id) {
-            for (const uri of receiptPhotos) {
-              const compressed = await compressImage(uri);
-              await uploadReceiptPhoto(compressed, entry.id);
+        // Handle receipt linkage after saving
+        if (newRec?.id) {
+          if (receiptId) {
+            // Launched from an existing receipt — link that entry to this new recording
+            await supabase.from('receipt_entries').update({ recording_id: newRec.id }).eq('id', receiptId);
+          } else if (receiptPhotos.length > 0) {
+            // New receipt photos were added inline — create a new entry and upload them
+            const { data: { user: u } } = await supabase.auth.getUser();
+            const note = recName.trim();
+            const { data: entry } = await supabase.from('receipt_entries')
+              .insert({ user_id: u!.id, note, recording_id: newRec.id })
+              .select().single();
+            if (entry?.id) {
+              for (const uri of receiptPhotos) {
+                const compressed = await compressImage(uri);
+                await uploadReceiptPhoto(compressed, entry.id);
+              }
             }
           }
         }

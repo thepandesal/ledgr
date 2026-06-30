@@ -2,10 +2,11 @@ import {
   View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Animated,
   Dimensions, ScrollView, Image, ActivityIndicator, Alert, Modal, TextInput
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../../src/lib/supabase';
+import { useSlideScreen } from '../../src/hooks/useSlideScreen';
 import { BlurView } from 'expo-blur';
 import * as ImagePicker from 'expo-image-picker';
 import BottomSheet from '@/components/ui/BottomSheet';
@@ -26,7 +27,7 @@ interface Photo { id: string; url: string; path: string; }
 export default function ReceiptDetailScreen() {
   const { receiptId } = useLocalSearchParams<{ receiptId: string }>();
   const router = useRouter();
-  const slideAnim = useRef(new Animated.Value(SW)).current;
+  const { slideAnim, handleBack } = useSlideScreen();
 
   const [entry, setEntry] = useState<any>(null);
   const [linkedRecordingName, setLinkedRecordingName] = useState('');
@@ -43,9 +44,12 @@ export default function ReceiptDetailScreen() {
   const [linkSearch, setLinkSearch] = useState('');
 
   useEffect(() => {
-    Animated.timing(slideAnim, { toValue: 0, duration: 280, useNativeDriver: false }).start();
     load();
   }, []);
+
+  useFocusEffect(useCallback(() => {
+    load();
+  }, [receiptId]));
 
   const load = async () => {
     const { data: e } = await supabase.from('receipt_entries').select('*').eq('id', receiptId).single();
@@ -67,9 +71,7 @@ export default function ReceiptDetailScreen() {
     setLoading(false);
   };
 
-  const handleBack = () => {
-    Animated.timing(slideAnim, { toValue: SW, duration: 250, useNativeDriver: false }).start(() => router.back());
-  };
+  // handleBack provided by useSlideScreen hook
 
   const rename = async () => {
     const timeStr = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });

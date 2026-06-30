@@ -59,27 +59,58 @@ export default function SplitBillDetailScreen() {
   // ── Receipt state ─────────────────────────────────────────────────────────
   const [linkedReceipt, setLinkedReceipt]   = useState<any>(null);
   const [receiptPhotos, setReceiptPhotos]   = useState<{ id: string; url: string }[]>([]);
+  // Receipts pulled from recordings linked to this split bill
+  const [recordingReceiptPhotos, setRecordingReceiptPhotos] = useState<{ id: string; url: string; recordingName: string }[]>([]);
   const [addReceiptModal, setAddReceiptModal] = useState(false);
   const [photoModal, setPhotoModal]         = useState(false);
   const [photoModalIndex, setPhotoModalIndex] = useState(0);
+  // which pool is the carousel showing: 'direct' | 'recording'
+  const [photoModalPool, setPhotoModalPool] = useState<'direct' | 'recording'>('direct');
 
   const loadLinkedReceipt = async () => {
     if (!splitBillId) return;
     const { data: entry } = await supabase.from('receipt_entries').select('id, note, created_at').eq('split_bill_id', splitBillId).maybeSingle();
-    if (!entry) { setLinkedReceipt(null); setReceiptPhotos([]); return; }
-    setLinkedReceipt(entry);
-    const { data: photos } = await supabase.from('receipt_photos').select('id, storage_path, url').eq('entry_id', entry.id).order('created_at');
-    if (photos) {
-      const urls = await Promise.all(photos.map(async (p: any) => {
-        let url = p.url ?? '';
-        if (!url && p.storage_path) {
-          const { data } = await supabase.storage.from('receipts').createSignedUrl(p.storage_path, 3600);
-          url = data?.signedUrl ?? '';
-        }
-        return { id: p.id, url };
-      }));
-      setReceiptPhotos(urls);
+    if (!entry) { setLinkedReceipt(null); setReceiptPhotos([]); }
+    else {
+      setLinkedReceipt(entry);
+      const { data: photos } = await supabase.from('receipt_photos').select('id, storage_path, url').eq('entry_id', entry.id).order('created_at');
+      if (photos) {
+        const urls = await Promise.all(photos.map(async (p: any) => {
+          let url = p.url ?? '';
+          if (!url && p.storage_path) {
+            const { data } = await supabase.storage.from('receipts').createSignedUrl(p.storage_path, 3600);
+            url = data?.signedUrl ?? '';
+          }
+          return { id: p.id, url };
+        }));
+        setReceiptPhotos(urls);
+      }
     }
+  };
+
+  /** Load receipts that are attached to any recording linked to this split bill */
+  const loadRecordingReceipts = async (linkedRecs: any[]) => {
+    const recIds = linkedRecs.map((lr: any) => lr.recording?.id).filter(Boolean);
+    if (recIds.length === 0) { setRecordingReceiptPhotos([]); return; }
+    // Get all receipt_entries linked to these recordings
+    const { data: entries } = await supabase.from('receipt_entries').select('id, recording_id').in('recording_id', recIds);
+    if (!entries || entries.length === 0) { setRecordingReceiptPhotos([]); return; }
+    const allPhotos: { id: string; url: string; recordingName: string }[] = [];
+    for (const entry of entries) {
+      const recName = linkedRecs.find((lr: any) => lr.recording?.id === entry.recording_id)?.recording?.name ?? '';
+      const { data: photos } = await supabase.from('receipt_photos').select('id, storage_path, url').eq('entry_id', entry.id).order('created_at');
+      if (photos) {
+        for (const p of photos) {
+          let url = p.url ?? '';
+          if (!url && p.storage_path) {
+            const { data } = await supabase.storage.from('receipts').createSignedUrl(p.storage_path, 3600);
+            url = data?.signedUrl ?? '';
+          }
+          if (url) allPhotos.push({ id: p.id, url, recordingName: recName });
+        }
+      }
+    }
+    setRecordingReceiptPhotos(allPhotos);
   };
 
   const addReceiptFromCamera = async () => {
@@ -568,7 +599,7 @@ export default function SplitBillDetailScreen() {
     queryFn: async () => {
       const { data } = await supabase
         .from('split_bill_recordings')
-        .select('id, amount_contributed, recording:recording_id(id, name, amount, type, transaction_date, status, space_id, category_id, linked_recording_id)')
+        .select('id, amount_contributed, recording:recording_id(id, name, amount, type, transaction_date, status, paid_amount, is_due, space_id, category_id, linked_recording_id)')
         .eq('split_bill_id', splitBillId)
         .order('created_at');
       return (data ?? []).map((r: any) => ({
@@ -578,6 +609,12 @@ export default function SplitBillDetailScreen() {
     },
     enabled: !!splitBillId,
   });
+
+  // Load recording receipts whenever linked recordings change
+  useEffect(() => {
+    if (linkedRecordings.length > 0) loadRecordingReceipts(linkedRecordings);
+    else setRecordingReceiptPhotos([]);
+  }, [linkedRecordings]);
 
   // ── Mark as paid ───────────────────────────────────────────────────────
   const [markPaidRec, setMarkPaidRec]     = useState<any>(null);
@@ -676,6 +713,7 @@ export default function SplitBillDetailScreen() {
   const [paymentPerson, setPaymentPerson]   = useState('');
   const [paymentMode, setPaymentMode]       = useState<'full' | 'manual'>('full');
   const [paymentAmount, setPaymentAmount]   = useState('');
+  const [paymentManualAmounts, setPaymentManualAmounts] = useState<Record<string, string>>({});
   const [paymentRecord, setPaymentRecord]   = useState(true);
   const [paymentSaving, setPaymentSaving]   = useState(false);
 
@@ -697,8 +735,41 @@ export default function SplitBillDetailScreen() {
     setPaymentPerson(person);
     setPaymentMode('full');
     setPaymentAmount('');
+    setPaymentManualAmounts({});
     setPaymentRecord(true);
     setPaymentModal(true);
+  };
+
+  const getPersonRecordingRows = (person: string) => {
+    const recordingOwed: Record<string, { amount: number; rec: any }> = {};
+    items.forEach((item: any) => {
+      const assignedToMe = (item.people ?? []).includes(person);
+      if (!assignedToMe || !item.recording_id) return;
+      const pp = (item.people ?? []).length > 0 ? Number(item.cost) / item.people.length : 0;
+      const rid = item.recording_id;
+      const lr = linkedRecordings.find((l: any) => l.recording?.id === rid);
+      if (!recordingOwed[rid]) recordingOwed[rid] = { amount: 0, rec: lr?.recording };
+      recordingOwed[rid].amount += pp;
+    });
+    return Object.entries(recordingOwed)
+      .map(([recordingId, { amount, rec }]) => ({
+        recordingId,
+        recording: rec,
+        owed: amount,
+        paid: Number(rec?.paid_amount ?? 0),
+      }))
+      .filter((row) => row.recording);
+  };
+
+  const getPersonManualOwed = (person: string) => {
+    let manual = 0;
+    items.forEach((item: any) => {
+      const assignedToMe = (item.people ?? []).includes(person);
+      if (!assignedToMe || item.recording_id) return;
+      const pp = (item.people ?? []).length > 0 ? Number(item.cost) / item.people.length : 0;
+      manual += pp;
+    });
+    return manual;
   };
 
   // ── Manual return prompt state ─────────────────────────────────────────
@@ -731,7 +802,11 @@ export default function SplitBillDetailScreen() {
     const paidSoFar = payments
       .filter((p: any) => p.person_name === paymentPerson)
       .reduce((s: number, p: any) => s + Number(p.amount), 0);
-    const amount = paymentMode === 'full' ? owed - paidSoFar : parseFloat(paymentAmount || '0');
+    const manualRowsTotal = Object.values(paymentManualAmounts)
+      .reduce((s, v) => s + (parseFloat(v || '0') || 0), 0);
+    const amount = paymentMode === 'full'
+      ? owed - paidSoFar
+      : manualRowsTotal + (parseFloat(paymentAmount || '0') || 0);
     if (!amount || amount <= 0) return;
     setPaymentSaving(true);
 
@@ -748,14 +823,18 @@ export default function SplitBillDetailScreen() {
     // Build: { recordingId -> amount_owed_by_person } and manual total
     const recordingOwed: Record<string, { amount: number; rec: any }> = {};
     let manualOwed = 0;
+    const requestedRecordingAmounts: Record<string, number> = {};
+    Object.entries(paymentManualAmounts).forEach(([rid, value]) => {
+      const parsed = parseFloat(value || '0');
+      if (parsed > 0) requestedRecordingAmounts[rid] = parsed;
+    });
 
     items.forEach((item: any) => {
       const assignedToMe = (item.people ?? []).includes(paymentPerson);
       if (!assignedToMe) return;
-      const pp = Number(item.cost) / item.people.length;
+      const pp = (item.people ?? []).length > 0 ? Number(item.cost) / item.people.length : 0;
       if (item.recording_id) {
         const rid = item.recording_id;
-        // Find the recording details from linkedRecordings
         const lr = linkedRecordings.find((l: any) => l.recording?.id === rid);
         if (!recordingOwed[rid]) recordingOwed[rid] = { amount: 0, rec: lr?.recording };
         recordingOwed[rid].amount += pp;
@@ -764,7 +843,7 @@ export default function SplitBillDetailScreen() {
       }
     });
 
-    // 3. Sequential assignment — pay recording items first, then manual
+    // 3. Assign payments by recording first, then manual items
     let remaining = amount;
     const today = new Date().toISOString().split('T')[0];
 
@@ -772,7 +851,11 @@ export default function SplitBillDetailScreen() {
       if (remaining <= 0) break;
       const { amount: itemAmount, rec } = recordingOwed[rid];
       if (!rec) continue;
-      const credit = Math.min(remaining, itemAmount);
+      const requested = requestedRecordingAmounts[rid] ?? 0;
+      const credit = requested > 0
+        ? Math.min(requested, remaining, itemAmount)
+        : Math.min(remaining, itemAmount);
+      if (credit <= 0) continue;
       remaining -= credit;
 
       // FIX 2: store split_bill_payment_id so this return can be reversed
@@ -806,8 +889,9 @@ export default function SplitBillDetailScreen() {
     }
 
     // 4. Handle manual portion
+    const manualExtra = parseFloat(paymentAmount || '0') || 0;
     if (remaining > 0 && manualOwed > 0) {
-      const manualCredit = Math.min(remaining, manualOwed);
+      const manualCredit = Math.min(remaining, manualOwed, manualExtra);
       // FIX 1: check by split_bill_id instead of name so renames don't
       // break the dedup and a new prompt isn't shown after every payment.
       const { data: existingManual } = await supabase
@@ -880,6 +964,10 @@ export default function SplitBillDetailScreen() {
                     (rec?.type === 'expense' && rec?.status === 'paid') ||
                     (rec?.type === 'due'     && rec?.status === 'paid') ||
                     (rec?.type === 'debt'    && rec?.status === 'paid');
+                  const isPartial =
+                    (rec?.type === 'expense' && rec?.status === 'partial') ||
+                    (rec?.type === 'due'     && rec?.status === 'partial') ||
+                    (rec?.type === 'debt'    && rec?.status === 'partial');
                   const actionable = rec?.type === 'expense' || rec?.type === 'due' || rec?.type === 'debt';
                   return (
                 <TouchableOpacity
@@ -893,20 +981,62 @@ export default function SplitBillDetailScreen() {
                   </View>
                   <View style={s.recMid}>
                     <Text style={s.recName} numberOfLines={1}>{lr.recording?.name ?? '—'}</Text>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <Text style={s.recDate}>
-                        {lr.recording?.transaction_date
-                          ? new Date(lr.recording.transaction_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-                          : '—'}
-                      </Text>
-                      {isDone && (
-                        <View style={{ backgroundColor: ACCENT + '44', borderRadius: Radius.pill, paddingHorizontal: 6, paddingVertical: 1 }}>
-                          <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 9, color: ACCENT_DARK }}>
-                            {rec?.type === 'due' ? 'collected' : 'paid'}
+                    <Text style={s.recDate}>
+                      {rec?.transaction_date
+                        ? new Date(rec.transaction_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                        : '—'}
+                    </Text>
+                    {(() => {
+                      const total = Number(rec?.amount ?? 0);
+                      if (total <= 0) return null;
+                      // Sum collections by tallying split_bill_payments for people
+                      // assigned to items linked to this recording
+                      const itemsForRec = items.filter((item: any) => item.recording_id === rec?.id);
+                      let paidAmt = 0;
+                      if (itemsForRec.length > 0) {
+                        // Build per-person owed map for this recording
+                        const owedPerPerson: Record<string, number> = {};
+                        itemsForRec.forEach((item: any) => {
+                          const pp = (item.people ?? []).length > 0 ? Number(item.cost) / item.people.length : 0;
+                          (item.people ?? []).forEach((p: string) => {
+                            owedPerPerson[p] = (owedPerPerson[p] ?? 0) + pp;
+                          });
+                        });
+                        // For each payment, credit up to what that person owes for this recording
+                        const creditedPerPerson: Record<string, number> = {};
+                        payments.forEach((pay: any) => {
+                          const personOwed = owedPerPerson[pay.person_name] ?? 0;
+                          if (personOwed > 0) {
+                            const alreadyCredited = creditedPerPerson[pay.person_name] ?? 0;
+                            const credit = Math.min(Number(pay.amount), personOwed - alreadyCredited);
+                            if (credit > 0) {
+                              creditedPerPerson[pay.person_name] = alreadyCredited + credit;
+                              paidAmt += credit;
+                            }
+                          }
+                        });
+                      } else {
+                        // No items linked — fall back to paid_amount on the recording
+                        paidAmt = Number(rec?.paid_amount ?? 0);
+                      }
+                      const fullyCollected = paidAmt >= total - 0.01;
+                      const hasPartial = paidAmt > 0 && !fullyCollected;
+                      if (fullyCollected) {
+                        return (
+                          <Text style={{ fontFamily: Brand.font.mono, fontSize: 9, color: ACCENT_DARK }}>
+                            {rec?.type === 'due' ? 'fully collected' : 'fully paid'} · {fmt(paidAmt)}
                           </Text>
-                        </View>
-                      )}
-                    </View>
+                        );
+                      }
+                      if (hasPartial) {
+                        return (
+                          <Text style={{ fontFamily: Brand.font.mono, fontSize: 9, color: PEACH }}>
+                            partially paid · {fmt(paidAmt)}
+                          </Text>
+                        );
+                      }
+                      return null;
+                    })()}
                   </View>
                   <Text style={[s.recAmount, { color: typeColor(lr.recording?.type ?? '') }]}>
                     {fmt(Number(lr.amount_contributed))}
@@ -977,6 +1107,7 @@ export default function SplitBillDetailScreen() {
           )}
 
           {/* Items */}
+          <View style={s.divider} />
           <View style={s.sectionRow}>
             <Text style={s.sectionHeader}>items</Text>
             <TouchableOpacity
@@ -1034,21 +1165,44 @@ export default function SplitBillDetailScreen() {
               <Text style={s.sectionAddText}>add</Text>
             </TouchableOpacity>
           </View>
+          {/* Direct receipts uploaded to this split bill */}
           {linkedReceipt && receiptPhotos.length > 0 ? (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ paddingBottom: 12 }} contentContainerStyle={{ gap: 8 }}>
-              {receiptPhotos.map((p, idx) => (
-                <TouchableOpacity key={p.id} onPress={() => { setPhotoModalIndex(idx); setPhotoModal(true); }} activeOpacity={0.85}>
-                  <Image source={{ uri: p.url }} style={{ width: 90, height: 90, borderRadius: Radius.md, backgroundColor: Colors.surface }} resizeMode="cover" />
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+            <>
+              <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: ACCENT_DARK, letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 6 }}>uploaded here</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ paddingBottom: 12 }} contentContainerStyle={{ gap: 8 }}>
+                {receiptPhotos.map((p, idx) => (
+                  <TouchableOpacity key={p.id} onPress={() => { setPhotoModalPool('direct'); setPhotoModalIndex(idx); setPhotoModal(true); }} activeOpacity={0.85}>
+                    <Image source={{ uri: p.url }} style={{ width: 90, height: 90, borderRadius: Radius.md, backgroundColor: Colors.surface }} resizeMode="cover" />
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </>
           ) : (
-            <View style={s.emptyWrap}>
-              <Text style={Brand.type.emptyText}>no receipt photos yet</Text>
-            </View>
+            receiptPhotos.length === 0 && recordingReceiptPhotos.length === 0 && (
+              <View style={s.emptyWrap}>
+                <Text style={Brand.type.emptyText}>no receipt photos yet</Text>
+              </View>
+            )
+          )}
+          {/* Receipts from linked recordings */}
+          {recordingReceiptPhotos.length > 0 && (
+            <>
+              <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: ACCENT_DARK, letterSpacing: 0.6, textTransform: 'uppercase', marginTop: linkedReceipt && receiptPhotos.length > 0 ? 8 : 0, marginBottom: 6 }}>from recordings</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ paddingBottom: 12 }} contentContainerStyle={{ gap: 8 }}>
+                {recordingReceiptPhotos.map((p, idx) => (
+                  <View key={p.id}>
+                    <TouchableOpacity onPress={() => { setPhotoModalPool('recording'); setPhotoModalIndex(idx); setPhotoModal(true); }} activeOpacity={0.85}>
+                      <Image source={{ uri: p.url }} style={{ width: 90, height: 90, borderRadius: Radius.md, backgroundColor: Colors.surface }} resizeMode="cover" />
+                    </TouchableOpacity>
+                    <Text style={{ fontFamily: Brand.font.mono, fontSize: 9, color: Colors.muted, maxWidth: 90, marginTop: 3 }} numberOfLines={1}>{p.recordingName}</Text>
+                  </View>
+                ))}
+              </ScrollView>
+            </>
           )}
 
           {/* Payment history */}
+          <View style={s.divider} />
           <View style={s.sectionRow}>
             <Text style={s.sectionHeader}>payment history</Text>
           </View>
@@ -1064,20 +1218,21 @@ export default function SplitBillDetailScreen() {
                   const owed = totals[p] ?? 0;
                   const isNegative = owed < 0; // you owe them
                   const absOwed = Math.abs(owed);
-                  const paid = payments
-                    .filter((pay: any) => pay.person_name === p)
-                    .reduce((s: number, pay: any) => s + Number(pay.amount), 0);
+                  const personPayments = payments.filter((pay: any) => pay.person_name === p);
+                  const paid = personPayments.reduce((s: number, pay: any) => s + Number(pay.amount), 0);
                   const remaining = Math.max(0, absOwed - paid);
                   const fullyPaid = absOwed > 0 && paid >= absOwed - 0.01;
                   const pct = absOwed > 0 ? Math.min(paid / absOwed, 1) : 0;
+                  const lastPayment = personPayments.length > 0
+                    ? personPayments.reduce((latest: any, pay: any) =>
+                        new Date(pay.created_at) > new Date(latest.created_at) ? pay : latest
+                      )
+                    : null;
                   return (
                     <View key={p} style={{ paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 8 }}>
                       {/* Name row */}
                       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                         <Text style={[s.recName, { flex: 1 }]}>{p}</Text>
-                        <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 13, color: isNegative ? PEACH : ACCENT_DARK }}>
-                          {isNegative ? 'to pay: ' : 'to collect: '}{fmt(absOwed)}
-                        </Text>
                         {!fullyPaid && absOwed > 0 && (
                           <TouchableOpacity
                             onPress={() => openPaymentModal(p)}
@@ -1098,19 +1253,25 @@ export default function SplitBillDetailScreen() {
                           <View style={{ height: 3, backgroundColor: Colors.border, borderRadius: 2, overflow: 'hidden' }}>
                             <View style={{ height: 3, width: `${pct * 100}%` as any, backgroundColor: fullyPaid ? ACCENT_DARK : '#FFAB91', borderRadius: 2 }} />
                           </View>
-                          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                            <Text style={{ fontFamily: Brand.font.mono, fontSize: 9, color: Colors.muted }}>{fmt(paid)} paid</Text>
-                            {!fullyPaid && <Text style={{ fontFamily: Brand.font.mono, fontSize: 9, color: Colors.muted }}>{fmt(remaining)} left</Text>}
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <View style={{ gap: 1 }}>
+                              <Text style={{ fontFamily: Brand.font.mono, fontSize: 9, color: Colors.muted }}>{fmt(paid)} paid</Text>
+                              {lastPayment && (
+                                <Text style={{ fontFamily: Brand.font.mono, fontSize: 9, color: Colors.faint }}>
+                                  last paid {new Date(lastPayment.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                </Text>
+                              )}
+                            </View>
+                            {!fullyPaid && (
+                              <Text style={{ fontFamily: Brand.font.mono, fontSize: 9, color: Colors.muted }}>{fmt(remaining)} left</Text>
+                            )}
                           </View>
                         </>
                       )}
                       {/* Payment history rows */}
-                      {payments.filter((pay: any) => pay.person_name === p).map((pay: any) => (
-                        <View key={pay.id} style={{ flexDirection: 'row', alignItems: 'center', paddingTop: 4, borderTopWidth: 1, borderTopColor: Colors.border }}>
-                          <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: Colors.muted, flex: 1 }}>
-                            {new Date(pay.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                          </Text>
-                          <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 11, color: ACCENT_DARK }}>{fmt(Number(pay.amount))}</Text>
+                      {personPayments.map((pay: any) => (
+                        <View key={pay.id} style={{ flexDirection: 'row', alignItems: 'center', paddingTop: 4 }}>
+                          <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 11, color: ACCENT_DARK, flex: 1 }}>{fmt(Number(pay.amount))}</Text>
                           <TouchableOpacity
                             onPress={async () => {
                               // FIX 2: reverse the return recordings that were
@@ -1177,6 +1338,7 @@ export default function SplitBillDetailScreen() {
           })()}
 
           {/* Share */}
+          <View style={s.divider} />
           <TouchableOpacity style={s.shareBtn} onPress={openShareModal} activeOpacity={0.8}>
             <Ionicons name="share-outline" size={15} color={ACCENT_DARK} />
             <Text style={s.shareBtnText}>share split bill</Text>
@@ -1716,17 +1878,63 @@ export default function SplitBillDetailScreen() {
                   </TouchableOpacity>
                 ))}
               </View>
-              {paymentMode === 'manual' && (
-                <TextInput
-                  style={s.itemFormInput}
-                  placeholder="0.00"
-                  placeholderTextColor={Colors.faint}
-                  value={paymentAmount}
-                  onChangeText={setPaymentAmount}
-                  keyboardType="decimal-pad"
-                  autoFocus
-                />
-              )}
+              {paymentMode === 'manual' && (() => {
+                const recordingRows = getPersonRecordingRows(paymentPerson);
+                const manualOwed = getPersonManualOwed(paymentPerson);
+                const manualEntered = Object.values(paymentManualAmounts)
+                  .reduce((s, v) => s + (parseFloat(v || '0') || 0), 0) + (parseFloat(paymentAmount || '0') || 0);
+                return (
+                  <>
+                    {recordingRows.length > 0 && recordingRows.map((row) => (
+                      <View key={row.recordingId} style={s.manualRow}>
+                        <View style={s.manualLeft}>
+                          <Text style={s.manualName} numberOfLines={1}>{row.recording?.name ?? 'recording'}</Text>
+                          <Text style={s.manualHint}>owed {fmt(row.owed)} · settled {fmt(row.paid)}</Text>
+                        </View>
+                        <TextInput
+                          style={[s.itemFormInput, s.manualInput]}
+                          placeholder="0.00"
+                          placeholderTextColor={Colors.faint}
+                          value={paymentManualAmounts[row.recordingId] ?? ''}
+                          onChangeText={(value) => setPaymentManualAmounts((prev) => ({ ...prev, [row.recordingId]: value }))}
+                          keyboardType="decimal-pad"
+                        />
+                      </View>
+                    ))}
+                    {manualOwed > 0 && (
+                      <View style={s.manualRow}>
+                        <View style={s.manualLeft}>
+                          <Text style={s.manualName}>manual items</Text>
+                          <Text style={s.manualHint}>owed {fmt(manualOwed)} · no linked recording</Text>
+                        </View>
+                        <TextInput
+                          style={[s.itemFormInput, s.manualInput]}
+                          placeholder="0.00"
+                          placeholderTextColor={Colors.faint}
+                          value={paymentAmount}
+                          onChangeText={setPaymentAmount}
+                          keyboardType="decimal-pad"
+                        />
+                      </View>
+                    )}
+                    {recordingRows.length === 0 && manualOwed === 0 && (
+                      <TextInput
+                        style={s.itemFormInput}
+                        placeholder="0.00"
+                        placeholderTextColor={Colors.faint}
+                        value={paymentAmount}
+                        onChangeText={setPaymentAmount}
+                        keyboardType="decimal-pad"
+                        autoFocus
+                      />
+                    )}
+                    <View style={s.manualTotalRow}>
+                      <Text style={s.manualTotalLabel}>total payment</Text>
+                      <Text style={s.manualTotalValue}>{fmt(manualEntered)}</Text>
+                    </View>
+                  </>
+                );
+              })()}
               {paymentMode === 'full' && (
                 <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 15, color: ACCENT_DARK, marginBottom: 8 }}>{fmt(remaining)}</Text>
               )}
@@ -1766,14 +1974,22 @@ export default function SplitBillDetailScreen() {
           <TouchableOpacity style={{ position: 'absolute', top: 52, right: 24, zIndex: 10 }} onPress={() => setPhotoModal(false)}>
             <Ionicons name="close" size={26} color="#fff" />
           </TouchableOpacity>
-          <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} contentOffset={{ x: photoModalIndex * width, y: 0 }}>
-            {receiptPhotos.map((p, i) => (
-              <View key={p.id} style={{ width, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 16 }}>
-                <Image source={{ uri: p.url }} style={{ width: width - 32, height: width - 32, borderRadius: 12 }} resizeMode="contain" />
-                <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 12 }}>{i + 1} / {receiptPhotos.length}</Text>
-              </View>
-            ))}
-          </ScrollView>
+          {(() => {
+            const pool = photoModalPool === 'direct' ? receiptPhotos : recordingReceiptPhotos;
+            return (
+              <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} contentOffset={{ x: photoModalIndex * width, y: 0 }}>
+                {pool.map((p, i) => (
+                  <View key={p.id} style={{ width, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 16 }}>
+                    <Image source={{ uri: p.url }} style={{ width: width - 32, height: width - 32, borderRadius: 12 }} resizeMode="contain" />
+                    {'recordingName' in p && p.recordingName ? (
+                      <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: 'rgba(255,255,255,0.6)', marginTop: 8 }} numberOfLines={1}>{p.recordingName}</Text>
+                    ) : null}
+                    <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>{i + 1} / {pool.length}</Text>
+                  </View>
+                ))}
+              </ScrollView>
+            );
+          })()}
         </View>
       </Modal>
 
@@ -1892,6 +2108,14 @@ const s = StyleSheet.create({
   itemsTotalValue:{ fontFamily: Brand.font.monoBold, fontSize: 11, color: Colors.text },
   itemFormRow:    { flexDirection: 'row', gap: 8, marginBottom: 10 },
   itemFormInput:  { fontFamily: Brand.font.mono, fontSize: 16, color: Colors.text, backgroundColor: Colors.white, borderRadius: Radius.md, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: Colors.borderMid },
+  manualRow:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 12, padding: 12, borderRadius: Radius.md, backgroundColor: Colors.surface },
+  manualLeft:     { flex: 1, gap: 4 },
+  manualName:     { ...Brand.type.cardTitle, fontSize: 13, color: Colors.text },
+  manualHint:     { ...Brand.type.cardMeta, color: Colors.muted, fontSize: 11 },
+  manualInput:    { flex: 0, minWidth: 96, width: 96, textAlign: 'right' },
+  manualTotalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10, paddingHorizontal: 12, borderRadius: Radius.md, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.borderMid },
+  manualTotalLabel:{ ...Brand.type.cardMeta, color: Colors.muted },
+  manualTotalValue:{ fontFamily: Brand.font.monoBold, fontSize: 14, color: Colors.text },
 
   summaryRow:    { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surface, borderRadius: Radius.pill, paddingVertical: 12, paddingHorizontal: PAGE, borderWidth: 1, borderColor: Colors.border },
   summaryName:   { ...Brand.type.cardMeta, color: Colors.text, flexShrink: 0 },

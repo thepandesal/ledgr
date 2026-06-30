@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '../../src/lib/supabase';
+import { useSlideScreen } from '../../src/hooks/useSlideScreen';
 import pageStyles from '@/components/ui/pageStyles';
 import { Colors, Fonts, Radius } from '@/components/ui/theme';
 import { compressImage, uploadReceiptPhoto } from '../../src/lib/receiptUpload';

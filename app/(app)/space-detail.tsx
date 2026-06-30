@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useUser } from '../../src/hooks/useUser';
+import { useSlideScreen } from '../../src/hooks/useSlideScreen';
 import { supabase } from '../../src/lib/supabase';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import BottomSheet from '@/components/ui/BottomSheet';
@@ -91,17 +92,26 @@ function getTypeLabel(type: string, status: string, is_due?: boolean, paid_amoun
   if (type === 'income')  return { label: 'income',  color: Colors.cyan };
   if (type === 'expense') {
     if (is_due) {
-      const collected = paid_amount != null && amount != null && Number(paid_amount) > 0 && Number(paid_amount) >= Number(amount) - 0.01;
-      return { label: collected ? 'expense · collected' : 'expense · due', color: collected ? Colors.cyan : PEACH };
+      const paid = Number(paid_amount ?? 0);
+      const total = Number(amount ?? 0);
+      const collected = total > 0 && paid >= total - 0.01;
+      const partial   = paid > 0 && !collected;
+      if (collected) return { label: 'expense · collected',        color: Colors.cyan };
+      if (partial)   return { label: 'expense · due · partial',    color: PEACH };
+      return               { label: 'expense · due',               color: PEACH };
     }
     return { label: 'expense', color: PEACH };
   }
-  if (type === 'debt')    return status === 'paid'
-    ? { label: 'debt · paid', color: Colors.cyan }
-    : { label: 'debt',        color: PEACH };
-  if (type === 'due')     return status === 'paid'
-    ? { label: 'due · collected', color: Colors.cyan }
-    : { label: 'due',             color: Colors.cyan };
+  if (type === 'debt') {
+    if (status === 'paid')    return { label: 'debt · paid',           color: Colors.cyan };
+    if (status === 'partial') return { label: 'debt · partially paid', color: PEACH };
+    return                           { label: 'debt',                  color: PEACH };
+  }
+  if (type === 'due') {
+    if (status === 'paid')    return { label: 'due · collected',        color: Colors.cyan };
+    if (status === 'partial') return { label: 'due · partially paid',   color: Colors.cyan };
+    return                           { label: 'due',                    color: Colors.cyan };
+  }
   return { label: type, color: Colors.muted };
 }
 
@@ -133,7 +143,7 @@ export default function SpaceDetailScreen() {
   const { userId } = useUser();
 
   // Slide animation
-  const slideAnim = useRef(new Animated.Value(width)).current;
+  const { slideAnim, handleBack } = useSlideScreen();
 
   // Date range state
   const [activePreset, setActivePreset] = useState<Preset>('this-month');
@@ -295,7 +305,6 @@ export default function SpaceDetailScreen() {
 
   // ── Event handlers ─────────────────────────────────────────────────────────
   useEffect(() => {
-    Animated.timing(slideAnim, { toValue: 0, duration: 280, useNativeDriver: false }).start();
     // Push a history entry on web so minimize/restore keeps us here
     if (typeof window !== 'undefined' && window.history) {
       window.history.pushState(null, '', window.location.href);
@@ -331,10 +340,6 @@ export default function SpaceDetailScreen() {
     queryClient.invalidateQueries({ queryKey: ['recordings', spaceId] });
     setPendingFocusDate(null);
   }, [spaceId]));
-
-  const handleBack = () => {
-    Animated.timing(slideAnim, { toValue: width, duration: 250, useNativeDriver: false }).start(() => router.back());
-  };
 
   const confirmDelete = async () => {
     await supabase.from('recordings').delete().eq('id', pendingDeleteId);

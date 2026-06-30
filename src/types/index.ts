@@ -71,6 +71,7 @@ export interface ReceiptEntry {
   user_id: string;
   note: string | null;
   recording_id: string | null;
+  split_bill_id: string | null;
   created_at: string;
 }
 

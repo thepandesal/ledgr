@@ -11,6 +11,7 @@ import BottomSheet from '@/components/ui/BottomSheet';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import PayModal from '@/components/modals/PayModal';
 import CollectModal from '@/components/modals/CollectModal';
+import CollectDueModal from '@/components/modals/CollectDueModal';
 import ShareModal from '@/components/modals/ShareModal';
 import ReceivableModal from '@/components/modals/ReceivableModal';
 import formStyles from '@/components/ui/formStyles';
@@ -96,6 +97,17 @@ export default function RecordingDetailScreen() {
   const [collectDate, setCollectDate] = useState(new Date().toISOString().split('T')[0]);
   const [collectComplete, setCollectComplete] = useState<boolean | null>(null);
   const [collectLoading, setCollectLoading] = useState(false);
+
+  // Collect due payment (expense tagged as due, no split bill)
+  const [collectDueModal, setCollectDueModal] = useState(false);
+  const [collectDueAmount, setCollectDueAmount] = useState('');
+  const [collectDueDate, setCollectDueDate] = useState(new Date().toISOString().split('T')[0]);
+  const [collectDueComplete, setCollectDueComplete] = useState<boolean | null>(null);
+  const [collectDueLoading, setCollectDueLoading] = useState(false);
+
+  // Cancel due state
+  const [cancelDueConfirm, setCancelDueConfirm] = useState(false);
+  const [cancelDueLoading, setCancelDueLoading] = useState(false);
 
   // Create receivable from expense
   const [receivableModal, setReceivableModal] = useState(false);
@@ -302,6 +314,42 @@ export default function RecordingDetailScreen() {
       const { data: recv } = await supabase.from('recordings').select('id, name').eq('linked_recording_id', recordingId).eq('type', 'due').maybeSingle();
       if (recv) setLinkedReceivable(recv);
     }
+  };
+
+  const openCollectDueModal = () => {
+    setCollectDueAmount('');
+    setCollectDueDate(new Date().toISOString().split('T')[0]);
+    setCollectDueComplete(null);
+    setCollectDueModal(true);
+  };
+
+  const confirmCollectDue = async () => {
+    if (!recording || collectDueComplete === null) return;
+    const amount = parseFloat(collectDueAmount || '0') || 0;
+    if (amount <= 0) return;
+    setCollectDueLoading(true);
+    try {
+      const prevPaid = Number(recording.paid_amount ?? 0);
+      const newPaid = prevPaid + amount;
+      const newStatus = collectDueComplete ? 'paid' : 'partial';
+      await supabase.from('recordings').update({
+        paid_amount: newPaid,
+        status: newStatus,
+      }).eq('id', recordingId);
+      setRecording((prev: any) => ({ ...prev, paid_amount: newPaid, status: newStatus }));
+      setCollectDueModal(false);
+    } catch (e) { console.log(e); }
+    finally { setCollectDueLoading(false); }
+  };
+
+  const confirmCancelDue = async () => {
+    setCancelDueLoading(true);
+    try {
+      await supabase.from('recordings').update({ is_due: false, paid_amount: 0, status: 'unpaid' }).eq('id', recordingId);
+      setRecording((prev: any) => ({ ...prev, is_due: false, paid_amount: 0, status: 'unpaid' }));
+      setCancelDueConfirm(false);
+    } catch (e) { console.log(e); }
+    finally { setCancelDueLoading(false); }
   };
 
   const openCollectModal = async () => {
@@ -1092,10 +1140,26 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
   };
 
   const typeLabel = (type: string, status: string) => {
-    if (type === 'debt') return `Debt · ${status === 'paid' ? 'Paid' : status === 'partial' ? 'Partial' : 'Unpaid'}`;
-    if (type === 'due')  return `Due · ${status === 'paid' ? 'Collected' : status === 'partial' ? 'Partial' : 'Unpaid'}`;
+    if (type === 'debt') {
+      if (status === 'paid')    return 'Debt · Paid';
+      if (status === 'partial') return 'Debt · Partially Paid';
+      return 'Debt · Unpaid';
+    }
+    if (type === 'due') {
+      if (status === 'paid')    return 'Due · Collected';
+      if (status === 'partial') return 'Due · Partially Paid';
+      return 'Due · Unpaid';
+    }
     if (type === 'return') return 'Return';
-    if (type === 'expense' && recording?.is_due) return 'Expense · Due';
+    if (type === 'expense' && recording?.is_due) {
+      const paid = Number(recording?.paid_amount ?? 0);
+      const total = Number(recording?.amount ?? 0);
+      const collected = total > 0 && paid >= total - 0.01;
+      const partial   = paid > 0 && !collected;
+      if (collected) return 'Expense · Collected';
+      if (partial)   return 'Expense · Due · Partial';
+      return 'Expense · Due';
+    }
     return { expense: 'Expense', income: 'Income' }[type] ?? type;
   };
 
@@ -1169,22 +1233,37 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
               const total = Number(recording.amount);
               const paid  = Number(recording.paid_amount ?? 0);
               const fullyCollected = paid >= total - 0.01;
+              const nothingCollected = paid <= 0;
               return fullyCollected ? (
                 <View style={[rd.actionChip, { backgroundColor: Colors.successBg }]}>
                   <Ionicons name="checkmark-circle" size={13} color={Colors.success} />
                   <Text style={[rd.actionChipText, { color: Colors.success }]}>fully collected</Text>
                 </View>
               ) : (
-                <TouchableOpacity style={rd.actionChip} onPress={async () => {
-                  await supabase.from('recordings').update({
-                    paid_amount: total,
-                    status: 'paid',
-                  }).eq('id', recordingId);
-                  setRecording((prev: any) => ({ ...prev, paid_amount: total, status: 'paid' }));
-                }}>
-                  <Ionicons name="checkmark-circle-outline" size={13} color={ACCENT_DARK} />
-                  <Text style={rd.actionChipText}>mark collected</Text>
-                </TouchableOpacity>
+                <>
+                  <TouchableOpacity
+                    style={rd.actionChip}
+                    onPress={() => {
+                      if (linkedSplitBill) {
+                        router.push({ pathname: '/(app)/split-bill-detail', params: { splitBillId: linkedSplitBill.id, name: linkedSplitBill.name } } as any);
+                      } else {
+                        openCollectDueModal();
+                      }
+                    }}
+                  >
+                    <Ionicons name="arrow-down-circle-outline" size={13} color={ACCENT_DARK} />
+                    <Text style={rd.actionChipText}>collect payment</Text>
+                  </TouchableOpacity>
+                  {nothingCollected && (
+                    <TouchableOpacity
+                      style={[rd.actionChip, { backgroundColor: Colors.dangerBg }]}
+                      onPress={() => setCancelDueConfirm(true)}
+                    >
+                      <Ionicons name="close-circle-outline" size={13} color={Colors.danger} />
+                      <Text style={[rd.actionChipText, { color: Colors.danger }]}>cancel due</Text>
+                    </TouchableOpacity>
+                  )}
+                </>
               );
             })()}
             {recording?.type === 'debt' && recording?.status !== 'paid' && (
@@ -1532,6 +1611,32 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
         onConfirm={confirmCreateReceivable}
       />
 
+      <CollectDueModal
+        visible={collectDueModal}
+        onClose={() => setCollectDueModal(false)}
+        recordingName={recording?.name ?? ''}
+        recordingAmount={Number(recording?.amount ?? 0)}
+        amount={collectDueAmount}
+        setAmount={setCollectDueAmount}
+        date={collectDueDate}
+        setDate={setCollectDueDate}
+        complete={collectDueComplete}
+        setComplete={setCollectDueComplete}
+        loading={collectDueLoading}
+        onConfirm={confirmCollectDue}
+      />
+
+      <ConfirmModal
+        visible={cancelDueConfirm}
+        onClose={() => setCancelDueConfirm(false)}
+        title="cancel due tag"
+        message="this will remove the due tag from this expense. any collections will also be reset."
+        actions={[
+          { label: 'keep', onPress: () => setCancelDueConfirm(false), muted: true },
+          { label: cancelDueLoading ? '...' : 'cancel due', onPress: confirmCancelDue, destructive: true, disabled: cancelDueLoading },
+        ]}
+      />
+
 
       {copiedToast && (
         <View style={rd.toast} pointerEvents="none">
@@ -1591,23 +1696,56 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
 
       {/* Photo carousel modal */}
       <Modal visible={photoModal} transparent animationType="fade" onRequestClose={() => setPhotoModal(false)}>
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center' }}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.95)' }}>
+          {/* Close button */}
           <TouchableOpacity style={{ position: 'absolute', top: 52, right: 24, zIndex: 10 }} onPress={() => setPhotoModal(false)}>
             <Ionicons name="close" size={26} color="#fff" />
           </TouchableOpacity>
-          <ScrollView
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            contentOffset={{ x: photoModalIndex * width, y: 0 }}
-          >
-            {receiptPhotos.map((p, i) => (
-              <View key={p.id} style={{ width, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 16 }}>
-                <Image source={{ uri: p.url }} style={{ width: width - 32, height: width - 32, borderRadius: 12 }} resizeMode="contain" />
-                <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 12 }}>{i + 1} / {receiptPhotos.length}</Text>
-              </View>
-            ))}
-          </ScrollView>
+
+          {/* Image — vertically centered */}
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+            <Image
+              source={{ uri: receiptPhotos[photoModalIndex]?.url ?? '' }}
+              style={{ width: width - 32, height: width - 32, borderRadius: 12 }}
+              resizeMode="contain"
+            />
+          </View>
+
+          {/* Left arrow */}
+          {photoModalIndex > 0 && (
+            <TouchableOpacity
+              onPress={() => setPhotoModalIndex(i => i - 1)}
+              style={{ position: 'absolute', left: 16, top: '50%' as any, marginTop: -22, width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' }}
+            >
+              <Ionicons name="chevron-back" size={24} color="#fff" />
+            </TouchableOpacity>
+          )}
+
+          {/* Right arrow */}
+          {photoModalIndex < receiptPhotos.length - 1 && (
+            <TouchableOpacity
+              onPress={() => setPhotoModalIndex(i => i + 1)}
+              style={{ position: 'absolute', right: 16, top: '50%' as any, marginTop: -22, width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' }}
+            >
+              <Ionicons name="chevron-forward" size={24} color="#fff" />
+            </TouchableOpacity>
+          )}
+
+          {/* Dot indicators */}
+          {receiptPhotos.length > 1 && (
+            <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 6, paddingBottom: 48 }}>
+              {receiptPhotos.map((_, i) => (
+                <TouchableOpacity key={i} onPress={() => setPhotoModalIndex(i)}>
+                  <View style={{
+                    width: i === photoModalIndex ? 18 : 6,
+                    height: 6,
+                    borderRadius: 3,
+                    backgroundColor: i === photoModalIndex ? '#fff' : 'rgba(255,255,255,0.35)',
+                  }} />
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
         </View>
       </Modal>
 
