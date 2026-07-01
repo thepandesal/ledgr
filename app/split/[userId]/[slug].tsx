@@ -245,12 +245,14 @@ export default function SplitShareSlugPage() {
               return (
                 <View key={ii} style={s.itemCard}>
                   <View style={s.itemHeader}>
-                    <View style={s.rowIconWrap}><Ionicons name="pricetag-outline" size={15} color={deduct ? PEACH : ACCENT_DARK} /></View>
+                    <View style={[s.rowIconWrap, { backgroundColor: ACCENT + '44' }]}>
+                      <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 13, color: ACCENT_DARK }}>{ii + 1}</Text>
+                    </View>
                     <Text style={s.rowName}>{String(item.name ?? '').toLowerCase()}</Text>
                     <Text style={[s.rowAmount, { color: deduct ? PEACH : ACCENT_DARK }]}>{deduct ? '-' : '+'}{fmt(Number(item.cost ?? 0))}</Text>
                   </View>
                   {subs.length === 0 && itemPeople.length > 0 && (
-                    <View style={{ paddingHorizontal: 14, paddingBottom: 10, paddingLeft: 60, flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
+                    <View style={{ paddingLeft: 60, paddingRight: 14, paddingBottom: 10, flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
                       {itemPeople.map((person: string, pi: number) => (
                         <View key={pi} style={{ backgroundColor: ACCENT + '44', borderRadius: 99, paddingHorizontal: 8, paddingVertical: 3 }}>
                           <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: ACCENT_DARK }}>{person}</Text>
