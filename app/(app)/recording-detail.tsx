@@ -143,6 +143,7 @@ export default function RecordingDetailScreen() {
   // ── Linked split bill ────────────────────────────────────────────────────
   const [linkedSplitBill, setLinkedSplitBill] = useState<{ id: string; name: string } | null>(null);
   const [splitBillModal, setSplitBillModal] = useState(false);
+  const [splitBillName, setSplitBillName] = useState('');
   const [existingSplitBills, setExistingSplitBills] = useState<any[]>([]);
 
   const loadLinkedSplitBill = async () => {
@@ -162,8 +163,9 @@ export default function RecordingDetailScreen() {
     if (!recording) return;
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
+    const billName = splitBillName.trim() || recording.name;
     const { data: bill } = await supabase.from('split_bills')
-      .insert({ user_id: user.id, name: recording.name })
+      .insert({ user_id: user.id, name: billName })
       .select('id, name').single();
     if (!bill) return;
     await supabase.from('split_bill_recordings').insert({
@@ -186,6 +188,7 @@ export default function RecordingDetailScreen() {
     if (!user) return;
     const { data } = await supabase.from('split_bills').select('id, name').eq('user_id', user.id).order('created_at', { ascending: false });
     setExistingSplitBills(data ?? []);
+    setSplitBillName(recording?.name ?? '');
     setSplitBillModal(true);
   };
 
@@ -1414,21 +1417,29 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
               <Text style={rd.infoValue}>{typeLabel(recording?.type ?? '', recording?.status ?? '')}</Text>
             </View>
             <View style={rd.infoRow}>
+              <Text style={rd.infoLabel}>amount</Text>
+              <Text style={rd.infoValue}>{Number(recording?.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+            </View>
+            <View style={rd.infoRow}>
+              <Text style={rd.infoLabel}>status</Text>
+              <Text style={rd.infoValue}>{recording?.status ?? '—'}</Text>
+            </View>
+            <View style={rd.infoRow}>
               <Text style={rd.infoLabel}>account</Text>
               <Text style={rd.infoValue}>{truncate(recording?.account?.account_name ?? '—', 20)}</Text>
             </View>
-            {recording?.categories?.name && (
-              <View style={rd.infoRow}>
-                <Text style={rd.infoLabel}>category</Text>
-                <Text style={rd.infoValue}>{recording.categories.name}</Text>
-              </View>
-            )}
-            {recording?.notes ? (
-              <View style={[rd.infoRow, { flexDirection: 'column', alignItems: 'flex-start', gap: 4 }]}>
-                <Text style={rd.infoLabel}>notes</Text>
-                <Text style={{ fontFamily: Brand.font.mono, fontSize: 12, color: Colors.text, lineHeight: 18 }}>{recording.notes}</Text>
-              </View>
-            ) : null}
+            <View style={rd.infoRow}>
+              <Text style={rd.infoLabel}>category</Text>
+              <Text style={rd.infoValue}>{recording?.categories?.name ?? '—'}</Text>
+            </View>
+            <View style={rd.infoRow}>
+              <Text style={rd.infoLabel}>{recording?.type === 'debt' ? 'paying' : 'owes you'}</Text>
+              <Text style={rd.infoValue}>{recording?.person_name ?? '—'}</Text>
+            </View>
+            <View style={[rd.infoRow, { flexDirection: 'column', alignItems: 'flex-start', gap: 4 }]}>
+              <Text style={rd.infoLabel}>notes</Text>
+              <Text style={{ fontFamily: Brand.font.mono, fontSize: 12, color: Colors.text, lineHeight: 18 }}>{recording?.notes ?? '—'}</Text>
+            </View>
             {linkedPayable && (
               <TouchableOpacity style={rd.infoRow} onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: linkedPayable.id } } as any)}>
                 <Text style={rd.infoLabel}>{recording?.type === 'return' ? 'linked due' : 'linked debt'}</Text>
@@ -1552,7 +1563,16 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
 
       {/* Split bill modal */}
       <BottomSheet visible={splitBillModal} onClose={() => setSplitBillModal(false)} title="split bill" height="50%">
-        <TouchableOpacity style={rd.doneBtn} onPress={createAndLinkSplitBill}>
+        <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: Colors.muted, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.6 }}>split bill name</Text>
+        <TextInput
+          style={{ fontFamily: Brand.font.mono, fontSize: 15, color: Colors.text, backgroundColor: Colors.surface, borderRadius: Radius.md, paddingHorizontal: 14, paddingVertical: 11, borderWidth: 1, borderColor: Colors.borderMid, marginBottom: 12 }}
+          value={splitBillName}
+          onChangeText={setSplitBillName}
+          placeholder={recording?.name ?? 'split bill name'}
+          placeholderTextColor={Colors.faint}
+          autoFocus
+        />
+        <TouchableOpacity style={[rd.doneBtn, { opacity: !splitBillName.trim() ? 0.4 : 1 }]} onPress={createAndLinkSplitBill} disabled={!splitBillName.trim()}>
           <Ionicons name="add-circle-outline" size={15} color={ACCENT_DARK} />
           <Text style={rd.doneBtnText}>create new split bill</Text>
         </TouchableOpacity>
@@ -1955,8 +1975,8 @@ const rd = StyleSheet.create({
 
   // Info rows
   infoRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  infoLabel:  { fontFamily: Brand.font.mono, fontSize: 11, color: Colors.muted },
-  infoValue:  { fontFamily: Brand.font.monoBold, fontSize: 12, color: Colors.text },
+  infoLabel:  { fontFamily: Brand.font.mono, fontSize: 11, color: Colors.muted, width: 80, flexShrink: 0 },
+  infoValue:  { fontFamily: Brand.font.monoBold, fontSize: 12, color: Colors.text, flex: 1, textAlign: 'right' },
 
   // Action chips
   actionChip:     { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: Radius.pill, backgroundColor: ACCENT + '44' },

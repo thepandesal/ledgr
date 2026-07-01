@@ -26,15 +26,7 @@ interface FormBlockProps {
 export function FormBlock({ children, style }: FormBlockProps) {
   return (
     <View style={[styles.block, style]}>
-      {/* Inject dividers between children automatically */}
-      {Array.isArray(children)
-        ? children.filter(Boolean).map((child, i, arr) => (
-            <View key={i}>
-              {child}
-              {i < arr.length - 1 && <View style={styles.divider} />}
-            </View>
-          ))
-        : children}
+      {children}
     </View>
   );
 }
@@ -67,12 +59,7 @@ export function FormRow({ label, children, stacked }: FormRowProps) {
 
 const styles = StyleSheet.create({
   block: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.lg,
-    paddingHorizontal: 14,
-    paddingVertical: 4,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    gap: 8,
   },
   divider: {
     height: 1,
@@ -81,8 +68,11 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
     gap: 10,
+    backgroundColor: Colors.surface,
+    borderRadius: 0,
   },
   rowStacked: {
     flexDirection: 'column',
@@ -94,7 +84,7 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.mono,
     fontSize: 11,
     color: Colors.muted,
-    width: 60,
+    width: 80,
     flexShrink: 0,
   },
 });

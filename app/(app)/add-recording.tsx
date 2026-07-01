@@ -7,6 +7,7 @@
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
   TextInput, ActivityIndicator, Switch, FlatList, Image, Alert,
+  Modal, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,6 +15,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../src/lib/supabase';
 import * as ImagePicker from 'expo-image-picker';
 import { compressImage, uploadReceiptPhoto } from '../../src/lib/receiptUpload';
+import { BlurView } from 'expo-blur';
 import { setPendingFocusDate } from './space-detail';
 
 import {
@@ -31,7 +33,6 @@ import {
   Radius,
   Spacing,
 } from '@/components/ui';
-import accountStyles from '@/components/ui/accountStyles';
 import formStyles from '@/components/ui/formStyles';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -120,9 +121,16 @@ export default function AddRecordingScreen() {
   // ── Type dropdown ─────────────────────────────────────────────────────────
   const [showTypeModal, setShowTypeModal] = useState(false);
 
+  // ── Sub-type toggles ────────────────────────────────────────────────────
+  const [expenseIsReceivable, setExpenseIsReceivable] = useState(false);
+  const [incomeIsLoan, setIncomeIsLoan]               = useState(false);
+
   // ── Derived ──────────────────────────────────────────────────────────────
-  const isLoanType   = type === 'receivable' || type === 'payable';
-  const isComboType  = type === 'expense_receivable';
+  const effectiveType = type === 'expense' && expenseIsReceivable ? 'expense_receivable'
+                      : type === 'income'  && incomeIsLoan        ? 'payable'
+                      : type;
+  const isLoanType   = effectiveType === 'receivable' || effectiveType === 'payable';
+  const isComboType  = effectiveType === 'expense_receivable';
   const selectedType = TYPES.find(t => t.key === type)!;
 
   // ─── Lifecycle ─────────────────────────────────────────────────────────
@@ -247,6 +255,8 @@ export default function AddRecordingScreen() {
             category_id: selectedCategory?.id || null,
             account_id: selectedAccount?.id || null,
             status: 'paid',
+            is_due: true,
+            person_name: personName.trim() || null,
           }).select('id').single();
           if (expErr) throw expErr;
           // Create receivable linked to expense
@@ -270,28 +280,28 @@ export default function AddRecordingScreen() {
           space_id: spaceId,
           user_id: user!.id,
           name: recName.trim(),
-          type,
+          type: effectiveType,
           amount: parseFloat(amount),
           transaction_date: date,
           notes: notes.trim() || null,
           category_id: selectedCategory?.id || null,
-          account_id: type === 'receivable'
+          account_id: effectiveType === 'receivable'
             ? receiveToAccount?.id || null
             : selectedAccount?.id || null,
-          status: statusMap[type] ?? 'paid',
+          status: statusMap[effectiveType] ?? 'paid',
           person_name: isLoanType ? personName.trim() || null : null,
           is_recurring: isLoanType ? isRecurring : false,
           recurring_frequency: isLoanType && isRecurring ? frequency : null,
           recurring_days: isLoanType && isRecurring && frequency === 'weekly' ? recurringDays : null,
           recurring_date: isLoanType && isRecurring && ['monthly', 'yearly'].includes(frequency)
             ? parseInt(recurringDate) : null,
-          linked_recording_id: type === 'receivable' && linkedExpense ? linkedExpense.id : null,
-          decreased_from_account_id: type === 'receivable' ? decreasedFromAccount?.id || null : null,
-          receive_to_account_id: type === 'receivable' ? receiveToAccount?.id || null : null,
+          linked_recording_id: effectiveType === 'receivable' && linkedExpense ? linkedExpense.id : null,
+          decreased_from_account_id: effectiveType === 'receivable' ? decreasedFromAccount?.id || null : null,
+          receive_to_account_id: effectiveType === 'receivable' ? receiveToAccount?.id || null : null,
         }).select('id').single();
         if (err) throw err;
 
-        if (type === 'receivable' && decreasedFromAccount && newRec) {
+        if (effectiveType === 'receivable' && decreasedFromAccount && newRec) {
           await supabase.from('recordings').insert({
             space_id: spaceId, user_id: user!.id, name: recName.trim(),
             type: 'expense', amount: parseFloat(amount), transaction_date: date,
@@ -350,7 +360,23 @@ export default function AddRecordingScreen() {
   // ─── Render ─────────────────────────────────────────────────────────────
 
   return (
-    <BottomSheet visible onClose={() => router.back()} sub={spaceName?.toLowerCase() ?? ''} title={editId ? 'edit recording' : 'new recording'}>
+    <Modal visible animationType="slide" transparent onRequestClose={() => router.back()}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => router.back()}>
+          <BlurView intensity={40} tint="dark" style={{ flex: 1 }} />
+        </TouchableOpacity>
+        <View style={formStyles.sheet}>
+          {/* Header */}
+          <View style={formStyles.header}>
+            <View>
+              {spaceName ? <Text style={formStyles.headerSub}>{spaceName.toLowerCase()}</Text> : null}
+              <Text style={formStyles.headerTitle}>{editId ? 'edit recording' : 'new recording'}</Text>
+            </View>
+            <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="close" size={20} color="#929090" />
+            </TouchableOpacity>
+          </View>
+          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 32, gap: 8 }} style={{ flex: 1 }}>
 
       {/* ── Receipt reference carousel ── */}
       {receiptPhotos.length > 0 && (
@@ -369,30 +395,32 @@ export default function AddRecordingScreen() {
       {/* ── Error ── */}
       {error ? <Text style={formStyles.errorText}>{error}</Text> : null}
 
-      {/* ── Type selector ── */}
-      <FormLabel>type</FormLabel>
-      <SelectorButton
-        placeholder="select type"
-        onPress={() => setShowTypeModal(true)}
-        hasValue={!!selectedType}
-      >
-        {selectedType && (
-          <View style={s.selectedItem}>
-            <View style={[s.catDot, { backgroundColor: selectedType.color + '33' }]}>
+      {/* ── Core info block ── */}
+      <FormBlock>
+        <FormRow label="type">
+          <TouchableOpacity style={s.typeDropRow} onPress={() => setShowTypeModal(true)} activeOpacity={0.8}>
+            <View style={[s.catDot, { backgroundColor: selectedType.color + '22' }]}>
               <Ionicons name={selectedType.icon as any} size={11} color={selectedType.color} />
             </View>
-            <View>
-              <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted, textTransform: 'uppercase', letterSpacing: 0.6 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontFamily: Fonts.mono, fontSize: 9, color: Colors.muted, textTransform: 'uppercase', letterSpacing: 0.6 }}>
                 {TYPE_GROUPS.find(g => g.types.some((t: any) => t.key === type))?.label}
               </Text>
-              <Text style={s.selectedItemText}>{selectedType.label}</Text>
+              <Text style={{ fontFamily: Fonts.monoBold, fontSize: 13, color: Colors.text }}>{selectedType.label}</Text>
             </View>
-          </View>
+            <Ionicons name="chevron-down" size={13} color={Colors.faint} />
+          </TouchableOpacity>
+        </FormRow>
+        {type === 'expense' && (
+          <FormRow label="receivable?">
+            <Switch value={expenseIsReceivable} onValueChange={setExpenseIsReceivable} trackColor={{ true: Colors.cyan, false: Colors.borderMid }} thumbColor={Colors.white} />
+          </FormRow>
         )}
-      </SelectorButton>
-
-      {/* ── Core info block ── */}
-      <FormBlock style={s.infoBlockSpaced}>
+        {type === 'income' && (
+          <FormRow label="is a loan?">
+            <Switch value={incomeIsLoan} onValueChange={setIncomeIsLoan} trackColor={{ true: Colors.cyan, false: Colors.borderMid }} thumbColor={Colors.white} />
+          </FormRow>
+        )}
         <FormRow label="name">
           <TextInput
             style={s.inlineInput}
@@ -423,147 +451,112 @@ export default function AddRecordingScreen() {
         </FormRow>
       </FormBlock>
 
-      {/* ── Category picker ── */}
-      <FormLabel optional>category</FormLabel>
-      <SelectorButton
-        placeholder="select category"
-        onPress={() => setShowCategoryModal(true)}
-        hasValue={!!selectedCategory}
-        onClear={() => setSelectedCategory(null)}
-      >
-        {selectedCategory && (
-          <View style={s.selectedItem}>
-            <View style={[s.catDot, { backgroundColor: selectedCategory.color }]}>
-              <Ionicons name={selectedCategory.icon} size={11} color={Colors.text} />
-            </View>
-            <Text style={s.selectedItemText}>{selectedCategory.name}</Text>
-          </View>
-        )}
-      </SelectorButton>
-
-      {/* ── Account picker ── */}
-      {type !== 'receivable' && (
-        <>
-          <FormLabel optional>account</FormLabel>
-          <SelectorButton
-            placeholder="select account"
-            onPress={() => setShowAccountModal(true)}
-            hasValue={!!selectedAccount}
-            onClear={() => setSelectedAccount(null)}
-          >
-            {selectedAccount && (
-              <View style={s.selectedItem}>
-                <View style={[s.catDot, { backgroundColor: selectedAccount.color ?? Colors.borderMid }]} />
-                <View>
-                  <Text style={s.selectedItemText}>{selectedAccount.account_name}</Text>
-                  <Text style={s.selectedItemSub}>{selectedAccount.bank}</Text>
+      {/* ── Category + Account block ── */}
+      <FormBlock>
+        <FormRow label="category">
+          <TouchableOpacity style={s.typeDropRow} onPress={() => setShowCategoryModal(true)} activeOpacity={0.8}>
+            {selectedCategory ? (
+              <>
+                <View style={[s.catDot, { backgroundColor: selectedCategory.color }]}>
+                  <Ionicons name={selectedCategory.icon} size={11} color={Colors.text} />
                 </View>
-              </View>
+                <Text style={{ fontFamily: Fonts.mono, fontSize: 13, color: Colors.text, flex: 1 }}>{selectedCategory.name}</Text>
+                <TouchableOpacity onPress={() => setSelectedCategory(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Ionicons name="close" size={13} color={Colors.muted} />
+                </TouchableOpacity>
+              </>
+            ) : (
+              <Text style={{ fontFamily: Fonts.mono, fontSize: 13, color: Colors.faint, flex: 1 }}>optional</Text>
             )}
-          </SelectorButton>
-        </>
-      )}
-
-      {/* ── Notes ── */}
-      <FormLabel optional>notes</FormLabel>
-      <FormInput placeholder="add a note..." value={notes} onChangeText={setNotes} multiline numberOfLines={3} />
+            <Ionicons name="chevron-down" size={13} color={Colors.faint} />
+          </TouchableOpacity>
+        </FormRow>
+        {type !== 'receivable' && (
+          <FormRow label="account">
+            <TouchableOpacity style={s.typeDropRow} onPress={() => setShowAccountModal(true)} activeOpacity={0.8}>
+              {selectedAccount ? (
+                <>
+                  <View style={[s.catDot, { backgroundColor: selectedAccount.color ?? Colors.borderMid }]} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontFamily: Fonts.mono, fontSize: 13, color: Colors.text }}>{selectedAccount.account_name}</Text>
+                    <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted }}>{selectedAccount.bank}</Text>
+                  </View>
+                  <TouchableOpacity onPress={() => setSelectedAccount(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Ionicons name="close" size={13} color={Colors.muted} />
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <Text style={{ fontFamily: Fonts.mono, fontSize: 13, color: Colors.faint, flex: 1 }}>optional</Text>
+              )}
+              <Ionicons name="chevron-down" size={13} color={Colors.faint} />
+            </TouchableOpacity>
+          </FormRow>
+        )}
+      </FormBlock>
 
       {/* ── Loan-type person field ── */}
       {isLoanType && (
-        <>
-          <FormLabel optional>
-            {type === 'payable' ? 'who are you paying?' : 'who owes you?'}
-          </FormLabel>
-          <FormInput placeholder="e.g. john" value={personName} onChangeText={setPersonName} />
-        </>
+        <FormBlock>
+          <FormRow label={type === 'payable' ? 'paying' : 'owes you'}>
+            <TextInput
+              style={s.inlineInput}
+              placeholder="e.g. john"
+              placeholderTextColor={Colors.faint}
+              value={personName}
+              onChangeText={setPersonName}
+            />
+          </FormRow>
+        </FormBlock>
       )}
 
       {/* ── Combo type extra fields ── */}
       {isComboType && (
-        <>
-          <FormLabel optional>who owes you?</FormLabel>
-          <FormInput placeholder="e.g. john" value={personName} onChangeText={setPersonName} />
-          <FormLabel optional>expecting to receive in</FormLabel>
-          <SelectorButton
-            placeholder="select account"
-            onPress={() => setShowReceiveToModal(true)}
-            hasValue={!!receiveToAccount}
-            onClear={() => setReceiveToAccount(null)}
-          >
-            {receiveToAccount && (
-              <View style={s.selectedItem}>
-                <View style={[s.catDot, { backgroundColor: receiveToAccount.color ?? Colors.borderMid }]} />
-                <View>
-                  <Text style={s.selectedItemText}>{receiveToAccount.account_name}</Text>
-                  <Text style={s.selectedItemSub}>{receiveToAccount.bank}</Text>
-                </View>
-              </View>
-            )}
-          </SelectorButton>
-          <Text style={s.hint}>creates an expense + a linked receivable</Text>
-        </>
+        <FormBlock>
+          <FormRow label="owes you">
+            <TextInput style={s.inlineInput} placeholder="e.g. john" placeholderTextColor={Colors.faint} value={personName} onChangeText={setPersonName} />
+          </FormRow>
+        </FormBlock>
       )}
 
-      {/* ── Receivable: link to expense + decreased from + receive to ── */}
+      {/* ── Receivable extra fields ── */}
       {type === 'receivable' && (
-        <>
-          <FormLabel optional>linked expense (optional shortcut)</FormLabel>
-          <SelectorButton
-            placeholder="pick an expense to link"
-            onPress={openExpensePicker}
-            hasValue={!!linkedExpense}
-            onClear={() => { setLinkedExpense(null); }}
-          >
-            {linkedExpense && (
-              <View style={s.selectedItem}>
-                <Ionicons name="receipt-outline" size={14} color={Colors.expense} />
-                <View>
-                  <Text style={s.selectedItemText}>{linkedExpense.name}</Text>
-                  <Text style={s.selectedItemSub}>
-                    {Number(linkedExpense.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })} · {linkedExpense.transaction_date}
-                  </Text>
-                </View>
-              </View>
-            )}
-          </SelectorButton>
-          {linkedExpense && <Text style={s.hint}>this receivable will be linked to that expense</Text>}
-          <FormLabel optional>decreased from (where you lent from)</FormLabel>
-          <SelectorButton
-            placeholder="select account"
-            onPress={() => setShowDecreasedFromModal(true)}
-            hasValue={!!decreasedFromAccount}
-            onClear={() => setDecreasedFromAccount(null)}
-          >
-            {decreasedFromAccount && (
-              <View style={s.selectedItem}>
-                <View style={[s.catDot, { backgroundColor: decreasedFromAccount.color ?? Colors.borderMid }]} />
-                <View>
-                  <Text style={s.selectedItemText}>{decreasedFromAccount.account_name}</Text>
-                  <Text style={s.selectedItemSub}>{decreasedFromAccount.bank}</Text>
-                </View>
-              </View>
-            )}
-          </SelectorButton>
-          {decreasedFromAccount && <Text style={s.hint}>a linked expense will be created automatically</Text>}
-
-          <FormLabel optional>expecting to receive in</FormLabel>
-          <SelectorButton
-            placeholder="select account"
-            onPress={() => setShowReceiveToModal(true)}
-            hasValue={!!receiveToAccount}
-            onClear={() => setReceiveToAccount(null)}
-          >
-            {receiveToAccount && (
-              <View style={s.selectedItem}>
-                <View style={[s.catDot, { backgroundColor: receiveToAccount.color ?? Colors.borderMid }]} />
-                <View>
-                  <Text style={s.selectedItemText}>{receiveToAccount.account_name}</Text>
-                  <Text style={s.selectedItemSub}>{receiveToAccount.bank}</Text>
-                </View>
-              </View>
-            )}
-          </SelectorButton>
-        </>
+        <FormBlock>
+          <FormRow label="linked">
+            <TouchableOpacity style={s.typeDropRow} onPress={openExpensePicker} activeOpacity={0.8}>
+              {linkedExpense ? (
+                <>
+                  <Ionicons name="receipt-outline" size={13} color={Colors.expense} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontFamily: Fonts.mono, fontSize: 13, color: Colors.text }}>{linkedExpense.name}</Text>
+                    <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted }}>{Number(linkedExpense.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })} · {linkedExpense.transaction_date}</Text>
+                  </View>
+                  <TouchableOpacity onPress={() => setLinkedExpense(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Ionicons name="close" size={13} color={Colors.muted} />
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <Text style={{ fontFamily: Fonts.mono, fontSize: 13, color: Colors.faint, flex: 1 }}>link an expense (optional)</Text>
+              )}
+              <Ionicons name="chevron-down" size={13} color={Colors.faint} />
+            </TouchableOpacity>
+          </FormRow>
+          <FormRow label="lent from">
+            <TouchableOpacity style={s.typeDropRow} onPress={() => setShowDecreasedFromModal(true)} activeOpacity={0.8}>
+              {decreasedFromAccount ? (
+                <>
+                  <View style={[s.catDot, { backgroundColor: decreasedFromAccount.color ?? Colors.borderMid }]} />
+                  <Text style={{ fontFamily: Fonts.mono, fontSize: 13, color: Colors.text, flex: 1 }}>{decreasedFromAccount.account_name}</Text>
+                  <TouchableOpacity onPress={() => setDecreasedFromAccount(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Ionicons name="close" size={13} color={Colors.muted} />
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <Text style={{ fontFamily: Fonts.mono, fontSize: 13, color: Colors.faint, flex: 1 }}>optional</Text>
+              )}
+              <Ionicons name="chevron-down" size={13} color={Colors.faint} />
+            </TouchableOpacity>
+          </FormRow>
+        </FormBlock>
       )}
 
       {/* ── Recurring ── */}
@@ -571,24 +564,24 @@ export default function AddRecordingScreen() {
         <>
           <View style={s.switchRow}>
             <View>
-              <Text style={s.switchLabel}>recurring?</Text>
-              <Text style={s.switchSub}>does this repeat on a schedule?</Text>
+              <Text style={s.switchLabel}>recurring</Text>
+              <Text style={s.switchSub}>repeats on a schedule</Text>
             </View>
             <Switch value={isRecurring} onValueChange={setIsRecurring} trackColor={{ true: Colors.cyan }} thumbColor={Colors.white} />
           </View>
           {isRecurring && (
-            <>
-              <FormLabel>frequency</FormLabel>
-              <View style={s.chipRow}>
-                {FREQUENCIES.map(f => (
-                  <TouchableOpacity key={f} style={[s.chip, frequency === f && s.chipActive]} onPress={() => setFrequency(f)}>
-                    <Text style={[s.chipText, frequency === f && s.chipTextActive]}>{f}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+            <FormBlock>
+              <FormRow label="frequency" stacked>
+                <View style={s.chipRow}>
+                  {FREQUENCIES.map(f => (
+                    <TouchableOpacity key={f} style={[s.chip, frequency === f && s.chipActive]} onPress={() => setFrequency(f)}>
+                      <Text style={[s.chipText, frequency === f && s.chipTextActive]}>{f}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </FormRow>
               {frequency === 'weekly' && (
-                <>
-                  <FormLabel>choose days</FormLabel>
+                <FormRow label="days" stacked>
                   <View style={s.chipRow}>
                     {WEEKDAYS.map((day, i) => (
                       <TouchableOpacity key={day} style={[s.chip, recurringDays.includes(i) && s.chipActive]} onPress={() => toggleDay(i)}>
@@ -596,33 +589,55 @@ export default function AddRecordingScreen() {
                       </TouchableOpacity>
                     ))}
                   </View>
-                </>
+                </FormRow>
               )}
               {['monthly', 'yearly'].includes(frequency) && (
-                <>
-                  <FormLabel>day of {frequency === 'monthly' ? 'month' : 'year'}</FormLabel>
-                  <FormInput placeholder={frequency === 'monthly' ? '1-31' : '1-365'} value={recurringDate} onChangeText={setRecurringDate} keyboardType="number-pad" />
-                </>
+                <FormRow label={frequency === 'monthly' ? 'day' : 'day #'}>
+                  <TextInput
+                    style={s.inlineInput}
+                    placeholder={frequency === 'monthly' ? '1–31' : '1–365'}
+                    placeholderTextColor={Colors.faint}
+                    value={recurringDate}
+                    onChangeText={setRecurringDate}
+                    keyboardType="number-pad"
+                  />
+                </FormRow>
               )}
-            </>
+            </FormBlock>
           )}
         </>
       )}
 
+      {/* ── Notes ── */}
+      <FormBlock>
+        <FormRow label="notes" stacked>
+          <TextInput
+            style={[s.inlineInput, { minHeight: 36 }]}
+            placeholder="optional"
+            placeholderTextColor={Colors.faint}
+            value={notes}
+            onChangeText={setNotes}
+            multiline
+          />
+        </FormRow>
+      </FormBlock>
+
       {/* ── Receipt ── */}
-      <FormLabel optional>receipt</FormLabel>
-      <View style={{ flexDirection: 'row', gap: 8 }}>
-        <TouchableOpacity style={s.photoBtn} onPress={addFromCamera}>
-          <Ionicons name="camera-outline" size={16} color={Colors.cyan} />
-          <Text style={s.photoBtnText}>camera</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={s.photoBtn} onPress={addFromGallery}>
-          <Ionicons name="images-outline" size={16} color={Colors.text} />
-          <Text style={[s.photoBtnText, { color: Colors.text }]}>photos</Text>
-        </TouchableOpacity>
+      <View style={s.receiptRow}>
+        <Text style={s.receiptLabel}>receipt</Text>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <TouchableOpacity style={s.photoBtn} onPress={addFromCamera}>
+            <Ionicons name="camera-outline" size={14} color={Colors.cyan} />
+            <Text style={s.photoBtnText}>camera</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={s.photoBtn} onPress={addFromGallery}>
+            <Ionicons name="images-outline" size={14} color={Colors.muted} />
+            <Text style={[s.photoBtnText, { color: Colors.muted }]}>gallery</Text>
+          </TouchableOpacity>
+        </View>
       </View>
       {receiptPhotos.length > 0 && (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 8 }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 8 }} contentContainerStyle={{ gap: 8 }}>
           {receiptPhotos.map((uri, i) => (
             <View key={i} style={s.photoThumbWrap}>
               <Image source={{ uri }} style={s.receiptThumb} resizeMode="cover" />
@@ -674,8 +689,6 @@ export default function AddRecordingScreen() {
       >
         {loading ? <ActivityIndicator color={Colors.white} /> : <Text style={s.saveBtnText}>save recording</Text>}
       </TouchableOpacity>
-
-      {/* ── Type picker modal ── */}
       <BottomSheet visible={showTypeModal} onClose={() => setShowTypeModal(false)} sub="recording" title="select type">
         <ScrollView showsVerticalScrollIndicator={false}>
           {TYPE_GROUPS.map(group => (
@@ -690,7 +703,7 @@ export default function AddRecordingScreen() {
                       ? { backgroundColor: t.color + '22', borderColor: t.color }
                       : { backgroundColor: Colors.surface, borderColor: Colors.border },
                   ]}
-                  onPress={() => { setType(t.key); setIsRecurring(false); setShowTypeModal(false); }}
+                  onPress={() => { setType(t.key); setIsRecurring(false); setExpenseIsReceivable(false); setIncomeIsLoan(false); setShowTypeModal(false); }}
                 >
                   <View style={[s.catDot, { backgroundColor: t.color + '33' }]}>
                     <Ionicons name={t.icon as any} size={13} color={t.color} />
@@ -781,58 +794,50 @@ export default function AddRecordingScreen() {
         <FormActions onCancel={() => setShowExpenseModal(false)} onConfirm={() => setShowExpenseModal(false)} cancelLabel="cancel" confirmLabel="done" />
       </BottomSheet>
 
-    </BottomSheet>
+      </ScrollView>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
   );
 }
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
-  photoThumbWrap: { position: 'relative', marginRight: 8 },
-  photoRemoveBtn: { position: 'absolute', top: -6, right: -6, backgroundColor: Colors.white, borderRadius: 99 },
-  receiptThumb: { width: 72, height: 72, borderRadius: Radius.md },
-  typeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  typeBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    paddingHorizontal: 12, paddingVertical: 7,
-    borderRadius: Radius.pill, borderWidth: 1,
-    borderColor: Colors.borderMid, backgroundColor: Colors.surface,
-  },
-  typeBtnText: { fontFamily: Fonts.mono, fontSize: 11, color: Colors.muted },
-  infoBlockSpaced: { marginTop: 12 },
-  inlineInput: { flex: 1, fontFamily: Fonts.mono, fontSize: 16, color: Colors.text, padding: 0 },
-  amountRow: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 },
-  amountSign: { fontFamily: Fonts.monoBold, fontSize: 16 },
-  selectedItem: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  selectedItemText: { fontFamily: Fonts.mono, fontSize: 16, color: Colors.text },
-  selectedItemSub: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted, marginTop: 1 },
-  catDot: { width: 22, height: 22, borderRadius: 11, justifyContent: 'center', alignItems: 'center' },
-  hint: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.cyan, marginTop: 4 },
+  photoThumbWrap:  { position: 'relative', marginRight: 8 },
+  photoRemoveBtn:  { position: 'absolute', top: -6, right: -6, backgroundColor: Colors.white, borderRadius: 99 },
+  receiptThumb:    { width: 64, height: 64, borderRadius: Radius.md },
+  typeDropRow:     { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  infoBlockSpaced: { marginTop: 0 },
+  inlineInput:     { flex: 1, fontFamily: Fonts.mono, fontSize: 16, color: Colors.text, padding: 0 },
+  amountRow:       { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  amountSign:      { fontFamily: Fonts.monoBold, fontSize: 16 },
+  catDot:          { width: 22, height: 22, borderRadius: 11, justifyContent: 'center', alignItems: 'center' },
   switchRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: 14, marginTop: 8,
+    backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: 14, marginTop: 10,
     borderWidth: 1, borderColor: Colors.border,
   },
-  switchLabel: { fontFamily: Fonts.monoBold, fontSize: 12, color: Colors.text },
-  switchSub: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted, marginTop: 2 },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  chip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: Radius.pill, borderWidth: 1, borderColor: Colors.borderMid, backgroundColor: Colors.surface },
-  chipActive: { backgroundColor: Colors.cyan, borderColor: Colors.cyan },
-  chipText: { fontFamily: Fonts.mono, fontSize: 11, color: Colors.muted },
-  chipTextActive: { color: Colors.white, fontFamily: Fonts.monoBold },
-  photoBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: Radius.pill, borderWidth: 1, borderColor: Colors.borderMid, backgroundColor: Colors.surface },
-  photoBtnText: { fontFamily: Fonts.mono, fontSize: 12, color: Colors.cyan },
-  saveBtn: { backgroundColor: Colors.text, borderRadius: Radius.pill, paddingVertical: 14, alignItems: 'center', marginTop: 16 },
+  switchLabel:     { fontFamily: Fonts.monoBold, fontSize: 12, color: Colors.text },
+  switchSub:       { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted, marginTop: 2 },
+  chipRow:         { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  chip:            { paddingHorizontal: 12, paddingVertical: 7, borderRadius: Radius.pill, borderWidth: 1, borderColor: Colors.borderMid, backgroundColor: Colors.surface },
+  chipActive:      { backgroundColor: Colors.cyan, borderColor: Colors.cyan },
+  chipText:        { fontFamily: Fonts.mono, fontSize: 11, color: Colors.muted },
+  chipTextActive:  { color: Colors.white, fontFamily: Fonts.monoBold },
+  receiptRow:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 14 },
+  receiptLabel:    { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted, textTransform: 'uppercase', letterSpacing: 0.6 },
+  photoBtn:        { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: Radius.pill, borderWidth: 1, borderColor: Colors.borderMid, backgroundColor: Colors.surface },
+  photoBtnText:    { fontFamily: Fonts.mono, fontSize: 11, color: Colors.cyan },
+  saveBtn:         { backgroundColor: Colors.cyan, borderRadius: Radius.pill, paddingVertical: 14, alignItems: 'center', marginTop: 16 },
   saveBtnDisabled: { opacity: 0.4 },
-  saveBtnText: { fontFamily: Fonts.monoBold, fontSize: 13, color: Colors.white },
-
-  // Budget
-  budgetWrap: { gap: 6, padding: 14, backgroundColor: Colors.surface, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.border },
-  budgetLabelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  budgetLabel: { fontFamily: 'ChillaxRegular', fontSize: 11, color: Colors.muted, letterSpacing: 0.3 },
-  budgetValue: { fontFamily: Fonts.monoBold, fontSize: 11, color: Colors.text, letterSpacing: 0.2 },
-  budgetTrack: { height: 6, backgroundColor: Colors.border, borderRadius: Radius.pill, overflow: 'hidden' },
-  budgetFill: { height: '100%', borderRadius: Radius.pill },
-  budgetOver: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.expense, letterSpacing: 0.2 },
+  saveBtnText:     { fontFamily: Fonts.monoBold, fontSize: 13, color: Colors.text },
+  budgetWrap:      { gap: 6, padding: 14, backgroundColor: Colors.surface, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.border, marginTop: 10 },
+  budgetLabelRow:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  budgetLabel:     { fontFamily: 'ChillaxRegular', fontSize: 11, color: Colors.muted, letterSpacing: 0.3 },
+  budgetValue:     { fontFamily: Fonts.monoBold, fontSize: 11, color: Colors.text, letterSpacing: 0.2 },
+  budgetTrack:     { height: 6, backgroundColor: Colors.border, borderRadius: Radius.pill, overflow: 'hidden' },
+  budgetFill:      { height: '100%', borderRadius: Radius.pill },
+  budgetOver:      { fontFamily: Fonts.mono, fontSize: 10, color: Colors.expense, letterSpacing: 0.2 },
 });
 

@@ -31,11 +31,15 @@ export default function SplitBillDetailScreen() {
 
   useEffect(() => {
     Animated.timing(slideAnim, { toValue: 0, duration: 280, useNativeDriver: false }).start();
+    // Load current status
+    supabase.from('split_bills').select('status').eq('id', splitBillId).single()
+      .then(({ data }) => { if (data?.status) setBillStatus(data.status as any); });
   }, []);
 
   const [editNameModal, setEditNameModal] = useState(false);
   const [editNameVal, setEditNameVal]     = useState('');
   const [deleteSplitModal, setDeleteSplitModal] = useState(false);
+  const [billStatus, setBillStatus] = useState<'ongoing' | 'closed'>('ongoing');
 
   const openEditName = () => { setEditNameVal(String(name)); setEditNameModal(true); };
   const saveEditName = async () => {
@@ -59,6 +63,15 @@ export default function SplitBillDetailScreen() {
   };
 
   const confirmDeleteSplitWithRecordings = async () => {
+    // Delete receipt photos linked to this split bill
+    if (linkedReceipt) {
+      const { data: photos } = await supabase.from('receipt_photos').select('storage_path').eq('entry_id', linkedReceipt.id);
+      if (photos && photos.length > 0) {
+        await supabase.storage.from('receipts').remove(photos.map((p: any) => p.storage_path));
+        await supabase.from('receipt_photos').delete().eq('entry_id', linkedReceipt.id);
+      }
+      await supabase.from('receipt_entries').delete().eq('id', linkedReceipt.id);
+    }
     // Delete all recordings created from split bill payments
     await supabase.from('recordings').delete().eq('split_bill_id', splitBillId);
     
@@ -110,6 +123,7 @@ export default function SplitBillDetailScreen() {
   const [addPersonModal, setAddPersonModal] = useState(false);
   const [tagInputVal, setTagInputVal] = useState('');
   const [contacts, setContacts] = useState<string[]>([]);
+  const [contactsVisible, setContactsVisible] = useState(5);
 
   // ── Receipt state ─────────────────────────────────────────────────────────
   const [linkedReceipt, setLinkedReceipt]   = useState<any>(null);
@@ -669,7 +683,201 @@ export default function SplitBillDetailScreen() {
   useEffect(() => {
     if (linkedRecordings.length > 0) loadRecordingReceipts(linkedRecordings);
     else setRecordingReceiptPhotos([]);
-  }, [linkedRecordings]);
+  }, [linkedRecordings.map((lr: any) => lr.recording?.id).join(',')]);
+
+  // ── Mark recording complete (from split bill) ──────────────────────────
+  const [markRecCompleteModal, setMarkRecCompleteModal] = useState(false);
+  const [markRecCompleteLr, setMarkRecCompleteLr]       = useState<any>(null);
+  const [markRecCompleteLoading, setMarkRecCompleteLoading] = useState(false);
+
+  const openMarkRecComplete = (lr: any) => {
+    setMarkRecCompleteLr(lr);
+    setMarkRecCompleteModal(true);
+  };
+
+  const confirmMarkRecComplete = async () => {
+    if (!markRecCompleteLr) return;
+    setMarkRecCompleteLoading(true);
+    const rec = markRecCompleteLr.recording;
+    await supabase.from('recordings').update({ paid_amount: rec.amount, status: 'paid', is_due: true }).eq('id', rec.id);
+    setMarkRecCompleteModal(false);
+    setMarkRecCompleteLr(null);
+    setMarkRecCompleteLoading(false);
+    queryClient.invalidateQueries({ queryKey: ['split-bill-recordings', splitBillId] });
+  };
+
+  // ── Close bill with incomplete recordings ────────────────────────────────
+  const [closeWithIncompleteModal, setCloseWithIncompleteModal] = useState(false);
+  const [incompleteRecs, setIncompleteRecs] = useState<any[]>([]);
+  const [closingLoading, setClosingLoading] = useState(false);
+  const [completeMode, setCompleteMode] = useState<'as-is' | 'full'>('as-is');
+
+  const handleToggleStatus = async () => {
+    if (billStatus === 'closed') {
+      // Reopening — revert recordings back to their actual collected state
+      for (const lr of linkedRecordings) {
+        const rec = lr.recording;
+        if (!rec) continue;
+        // Sum what was actually collected via split bill payments for this recording
+        const { data: returnRecs } = await supabase
+          .from('recordings')
+          .select('amount')
+          .eq('linked_recording_id', rec.id)
+          .eq('split_bill_id', splitBillId)
+          .eq('type', 'return');
+        const actualCollected = (returnRecs ?? []).reduce((s: number, r: any) => s + Number(r.amount), 0);
+        const total = Number(rec.amount);
+        const newStatus = actualCollected <= 0 ? 'unpaid' : actualCollected >= total - 0.01 ? 'paid' : 'partial';
+        await supabase.from('recordings').update({
+          paid_amount: actualCollected,
+          status: newStatus,
+        }).eq('id', rec.id);
+      }
+      await supabase.from('split_bills').update({ status: 'ongoing' }).eq('id', splitBillId);
+      setBillStatus('ongoing');
+      queryClient.invalidateQueries({ queryKey: ['split-bill-recordings', splitBillId] });
+      return;
+    }
+    // Closing — check for incomplete recordings
+    const incomplete = linkedRecordings.filter((lr: any) => {
+      const rec = lr.recording;
+      if (!rec) return false;
+      // Calculate the collectible amount from items assigned to this recording
+      const recItems = items.filter((item: any) => item.recording_id === rec.id);
+      if (recItems.length === 0) return false; // no items linked, skip
+      const collectible = recItems.reduce((s: number, item: any) => {
+        const pp = (item.people ?? []).length > 0 ? Number(item.cost) / item.people.length : 0;
+        return s + pp * (item.people ?? []).length;
+      }, 0);
+      const paid = Number(rec.paid_amount ?? 0);
+      return collectible > 0 && paid < collectible - 0.01;
+    });
+    // Attach collectible amount to each incomplete rec for display
+    const incompleteWithAmounts = incomplete.map((lr: any) => {
+      const rec = lr.recording;
+      const recItems = items.filter((item: any) => item.recording_id === rec.id);
+      const collectible = recItems.reduce((s: number, item: any) => {
+        const pp = (item.people ?? []).length > 0 ? Number(item.cost) / item.people.length : 0;
+        return s + pp * (item.people ?? []).length;
+      }, 0);
+      const paid = Number(rec.paid_amount ?? 0);
+      return { ...lr, collectible, collectedSoFar: paid };
+    });
+    if (incomplete.length > 0) {
+      setIncompleteRecs(incompleteWithAmounts);
+      setCompleteMode('as-is');
+      setCloseWithIncompleteModal(true);
+    } else {
+      await supabase.from('split_bills').update({ status: 'closed' }).eq('id', splitBillId);
+      setBillStatus('closed');
+    }
+  };
+
+  const closeAndCompleteAll = async () => {
+    setClosingLoading(true);
+    const today = new Date().toISOString().split('T')[0];
+    for (const lr of incompleteRecs) {
+      const rec = lr.recording;
+      if (!rec) continue;
+      const currentPaid = Number(rec.paid_amount ?? 0);
+      const fullAmount = Number(rec.amount);
+      if (completeMode === 'full') {
+        const difference = fullAmount - currentPaid;
+        if (difference > 0.01) {
+          // Create a return recording for the uncollected difference
+          await supabase.from('recordings').insert({
+            user_id: userId,
+            space_id: rec.space_id,
+            name: `${rec.name} · manual override`,
+            type: 'return',
+            amount: difference,
+            transaction_date: today,
+            status: 'received',
+            linked_recording_id: rec.id,
+            split_bill_id: splitBillId,
+          });
+        }
+        await supabase.from('recordings').update({
+          paid_amount: fullAmount,
+          status: 'paid',
+          is_due: true,
+        }).eq('id', rec.id);
+      } else {
+        // as-is: just mark paid without changing paid_amount
+        await supabase.from('recordings').update({
+          status: 'paid',
+          is_due: true,
+        }).eq('id', rec.id);
+      }
+    }
+    await supabase.from('split_bills').update({ status: 'closed' }).eq('id', splitBillId);
+    setBillStatus('closed');
+    setCloseWithIncompleteModal(false);
+    setClosingLoading(false);
+    queryClient.invalidateQueries({ queryKey: ['split-bill-recordings', splitBillId] });
+  };
+
+  const closeWithoutCompleting = async () => {
+    await supabase.from('split_bills').update({ status: 'closed' }).eq('id', splitBillId);
+    setBillStatus('closed');
+    setCloseWithIncompleteModal(false);
+  };
+
+  // ── Auto-complete check after payment ────────────────────────────────────
+  const [autoCompleteRecs, setAutoCompleteRecs] = useState<any[]>([]);
+  const [autoCompleteModal, setAutoCompleteModal] = useState(false);
+  const [autoCompleteLoading, setAutoCompleteLoading] = useState(false);
+
+  const checkAutoComplete = (updatedPayments: any[]) => {
+    // For each linked recording, check if total payments from all people cover the recording amount
+    const toComplete: any[] = [];
+    for (const lr of linkedRecordings) {
+      const rec = lr.recording;
+      if (!rec || rec.status === 'paid') continue;
+      // Get items for this recording
+      const recItems = items.filter((item: any) => item.recording_id === rec.id);
+      if (recItems.length === 0) continue;
+      // Build total owed per person for this recording
+      const owedPerPerson: Record<string, number> = {};
+      recItems.forEach((item: any) => {
+        const pp = (item.people ?? []).length > 0 ? Number(item.cost) / item.people.length : 0;
+        (item.people ?? []).forEach((p: string) => { owedPerPerson[p] = (owedPerPerson[p] ?? 0) + pp; });
+      });
+      const totalOwed = Object.values(owedPerPerson).reduce((s, v) => s + v, 0);
+      if (totalOwed <= 0) continue;
+      // Sum all payments credited to this recording
+      const creditedPerPerson: Record<string, number> = {};
+      updatedPayments.forEach((pay: any) => {
+        const personOwed = owedPerPerson[pay.person_name] ?? 0;
+        if (personOwed > 0) {
+          const already = creditedPerPerson[pay.person_name] ?? 0;
+          const credit = Math.min(Number(pay.amount), personOwed - already);
+          if (credit > 0) creditedPerPerson[pay.person_name] = already + credit;
+        }
+      });
+      const totalCredited = Object.values(creditedPerPerson).reduce((s, v) => s + v, 0);
+      if (totalCredited >= totalOwed - 0.01) {
+        toComplete.push(lr);
+      }
+    }
+    if (toComplete.length > 0) {
+      setAutoCompleteRecs(toComplete);
+      setAutoCompleteModal(true);
+    }
+  };
+
+  const confirmAutoComplete = async () => {
+    setAutoCompleteLoading(true);
+    for (const lr of autoCompleteRecs) {
+      const rec = lr.recording;
+      if (rec) {
+        await supabase.from('recordings').update({ paid_amount: rec.amount, status: 'paid', is_due: true }).eq('id', rec.id);
+      }
+    }
+    setAutoCompleteModal(false);
+    setAutoCompleteLoading(false);
+    queryClient.invalidateQueries({ queryKey: ['split-bill-recordings', splitBillId] });
+  };
 
   // ── Mark as paid ───────────────────────────────────────────────────────
   const [markPaidRec, setMarkPaidRec]     = useState<any>(null);
@@ -973,6 +1181,9 @@ export default function SplitBillDetailScreen() {
     setPaymentModal(false);
     refetchPayments();
     queryClient.invalidateQueries({ queryKey: ['split-bill-recordings', splitBillId] });
+    // Check if any recordings are now fully paid by all people
+    const updatedPayments = [...payments, { person_name: paymentPerson, amount }];
+    checkAutoComplete(updatedPayments);
   };
   const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -991,9 +1202,16 @@ export default function SplitBillDetailScreen() {
             <Ionicons name="arrow-back" size={20} color={Colors.text} />
           </TouchableOpacity>
           <Text style={s.title} numberOfLines={1}>{name}</Text>
-          <TouchableOpacity onPress={openEditName} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ padding: 4 }}>
-            <Ionicons name="create-outline" size={16} color={Colors.muted} />
-          </TouchableOpacity>
+          {billStatus === 'closed' && (
+            <View style={{ backgroundColor: Colors.surface, borderRadius: Radius.pill, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: Colors.borderMid }}>
+              <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: Colors.muted, textTransform: 'uppercase', letterSpacing: 0.6 }}>closed</Text>
+            </View>
+          )}
+          {billStatus === 'ongoing' && (
+            <TouchableOpacity onPress={openEditName} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ padding: 4 }}>
+              <Ionicons name="create-outline" size={16} color={Colors.muted} />
+            </TouchableOpacity>
+          )}
           <View style={s.totalBadge}>
             <Text style={s.totalBadgeText}>{fmt(totalAmount)}</Text>
           </View>
@@ -1003,10 +1221,12 @@ export default function SplitBillDetailScreen() {
           <View style={{ height: 8 }} />
           <View style={s.sectionRow}>
             <Text style={s.sectionHeader}>recordings</Text>
-            <TouchableOpacity onPress={openAddRecording} style={s.sectionAddBtn}>
-              <Ionicons name="add" size={12} color={ACCENT_DARK} />
-              <Text style={s.sectionAddText}>add</Text>
-            </TouchableOpacity>
+            {billStatus === 'ongoing' && (
+              <TouchableOpacity onPress={openAddRecording} style={s.sectionAddBtn}>
+                <Ionicons name="add" size={12} color={ACCENT_DARK} />
+                <Text style={s.sectionAddText}>add</Text>
+              </TouchableOpacity>
+            )}
           </View>
           {loadingRecs ? (
             <ActivityIndicator color={ACCENT_DARK} />
@@ -1099,7 +1319,7 @@ export default function SplitBillDetailScreen() {
                   <Text style={[s.recAmount, { color: typeColor(lr.recording?.type ?? '') }]}>
                     {fmt(Number(lr.amount_contributed))}
                   </Text>
-                  {actionable && !isDone && (
+                  {actionable && !isDone && billStatus === 'ongoing' && (
                     <TouchableOpacity
                       onPress={() => openMarkPaid(lr)}
                       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -1108,30 +1328,26 @@ export default function SplitBillDetailScreen() {
                       <Ionicons name="checkmark-circle-outline" size={18} color={ACCENT_DARK} />
                     </TouchableOpacity>
                   )}
-                  {rec?.type === 'expense' && rec?.is_due && rec?.status !== 'paid' && (
+                  {!isDone && billStatus === 'ongoing' && (
                     <TouchableOpacity
-                      onPress={async () => {
-                        await supabase.from('recordings').update({
-                          paid_amount: rec.amount,
-                          status: 'paid',
-                        }).eq('id', rec.id);
-                        queryClient.invalidateQueries({ queryKey: ['split-bill-recordings', splitBillId] });
-                      }}
+                      onPress={() => openMarkRecComplete(lr)}
                       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                       style={{ padding: 4 }}
                     >
                       <Ionicons name="checkmark-done-circle-outline" size={18} color={ACCENT_DARK} />
                     </TouchableOpacity>
                   )}
-                  <TouchableOpacity
-                    onPress={async () => {
-                      await supabase.from('split_bill_recordings').delete().eq('id', lr.id);
-                      queryClient.invalidateQueries({ queryKey: ['split-bill-recordings', splitBillId] });
-                    }}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  >
-                    <Ionicons name="close" size={14} color={Colors.faint} />
-                  </TouchableOpacity>
+                  {billStatus === 'ongoing' && (
+                    <TouchableOpacity
+                      onPress={async () => {
+                        await supabase.from('split_bill_recordings').delete().eq('id', lr.id);
+                        queryClient.invalidateQueries({ queryKey: ['split-bill-recordings', splitBillId] });
+                      }}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Ionicons name="close" size={14} color={Colors.faint} />
+                    </TouchableOpacity>
+                  )}
                 </TouchableOpacity>
                   );
                 })}
@@ -1142,10 +1358,12 @@ export default function SplitBillDetailScreen() {
           <View style={s.divider} />
           <View style={s.sectionRow}>
             <Text style={s.sectionHeader}>people</Text>
-            <TouchableOpacity onPress={() => { setTagInputVal(''); setAddPersonModal(true); }} style={s.sectionAddBtn}>
-              <Ionicons name="add" size={12} color={ACCENT_DARK} />
-              <Text style={s.sectionAddText}>add</Text>
-            </TouchableOpacity>
+            {billStatus === 'ongoing' && (
+              <TouchableOpacity onPress={() => { setTagInputVal(''); setContactsVisible(5); setAddPersonModal(true); }} style={s.sectionAddBtn}>
+                <Ionicons name="add" size={12} color={ACCENT_DARK} />
+                <Text style={s.sectionAddText}>add</Text>
+              </TouchableOpacity>
+            )}
           </View>
           {filledPeople.length === 0 ? (
             <View style={s.emptyWrap}>
@@ -1156,9 +1374,11 @@ export default function SplitBillDetailScreen() {
               {people.map((p: any) => (
                 <View key={p.id} style={s.personChip}>
                   <Text style={s.personChipText}>{p.person_name}</Text>
-                  <TouchableOpacity onPress={() => removePerson(p.id)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-                    <Ionicons name="close" size={11} color={Colors.muted} />
-                  </TouchableOpacity>
+                  {billStatus === 'ongoing' && (
+                    <TouchableOpacity onPress={() => removePerson(p.id)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+                      <Ionicons name="close" size={11} color={Colors.muted} />
+                    </TouchableOpacity>
+                  )}
                 </View>
               ))}
             </View>
@@ -1168,14 +1388,16 @@ export default function SplitBillDetailScreen() {
           <View style={s.divider} />
           <View style={s.sectionRow}>
             <Text style={s.sectionHeader}>items</Text>
-            <TouchableOpacity
-              onPress={openAddItem}
-              style={[s.sectionAddBtn, filledPeople.length === 0 && { opacity: 0.4 }]}
-              disabled={filledPeople.length === 0}
-            >
-              <Ionicons name="add" size={12} color={ACCENT_DARK} />
-              <Text style={s.sectionAddText}>add</Text>
-            </TouchableOpacity>
+            {billStatus === 'ongoing' && (
+              <TouchableOpacity
+                onPress={openAddItem}
+                style={[s.sectionAddBtn, filledPeople.length === 0 && { opacity: 0.4 }]}
+                disabled={filledPeople.length === 0}
+              >
+                <Ionicons name="add" size={12} color={ACCENT_DARK} />
+                <Text style={s.sectionAddText}>add</Text>
+              </TouchableOpacity>
+            )}
           </View>
           {items.length === 0 ? (
             <View style={s.emptyWrap}>
@@ -1200,9 +1422,11 @@ export default function SplitBillDetailScreen() {
                       )}
                     </View>
                     <Text style={[s.itemCost, { color: deduct ? ACCENT_DARK : Colors.text }]}>{deduct ? '-' : ''}{fmt(Number(item.cost))}</Text>
-                    <TouchableOpacity onPress={() => deleteItem(item.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                      <Ionicons name="close" size={14} color={Colors.faint} />
-                    </TouchableOpacity>
+                    {billStatus === 'ongoing' && (
+                      <TouchableOpacity onPress={() => deleteItem(item.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                        <Ionicons name="close" size={14} color={Colors.faint} />
+                      </TouchableOpacity>
+                    )}
                   </TouchableOpacity>
                 );
               })}
@@ -1218,10 +1442,12 @@ export default function SplitBillDetailScreen() {
           <View style={s.divider} />
           <View style={s.sectionRow}>
             <Text style={s.sectionHeader}>receipt</Text>
-            <TouchableOpacity onPress={() => setAddReceiptModal(true)} style={s.sectionAddBtn}>
-              <Ionicons name="add" size={12} color={ACCENT_DARK} />
-              <Text style={s.sectionAddText}>add</Text>
-            </TouchableOpacity>
+            {billStatus === 'ongoing' && (
+              <TouchableOpacity onPress={() => setAddReceiptModal(true)} style={s.sectionAddBtn}>
+                <Ionicons name="add" size={12} color={ACCENT_DARK} />
+                <Text style={s.sectionAddText}>add</Text>
+              </TouchableOpacity>
+            )}
           </View>
           {/* Direct receipts uploaded to this split bill */}
           {linkedReceipt && receiptPhotos.length > 0 ? (
@@ -1291,7 +1517,7 @@ export default function SplitBillDetailScreen() {
                       {/* Name row */}
                       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                         <Text style={[s.recName, { flex: 1 }]}>{p}</Text>
-                        {!fullyPaid && absOwed > 0 && (
+                        {!fullyPaid && absOwed > 0 && billStatus === 'ongoing' && (
                           <TouchableOpacity
                             onPress={() => openPaymentModal(p)}
                             style={{ marginLeft: 10, paddingHorizontal: 10, paddingVertical: 5, backgroundColor: ACCENT + '44', borderRadius: Radius.pill }}
@@ -1402,10 +1628,14 @@ export default function SplitBillDetailScreen() {
             <Text style={s.shareBtnText}>share split bill</Text>
           </TouchableOpacity>
 
-          {/* Delete split bill */}
-          <TouchableOpacity style={[s.shareBtn, { borderColor: Colors.expense, backgroundColor: Colors.expense + '22', marginTop: 12 }]} onPress={() => setDeleteSplitModal(true)} activeOpacity={0.8}>
-            <Ionicons name="trash-outline" size={15} color={Colors.expense} />
-            <Text style={[s.shareBtnText, { color: Colors.expense }]}>delete split bill</Text>
+          {/* Toggle status */}
+          <TouchableOpacity
+            style={[s.shareBtn, { borderColor: ACCENT_DARK, backgroundColor: ACCENT + '22', marginTop: 12 }]}
+            onPress={handleToggleStatus}
+            activeOpacity={0.8}
+          >
+            <Ionicons name={billStatus === 'ongoing' ? 'lock-closed-outline' : 'lock-open-outline'} size={15} color={ACCENT_DARK} />
+            <Text style={s.shareBtnText}>{billStatus === 'ongoing' ? 'mark as closed' : 'mark as ongoing'}</Text>
           </TouchableOpacity>
 
           {/* Delete split bill */}
@@ -1684,22 +1914,42 @@ export default function SplitBillDetailScreen() {
         <Text style={s.contactsLabel}>your contacts</Text>
         <ScrollView style={{ maxHeight: 200 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           {contacts.length === 0 && <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: Colors.faint }}>no contacts saved yet</Text>}
-          {contacts.map((c, i) => {
-            const added = filledPeople.includes(c);
-            return (
-              <TouchableOpacity
-                key={i}
-                style={[s.contactRow, added && { opacity: 0.35 }]}
-                onPress={() => { if (!added) { savePerson(c); } }}
-                disabled={added}
-              >
-                <Text style={s.contactName}>{c}</Text>
-                {added
-                  ? <Ionicons name="checkmark" size={14} color={Colors.faint} />
-                  : <Ionicons name="add" size={14} color={ACCENT_DARK} />}
-              </TouchableOpacity>
+          {(() => {
+            const filtered = contacts.filter(c =>
+              !tagInputVal.trim() || c.toLowerCase().includes(tagInputVal.toLowerCase())
             );
-          })}
+            const visible = filtered.slice(0, contactsVisible);
+            return (
+              <>
+                {visible.map((c, i) => {
+                  const added = filledPeople.includes(c);
+                  return (
+                    <TouchableOpacity
+                      key={i}
+                      style={[s.contactRow, added && { opacity: 0.35 }]}
+                      onPress={() => { if (!added) { savePerson(c); } }}
+                      disabled={added}
+                    >
+                      <Text style={s.contactName}>{c}</Text>
+                      {added
+                        ? <Ionicons name="checkmark" size={14} color={Colors.faint} />
+                        : <Ionicons name="add" size={14} color={ACCENT_DARK} />}
+                    </TouchableOpacity>
+                  );
+                })}
+                {contactsVisible < filtered.length && (
+                  <TouchableOpacity
+                    style={{ paddingVertical: 10, alignItems: 'center' }}
+                    onPress={() => setContactsVisible(prev => prev + 5)}
+                  >
+                    <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: ACCENT_DARK }}>
+                      show {Math.min(5, filtered.length - contactsVisible)} more
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </>
+            );
+          })()}
         </ScrollView>
         <TouchableOpacity style={s.doneBtn} onPress={() => setAddPersonModal(false)} activeOpacity={0.8}>
           <Text style={s.doneBtnText}>done</Text>
@@ -2123,9 +2373,9 @@ export default function SplitBillDetailScreen() {
       </BottomSheet>
 
       {/* Delete split bill modal */}
-      <BottomSheet visible={deleteSplitModal} onClose={() => setDeleteSplitModal(false)} title="delete split bill" height="45%">
+      <BottomSheet visible={deleteSplitModal} onClose={() => setDeleteSplitModal(false)} title="delete split bill" height="55%">
         <Text style={{ fontFamily: Brand.font.mono, fontSize: 13, color: Colors.text, marginBottom: 16 }}>
-          What would you like to do with the payment recordings created from this split bill?
+          What would you like to do with the payment recordings and receipts?
         </Text>
         <TouchableOpacity
           style={[s.doneBtn, { backgroundColor: Colors.surface, marginTop: 0 }]}
@@ -2133,19 +2383,155 @@ export default function SplitBillDetailScreen() {
           activeOpacity={0.8}
         >
           <View style={{ gap: 4, alignItems: 'center' }}>
-            <Text style={[s.doneBtnText, { color: Colors.text }]}>keep recordings</Text>
-            <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: Colors.muted }}>deletes split bill only · keeps all payment recordings</Text>
+            <Text style={[s.doneBtnText, { color: Colors.text }]}>keep recordings &amp; receipts</Text>
+            <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: Colors.muted }}>deletes split bill only</Text>
           </View>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[s.doneBtn, { borderColor: Colors.expense, backgroundColor: Colors.expense + '22' }]}
+          style={[s.doneBtn, { backgroundColor: Colors.surface, marginTop: 8 }]}
+          onPress={async () => {
+            // Delete receipt photos linked to this split bill
+            if (linkedReceipt) {
+              const { data: photos } = await supabase.from('receipt_photos').select('storage_path').eq('entry_id', linkedReceipt.id);
+              if (photos && photos.length > 0) {
+                await supabase.storage.from('receipts').remove(photos.map((p: any) => p.storage_path));
+                await supabase.from('receipt_photos').delete().eq('entry_id', linkedReceipt.id);
+              }
+              await supabase.from('receipt_entries').delete().eq('id', linkedReceipt.id);
+            }
+            confirmDeleteSplit();
+          }}
+          activeOpacity={0.8}
+        >
+          <View style={{ gap: 4, alignItems: 'center' }}>
+            <Text style={[s.doneBtnText, { color: Colors.text }]}>keep recordings, delete receipts</Text>
+            <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: Colors.muted }}>deletes split bill + receipt photos</Text>
+          </View>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[s.doneBtn, { borderColor: Colors.expense, backgroundColor: Colors.expense + '22', marginTop: 8 }]}
           onPress={confirmDeleteSplitWithRecordings}
           activeOpacity={0.8}
         >
           <View style={{ gap: 4, alignItems: 'center' }}>
             <Text style={[s.doneBtnText, { color: Colors.expense }]}>delete everything</Text>
-            <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: Colors.expense + 'CC' }}>deletes split bill + all payment recordings</Text>
+            <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: Colors.expense + 'CC' }}>deletes split bill + recordings + receipts</Text>
           </View>
+        </TouchableOpacity>
+      </BottomSheet>
+
+      {/* Mark recording complete modal */}
+      <BottomSheet visible={markRecCompleteModal} onClose={() => setMarkRecCompleteModal(false)} title="mark as complete" height="40%">
+        {markRecCompleteLr && (() => {
+          const rec = markRecCompleteLr.recording;
+          const paid = Number(rec?.paid_amount ?? 0);
+          const total = Number(rec?.amount ?? 0);
+          const isPartial = paid > 0 && paid < total - 0.01;
+          return (
+            <>
+              <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 14, color: Colors.text, marginBottom: 8 }}>{rec?.name}</Text>
+              {isPartial && (
+                <View style={{ backgroundColor: Colors.surface, borderRadius: Radius.md, padding: 12, marginBottom: 16, gap: 4 }}>
+                  <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: Colors.muted }}>partially collected</Text>
+                  <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 13, color: PEACH }}>{fmt(paid)} of {fmt(total)}</Text>
+                  <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: Colors.muted }}>{fmt(total - paid)} remaining — marking complete will set it as fully paid</Text>
+                </View>
+              )}
+              {!isPartial && (
+                <Text style={{ fontFamily: Brand.font.mono, fontSize: 12, color: Colors.muted, marginBottom: 16 }}>
+                  {paid >= total - 0.01 ? 'fully collected — mark as complete?' : 'mark this recording as fully paid?'}
+                </Text>
+              )}
+              <TouchableOpacity
+                style={[s.doneBtn, { opacity: markRecCompleteLoading ? 0.5 : 1 }]}
+                onPress={confirmMarkRecComplete}
+                disabled={markRecCompleteLoading}
+              >
+                <Text style={s.doneBtnText}>{markRecCompleteLoading ? 'saving...' : 'confirm complete'}</Text>
+              </TouchableOpacity>
+            </>
+          );
+        })()}
+      </BottomSheet>
+
+      {/* Close with incomplete recordings modal */}
+      <BottomSheet visible={closeWithIncompleteModal} onClose={() => setCloseWithIncompleteModal(false)} title="incomplete recordings" height="60%">
+        <Text style={{ fontFamily: Brand.font.mono, fontSize: 12, color: Colors.muted, marginBottom: 12 }}>
+          {incompleteRecs.length} recording{incompleteRecs.length !== 1 ? 's are' : ' is'} not yet fully collected:
+        </Text>
+        <ScrollView style={{ maxHeight: 140 }} showsVerticalScrollIndicator={false}>
+          {incompleteRecs.map((lr: any) => (
+            <View key={lr.id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 10 }}>
+              <Ionicons name="alert-circle-outline" size={14} color={PEACH} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontFamily: Brand.font.mono, fontSize: 13, color: Colors.text }} numberOfLines={1}>{lr.recording?.name}</Text>
+                <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: Colors.muted }}>
+                  {fmt(lr.collectedSoFar)} of {fmt(lr.collectible)} collected
+                </Text>
+              </View>
+              <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 11, color: PEACH }}>{fmt(lr.collectible - lr.collectedSoFar)} left</Text>
+            </View>
+          ))}
+        </ScrollView>
+        <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.6, textTransform: 'uppercase', marginTop: 16, marginBottom: 8 }}>mark recordings as</Text>
+        <View style={{ gap: 8 }}>
+          {(['as-is', 'full'] as const).map(m => (
+            <TouchableOpacity
+              key={m}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: Radius.md, borderWidth: 1, borderColor: completeMode === m ? ACCENT_DARK : Colors.borderMid, backgroundColor: completeMode === m ? ACCENT + '22' : Colors.surface }}
+              onPress={() => setCompleteMode(m)}
+            >
+              <Ionicons name={completeMode === m ? 'radio-button-on' : 'radio-button-off'} size={16} color={completeMode === m ? ACCENT_DARK : Colors.muted} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 13, color: completeMode === m ? ACCENT_DARK : Colors.text }}>
+                  {m === 'as-is' ? 'as is (default)' : 'full amount'}
+                </Text>
+                <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: Colors.muted }}>
+                  {m === 'as-is' ? 'keep current collected amount, mark as paid' : 'set paid amount to full recording amount'}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <TouchableOpacity
+          style={[s.doneBtn, { marginTop: 16, opacity: closingLoading ? 0.5 : 1 }]}
+          onPress={closeAndCompleteAll}
+          disabled={closingLoading}
+        >
+          <Text style={s.doneBtnText}>{closingLoading ? 'saving...' : 'complete all & close'}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[s.doneBtn, { backgroundColor: Colors.surface, marginTop: 8 }]}
+          onPress={closeWithoutCompleting}
+        >
+          <Text style={[s.doneBtnText, { color: Colors.muted }]}>close without completing</Text>
+        </TouchableOpacity>
+      </BottomSheet>
+
+      {/* Auto-complete prompt after payment */}
+      <BottomSheet visible={autoCompleteModal} onClose={() => setAutoCompleteModal(false)} title="recordings fully paid" height="50%">
+        <Text style={{ fontFamily: Brand.font.mono, fontSize: 12, color: Colors.muted, marginBottom: 12 }}>
+          all people have paid for the following recording{autoCompleteRecs.length !== 1 ? 's' : ''}. mark as complete?
+        </Text>
+        {autoCompleteRecs.map((lr: any) => (
+          <View key={lr.id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 10 }}>
+            <Ionicons name="checkmark-circle-outline" size={14} color={ACCENT_DARK} />
+            <Text style={{ fontFamily: Brand.font.mono, fontSize: 13, color: Colors.text, flex: 1 }} numberOfLines={1}>{lr.recording?.name}</Text>
+            <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 11, color: ACCENT_DARK }}>{fmt(Number(lr.recording?.amount ?? 0))}</Text>
+          </View>
+        ))}
+        <TouchableOpacity
+          style={[s.doneBtn, { marginTop: 16, opacity: autoCompleteLoading ? 0.5 : 1 }]}
+          onPress={confirmAutoComplete}
+          disabled={autoCompleteLoading}
+        >
+          <Text style={s.doneBtnText}>{autoCompleteLoading ? 'saving...' : 'mark as complete'}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[s.doneBtn, { backgroundColor: Colors.surface, marginTop: 8 }]}
+          onPress={() => setAutoCompleteModal(false)}
+        >
+          <Text style={[s.doneBtnText, { color: Colors.muted }]}>not yet</Text>
         </TouchableOpacity>
       </BottomSheet>
 

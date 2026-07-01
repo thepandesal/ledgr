@@ -46,7 +46,7 @@ export default function BottomSheet({ visible, onClose, sub, title, height, chil
         <TouchableOpacity style={s.flex} activeOpacity={1} onPress={onClose} />
 
         {/* Sheet */}
-        <View style={[formStyles.sheet, height ? { height } : undefined]}>
+        <View style={[formStyles.sheet, height ? { height, maxHeight: height } : undefined]}>
           <View style={formStyles.header}>
             <View>
               {sub ? <Text style={formStyles.headerSub}>{sub}</Text> : null}
