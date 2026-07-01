@@ -1,6 +1,6 @@
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView,
-  TextInput, ActivityIndicator, Alert, Image, Dimensions, Modal,
+  TextInput, ActivityIndicator, Alert, Image, Dimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../../src/lib/supabase';
@@ -11,6 +11,7 @@ import { useUser } from '../../../src/hooks/useUser';
 import type { Account } from '../../../src/types';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
+import { cropEvents } from '../../../src/lib/cropEvents';
 import BottomSheet from '@/components/ui/BottomSheet';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import { Colors, Fonts, Radius, Spacing } from '@/components/ui/theme';
@@ -121,87 +122,6 @@ export default function AccountsScreen() {
   );
 }
 
-// ─── CropView (Croppie on web) ───────────────────────────────────────────────────────
-
-function CropView({ uri, onCrop, onCancel }: { uri: string; onCrop: (base64: string) => void; onCancel: () => void }) {
-  const containerRef = useRef<any>(null);
-  const croppieRef = useRef<any>(null);
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    // Load Croppie CSS
-    if (!document.getElementById('croppie-css')) {
-      const link = document.createElement('link');
-      link.id = 'croppie-css';
-      link.rel = 'stylesheet';
-      link.href = 'https://cdnjs.cloudflare.com/ajax/libs/croppie/2.6.5/croppie.min.css';
-      document.head.appendChild(link);
-    }
-
-    const initCroppie = () => {
-      if (!containerRef.current || !(window as any).Croppie) return;
-      const size = Math.min(SW, SH) * 0.8;
-      croppieRef.current = new (window as any).Croppie(containerRef.current, {
-        viewport: { width: size * 0.7, height: size * 0.7, type: 'square' },
-        boundary: { width: size, height: size },
-        showZoomer: true,
-        enableOrientation: true,
-      });
-      croppieRef.current.bind({ url: uri }).then(() => setReady(true));
-    };
-
-    if ((window as any).Croppie) {
-      initCroppie();
-    } else {
-      const script = document.createElement('script');
-      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/croppie/2.6.5/croppie.min.js';
-      script.onload = initCroppie;
-      document.head.appendChild(script);
-    }
-
-    return () => {
-      if (croppieRef.current) {
-        try { croppieRef.current.destroy(); } catch (_) {}
-        croppieRef.current = null;
-      }
-    };
-  }, [uri]);
-
-  const doCrop = async () => {
-    if (!croppieRef.current) return;
-    const result = await croppieRef.current.result({ type: 'base64', size: { width: 600, height: 600 }, format: 'jpeg', quality: 0.9 });
-    onCrop(result);
-  };
-
-  if (typeof window === 'undefined') return null;
-
-  return (
-    <View style={{ flex: 1, backgroundColor: '#111', justifyContent: 'center', alignItems: 'center' }}>
-      {/* Croppie container */}
-      <div ref={containerRef} style={{ width: Math.min(SW, SH) * 0.8, height: Math.min(SW, SH) * 0.8 }} />
-
-      {/* Buttons */}
-      <View style={{ flexDirection: 'row', gap: 12, marginTop: 24 }}>
-        <TouchableOpacity
-          onPress={onCancel}
-          style={{ paddingVertical: 12, paddingHorizontal: 24, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.15)' }}
-        >
-          <Text style={{ fontFamily: Fonts.mono, fontSize: 14, color: '#fff' }}>cancel</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={doCrop}
-          style={{ paddingVertical: 12, paddingHorizontal: 32, borderRadius: 999, backgroundColor: ACCENT, opacity: ready ? 1 : 0.4 }}
-          disabled={!ready}
-        >
-          <Text style={{ fontFamily: Fonts.monoBold, fontSize: 14, color: '#000' }}>save crop</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-}
-
 // ─── AccountForm ─────────────────────────────────────────────────────────────
 
 function AccountForm({ visible, userId, initial, onClose, onSaved }: {
@@ -213,7 +133,6 @@ function AccountForm({ visible, userId, initial, onClose, onSaved }: {
   const [accountName, setAccountName] = useState(initial?.account_name ?? '');
   const [accountNumber, setAccountNumber] = useState(initial?.account_number ?? '');
   const [qrCode, setQrCode] = useState<string | null>(initial?.qr_code ?? null);
-  const [cropUri, setCropUri] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -233,11 +152,16 @@ function AccountForm({ visible, userId, initial, onClose, onSaved }: {
     setSuggestions(val.trim() ? DEFAULT_BANKS.filter(b => b.toLowerCase().includes(val.toLowerCase())) : []);
   };
 
+  const router = useRouter();
+
   const pickQR = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') { Alert.alert('Permission needed', 'Please allow photo access.'); return; }
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: false, quality: 1 });
-    if (!result.canceled && result.assets[0]) setCropUri(result.assets[0].uri);
+    if (!result.canceled && result.assets[0]) {
+      cropEvents.on((b64) => { setQrCode(b64); cropEvents.off(); });
+      router.push({ pathname: '/(app)/crop-qr', params: { uri: result.assets[0].uri } } as any);
+    }
   };
 
   const handleSubmit = async () => {
@@ -254,11 +178,6 @@ function AccountForm({ visible, userId, initial, onClose, onSaved }: {
 
   return (
     <>
-      <Modal visible={!!cropUri} transparent={false} animationType="slide" onRequestClose={() => setCropUri(null)}>
-        {cropUri && (
-          <CropView uri={cropUri} onCrop={(b64) => { setQrCode(b64); setCropUri(null); }} onCancel={() => setCropUri(null)} />
-        )}
-      </Modal>
       <BottomSheet visible={visible} onClose={onClose} title={initial ? 'edit account' : 'new account'} height="60%">
         <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           {error ? <Text style={f.error}>{error}</Text> : null}
