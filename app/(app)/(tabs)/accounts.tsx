@@ -1,11 +1,12 @@
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView,
-  TextInput, ActivityIndicator, Alert, Image,
+  TextInput, ActivityIndicator, Alert, Animated, Image,
+  PanResponder, Dimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../../src/lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useState, useContext } from 'react';
+import { useEffect, useRef, useState, useContext } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useUser } from '../../../src/hooks/useUser';
 import type { Account } from '../../../src/types';
@@ -16,7 +17,11 @@ import ConfirmModal from '@/components/ui/ConfirmModal';
 import { Colors, Fonts, Radius, Spacing } from '@/components/ui/theme';
 import { BlurContext } from '../../../src/lib/BlurContext';
 
+const { width: SW, height: SH } = Dimensions.get('window');
 const DEFAULT_BANKS = ['BDO', 'BPI', 'Metrobank', 'UnionBank', 'Security Bank', 'PNB', 'Landbank', 'RCBC', 'Chinabank', 'EastWest', 'GCash', 'Maya', 'Seabank', 'GoTyme', 'Tonik'];
+const MIN_CROP = 80;
+const INIT_CROP = Math.min(SW, SH) * 0.7;
+const HANDLE_HIT = 32;
 const ACCENT      = '#B6E1DE'; // prev: #96D7D4
 const ACCENT_TEXT = '#101514';
 
@@ -117,6 +122,133 @@ export default function AccountsScreen() {
   );
 }
 
+// ─── CropView ─────────────────────────────────────────────────────────────
+
+function CropView({ uri, onCrop, onCancel }: { uri: string; onCrop: (base64: string) => void; onCancel: () => void }) {
+  const [imgNatural, setImgNatural] = useState({ w: 1, h: 1 });
+  const [rendered, setRendered] = useState({ x: 0, y: 0, w: SW, h: SH });
+  const initSize = INIT_CROP;
+  const initX = (SW - initSize) / 2;
+  const initY = (SH - initSize) / 2;
+
+  const boxRef = useRef({ x: initX, y: initY, s: initSize });
+  const animX = useRef(new Animated.Value(initX)).current;
+  const animY = useRef(new Animated.Value(initY)).current;
+  const animS = useRef(new Animated.Value(initSize)).current;
+
+  useEffect(() => {
+    Image.getSize(uri, (w, h) => {
+      setImgNatural({ w, h });
+      // Compute how the image is rendered with resizeMode="contain"
+      const imgRatio = w / h;
+      const screenRatio = SW / SH;
+      let rw, rh, rx, ry;
+      if (imgRatio > screenRatio) {
+        rw = SW; rh = SW / imgRatio; rx = 0; ry = (SH - rh) / 2;
+      } else {
+        rh = SH; rw = SH * imgRatio; rx = (SW - rw) / 2; ry = 0;
+      }
+      setRendered({ x: rx, y: ry, w: rw, h: rh });
+      // Center crop box on the image
+      const s = Math.min(rw, rh) * 0.7;
+      const x = rx + (rw - s) / 2;
+      const y = ry + (rh - s) / 2;
+      boxRef.current = { x, y, s };
+      animX.setValue(x);
+      animY.setValue(y);
+      animS.setValue(s);
+    });
+  }, [uri]);
+
+  const mode = useRef<'move' | 'resize' | null>(null);
+  const startBox = useRef(boxRef.current);
+
+  const pan = useRef(PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: () => true,
+    onPanResponderGrant: (e) => {
+      startBox.current = { ...boxRef.current };
+      const { locationX, locationY } = e.nativeEvent;
+      mode.current = (locationX > startBox.current.s - HANDLE_HIT && locationY > startBox.current.s - HANDLE_HIT) ? 'resize' : 'move';
+    },
+    onPanResponderMove: (_, gs) => {
+      const b = startBox.current;
+      if (mode.current === 'move') {
+        animX.setValue(Math.max(0, Math.min(SW - b.s, b.x + gs.dx)));
+        animY.setValue(Math.max(0, Math.min(SH - b.s, b.y + gs.dy)));
+      } else {
+        animS.setValue(Math.max(MIN_CROP, Math.min(Math.min(SW - b.x, SH - b.y), b.s + gs.dx)));
+      }
+    },
+    onPanResponderRelease: (_, gs) => {
+      const b = startBox.current;
+      const newBox = mode.current === 'move'
+        ? { x: Math.max(0, Math.min(SW - b.s, b.x + gs.dx)), y: Math.max(0, Math.min(SH - b.s, b.y + gs.dy)), s: b.s }
+        : { ...b, s: Math.max(MIN_CROP, Math.min(Math.min(SW - b.x, SH - b.y), b.s + gs.dx)) };
+      boxRef.current = newBox;
+      mode.current = null;
+    },
+  })).current;
+
+  const doCrop = async () => {
+    const { x: cx, y: cy, s: cs } = boxRef.current;
+    const { w: iw, h: ih } = imgNatural;
+    const { x: rx, y: ry, w: rw, h: rh } = rendered;
+    // Map screen crop box to natural image coordinates
+    const scaleX = iw / rw;
+    const scaleY = ih / rh;
+    const originX = Math.max(0, (cx - rx) * scaleX);
+    const originY = Math.max(0, (cy - ry) * scaleY);
+    const cropW = Math.min(iw - originX, cs * scaleX);
+    const cropH = Math.min(ih - originY, cs * scaleY);
+    const result = await ImageManipulator.manipulateAsync(
+      uri,
+      [{ crop: { originX, originY, width: cropW, height: cropH } }, { resize: { width: 600, height: 600 } }],
+      { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+    );
+    onCrop(`data:image/jpeg;base64,${result.base64}`);
+  };
+
+  return (
+    <View style={{ flex: 1, backgroundColor: '#000' }}>
+      <Image source={{ uri }} style={{ position: 'absolute', top: 0, left: 0, width: SW, height: SH }} resizeMode="contain" />
+      <Animated.View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: animY, backgroundColor: 'rgba(0,0,0,0.6)' }} pointerEvents="none" />
+      <Animated.View style={{ position: 'absolute', top: animY, width: animX, height: animS, backgroundColor: 'rgba(0,0,0,0.6)' }} pointerEvents="none" />
+      <Animated.View style={{ position: 'absolute', top: animY, left: Animated.add(animX, animS), right: 0, height: animS, backgroundColor: 'rgba(0,0,0,0.6)' }} pointerEvents="none" />
+      <Animated.View style={{ position: 'absolute', top: Animated.add(animY, animS), left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)' }} pointerEvents="none" />
+      <Animated.View style={{ position: 'absolute', left: animX, top: animY, width: animS, height: animS, borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' }} {...pan.panHandlers}>
+        {[0,1,2,3].map(i => {
+          const corners = [
+            { top: 0, left: 0, borderRightWidth: 0, borderBottomWidth: 0 },
+            { top: 0, right: 0, borderLeftWidth: 0, borderBottomWidth: 0 },
+            { bottom: 0, left: 0, borderRightWidth: 0, borderTopWidth: 0 },
+            { bottom: 0, right: 0, borderLeftWidth: 0, borderTopWidth: 0 },
+          ];
+          return <View key={i} style={[{ position: 'absolute', width: 22, height: 22, borderColor: ACCENT, borderWidth: 2.5 }, corners[i]]} />;
+        })}
+        <View style={{ position: 'absolute', bottom: 6, right: 6 }}>
+          <Ionicons name="resize-outline" size={12} color="rgba(255,255,255,0.6)" />
+        </View>
+      </Animated.View>
+      {/* Bottom save button — always visible */}
+      <TouchableOpacity
+        style={{ position: 'absolute', bottom: 48, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: ACCENT, borderRadius: 999, paddingVertical: 14, paddingHorizontal: 32 }}
+        onPress={doCrop}
+      >
+        <Ionicons name="checkmark-circle" size={18} color="#000" />
+        <Text style={{ fontFamily: Fonts.monoBold, fontSize: 14, color: '#000' }}>save crop</Text>
+      </TouchableOpacity>
+      <View style={{ position: 'absolute', top: 52, left: 0, right: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24 }}>
+        <TouchableOpacity onPress={onCancel} style={{ width: 44, height: 44, justifyContent: 'center', alignItems: 'center' }}>
+          <Ionicons name="close" size={24} color="#fff" />
+        </TouchableOpacity>
+        <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: 'rgba(255,255,255,0.6)' }}>drag to move · corner to resize</Text>
+        <View style={{ width: 44 }} />
+      </View>
+    </View>
+  );
+}
+
 // ─── AccountForm ─────────────────────────────────────────────────────────────
 
 function AccountForm({ visible, userId, initial, onClose, onSaved }: {
@@ -128,6 +260,7 @@ function AccountForm({ visible, userId, initial, onClose, onSaved }: {
   const [accountName, setAccountName] = useState(initial?.account_name ?? '');
   const [accountNumber, setAccountNumber] = useState(initial?.account_number ?? '');
   const [qrCode, setQrCode] = useState<string | null>(initial?.qr_code ?? null);
+  const [cropUri, setCropUri] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -150,27 +283,8 @@ function AccountForm({ visible, userId, initial, onClose, onSaved }: {
   const pickQR = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') { Alert.alert('Permission needed', 'Please allow photo access.'); return; }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 1,
-      base64: true,
-    });
-    if (!result.canceled && result.assets[0]) {
-      const asset = result.assets[0];
-      if (asset.base64) {
-        setQrCode(`data:image/jpeg;base64,${asset.base64}`);
-      } else {
-        // fallback: resize via manipulator
-        const manipulated = await ImageManipulator.manipulateAsync(
-          asset.uri,
-          [{ resize: { width: 600, height: 600 } }],
-          { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG, base64: true }
-        );
-        setQrCode(`data:image/jpeg;base64,${manipulated.base64}`);
-      }
-    }
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: false, quality: 1 });
+    if (!result.canceled && result.assets[0]) setCropUri(result.assets[0].uri);
   };
 
   const handleSubmit = async () => {
@@ -187,6 +301,11 @@ function AccountForm({ visible, userId, initial, onClose, onSaved }: {
 
   return (
     <BottomSheet visible={visible} onClose={onClose} title={initial ? 'edit account' : 'new account'} height="60%">
+      {cropUri ? (
+        <View style={StyleSheet.absoluteFill}>
+          <CropView uri={cropUri} onCrop={(b64) => { setQrCode(b64); setCropUri(null); }} onCancel={() => setCropUri(null)} />
+        </View>
+      ) : (
         <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           {error ? <Text style={f.error}>{error}</Text> : null}
 
@@ -232,6 +351,7 @@ function AccountForm({ visible, userId, initial, onClose, onSaved }: {
             {loading ? <ActivityIndicator color={Colors.white} /> : <Text style={f.saveBtnText}>{initial ? 'save changes' : 'add account'}</Text>}
           </TouchableOpacity>
         </ScrollView>
+      )}
     </BottomSheet>
   );
 }

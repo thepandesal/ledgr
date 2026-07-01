@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Image, TouchableOpacity, Modal, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Image, TouchableOpacity, Modal, TextInput, useWindowDimensions } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../../src/lib/supabase';
@@ -186,6 +186,8 @@ export default function SplitShareSlugPage() {
     ? new Date(recording.transaction_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
     : '';
   const grandTotal = perPerson.reduce((sum, p) => sum + p.total, 0);
+  const { width: screenW } = useWindowDimensions();
+  const qrSize = screenW * 0.9;
 
   return (
     <>
@@ -355,7 +357,7 @@ export default function SplitShareSlugPage() {
       <Modal visible={qrModal} transparent animationType="fade" onRequestClose={() => setQrModal(false)}>
         <BlurView intensity={60} tint="dark" style={s.overlay}>
           <TouchableOpacity style={s.overlay} activeOpacity={1} onPress={() => { setQrModal(false); setQrModalAcc(null); }}>
-            <Image source={{ uri: qrModalAcc?.qr_code ?? '' }} style={s.qrLarge} resizeMode="contain" />
+            <Image source={{ uri: qrModalAcc?.qr_code ?? '' }} style={[s.qrLarge, { width: qrSize, height: qrSize }]} resizeMode="contain" />
             <Text style={s.qrTap}>tap anywhere to close</Text>
           </TouchableOpacity>
         </BlurView>
@@ -400,6 +402,6 @@ const s = StyleSheet.create({
   urlInput: { flex: 1, fontFamily: Brand.font.mono, fontSize: 12, color: Colors.text, paddingVertical: 10 },
   footer: { fontFamily: Brand.font.mono, fontSize: 10, color: Colors.faint, textAlign: 'center', marginTop: 8 },
   overlay: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  qrLarge: { width: '90%' as any, height: undefined, aspectRatio: 1, borderRadius: Radius.lg },
+  qrLarge: { borderRadius: Radius.lg },
   qrTap:   { fontFamily: Brand.font.mono, fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 16 },
 });
