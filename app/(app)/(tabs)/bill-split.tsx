@@ -33,6 +33,8 @@ export default function BillSplitScreen() {
   const [error, setError] = useState('');
   const [menuModal, setMenuModal] = useState(false);
   const [selected, setSelected] = useState<SplitBillRow | null>(null);
+  const [displayCount, setDisplayCount] = useState(10);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   const { data: bills = [], isLoading } = useQuery<SplitBillRow[]>({
     queryKey: ['split-bills', userId],
@@ -70,6 +72,7 @@ export default function BillSplitScreen() {
     setLoading(false);
     setCreateModal(false);
     setBillName('');
+    setDisplayCount(10);
     router.push({ pathname: '/(app)/split-bill-detail', params: { splitBillId: data.id, name: billName.trim() } } as any);
   };
 
@@ -82,9 +85,31 @@ export default function BillSplitScreen() {
 
   const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+  const paginatedBills = bills.slice(0, displayCount);
+  const hasMore = displayCount < bills.length;
+
+  const handleScroll = (event: any) => {
+    const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
+    const paddingToBottom = 20;
+    const isCloseToBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom;
+    
+    if (isCloseToBottom && hasMore && !isLoadingMore) {
+      setIsLoadingMore(true);
+      setTimeout(() => {
+        setDisplayCount(prev => prev + 10);
+        setIsLoadingMore(false);
+      }, 300);
+    }
+  };
+
   return (
     <SafeAreaView style={s.container}>
-      <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        contentContainerStyle={s.scroll} 
+        showsVerticalScrollIndicator={false}
+        onScroll={handleScroll}
+        scrollEventThrottle={400}
+      >
 
         {isLoading ? (
           <ActivityIndicator color={Brand.color.accent} style={{ marginTop: 40 }} />
@@ -95,7 +120,7 @@ export default function BillSplitScreen() {
           </View>
         ) : (
           <View style={s.list}>
-            {bills.map(bill => (
+            {paginatedBills.map(bill => (
               <TouchableOpacity
                 key={bill.id}
                 style={s.card}
@@ -117,6 +142,15 @@ export default function BillSplitScreen() {
                 </TouchableOpacity>
               </TouchableOpacity>
             ))}
+            {hasMore && (
+              <View style={s.loadMoreWrap}>
+                {isLoadingMore ? (
+                  <ActivityIndicator color={Brand.color.accent} size="small" />
+                ) : (
+                  <Text style={s.loadMoreText}>scroll for more</Text>
+                )}
+              </View>
+            )}
           </View>
         )}
 
@@ -171,6 +205,9 @@ const s = StyleSheet.create({
   cardName:    { ...Brand.type.cardTitle },
   cardMeta:    { ...Brand.type.cardMeta },
   cardAmount:  { ...Brand.type.cardAmount, color: Brand.color.headerText },
+
+  loadMoreWrap: { alignItems: 'center', paddingVertical: 20 },
+  loadMoreText: { fontFamily: Brand.font.mono, fontSize: 11, color: Colors.muted },
 
   error:       { ...Brand.type.cardMeta, color: Colors.expense, marginBottom: 8 },
   label:       { ...Brand.type.modalLabel, marginBottom: 6, marginTop: 14 },

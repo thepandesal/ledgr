@@ -35,6 +35,7 @@ export default function SplitBillDetailScreen() {
 
   const [editNameModal, setEditNameModal] = useState(false);
   const [editNameVal, setEditNameVal]     = useState('');
+  const [deleteSplitModal, setDeleteSplitModal] = useState(false);
 
   const openEditName = () => { setEditNameVal(String(name)); setEditNameModal(true); };
   const saveEditName = async () => {
@@ -42,6 +43,60 @@ export default function SplitBillDetailScreen() {
     await supabase.from('split_bills').update({ name: editNameVal.trim() }).eq('id', splitBillId);
     setEditNameModal(false);
     router.setParams({ name: editNameVal.trim() });
+  };
+
+  const confirmDeleteSplit = async () => {
+    await Promise.all([
+      supabase.from('bill_splits').delete().eq('split_bill_id', splitBillId),
+      supabase.from('split_items').delete().eq('split_bill_id', splitBillId),
+      supabase.from('split_bill_recordings').delete().eq('split_bill_id', splitBillId),
+      supabase.from('split_bill_payments').delete().eq('split_bill_id', splitBillId),
+      supabase.from('split_shares').delete().eq('split_bill_id', splitBillId),
+      supabase.from('split_bills').delete().eq('id', splitBillId),
+    ]);
+    setDeleteSplitModal(false);
+    router.back();
+  };
+
+  const confirmDeleteSplitWithRecordings = async () => {
+    // Delete all recordings created from split bill payments
+    await supabase.from('recordings').delete().eq('split_bill_id', splitBillId);
+    
+    // Also need to reverse paid_amount on parent recordings
+    const { data: paymentRecordings } = await supabase
+      .from('recordings')
+      .select('linked_recording_id, amount')
+      .eq('split_bill_id', splitBillId)
+      .not('linked_recording_id', 'is', null);
+    
+    if (paymentRecordings && paymentRecordings.length > 0) {
+      const creditByParent: Record<string, number> = {};
+      paymentRecordings.forEach((rec: any) => {
+        if (rec.linked_recording_id) {
+          creditByParent[rec.linked_recording_id] = (creditByParent[rec.linked_recording_id] ?? 0) + Number(rec.amount);
+        }
+      });
+      
+      for (const [parentId, creditToReverse] of Object.entries(creditByParent)) {
+        const { data: parent } = await supabase
+          .from('recordings')
+          .select('paid_amount, amount, status')
+          .eq('id', parentId)
+          .single();
+        if (parent) {
+          const newPaid = Math.max(0, Number(parent.paid_amount ?? 0) - creditToReverse);
+          const wasFullyPaid = parent.status === 'paid';
+          const stillFullyPaid = newPaid >= Number(parent.amount) - 0.01;
+          await supabase.from('recordings').update({
+            paid_amount: newPaid,
+            ...(wasFullyPaid && !stillFullyPaid ? { status: 'unpaid' } : {}),
+          }).eq('id', parentId);
+        }
+      }
+    }
+    
+    // Then delete the split bill itself
+    await confirmDeleteSplit();
   };
 
   const handleBack = () => {
@@ -1344,6 +1399,18 @@ export default function SplitBillDetailScreen() {
             <Text style={s.shareBtnText}>share split bill</Text>
           </TouchableOpacity>
 
+          {/* Delete split bill */}
+          <TouchableOpacity style={[s.shareBtn, { borderColor: Colors.expense, backgroundColor: Colors.expense + '22', marginTop: 12 }]} onPress={() => setDeleteSplitModal(true)} activeOpacity={0.8}>
+            <Ionicons name="trash-outline" size={15} color={Colors.expense} />
+            <Text style={[s.shareBtnText, { color: Colors.expense }]}>delete split bill</Text>
+          </TouchableOpacity>
+
+          {/* Delete split bill */}
+          <TouchableOpacity style={[s.shareBtn, { borderColor: Colors.expense, backgroundColor: Colors.expense + '22', marginTop: 12 }]} onPress={() => setDeleteSplitModal(true)} activeOpacity={0.8}>
+            <Ionicons name="trash-outline" size={15} color={Colors.expense} />
+            <Text style={[s.shareBtnText, { color: Colors.expense }]}>delete split bill</Text>
+          </TouchableOpacity>
+
           <View style={{ height: 20 }} />
         </ScrollView>
       </SafeAreaView>
@@ -2050,6 +2117,33 @@ export default function SplitBillDetailScreen() {
             <Text style={s.doneBtnText}>save</Text>
           </TouchableOpacity>
         </View>
+      </BottomSheet>
+
+      {/* Delete split bill modal */}
+      <BottomSheet visible={deleteSplitModal} onClose={() => setDeleteSplitModal(false)} title="delete split bill" height="45%">
+        <Text style={{ fontFamily: Brand.font.mono, fontSize: 13, color: Colors.text, marginBottom: 16 }}>
+          What would you like to do with the payment recordings created from this split bill?
+        </Text>
+        <TouchableOpacity
+          style={[s.doneBtn, { backgroundColor: Colors.surface, marginTop: 0 }]}
+          onPress={confirmDeleteSplit}
+          activeOpacity={0.8}
+        >
+          <View style={{ gap: 4, alignItems: 'center' }}>
+            <Text style={[s.doneBtnText, { color: Colors.text }]}>keep recordings</Text>
+            <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: Colors.muted }}>deletes split bill only · keeps all payment recordings</Text>
+          </View>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[s.doneBtn, { borderColor: Colors.expense, backgroundColor: Colors.expense + '22' }]}
+          onPress={confirmDeleteSplitWithRecordings}
+          activeOpacity={0.8}
+        >
+          <View style={{ gap: 4, alignItems: 'center' }}>
+            <Text style={[s.doneBtnText, { color: Colors.expense }]}>delete everything</Text>
+            <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: Colors.expense + 'CC' }}>deletes split bill + all payment recordings</Text>
+          </View>
+        </TouchableOpacity>
       </BottomSheet>
 
     </Animated.View>

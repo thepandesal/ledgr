@@ -36,10 +36,10 @@ const PRESETS: { key: Preset; label: string; icon: string }[] = [
 ];
 
 const ACTIVITY_TABS = [
-  { key: 'all',         label: 'All',         types: ['income','expense','debt','due'] },
-  { key: 'money-in',    label: 'Money In',    types: ['income'] },
-  { key: 'money-out',   label: 'Money Out',   types: ['expense'] },
-  { key: 'loans',       label: 'Debt',        types: ['debt'] },
+  { key: 'all',         label: 'All',         types: ['income','expense','debt','due','payment','return'] },
+  { key: 'money-in',    label: 'Money In',    types: ['income','return'] },
+  { key: 'money-out',   label: 'Money Out',   types: ['expense','payment'] },
+  { key: 'loans',       label: 'Debt',        types: ['debt','payment'] },
   { key: 'receivables', label: 'Due',         types: ['due','expense'] },
 ] as const;
 type ActivityTab = typeof ACTIVITY_TABS[number]['key'];
@@ -103,7 +103,7 @@ function getTypeLabel(type: string, status: string, is_due?: boolean, paid_amoun
     return { label: 'expense', color: PEACH };
   }
   if (type === 'debt') {
-    if (status === 'paid')    return { label: 'debt · paid',           color: Colors.cyan };
+    if (status === 'paid')    return { label: 'debt · paid',           color: PEACH };
     if (status === 'partial') return { label: 'debt · partially paid', color: PEACH };
     return                           { label: 'debt',                  color: PEACH };
   }
@@ -112,6 +112,8 @@ function getTypeLabel(type: string, status: string, is_due?: boolean, paid_amoun
     if (status === 'partial') return { label: 'due · partially paid',   color: Colors.cyan };
     return                           { label: 'due',                    color: Colors.cyan };
   }
+  if (type === 'payment') return { label: 'payment', color: PEACH };
+  if (type === 'return')  return { label: 'return',  color: Colors.cyan };
   return { label: type, color: Colors.muted };
 }
 
@@ -145,7 +147,21 @@ export default function SpaceDetailScreen() {
   // Slide animation
   const { slideAnim, handleBack } = useSlideScreen();
 
-  // Date range state
+  // Load default settings from spaces page
+  const { data: spacesSettings } = useQuery({
+    queryKey: ['spaces-settings', userId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('user_settings')
+        .select('spaces_date_mode, spaces_week_start, spaces_date_offset, spaces_cutoff_day, spaces_use_cutoff')
+        .eq('user_id', userId)
+        .maybeSingle();
+      return data ?? null;
+    },
+    enabled: !!userId,
+  });
+
+  // Date range state - initialized from spaces settings
   const [activePreset, setActivePreset] = useState<Preset>('this-month');
   const [rangeOffset,  setRangeOffset]  = useState(0);
   const [cutoffDay,    setCutoffDay]    = useState(25);
@@ -172,6 +188,10 @@ export default function SpaceDetailScreen() {
   // Delete state
   const [pendingDeleteId,   setPendingDeleteId]   = useState('');
   const [pendingDeleteName, setPendingDeleteName] = useState('');
+
+  // Pagination state
+  const [displayCount, setDisplayCount] = useState(10);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   // ── Queries ────────────────────────────────────────────────────────────────
   const { data: recordings = [], isLoading } = useQuery({
@@ -264,9 +284,13 @@ export default function SpaceDetailScreen() {
   });
   grouped.sort((a, b) => b.date.getTime() - a.date.getTime());
 
+  // Paginate groups
+  const paginatedGroups = grouped.slice(0, displayCount);
+  const hasMore = displayCount < grouped.length;
+
   // Stats (all recordings, not date-filtered)
-  const moneyIn  = recordings.filter(r => r.type === 'income').reduce((s, r) => s + Number(r.amount), 0);
-  const moneyOut = recordings.filter(r => r.type === 'expense').reduce((s, r) => {
+  const moneyIn  = recordings.filter(r => r.type === 'income' || r.type === 'return').reduce((s, r) => s + Number(r.amount), 0);
+  const moneyOut = recordings.filter(r => r.type === 'expense' || r.type === 'debt' || r.type === 'payment').reduce((s, r) => {
     const net = r.is_due ? Math.max(0, Number(r.amount) - Number(r.paid_amount ?? 0)) : Number(r.amount);
     return s + net;
   }, 0);
@@ -304,6 +328,34 @@ export default function SpaceDetailScreen() {
   const isEdge    = (day: number) => { const d = new Date(pickerYear, pickerMonth, day); return isSameDay(d, customFrom) || isSameDay(d, customTo); };
 
   // ── Event handlers ─────────────────────────────────────────────────────────
+  // Initialize from spaces settings
+  useEffect(() => {
+    if (!spacesSettings) return;
+    
+    const dateMode = spacesSettings.spaces_date_mode || 'monthly';
+    const offset = Number(spacesSettings.spaces_date_offset ?? 0);
+    const useCutoff = Boolean(spacesSettings.spaces_use_cutoff);
+    const cutoff = Number(spacesSettings.spaces_cutoff_day ?? 25);
+    
+    // Always apply cutoff day if set
+    setCutoffDay(cutoff);
+    setCutoffInput(String(cutoff));
+    
+    // Map spaces filters to space-detail presets
+    if (dateMode === 'monthly') {
+      if (useCutoff) {
+        setActivePreset('cutoff');
+      } else {
+        setActivePreset('this-month');
+      }
+      setRangeOffset(offset);
+    } else {
+      // For non-monthly modes, just use this-month with offset 0
+      setActivePreset('this-month');
+      setRangeOffset(0);
+    }
+  }, [spacesSettings]);
+
   useEffect(() => {
     // Push a history entry on web so minimize/restore keeps us here
     if (typeof window !== 'undefined' && window.history) {
@@ -338,8 +390,10 @@ export default function SpaceDetailScreen() {
   useFocusEffect(useCallback(() => {
     if (!spaceId) return;
     queryClient.invalidateQueries({ queryKey: ['recordings', spaceId] });
+    queryClient.invalidateQueries({ queryKey: ['spaces-settings', userId] });
+    setDisplayCount(10);
     setPendingFocusDate(null);
-  }, [spaceId]));
+  }, [spaceId, userId]));
 
   const confirmDelete = async () => {
     await supabase.from('recordings').delete().eq('id', pendingDeleteId);
@@ -348,6 +402,7 @@ export default function SpaceDetailScreen() {
   };
 
   const navigateRange = (dir: 1 | -1) => {
+    setDisplayCount(10);
     if (activePreset === 'custom') {
       const days = Math.round((customTo.getTime() - customFrom.getTime()) / 86400000) + 1;
       const newFrom = new Date(customFrom); newFrom.setDate(newFrom.getDate() + dir * days);
@@ -361,6 +416,7 @@ export default function SpaceDetailScreen() {
   const applyPreset = (key: Preset) => {
     setRangeOffset(0);
     setActivePreset(key);
+    setDisplayCount(10);
     if (key === 'custom') setPickingDate('from');
   };
 
@@ -376,14 +432,34 @@ export default function SpaceDetailScreen() {
   };
 
   const handleTabToggle = (key: ActivityTab) => {
-    if (key === 'all') { setSelectedTabs(new Set(['all'])); return; }
+    if (key === 'all') { setSelectedTabs(new Set(['all'])); setDisplayCount(10); return; }
     setSelectedTabs(prev => {
       const next = new Set(prev);
       next.delete('all');
       if (next.has(key)) { next.delete(key); if (next.size === 0) return new Set(['all']); }
       else { next.add(key); if (next.size === 4) return new Set(['all']); }
+      setDisplayCount(10);
       return next;
     });
+  };
+
+  const handleScroll = (event: any) => {
+    const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
+    const paddingToBottom = 100;
+    const isCloseToBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom;
+    
+    if (isCloseToBottom && hasMore && !isLoadingMore) {
+      setIsLoadingMore(true);
+      setTimeout(() => {
+        setDisplayCount(prev => prev + 10);
+        setIsLoadingMore(false);
+      }, 300);
+    }
+  };
+
+  const handleCategoryFilter = () => {
+    setShowFilterModal(true);
+    setDisplayCount(10);
   };
 
   // ── Render ──────────────────────────────────────────────────────────────────
@@ -409,7 +485,12 @@ export default function SpaceDetailScreen() {
         </View>
 
         {/* Main scroll */}
-        <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+        <ScrollView 
+          contentContainerStyle={s.scroll} 
+          showsVerticalScrollIndicator={false}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
+        >
 
           {/* Tab circles — dashboard style */}
           <View style={s.tabRow}>
@@ -440,7 +521,7 @@ export default function SpaceDetailScreen() {
                 <Ionicons name="chevron-forward" size={14} color={Colors.cyan} />
               </TouchableOpacity>
             </View>
-            <TouchableOpacity style={s.filterBtn} onPress={() => setShowFilterModal(true)} activeOpacity={0.75}>
+            <TouchableOpacity style={s.filterBtn} onPress={handleCategoryFilter} activeOpacity={0.75}>
               <Ionicons name="options-outline" size={13} color={!isAllCats ? Colors.cyan : Colors.muted} />
               <Text style={[s.filterBtnText, !isAllCats && { color: Colors.cyan }]}>Filter</Text>
             </TouchableOpacity>
@@ -450,7 +531,7 @@ export default function SpaceDetailScreen() {
 
           {/* Recordings section */}
           <View style={s.sectionRow}>
-            <Text style={s.sectionHeader}>recordings</Text>
+            <Text style={s.sectionHeader}>recordings ({filtered.length})</Text>
           </View>
 
           {isLoading ? (
@@ -460,7 +541,7 @@ export default function SpaceDetailScreen() {
               <Text style={s.emptyText}>no recordings found for this period</Text>
             </View>
           ) : (
-            grouped.map(group => (
+            paginatedGroups.map(group => (
               <View key={group.key}>
                 <View style={s.dateHeaderRow}>
                   <Text style={s.dateHeaderText}>{group.label}</Text>
@@ -493,6 +574,18 @@ export default function SpaceDetailScreen() {
               </View>
             ))
           )}
+
+          {/* Load more indicator */}
+          {hasMore && (
+            <View style={s.loadMoreWrap}>
+              {isLoadingMore ? (
+                <ActivityIndicator color={Colors.cyan} size="small" />
+              ) : (
+                <Text style={s.loadMoreText}>scroll for more</Text>
+              )}
+            </View>
+          )}
+
           <View style={{ height: 80 }} />
         </ScrollView>
       </SafeAreaView>
@@ -675,4 +768,8 @@ const s = StyleSheet.create({
   calCellToday:    { backgroundColor: Colors.surface },
   calCellText:     { fontFamily: Fonts.mono,     fontSize: 13, color: Colors.text },
   calCellTextActive: { fontFamily: Fonts.monoBold, color: Colors.text },
+
+  // Load more
+  loadMoreWrap: { alignItems: 'center', paddingVertical: 20 },
+  loadMoreText: { fontFamily: Fonts.mono, fontSize: 11, color: Colors.muted },
 });

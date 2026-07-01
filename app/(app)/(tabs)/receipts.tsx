@@ -32,9 +32,12 @@ export default function ReceiptsScreen() {
   const [folderName, setFolderName] = useState('');
   const [creating, setCreating] = useState(false);
   const [activeEntryId, setActiveEntryId] = useState<string | null>(null);
+  const [displayCount, setDisplayCount] = useState(10);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   useFocusEffect(useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['receipts', userId] });
+    setDisplayCount(10);
   }, [userId]));
 
   const { data: entries = [], isLoading: loading } = useQuery({
@@ -72,6 +75,7 @@ export default function ReceiptsScreen() {
 
   const closeAddModal = () => {
     setAddModal(false); setAddStep('name'); setFolderName(''); setActiveEntryId(null);
+    setDisplayCount(10);
     queryClient.invalidateQueries({ queryKey: ['receipts', userId] });
   };
 
@@ -100,6 +104,23 @@ export default function ReceiptsScreen() {
   const formatDate = (d: string) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   const typeColor = (type: string) => type === 'expense' ? Colors.expense : type === 'income' ? Colors.income : Colors.text;
 
+  const paginatedEntries = entries.slice(0, displayCount);
+  const hasMore = displayCount < entries.length;
+
+  const handleScroll = (event: any) => {
+    const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
+    const paddingToBottom = 20;
+    const isCloseToBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom;
+    
+    if (isCloseToBottom && hasMore && !isLoadingMore) {
+      setIsLoadingMore(true);
+      setTimeout(() => {
+        setDisplayCount(prev => prev + 10);
+        setIsLoadingMore(false);
+      }, 300);
+    }
+  };
+
   return (
     <SafeAreaView style={s.container}>
       {loading ? (
@@ -110,8 +131,13 @@ export default function ReceiptsScreen() {
           <Text style={Brand.type.emptyText}>no receipts yet</Text>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={s.list} showsVerticalScrollIndicator={false}>
-          {entries.map(entry => (
+        <ScrollView 
+          contentContainerStyle={s.list} 
+          showsVerticalScrollIndicator={false}
+          onScroll={handleScroll}
+          scrollEventThrottle={400}
+        >
+          {paginatedEntries.map(entry => (
             <TouchableOpacity key={entry.id} style={s.card} activeOpacity={0.85}
               onPress={() => router.push({ pathname: '/(app)/receipt-detail', params: { receiptId: entry.id } } as any)}>
               {entry.firstPhoto ? (
@@ -137,6 +163,15 @@ export default function ReceiptsScreen() {
               <Ionicons name="chevron-forward" size={16} color={Colors.faint} />
             </TouchableOpacity>
           ))}
+          {hasMore && (
+            <View style={s.loadMoreWrap}>
+              {isLoadingMore ? (
+                <ActivityIndicator color={Brand.color.accent} size="small" />
+              ) : (
+                <Text style={s.loadMoreText}>scroll for more</Text>
+              )}
+            </View>
+          )}
           <Text style={[Brand.type.footer, { marginTop: 24 }]}>managed by LEDGR</Text>
         </ScrollView>
       )}
@@ -207,4 +242,7 @@ const s = StyleSheet.create({
     backgroundColor: Brand.color.accent,
     alignItems: 'center', justifyContent: 'center',
   },
+
+  loadMoreWrap: { alignItems: 'center', paddingVertical: 20 },
+  loadMoreText: { fontFamily: Brand.font.mono, fontSize: 11, color: Colors.muted },
 });

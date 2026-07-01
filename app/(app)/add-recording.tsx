@@ -503,7 +503,7 @@ export default function AddRecordingScreen() {
         </>
       )}
 
-      {/* ── Receivable: link to expense + decreased from + receive to ── */}}
+      {/* ── Receivable: link to expense + decreased from + receive to ── */}
       {type === 'receivable' && (
         <>
           <FormLabel optional>linked expense (optional shortcut)</FormLabel>

@@ -20,6 +20,7 @@ export default function SplitSharePage() {
   const [perPerson, setPerPerson]           = useState<{ name: string; total: number }[]>([]);
   const [items, setItems]                   = useState<any[]>([]);
   const [payments, setPayments]             = useState<any[]>([]);
+  const [billPayments, setBillPayments]     = useState<any[]>([]);
   const [receiptId, setReceiptId]           = useState<string | null>(null);
   const [receiptPhotos, setReceiptPhotos]   = useState<string[]>([]);
   const [receiptModal, setReceiptModal]     = useState(false);
@@ -50,14 +51,16 @@ export default function SplitSharePage() {
     const rid = share.recording_id;
 
     if (splitBillId) {
-      const [billRes, splitsRes, itemsRes, recsRes, adjRes] = await Promise.all([
+      const [billRes, splitsRes, itemsRes, recsRes, adjRes, billPaysRes] = await Promise.all([
         supabase.from('split_bills').select('id, name').eq('id', splitBillId).single(),
         supabase.from('bill_splits').select('person_name').eq('split_bill_id', splitBillId).order('created_at'),
         supabase.from('split_items').select('*, split_subitems(*)').eq('split_bill_id', splitBillId).order('created_at'),
         supabase.from('split_bill_recordings').select('amount_contributed, recording:recording_id(name, amount, type, transaction_date)').eq('split_bill_id', splitBillId),
         supabase.from('split_adjustments').select('*').eq('split_bill_id', splitBillId),
+        supabase.from('split_bill_payments').select('person_name, amount').eq('split_bill_id', splitBillId),
       ]);
       if (!billRes.data) { setNotFound(true); setLoading(false); return; }
+      setBillPayments(billPaysRes.data ?? []);
       const firstRec = (recsRes.data ?? []).map((r: any) => ({ ...r, recording: Array.isArray(r.recording) ? r.recording[0] : r.recording }))[0]?.recording;
       setRecording(firstRec ? { ...firstRec, name: billRes.data.name } : { name: billRes.data.name, amount: 0, type: 'expense', transaction_date: '' });
       if (accountIds.length > 0) {
@@ -196,17 +199,35 @@ export default function SplitSharePage() {
         {perPerson.length > 0 && <>
           <Text style={s.sectionHeader}>per person pay</Text>
           <View style={s.listBlock}>
-            {perPerson.map((p, i) => (
+            {perPerson.map((p, i) => {
+              const absOwed = Math.abs(p.total);
+              const paid = billPayments
+                .filter((bp: any) => bp.person_name === p.name)
+                .reduce((s: number, bp: any) => s + Number(bp.amount), 0);
+              const fullyPaid = absOwed > 0 && paid >= absOwed - 0.01;
+              const partiallyPaid = paid > 0 && !fullyPaid;
+              const checkColor = fullyPaid ? '#4CAF50' : partiallyPaid ? '#FFAB91' : 'transparent';
+              return (
               <View key={i} style={s.row}>
-                <View style={s.rowIconWrap}>
-                  <Ionicons name="person-outline" size={15} color={ACCENT_DARK} />
+                <View style={[s.rowIconWrap, { backgroundColor: fullyPaid ? '#4CAF5022' : partiallyPaid ? '#FFAB9122' : ACCENT + '44' }]}>
+                  <Ionicons
+                    name={fullyPaid || partiallyPaid ? 'checkmark-circle' : 'person-outline'}
+                    size={15}
+                    color={fullyPaid ? '#4CAF50' : partiallyPaid ? '#FFAB91' : ACCENT_DARK}
+                  />
                 </View>
                 <Text style={s.rowName}>{p.name}</Text>
+                {(fullyPaid || partiallyPaid) && (
+                  <Text style={[s.rowAmount, { color: fullyPaid ? '#4CAF50' : '#FFAB91', fontSize: 11 }]}>
+                    {fullyPaid ? 'complete' : fmt(paid)}
+                  </Text>
+                )}
                 <Text style={[s.rowAmount, { color: p.total < 0 ? PEACH : ACCENT_DARK }]}>
                   {p.total < 0 ? '-' : ''}{fmt(Math.abs(p.total))}
                 </Text>
               </View>
-            ))}
+              );
+            })}
             {/* Total row */}
             <View style={[s.row, { backgroundColor: ACCENT + '44' }]}>
               <View style={[s.rowIconWrap, { backgroundColor: ACCENT }]}>

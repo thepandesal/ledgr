@@ -20,6 +20,7 @@ export default function SplitShareSlugPage() {
   const [perPerson, setPerPerson]           = useState<{ name: string; total: number }[]>([]);
   const [items, setItems]                   = useState<any[]>([]);
   const [payments, setPayments]             = useState<any[]>([]);
+  const [paymentHistory, setPaymentHistory] = useState<any[]>([]);
   const [receiptId, setReceiptId]           = useState<string | null>(null);
   const [receiptPhotos, setReceiptPhotos]   = useState<string[]>([]);
   const [receiptModal, setReceiptModal]     = useState(false);
@@ -57,12 +58,13 @@ export default function SplitShareSlugPage() {
     const rid = share.recording_id;
 
     if (splitBillId) {
-      const [billRes, splitsRes, itemsRes, recsRes, adjRes] = await Promise.all([
+      const [billRes, splitsRes, itemsRes, recsRes, adjRes, paymentsRes] = await Promise.all([
         supabase.from('split_bills').select('id, name').eq('id', splitBillId).single(),
         supabase.from('bill_splits').select('person_name').eq('split_bill_id', splitBillId).order('created_at'),
         supabase.from('split_items').select('*, split_subitems(*)').eq('split_bill_id', splitBillId).order('created_at'),
         supabase.from('split_bill_recordings').select('amount_contributed, recording:recording_id(name, amount, type, transaction_date)').eq('split_bill_id', splitBillId),
         supabase.from('split_adjustments').select('*').eq('split_bill_id', splitBillId),
+        supabase.from('split_bill_payments').select('*').eq('split_bill_id', splitBillId).order('created_at'),
       ]);
       if (!billRes.data) { setNotFound(true); setLoading(false); return; }
       const firstRec = (recsRes.data ?? []).map((r: any) => ({ ...r, recording: Array.isArray(r.recording) ? r.recording[0] : r.recording }))[0]?.recording;
@@ -101,6 +103,7 @@ export default function SplitShareSlugPage() {
         }
       });
       setPerPerson(Object.entries(perPersonMap).map(([name, total]) => ({ name, total })));
+      setPaymentHistory(paymentsRes.data ?? []);
       setLoading(false);
       return;
     }
