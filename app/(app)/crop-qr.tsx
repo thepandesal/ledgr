@@ -37,19 +37,25 @@ export default function CropQRScreen() {
     });
   }, [uri]);
 
+  const startMove = useRef({ x: 0, y: 0 });
+  const startSize = useRef(0);
+
   // Pan responder for moving the box
   const movePan = useRef(PanResponder.create({
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: () => true,
+    onPanResponderGrant: () => {
+      startMove.current = { x: boxX.current, y: boxY.current };
+    },
     onPanResponderMove: (_, gs) => {
-      const newX = Math.max(0, Math.min(SW - boxSize.current, boxX.current + gs.dx));
-      const newY = Math.max(0, Math.min(SH - boxSize.current, boxY.current + gs.dy));
+      const newX = Math.max(0, Math.min(SW - boxSize.current, startMove.current.x + gs.dx));
+      const newY = Math.max(0, Math.min(SH - boxSize.current, startMove.current.y + gs.dy));
       animX.setValue(newX);
       animY.setValue(newY);
     },
     onPanResponderRelease: (_, gs) => {
-      boxX.current = Math.max(0, Math.min(SW - boxSize.current, boxX.current + gs.dx));
-      boxY.current = Math.max(0, Math.min(SH - boxSize.current, boxY.current + gs.dy));
+      boxX.current = Math.max(0, Math.min(SW - boxSize.current, startMove.current.x + gs.dx));
+      boxY.current = Math.max(0, Math.min(SH - boxSize.current, startMove.current.y + gs.dy));
     },
   })).current;
 
@@ -57,17 +63,20 @@ export default function CropQRScreen() {
   const resizePan = useRef(PanResponder.create({
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: () => true,
+    onPanResponderGrant: () => {
+      startSize.current = boxSize.current;
+    },
     onPanResponderMove: (_, gs) => {
       const newSize = Math.max(MIN_SIZE, Math.min(
         Math.min(SW - boxX.current, SH - boxY.current),
-        boxSize.current + gs.dx
+        startSize.current + gs.dx
       ));
       animSize.setValue(newSize);
     },
     onPanResponderRelease: (_, gs) => {
       boxSize.current = Math.max(MIN_SIZE, Math.min(
         Math.min(SW - boxX.current, SH - boxY.current),
-        boxSize.current + gs.dx
+        startSize.current + gs.dx
       ));
     },
   })).current;
