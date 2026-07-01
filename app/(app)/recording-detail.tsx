@@ -105,6 +105,12 @@ export default function RecordingDetailScreen() {
   const [collectDueComplete, setCollectDueComplete] = useState<boolean | null>(null);
   const [collectDueLoading, setCollectDueLoading] = useState(false);
 
+  // Mark as complete state
+  const [markCompleteModal, setMarkCompleteModal] = useState(false);
+  const [markCompleteOverride, setMarkCompleteOverride] = useState(false);
+  const [markCompleteAmount, setMarkCompleteAmount] = useState('');
+  const [markCompleteLoading, setMarkCompleteLoading] = useState(false);
+
   // Cancel due state
   const [cancelDueConfirm, setCancelDueConfirm] = useState(false);
   const [cancelDueLoading, setCancelDueLoading] = useState(false);
@@ -314,6 +320,51 @@ export default function RecordingDetailScreen() {
       const { data: recv } = await supabase.from('recordings').select('id, name').eq('linked_recording_id', recordingId).eq('type', 'due').maybeSingle();
       if (recv) setLinkedReceivable(recv);
     }
+  };
+
+  const openMarkCompleteModal = () => {
+    setMarkCompleteOverride(false);
+    setMarkCompleteAmount('');
+    setMarkCompleteModal(true);
+  };
+
+  const confirmMarkComplete = async () => {
+    if (!recording) return;
+    setMarkCompleteLoading(true);
+    try {
+      const total = Number(recording.amount);
+      if (markCompleteOverride) {
+        const overrideAmt = parseFloat(markCompleteAmount || '0') || 0;
+        if (overrideAmt <= 0) { setMarkCompleteLoading(false); return; }
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) { setMarkCompleteLoading(false); return; }
+        await supabase.from('recordings').insert({
+          user_id: user.id,
+          space_id: recording.space_id,
+          name: recording.name,
+          type: 'return',
+          amount: overrideAmt,
+          transaction_date: new Date().toISOString().split('T')[0],
+          status: 'received',
+          linked_recording_id: recordingId,
+          category_id: recording.category_id ?? null,
+        });
+        await supabase.from('recordings').update({
+          paid_amount: overrideAmt,
+          status: 'paid',
+        }).eq('id', recordingId);
+        setRecording((prev: any) => ({ ...prev, paid_amount: overrideAmt, status: 'paid' }));
+      } else {
+        await supabase.from('recordings').update({
+          paid_amount: total,
+          status: 'paid',
+        }).eq('id', recordingId);
+        setRecording((prev: any) => ({ ...prev, paid_amount: total, status: 'paid' }));
+      }
+      setMarkCompleteModal(false);
+      loadPaymentData();
+    } catch (e) { console.log(e); }
+    finally { setMarkCompleteLoading(false); }
   };
 
   const openCollectDueModal = () => {
@@ -1254,6 +1305,10 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                     <Ionicons name="arrow-down-circle-outline" size={13} color={ACCENT_DARK} />
                     <Text style={rd.actionChipText}>collect payment</Text>
                   </TouchableOpacity>
+                  <TouchableOpacity style={rd.actionChip} onPress={openMarkCompleteModal}>
+                    <Ionicons name="checkmark-done-circle-outline" size={13} color={ACCENT_DARK} />
+                    <Text style={rd.actionChipText}>mark as complete</Text>
+                  </TouchableOpacity>
                   {nothingCollected && (
                     <TouchableOpacity
                       style={[rd.actionChip, { backgroundColor: Colors.dangerBg }]}
@@ -1636,6 +1691,68 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
           { label: cancelDueLoading ? '...' : 'cancel due', onPress: confirmCancelDue, destructive: true, disabled: cancelDueLoading },
         ]}
       />
+
+      {/* Mark as complete modal */}
+      <BottomSheet visible={markCompleteModal} onClose={() => setMarkCompleteModal(false)} title="mark as complete" height="45%">
+        {markCompleteModal && (() => {
+          const total = Number(recording?.amount ?? 0);
+          const collected = Number(recording?.paid_amount ?? 0);
+          const remaining = Math.max(0, total - collected);
+          return (
+            <>
+              <View style={{ gap: 6, marginBottom: 16 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text style={{ fontFamily: Brand.font.mono, fontSize: 12, color: Colors.muted }}>total amount</Text>
+                  <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 12, color: Colors.text }}>{total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text style={{ fontFamily: Brand.font.mono, fontSize: 12, color: Colors.muted }}>already collected</Text>
+                  <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 12, color: ACCENT_DARK }}>{collected.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text style={{ fontFamily: Brand.font.mono, fontSize: 12, color: Colors.muted }}>remaining</Text>
+                  <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 12, color: remaining > 0 ? PEACH : ACCENT_DARK }}>{remaining.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+                </View>
+              </View>
+              <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
+                <TouchableOpacity
+                  style={[rd.actionChip, { paddingVertical: 9, paddingHorizontal: 16, flex: 1, justifyContent: 'center', ...(!markCompleteOverride ? { backgroundColor: ACCENT + '44' } : { backgroundColor: Colors.surface }) }]}
+                  onPress={() => setMarkCompleteOverride(false)}
+                >
+                  <Text style={[rd.actionChipText, !markCompleteOverride && { color: ACCENT_DARK }]}>as is</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[rd.actionChip, { paddingVertical: 9, paddingHorizontal: 16, flex: 1, justifyContent: 'center', ...(markCompleteOverride ? { backgroundColor: ACCENT + '44' } : { backgroundColor: Colors.surface }) }]}
+                  onPress={() => setMarkCompleteOverride(true)}
+                >
+                  <Text style={[rd.actionChipText, markCompleteOverride && { color: ACCENT_DARK }]}>override amount</Text>
+                </TouchableOpacity>
+              </View>
+              {markCompleteOverride && (
+                <>
+                  <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: Colors.muted, marginBottom: 6 }}>enter total collected amount (creates a return recording)</Text>
+                  <TextInput
+                    style={[rd.doneBtn, { backgroundColor: Colors.surface, paddingVertical: 12, paddingHorizontal: 14, fontFamily: Brand.font.monoBold, fontSize: 15, color: Colors.text, textAlign: 'right', marginTop: 0 }]}
+                    placeholder={total.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    placeholderTextColor={Colors.faint}
+                    value={markCompleteAmount}
+                    onChangeText={setMarkCompleteAmount}
+                    keyboardType="decimal-pad"
+                    autoFocus
+                  />
+                </>
+              )}
+              <TouchableOpacity
+                style={[rd.doneBtn, { opacity: markCompleteLoading || (markCompleteOverride && !markCompleteAmount) ? 0.4 : 1 }]}
+                onPress={confirmMarkComplete}
+                disabled={markCompleteLoading || (markCompleteOverride && !markCompleteAmount)}
+              >
+                <Text style={rd.doneBtnText}>{markCompleteLoading ? 'saving...' : 'confirm complete'}</Text>
+              </TouchableOpacity>
+            </>
+          );
+        })()}
+      </BottomSheet>
 
 
       {copiedToast && (
