@@ -200,15 +200,37 @@ export default function SplitShareSlugPage() {
         {perPerson.length > 0 && <>
           <Text style={s.sectionHeader}>per person pay</Text>
           <View style={s.listBlock}>
-            {perPerson.map((p, i) => (
+            {perPerson.map((p, i) => {
+              const absOwed = Math.abs(p.total);
+              const paid = paymentHistory
+                .filter((bp: any) => bp.person_name === p.name)
+                .reduce((s: number, bp: any) => s + Number(bp.amount), 0);
+              const fullyPaid = absOwed > 0 && paid >= absOwed - 0.01;
+              const partiallyPaid = paid > 0 && !fullyPaid;
+              return (
               <View key={i} style={s.row}>
-                <View style={s.rowIconWrap}><Ionicons name="person-outline" size={15} color={ACCENT_DARK} /></View>
-                <Text style={s.rowName}>{p.name}</Text>
+                <View style={[s.rowIconWrap, { backgroundColor: fullyPaid ? '#4CAF5022' : partiallyPaid ? '#FFAB9122' : ACCENT + '44' }]}>
+                  <Ionicons
+                    name={fullyPaid || partiallyPaid ? 'checkmark-circle' : 'person-outline'}
+                    size={15}
+                    color={fullyPaid ? '#4CAF50' : partiallyPaid ? '#FFAB91' : ACCENT_DARK}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.rowName}>{p.name}</Text>
+                  {partiallyPaid && (
+                    <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: '#FFAB91' }}>{fmt(paid)} paid</Text>
+                  )}
+                </View>
+                {fullyPaid && (
+                  <Text style={[s.rowAmount, { color: '#4CAF50', fontSize: 11 }]}>complete</Text>
+                )}
                 <Text style={[s.rowAmount, { color: p.total < 0 ? PEACH : ACCENT_DARK }]}>
                   {p.total < 0 ? '-' : ''}{fmt(Math.abs(p.total))}
                 </Text>
               </View>
-            ))}
+              );
+            })}
             <View style={[s.row, { backgroundColor: ACCENT + '44' }]}>
               <View style={[s.rowIconWrap, { backgroundColor: ACCENT }]}><Ionicons name="calculator-outline" size={15} color={ACCENT_DARK} /></View>
               <Text style={[s.rowName, { fontFamily: Brand.font.monoBold, color: ACCENT_DARK }]}>total</Text>

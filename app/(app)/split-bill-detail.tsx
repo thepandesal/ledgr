@@ -1515,36 +1515,19 @@ export default function SplitBillDetailScreen() {
                   return (
                     <View key={p} style={{ paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 8 }}>
                       {/* Name row */}
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                        <View style={{
-                          width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center',
-                          backgroundColor: fullyPaid ? '#2ab67122' : paid > 0 ? '#FFAB9122' : ACCENT + '44',
-                        }}>
-                          <Ionicons
-                            name={fullyPaid ? 'checkmark-circle' : paid > 0 ? 'checkmark-circle' : 'ellipse-outline'}
-                            size={18}
-                            color={fullyPaid ? '#2ab671' : paid > 0 ? PEACH : Colors.muted}
-                          />
-                        </View>
-                        <View style={{ flex: 1 }}>
-                          <Text style={s.recName}>{p}</Text>
-                          {paid > 0 && !fullyPaid && (
-                            <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: PEACH }}>
-                              {fmt(paid)} paid
-                            </Text>
-                          )}
-                        </View>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Text style={[s.recName, { flex: 1 }]}>{p}</Text>
                         {!fullyPaid && absOwed > 0 && billStatus === 'ongoing' && (
                           <TouchableOpacity
                             onPress={() => openPaymentModal(p)}
-                            style={{ paddingHorizontal: 10, paddingVertical: 5, backgroundColor: ACCENT + '44', borderRadius: Radius.pill }}
+                            style={{ marginLeft: 10, paddingHorizontal: 10, paddingVertical: 5, backgroundColor: ACCENT + '44', borderRadius: Radius.pill }}
                           >
                             <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: ACCENT_DARK }}>add payment</Text>
                           </TouchableOpacity>
                         )}
                         {fullyPaid && (
-                          <View style={{ paddingHorizontal: 10, paddingVertical: 5, backgroundColor: '#2ab67122', borderRadius: Radius.pill }}>
-                            <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: '#2ab671' }}>settled ✓</Text>
+                          <View style={{ marginLeft: 10, paddingHorizontal: 10, paddingVertical: 5, backgroundColor: ACCENT + '44', borderRadius: Radius.pill }}>
+                            <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: ACCENT_DARK }}>settled ✓</Text>
                           </View>
                         )}
                       </View>
