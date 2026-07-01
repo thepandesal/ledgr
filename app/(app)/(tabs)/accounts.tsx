@@ -186,17 +186,14 @@ function InlineCropModal({ uri, onCrop, onCancel }: { uri: string; onCrop: (b64:
 
   const doCrop = async () => {
     const cx = boxX.current, cy = boxY.current, cs = boxSize.current;
-    const relX = (cx - imgDisplay.x) / imgDisplay.w;
-    const relY = (cy - imgDisplay.y) / imgDisplay.h;
-    const relS = cs / imgDisplay.w;
-    const originX = Math.max(0, relX * imgNaturalSize.w);
-    const originY = Math.max(0, relY * imgNaturalSize.h);
-    const cropW = Math.min(imgNaturalSize.w - originX, relS * imgNaturalSize.w);
-    const cropH = Math.min(imgNaturalSize.h - originY, relS * imgNaturalSize.h);
+    const originX = Math.max(0, (cx - imgDisplay.x) / imgDisplay.w * imgNaturalSize.w);
+    const originY = Math.max(0, (cy - imgDisplay.y) / imgDisplay.h * imgNaturalSize.h);
+    const cropW = Math.min(imgNaturalSize.w - originX, cs / imgDisplay.w * imgNaturalSize.w);
+    const cropH = Math.min(imgNaturalSize.h - originY, cs / imgDisplay.h * imgNaturalSize.h);
     const result = await ImageManipulator.manipulateAsync(
       uri,
-      [{ crop: { originX, originY, width: cropW, height: cropH } }, { resize: { width: 300, height: 300 } }],
-      { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+      [{ crop: { originX, originY, width: cropW, height: cropH } }],
+      { compress: 0.85, format: ImageManipulator.SaveFormat.JPEG, base64: true }
     );
     onCrop(`data:image/jpeg;base64,${result.base64}`);
   };
