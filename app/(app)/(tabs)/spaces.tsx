@@ -16,7 +16,7 @@ import { BlurContext } from '../../../src/lib/BlurContext';
 
 interface SpaceData {
   id: string; name: string; color: string; icon: string;
-  budget?: number | null; spent?: number; saved?: number; count?: number;
+  budget?: number | null; spent?: number; saved?: number; savedAllTime?: number; count?: number;
   space_type?: string; savings_target_date?: string | null; is_active?: boolean;
 }
 
@@ -25,6 +25,11 @@ const ACCENT_TEXT = '#101514'; // dark text ON accent bg
 const ACCENT_DARK = Brand.color.accentDark; // dark teal — text/icons on white bg
 
 const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmtCompact = (n: number) => {
+  if (n >= 1_000_000_000) return (n / 1_000_000_000).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 2 }) + 'B';
+  if (n >= 1_000_000)     return (n / 1_000_000).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 2 }) + 'M';
+  return fmt(n);
+};
 
 type DateMode = 'monthly' | 'weekly' | 'daily' | 'yearly';
 type WeekStart = 'monday' | 'sunday' | 'saturday';
@@ -102,16 +107,21 @@ export default function SpacesScreen() {
       const toStr   = `${to.getFullYear()}-${String(to.getMonth() + 1).padStart(2, '0')}-${String(to.getDate()).padStart(2, '0')}`;
       
       // Fetch all recordings in date range for this user
-      const { data: allRecs } = await supabase
-        .from('recordings')
-        .select('space_id, amount, type, is_due, paid_amount')
-        .eq('user_id', userId)
-        .gte('transaction_date', fromStr)
-        .lte('transaction_date', toStr);
-      
+      const [{ data: allRecs }, { data: allTimeRecs }] = await Promise.all([
+        supabase.from('recordings').select('space_id, amount, type, is_due, paid_amount')
+          .eq('user_id', userId).gte('transaction_date', fromStr).lte('transaction_date', toStr),
+        supabase.from('recordings').select('space_id, amount, type')
+          .eq('user_id', userId).in('type', ['income', 'return']),
+      ]);
+
       const spentMap: Record<string, number> = {};
       const savedMap: Record<string, number> = {};
+      const savedAllTimeMap: Record<string, number> = {};
       const countMap: Record<string, number> = {};
+
+      (allTimeRecs ?? []).forEach((r: any) => {
+        savedAllTimeMap[r.space_id] = (savedAllTimeMap[r.space_id] ?? 0) + Number(r.amount);
+      });
       
       // Debug: log what we're processing
       console.log('[Spaces Query] Date range:', fromStr, 'to', toStr);
@@ -146,7 +156,7 @@ export default function SpacesScreen() {
       // Debug: log counts per space
       console.log('[Spaces Query] Count map:', countMap);
       
-      return data.map((s: any) => ({ ...s, spent: spentMap[s.id] ?? 0, saved: savedMap[s.id] ?? 0, count: countMap[s.id] ?? 0 })) as SpaceData[];
+      return data.map((s: any) => ({ ...s, spent: spentMap[s.id] ?? 0, saved: savedMap[s.id] ?? 0, savedAllTime: savedAllTimeMap[s.id] ?? 0, count: countMap[s.id] ?? 0 })) as SpaceData[];
     },
     enabled: !!userId,
   });
@@ -339,10 +349,10 @@ export default function SpacesScreen() {
           <Text style={s.cardMeta}>{space.count ?? 0} transaction{(space.count ?? 0) !== 1 ? 's' : ''}</Text>
         </View>
         <View style={s.cardRight}>
-          <View style={s.cardRow}><Text style={s.cardRowLabel}>spend</Text><Text style={[s.cardRowValue, over && { color: Colors.expense }]}>{fmt(value)}</Text></View>
+          <View style={s.cardRow}><Text style={s.cardRowLabel}>spend</Text><Text style={[s.cardRowValue, over && { color: Colors.expense }]}>{fmtCompact(value)}</Text></View>
           {budget > 0 && (<>
-            <View style={s.cardRow}><Text style={s.cardRowLabel}>budget</Text><Text style={s.cardRowValue}>{fmt(budget)}</Text></View>
-            <View style={s.cardRow}><Text style={s.cardRowLabel}>usable</Text><Text style={[s.cardRowValue, { color: statusColor }]}>{fmt(Math.max(remaining, 0))}</Text></View>
+            <View style={s.cardRow}><Text style={s.cardRowLabel}>budget</Text><Text style={s.cardRowValue}>{fmtCompact(budget)}</Text></View>
+            <View style={s.cardRow}><Text style={s.cardRowLabel}>usable</Text><Text style={[s.cardRowValue, { color: statusColor }]}>{fmtCompact(Math.max(remaining, 0))}</Text></View>
           </>)}
         </View>
         <TouchableOpacity onPress={() => { setSelectedSpace(space); setMenuModal(true); setBlur(true); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -354,8 +364,10 @@ export default function SpacesScreen() {
 
   const renderSavingsCard = (space: SpaceData) => {
     const value       = space.saved ?? 0;
+    const allTime     = space.savedAllTime ?? 0;
     const budget      = space.budget ?? 0;
-    const pct         = budget > 0 ? Math.min(value / budget, 1) : 0;
+    const remaining   = Math.max(budget - allTime, 0);
+    const pct         = budget > 0 ? Math.min(allTime / budget, 1) : 0;
     const statusColor = pct >= 1 ? ACCENT_DARK : '#F97316';
     return (
       <TouchableOpacity key={space.id} style={s.card} activeOpacity={0.85} onPress={() => router.push({ pathname: '/(app)/space-detail', params: { spaceId: space.id, name: space.name, color: space.color } })}>
@@ -364,10 +376,10 @@ export default function SpacesScreen() {
           <Text style={s.cardMeta}>{space.count ?? 0} transaction{(space.count ?? 0) !== 1 ? 's' : ''}</Text>
         </View>
         <View style={s.cardRight}>
-          <View style={s.cardRow}><Text style={s.cardRowLabel}>saved</Text><Text style={[s.cardRowValue, { color: ACCENT }]}>{fmt(value)}</Text></View>
+          <View style={s.cardRow}><Text style={s.cardRowLabel}>saved</Text><Text style={[s.cardRowValue, { color: ACCENT_DARK }]}>{fmtCompact(value)}</Text></View>
           {budget > 0 && (<>
-            <View style={s.cardRow}><Text style={s.cardRowLabel}>goal</Text><Text style={s.cardRowValue}>{fmt(budget)}</Text></View>
-            <View style={s.cardRow}><Text style={s.cardRowLabel}>remaining</Text><Text style={[s.cardRowValue, { color: statusColor }]}>{fmt(Math.max(budget - value, 0))}</Text></View>
+            <View style={s.cardRow}><Text style={s.cardRowLabel}>goal</Text><Text style={s.cardRowValue}>{fmtCompact(budget)}</Text></View>
+            <View style={s.cardRow}><Text style={s.cardRowLabel}>remaining</Text><Text style={[s.cardRowValue, { color: statusColor }]}>{fmtCompact(remaining)}</Text></View>
           </>)}
         </View>
         <TouchableOpacity onPress={() => { setSelectedSpace(space); setMenuModal(true); setBlur(true); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
