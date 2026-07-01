@@ -216,12 +216,15 @@ export default function SplitSharePage() {
                     color={fullyPaid ? '#4CAF50' : partiallyPaid ? '#FFAB91' : ACCENT_DARK}
                   />
                 </View>
-                <Text style={s.rowName}>{p.name}</Text>
-                {(fullyPaid || partiallyPaid) && (
-                  <Text style={[s.rowAmount, { color: fullyPaid ? '#4CAF50' : '#FFAB91', fontSize: 11 }]}>
-                    {fullyPaid ? 'complete' : fmt(paid)}
-                  </Text>
-                )}
+                <View style={{ flex: 1 }}>
+                  <Text style={s.rowName}>{p.name}</Text>
+                  {partiallyPaid && (
+                    <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: '#FFAB91' }}>{fmt(paid)} paid</Text>
+                  )}
+                  {fullyPaid && (
+                    <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: '#4CAF50' }}>complete</Text>
+                  )}
+                </View>
                 <Text style={[s.rowAmount, { color: p.total < 0 ? PEACH : ACCENT_DARK }]}>
                   {p.total < 0 ? '-' : ''}{fmt(Math.abs(p.total))}
                 </Text>

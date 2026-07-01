@@ -221,10 +221,10 @@ export default function SplitShareSlugPage() {
                   {partiallyPaid && (
                     <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: '#FFAB91' }}>{fmt(paid)} paid</Text>
                   )}
+                  {fullyPaid && (
+                    <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: '#4CAF50' }}>complete</Text>
+                  )}
                 </View>
-                {fullyPaid && (
-                  <Text style={[s.rowAmount, { color: '#4CAF50', fontSize: 11 }]}>complete</Text>
-                )}
                 <Text style={[s.rowAmount, { color: p.total < 0 ? PEACH : ACCENT_DARK }]}>
                   {p.total < 0 ? '-' : ''}{fmt(Math.abs(p.total))}
                 </Text>
