@@ -1380,7 +1380,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
             </TouchableOpacity>
           </View>
           {linkedReceipt ? (
-            <>
+            <View style={{ paddingHorizontal: PAGE }}>
               {receiptPhotos.length > 0 ? (
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ paddingBottom: 12 }} contentContainerStyle={{ gap: 8 }}>
                   {receiptPhotos.map((p, idx) => (
@@ -1397,7 +1397,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                 <Text style={[rd.recName, { flex: 1 }]}>view full receipt</Text>
                 <Ionicons name="chevron-forward" size={13} color={Colors.muted} />
               </TouchableOpacity>
-            </>
+            </View>
           ) : (
             <View style={rd.emptyWrap}><Text style={{ fontFamily: Brand.font.mono, fontSize: 12, color: Colors.muted }}>no receipt attached</Text></View>
           )}

@@ -1,7 +1,6 @@
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView,
-  TextInput, ActivityIndicator, Alert, Animated, Image,
-  PanResponder, Dimensions,
+  TextInput, ActivityIndicator, Alert, Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../../src/lib/supabase';
@@ -234,7 +233,6 @@ function AccountForm({ visible, userId, initial, onClose, onSaved }: {
   const [accountName, setAccountName] = useState(initial?.account_name ?? '');
   const [accountNumber, setAccountNumber] = useState(initial?.account_number ?? '');
   const [qrCode, setQrCode] = useState<string | null>(initial?.qr_code ?? null);
-  const [cropUri, setCropUri] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -257,8 +255,27 @@ function AccountForm({ visible, userId, initial, onClose, onSaved }: {
   const pickQR = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') { Alert.alert('Permission needed', 'Please allow photo access.'); return; }
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: false, quality: 1 });
-    if (!result.canceled && result.assets[0]) setCropUri(result.assets[0].uri);
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 1,
+      base64: true,
+    });
+    if (!result.canceled && result.assets[0]) {
+      const asset = result.assets[0];
+      if (asset.base64) {
+        setQrCode(`data:image/jpeg;base64,${asset.base64}`);
+      } else {
+        // fallback: resize via manipulator
+        const manipulated = await ImageManipulator.manipulateAsync(
+          asset.uri,
+          [{ resize: { width: 600, height: 600 } }],
+          { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+        );
+        setQrCode(`data:image/jpeg;base64,${manipulated.base64}`);
+      }
+    }
   };
 
   const handleSubmit = async () => {
@@ -275,11 +292,6 @@ function AccountForm({ visible, userId, initial, onClose, onSaved }: {
 
   return (
     <BottomSheet visible={visible} onClose={onClose} title={initial ? 'edit account' : 'new account'} height="60%">
-      {cropUri ? (
-        <View style={StyleSheet.absoluteFill}>
-          <CropView uri={cropUri} onCrop={(b64) => { setQrCode(b64); setCropUri(null); }} onCancel={() => setCropUri(null)} />
-        </View>
-      ) : (
         <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           {error ? <Text style={f.error}>{error}</Text> : null}
 
@@ -325,7 +337,6 @@ function AccountForm({ visible, userId, initial, onClose, onSaved }: {
             {loading ? <ActivityIndicator color={Colors.white} /> : <Text style={f.saveBtnText}>{initial ? 'save changes' : 'add account'}</Text>}
           </TouchableOpacity>
         </ScrollView>
-      )}
     </BottomSheet>
   );
 }
