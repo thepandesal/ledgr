@@ -111,7 +111,7 @@ export default function SpacesScreen() {
         supabase.from('recordings').select('space_id, amount, type, is_due, paid_amount')
           .eq('user_id', userId).gte('transaction_date', fromStr).lte('transaction_date', toStr),
         supabase.from('recordings').select('space_id, amount, type')
-          .eq('user_id', userId).eq('type', 'income'),
+          .eq('user_id', userId).in('type', ['income', 'expense']),
       ]);
 
       const spentMap: Record<string, number> = {};
@@ -122,6 +122,8 @@ export default function SpacesScreen() {
       (allTimeRecs ?? []).forEach((r: any) => {
         if (r.type === 'income') {
           savedAllTimeMap[r.space_id] = (savedAllTimeMap[r.space_id] ?? 0) + Number(r.amount);
+        } else if (r.type === 'expense') {
+          savedAllTimeMap[r.space_id] = (savedAllTimeMap[r.space_id] ?? 0) - Number(r.amount);
         }
       });
       
