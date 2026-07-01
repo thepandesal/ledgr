@@ -1,6 +1,6 @@
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  SafeAreaView, Animated, Dimensions, ScrollView, ActivityIndicator,
+  SafeAreaView, Animated, Dimensions, ScrollView, ActivityIndicator, Platform,
 } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -11,6 +11,7 @@ import { useSlideScreen } from '../../src/hooks/useSlideScreen';
 import { supabase } from '../../src/lib/supabase';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import BottomSheet from '@/components/ui/BottomSheet';
+import ActivityTabs, { ACTIVITY_TABS, ActivityTab } from '@/components/ui/ActivityTabs';
 import { Colors, Fonts, Radius } from '@/components/ui/theme';
 import { Brand } from '../../src/lib/brand';
 
@@ -22,6 +23,7 @@ export function setPendingFocusDate(date: string | null) { pendingFocusDate = da
 const { width } = Dimensions.get('window');
 
 const PEACH = '#FFAB91';
+const PAGE_HEIGHT = 1200; // px per image slice (at scale 2 = 2400px actual)
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
@@ -34,15 +36,6 @@ const PRESETS: { key: Preset; label: string; icon: string }[] = [
   { key: 'cutoff',     label: 'Cutoff',     icon: 'cut-outline'      },
   { key: 'custom',     label: 'Custom',     icon: 'options-outline'  },
 ];
-
-const ACTIVITY_TABS = [
-  { key: 'all',         label: 'All',         types: ['income','expense','debt','due','payment','return'] },
-  { key: 'money-in',    label: 'Money In',    types: ['income','return'] },
-  { key: 'money-out',   label: 'Money Out',   types: ['expense','payment'] },
-  { key: 'loans',       label: 'Debt',        types: ['debt','payment'] },
-  { key: 'receivables', label: 'Due',         types: ['due','expense'] },
-] as const;
-type ActivityTab = typeof ACTIVITY_TABS[number]['key'];
 
 // ── Helper functions ─────────────────────────────────────────────────────────
 function isSameDay(a: Date, b: Date) {
@@ -189,6 +182,11 @@ export default function SpaceDetailScreen() {
   const [pendingDeleteId,   setPendingDeleteId]   = useState('');
   const [pendingDeleteName, setPendingDeleteName] = useState('');
 
+  // Statement image state
+  const [statementLoading, setStatementLoading] = useState(false);
+  const [captureHtml, setCaptureHtml] = useState<string | null>(null);
+  const webviewRef = useRef<any>(null);
+
   // Pagination state
   const [displayCount, setDisplayCount] = useState(10);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -288,14 +286,21 @@ export default function SpaceDetailScreen() {
   const paginatedGroups = grouped.slice(0, displayCount);
   const hasMore = displayCount < grouped.length;
 
-  // Stats (all recordings, not date-filtered)
-  const moneyIn  = recordings.filter(r => r.type === 'income' || r.type === 'return').reduce((s, r) => s + Number(r.amount), 0);
-  const moneyOut = recordings.filter(r => r.type === 'expense' || r.type === 'debt' || r.type === 'payment').reduce((s, r) => {
+  // Stats — date-filtered but not tab-filtered
+  const dateFiltered = recordings.filter(r => {
+    const [y, m, d] = r.transaction_date.split('-').map(Number);
+    const date = new Date(y, m - 1, d);
+    if (date < range.from) return false;
+    const to = new Date(range.to); to.setHours(23, 59, 59);
+    return date <= to;
+  });
+  const moneyIn  = dateFiltered.filter(r => r.type === 'income' || r.type === 'return').reduce((s, r) => s + Number(r.amount), 0);
+  const moneyOut = dateFiltered.filter(r => r.type === 'expense' || r.type === 'debt' || r.type === 'payment').reduce((s, r) => {
     const net = r.is_due ? Math.max(0, Number(r.amount) - Number(r.paid_amount ?? 0)) : Number(r.amount);
     return s + net;
   }, 0);
-  const loansActive        = recordings.filter(r => r.type === 'debt' && r.status !== 'paid').length;
-  const receivablesPending = recordings.filter(r =>
+  const loansActive        = dateFiltered.filter(r => r.type === 'debt' && r.status !== 'paid').length;
+  const receivablesPending = dateFiltered.filter(r =>
     (r.type === 'due' && r.status !== 'paid') ||
     (r.type === 'expense' && r.is_due && Number(r.paid_amount ?? 0) < Number(r.amount) - 0.01)
   ).length;
@@ -462,6 +467,255 @@ export default function SpaceDetailScreen() {
     setDisplayCount(10);
   };
 
+  const buildStatementHtml = (paymentsByParent: Record<string, any[]>) => {
+    const fmtDate = (d: string) => {
+      if (!d) return '\u2014';
+      const [y, m, day] = d.split('-').map(Number);
+      return new Date(y, m - 1, day).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    };
+    const fmtAmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2 });
+    const fmtD = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+
+    const TEAL   = '#2A7A6F';
+    const PEACH_C = '#FFAB91';
+    const MINT    = '#B6E1DE';
+    const TEXT    = '#425252';
+    const MUTED   = '#929090';
+    const FAINT   = '#c0c0c0';
+    const BORDER  = '#f0f0f0';
+
+    // Build groups from all date-filtered recordings (ignores tab filter) for accurate totals
+    // Exclude linked recordings — they'll be appended after their parent
+    const linkedIds = new Set(Object.values(paymentsByParent).flat().map((p: any) => p.id));
+    const allGrouped: { key: string; date: Date; items: any[] }[] = [];
+    dateFiltered.filter((r: any) => !linkedIds.has(r.id)).forEach((r: any) => {
+      const [y, m, d] = r.transaction_date.split('-').map(Number);
+      const date = new Date(y, m - 1, d);
+      const k = dateKey(date);
+      const existing = allGrouped.find(g => g.key === k);
+      if (existing) existing.items.push(r);
+      else allGrouped.push({ key: k, date, items: [r] });
+    });
+    const sortedGroups = allGrouped.sort((a, b) => a.date.getTime() - b.date.getTime());
+
+    let totalIn = 0, totalOut = 0;
+    sortedGroups.flatMap(g => g.items).forEach((r: any) => {
+      if (r.type === 'income' || r.type === 'return') totalIn += Number(r.amount);
+      else if (r.type === 'expense' || r.type === 'debt' || r.type === 'payment') {
+        const net = r.is_due ? Math.max(0, Number(r.amount) - Number(r.paid_amount ?? 0)) : Number(r.amount);
+        totalOut += net;
+      }
+    });
+    const netBalance = totalIn - totalOut;
+    const netColor = netBalance >= 0 ? TEAL : PEACH_C;
+
+    const rangeStr = isSameDay(range.from, range.to)
+      ? fmtDate(fmtD(range.from))
+      : `${fmtDate(fmtD(range.from))} &ndash; ${fmtDate(fmtD(range.to))}`;
+    const generatedOn = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+
+    // Flatten all items across groups into a single sorted list, appending linked activities after their parent
+    const allItems: any[] = [];
+    sortedGroups.forEach(group => {
+      group.items.forEach((r: any) => {
+        allItems.push(r);
+        (paymentsByParent[r.id] ?? []).forEach((sub: any) => allItems.push(sub));
+      });
+    });
+
+    let runningBalance = 0;
+    const tableRows = allItems.map((r: any) => {
+        const tl = getTypeLabel(r.type, r.status, r.is_due, r.paid_amount, r.amount);
+        const displayAmt = Number(r.amount);
+        const isCredit = r.type === 'income' || r.type === 'return';
+        const isDebit  = r.type === 'expense' || r.type === 'debt' || r.type === 'payment';
+        if (isCredit) runningBalance += displayAmt;
+        else if (isDebit) runningBalance -= displayAmt;
+        const balColor = runningBalance >= 0 ? TEAL : PEACH_C;
+
+        return `<tr style="border-bottom:1px solid ${BORDER}">
+          <td style="padding:10px 8px;font-family:monospace;font-size:10px;color:${MUTED};white-space:nowrap">${fmtDate(r.transaction_date)}</td>
+          <td style="padding:10px 8px">
+            <div style="font-family:monospace;font-size:12px;font-weight:700;color:${TEXT}">${r.name}</div>
+            ${r.categories?.name ? `<div style="font-family:monospace;font-size:10px;color:${FAINT};margin-top:2px">${r.categories.name}</div>` : ''}
+          </td>
+          <td style="padding:10px 8px;text-align:center">
+            <span style="font-family:monospace;font-size:9px;font-weight:700;padding:3px 8px;border-radius:999px;background:${isCredit ? MINT + '55' : PEACH_C + '44'};color:${isCredit ? TEAL : PEACH_C};white-space:nowrap;letter-spacing:0.3px">${tl.label.toUpperCase()}</span>
+          </td>
+          <td style="padding:10px 8px;text-align:right;font-family:monospace;font-size:12px;font-weight:700;color:${PEACH_C}">${isDebit ? fmtAmt(displayAmt) : ''}</td>
+          <td style="padding:10px 8px;text-align:right;font-family:monospace;font-size:12px;font-weight:700;color:${TEAL}">${isCredit ? fmtAmt(displayAmt) : ''}</td>
+          <td style="padding:10px 8px;text-align:right;font-family:monospace;font-size:12px;font-weight:700;color:${balColor}">${fmtAmt(runningBalance)}</td>
+        </tr>`;
+      }).join('');
+
+    return `<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; background:#fff; width:794px; padding:32px; }
+  table { width:100%; border-collapse:collapse; }
+  th { padding:9px 8px; font-family:monospace; font-size:10px; font-weight:700; color:${MUTED}; text-transform:uppercase; letter-spacing:0.6px; border-bottom:1px solid ${BORDER}; }
+  th:nth-child(4), th:nth-child(5), th:nth-child(6) { text-align:right; }
+</style>
+</head><body>
+
+<div style="font-family:monospace;font-size:13px;font-weight:700;color:${TEAL};letter-spacing:1px;margin-bottom:16px">LEDGR</div>
+<div style="font-size:26px;font-weight:600;color:${TEXT};letter-spacing:-0.5px;margin-bottom:6px">${String(name)}</div>
+<div style="font-family:monospace;font-size:11px;color:${MUTED};margin-bottom:2px">${rangeStr}</div>
+<div style="font-family:monospace;font-size:10px;color:${FAINT};margin-bottom:24px">${dateFiltered.length} transaction${dateFiltered.length !== 1 ? 's' : ''} &middot; generated ${generatedOn}</div>
+
+<div style="height:1px;background:${BORDER};margin-bottom:20px"></div>
+
+<div style="display:flex;gap:12px;margin-bottom:24px">
+  <div style="flex:1;border:1px solid ${BORDER};border-radius:12px;padding:14px 16px">
+    <div style="font-family:monospace;font-size:10px;color:${MUTED};letter-spacing:0.6px;text-transform:uppercase;margin-bottom:6px">money in</div>
+    <div style="font-family:monospace;font-size:18px;font-weight:700;color:${TEAL}">${fmtAmt(totalIn)}</div>
+  </div>
+  <div style="flex:1;border:1px solid ${BORDER};border-radius:12px;padding:14px 16px">
+    <div style="font-family:monospace;font-size:10px;color:${MUTED};letter-spacing:0.6px;text-transform:uppercase;margin-bottom:6px">money out</div>
+    <div style="font-family:monospace;font-size:18px;font-weight:700;color:${PEACH_C}">${fmtAmt(totalOut)}</div>
+  </div>
+  <div style="flex:1;border:1px solid ${BORDER};border-radius:12px;padding:14px 16px;background:${netBalance >= 0 ? MINT + '44' : PEACH_C + '33'}">
+    <div style="font-family:monospace;font-size:10px;color:${MUTED};letter-spacing:0.6px;text-transform:uppercase;margin-bottom:6px">net</div>
+    <div style="font-family:monospace;font-size:18px;font-weight:700;color:${netColor}">${fmtAmt(netBalance)}</div>
+  </div>
+</div>
+
+<div style="border:1px solid ${BORDER};border-radius:12px;overflow:hidden;margin-bottom:24px">
+  <table>
+    <thead>
+      <tr style="background:#fafafa">
+        <th style="width:100px;text-align:left">Date</th>
+        <th style="text-align:left">Description</th>
+        <th style="width:130px;text-align:center">Type</th>
+        <th style="width:110px">Out</th>
+        <th style="width:110px">In</th>
+        <th style="width:110px">Balance</th>
+      </tr>
+    </thead>
+    <tbody>${tableRows}</tbody>
+    <tfoot>
+      <tr style="background:#fafafa;border-top:1px solid ${BORDER}">
+        <td colspan="3" style="padding:10px 8px;font-family:monospace;font-size:10px;font-weight:700;color:${MUTED};letter-spacing:0.6px;text-transform:uppercase">closing balance</td>
+        <td style="padding:10px 8px;text-align:right;font-family:monospace;font-size:12px;font-weight:700;color:${PEACH_C}">${fmtAmt(totalOut)}</td>
+        <td style="padding:10px 8px;text-align:right;font-family:monospace;font-size:12px;font-weight:700;color:${TEAL}">${fmtAmt(totalIn)}</td>
+        <td style="padding:10px 8px;text-align:right;font-family:monospace;font-size:13px;font-weight:700;color:${netColor}">${fmtAmt(netBalance)}</td>
+      </tr>
+    </tfoot>
+  </table>
+</div>
+
+<div style="font-family:monospace;font-size:10px;color:${FAINT};text-align:center">generated by LEDGR</div>
+
+</body></html>`;
+  };
+
+  const handleStatementWebViewMessage = async (event: any) => {
+    const dataUrl: string = event.nativeEvent.data;
+    if (!dataUrl.startsWith('data:image/png')) return;
+    setCaptureHtml(null);
+    try {
+      const FileSystem = require('expo-file-system');
+      const MediaLibrary = require('expo-media-library');
+      const Sharing = require('expo-sharing');
+      const base64 = dataUrl.replace('data:image/png;base64,', '');
+      const fileUri = `${FileSystem.cacheDirectory}statement_${Date.now()}.png`;
+      await FileSystem.writeAsStringAsync(fileUri, base64, { encoding: FileSystem.EncodingType.Base64 });
+      if (Platform.OS === 'ios') {
+        const { status } = await MediaLibrary.requestPermissionsAsync();
+        if (status === 'granted') {
+          await MediaLibrary.saveToLibraryAsync(fileUri);
+          alert('Statement saved to your Photos!');
+        } else if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(fileUri, { mimeType: 'image/png', dialogTitle: 'Save statement' });
+        }
+      } else {
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(fileUri, { mimeType: 'image/png', dialogTitle: 'Save statement' });
+        }
+      }
+    } catch (e) { console.error('handleStatementWebViewMessage error:', e); }
+    finally { setStatementLoading(false); }
+  };
+
+  const generateStatement = async () => {
+    const diffDays = (range.to.getTime() - range.from.getTime()) / 86400000;
+    if (diffDays > 184) { alert('Statement is limited to a maximum of 6 months.'); return; }
+    if (filtered.length === 0) { alert('No recordings found for this period.'); return; }
+    setStatementLoading(true);
+    try {
+      const recordingIds = filtered.map((r: any) => r.id);
+      const { data: linkedPayments } = await supabase
+        .from('recordings')
+        .select('id, name, amount, transaction_date, type, linked_recording_id')
+        .in('linked_recording_id', recordingIds)
+        .in('type', ['return', 'expense', 'income'])
+        .order('transaction_date', { ascending: true });
+      const paymentsByParent: Record<string, any[]> = {};
+      (linkedPayments ?? []).forEach((p: any) => {
+        if (!paymentsByParent[p.linked_recording_id]) paymentsByParent[p.linked_recording_id] = [];
+        paymentsByParent[p.linked_recording_id].push(p);
+      });
+      const html = buildStatementHtml(paymentsByParent);
+      if (Platform.OS === 'web') {
+        await new Promise<void>((resolve, reject) => {
+          if ((window as any).html2canvas) { resolve(); return; }
+          const script = document.createElement('script');
+          script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+          script.onload = () => resolve(); script.onerror = reject;
+          document.head.appendChild(script);
+        });
+        const iframe = document.createElement('iframe');
+        iframe.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;height:4000px;border:none;background:#fff';
+        document.body.appendChild(iframe);
+        iframe.contentDocument!.open();
+        iframe.contentDocument!.write(html);
+        iframe.contentDocument!.close();
+        await new Promise(r => setTimeout(r, 800));
+        const body = iframe.contentDocument!.body;
+        const fullCanvas = await (window as any).html2canvas(body, {
+          scale: 2, useCORS: true, allowTaint: true, backgroundColor: '#ffffff',
+          width: 794, windowWidth: 794, scrollY: 0, scrollX: 0,
+          height: body.scrollHeight, windowHeight: body.scrollHeight,
+        });
+        document.body.removeChild(iframe);
+        const totalH = fullCanvas.height;
+        const sliceH = PAGE_HEIGHT * 2;
+        const pageCount = Math.ceil(totalH / sliceH);
+        const slug = String(name).replace(/\s+/g, '-');
+        for (let i = 0; i < pageCount; i++) {
+          const sliceCanvas = document.createElement('canvas');
+          sliceCanvas.width = fullCanvas.width;
+          sliceCanvas.height = Math.min(sliceH, totalH - i * sliceH);
+          sliceCanvas.getContext('2d')!.drawImage(fullCanvas, 0, -i * sliceH);
+          await new Promise<void>(res => {
+            sliceCanvas.toBlob(blob => {
+              if (!blob) { res(); return; }
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = pageCount > 1 ? `${slug}-statement-${i + 1}.png` : `${slug}-statement.png`;
+              document.body.appendChild(a); a.click();
+              document.body.removeChild(a); URL.revokeObjectURL(url);
+              res();
+            }, 'image/png');
+          });
+        }
+        setStatementLoading(false);
+      } else {
+        const captureScript = html.replace(
+          '</body>',
+          `<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>`+
+          `<script>window.onload=function(){html2canvas(document.body,{scale:2,useCORS:true,backgroundColor:'#ffffff',width:794,windowWidth:794}).then(function(c){window.ReactNativeWebView.postMessage(c.toDataURL('image/png'));});}<\/script>`+
+          `</body>`
+        );
+        setCaptureHtml(captureScript);
+      }
+    } catch (e) {
+      console.error('generateStatement error:', e);
+      setStatementLoading(false);
+    }
+  };
+
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <Animated.View style={[{ flex: 1, backgroundColor: Colors.white }, { transform: [{ translateX: slideAnim }] }]}>
@@ -473,6 +727,16 @@ export default function SpaceDetailScreen() {
             <Ionicons name="arrow-back" size={20} color={Colors.text} />
           </TouchableOpacity>
           <Text style={s.title} numberOfLines={1}>{name}</Text>
+          <TouchableOpacity
+            style={[s.addBtn, { backgroundColor: Colors.surface, marginRight: 2 }]}
+            onPress={generateStatement}
+            activeOpacity={0.8}
+            disabled={statementLoading}
+          >
+            {statementLoading
+              ? <ActivityIndicator size="small" color={Colors.cyan} />
+              : <Ionicons name="document-text-outline" size={16} color={Colors.cyan} />}
+          </TouchableOpacity>
           {spaceId !== 'all' && (
             <TouchableOpacity
               style={s.addBtn}
@@ -492,20 +756,11 @@ export default function SpaceDetailScreen() {
           scrollEventThrottle={16}
         >
 
-          {/* Tab circles — dashboard style */}
-          <View style={s.tabRow}>
-            {ACTIVITY_TABS.map(tab => {
-              const isActive = selectedTabs.has(tab.key);
-              return (
-                <TouchableOpacity key={tab.key} style={s.tabWrap} onPress={() => handleTabToggle(tab.key)} activeOpacity={0.75}>
-                  <View style={[s.tabCircle, isActive && s.tabCircleActive]}>
-                    <Text style={[s.tabCircleValue, isActive && s.tabCircleValueActive]}>{tabValue(tab.key)}</Text>
-                  </View>
-                  <Text style={[s.tabLabel, isActive && s.tabLabelActive]}>{tab.label}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
+          <ActivityTabs
+            selectedTabs={selectedTabs}
+            onToggle={handleTabToggle}
+            tabValue={tabValue}
+          />
 
           {/* Filter controls row */}
           <View style={s.filterControlsRow}>
@@ -681,6 +936,21 @@ export default function SpaceDetailScreen() {
         </View>
       </BottomSheet>
 
+      {/* Hidden WebView for native statement capture */}
+      {captureHtml && Platform.OS !== 'web' && (() => {
+        const { WebView } = require('react-native-webview');
+        return (
+          <WebView
+            ref={webviewRef}
+            source={{ html: captureHtml }}
+            style={{ position: 'absolute', width: 794, height: 1, opacity: 0, top: -9999 }}
+            onMessage={handleStatementWebViewMessage}
+            javaScriptEnabled
+            originWhitelist={['*']}
+          />
+        );
+      })()}
+
       {/* Delete confirm */}
       <ConfirmModal
         visible={confirmModal}
@@ -719,15 +989,7 @@ const s = StyleSheet.create({
   filterBtn:    { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: Colors.white, borderWidth: 1, borderColor: Colors.borderMid },
   filterBtnText: { fontFamily: Fonts.mono, fontSize: 11, color: Colors.text },
 
-  // Tab circles — dashboard style
-  tabRow:               { flexDirection: 'row', justifyContent: 'space-between', paddingTop: 16, paddingBottom: 4 },
-  tabWrap:              { flex: 1, alignItems: 'center' },
-  tabCircle:            { width: 56, height: 56, borderRadius: 28, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.surface },
-  tabCircleActive:      { backgroundColor: Colors.cyan },
-  tabCircleValue:       { fontFamily: Fonts.monoBold, fontSize: 11, color: Colors.muted, letterSpacing: -0.3 },
-  tabCircleValueActive: { color: Colors.white },
-  tabLabel:             { fontFamily: Fonts.mono,     fontSize: 9,  color: Colors.muted, marginTop: 5, letterSpacing: 0.2 },
-  tabLabelActive:       { fontFamily: Fonts.monoBold, fontSize: 9,  color: Colors.cyan },
+  // Tab circles — now in ActivityTabs component
 
   // Empty
   emptyWrap: { alignItems: 'center', paddingVertical: 24 },

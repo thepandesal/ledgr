@@ -801,10 +801,11 @@ export default function SplitBillDetailScreen() {
       const assignedToMe = (item.people ?? []).includes(person);
       if (!assignedToMe || !item.recording_id) return;
       const pp = (item.people ?? []).length > 0 ? Number(item.cost) / item.people.length : 0;
+      const deduct = isDeductType(item.recording_type);
       const rid = item.recording_id;
       const lr = linkedRecordings.find((l: any) => l.recording?.id === rid);
       if (!recordingOwed[rid]) recordingOwed[rid] = { amount: 0, rec: lr?.recording };
-      recordingOwed[rid].amount += pp;
+      recordingOwed[rid].amount += deduct ? -pp : pp;
     });
     return Object.entries(recordingOwed)
       .map(([recordingId, { amount, rec }]) => ({
@@ -822,7 +823,8 @@ export default function SplitBillDetailScreen() {
       const assignedToMe = (item.people ?? []).includes(person);
       if (!assignedToMe || item.recording_id) return;
       const pp = (item.people ?? []).length > 0 ? Number(item.cost) / item.people.length : 0;
-      manual += pp;
+      const deduct = isDeductType(item.recording_type);
+      manual += deduct ? -pp : pp;
     });
     return manual;
   };
@@ -888,13 +890,14 @@ export default function SplitBillDetailScreen() {
       const assignedToMe = (item.people ?? []).includes(paymentPerson);
       if (!assignedToMe) return;
       const pp = (item.people ?? []).length > 0 ? Number(item.cost) / item.people.length : 0;
+      const deduct = isDeductType(item.recording_type);
       if (item.recording_id) {
         const rid = item.recording_id;
         const lr = linkedRecordings.find((l: any) => l.recording?.id === rid);
         if (!recordingOwed[rid]) recordingOwed[rid] = { amount: 0, rec: lr?.recording };
-        recordingOwed[rid].amount += pp;
+        recordingOwed[rid].amount += deduct ? -pp : pp;
       } else {
-        manualOwed += pp;
+        manualOwed += deduct ? -pp : pp;
       }
     });
 

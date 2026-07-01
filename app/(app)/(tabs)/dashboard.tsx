@@ -8,6 +8,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useUser } from '../../../src/hooks/useUser';
 import { supabase } from '../../../src/lib/supabase';
 import BottomSheet from '@/components/ui/BottomSheet';
+import ActivityTabs, { ACTIVITY_TABS, ActivityTab } from '@/components/ui/ActivityTabs';
 import { Colors, Fonts, Radius } from '@/components/ui/theme';
 import { Spacing } from '@/components/ui/theme';
 import pageStyles from '@/components/ui/pageStyles';
@@ -22,16 +23,6 @@ const ACCENT_TEXT = '#101514'; // dark text on light accent
 const PEACH = '#FFAB91';
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-
-const ACTIVITY_TABS = [
-  { key: 'all',         label: 'All',         icon: 'apps-outline',              types: ['income','expense','debt','due'] },
-  { key: 'money-in',    label: 'Money In',    icon: 'arrow-down-circle-outline', types: ['income'] },
-  { key: 'money-out',   label: 'Money Out',   icon: 'arrow-up-circle-outline',   types: ['expense'] },
-  { key: 'loans',       label: 'Debt',        icon: 'cash-outline',              types: ['debt'] },
-  { key: 'receivables', label: 'Due',         icon: 'arrow-undo-outline',        types: ['due', 'expense'] },
-] as const;
-
-type ActivityTab = typeof ACTIVITY_TABS[number]['key'];
 
 type Preset = 'this-month' | 'last-30' | 'cutoff' | 'custom';
 
@@ -519,19 +510,13 @@ export default function DashboardScreen() {
           s.menuCard,
           { opacity: headerAnim, transform: [{ translateY: headerAnim.interpolate({ inputRange: [0,1], outputRange: [-130,0] }) }] },
         ]}>
-          <View style={s.tabRow}>
-            {ACTIVITY_TABS.map(tab => {
-              const isActive = selectedTabs.has(tab.key);
-              return (
-                <TouchableOpacity key={tab.key} style={s.tabWrap} onPress={() => handleTabToggle(tab.key)} activeOpacity={0.75}>
-                  <View style={[s.tabCircle, isActive && s.tabCircleActive]}>
-                    <Text style={[s.tabCircleValue, isActive && s.tabCircleValueActive]}>{tabValue(tab.key)}</Text>
-                  </View>
-                  <Text style={[s.tabLabel, isActive && s.tabLabelActive]}>{tab.label}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
+          <ActivityTabs
+            selectedTabs={selectedTabs}
+            onToggle={handleTabToggle}
+            tabValue={tabValue}
+            activeColor={ACCENT}
+            activeTextColor={ACCENT_TEXT}
+          />
           <View style={s.filterRow}>
             <View style={s.dateNavRow}>
               <TouchableOpacity style={s.dateNavArrow} onPress={() => navigateRange(-1)} activeOpacity={0.7}>
@@ -926,15 +911,7 @@ const s = StyleSheet.create({
     paddingTop: 12, paddingBottom: 8, gap: 8,
   },
 
-  // Tab circles
-  tabRow:  { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 25, paddingVertical: 4 },
-  tabWrap: { flex: 1, alignItems: 'center' },
-  tabCircle:            { width: 56, height: 56, borderRadius: 28, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.surface },
-  tabCircleActive:      { backgroundColor: ACCENT },
-  tabCircleValue:       { fontFamily: Fonts.monoBold, fontSize: 11, color: Colors.muted, letterSpacing: -0.3 },
-  tabCircleValueActive: { color: ACCENT_TEXT },
-  tabLabel:             { fontFamily: 'ChillaxRegular', fontSize: 9, color: Colors.muted, marginTop: 5, letterSpacing: 0.2 },
-  tabLabelActive:       { fontFamily: 'ChillaxMedium', fontSize: 9, color: ACCENT_TEXT },
+  // Tab circles — now in ActivityTabs component
 
   // Filter row
   filterRow:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },

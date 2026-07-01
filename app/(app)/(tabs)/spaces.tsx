@@ -111,7 +111,7 @@ export default function SpacesScreen() {
         supabase.from('recordings').select('space_id, amount, type, is_due, paid_amount')
           .eq('user_id', userId).gte('transaction_date', fromStr).lte('transaction_date', toStr),
         supabase.from('recordings').select('space_id, amount, type')
-          .eq('user_id', userId).in('type', ['income', 'return']),
+          .eq('user_id', userId).eq('type', 'income'),
       ]);
 
       const spentMap: Record<string, number> = {};
@@ -120,7 +120,9 @@ export default function SpacesScreen() {
       const countMap: Record<string, number> = {};
 
       (allTimeRecs ?? []).forEach((r: any) => {
-        savedAllTimeMap[r.space_id] = (savedAllTimeMap[r.space_id] ?? 0) + Number(r.amount);
+        if (r.type === 'income') {
+          savedAllTimeMap[r.space_id] = (savedAllTimeMap[r.space_id] ?? 0) + Number(r.amount);
+        }
       });
       
       // Debug: log what we're processing
@@ -137,9 +139,6 @@ export default function SpacesScreen() {
         
         // Calculate amounts based on type
         if (r.type === 'income') {
-          savedMap[r.space_id] = (savedMap[r.space_id] || 0) + Number(r.amount);
-        } else if (r.type === 'return') {
-          // Returns are money coming back (like income)
           savedMap[r.space_id] = (savedMap[r.space_id] || 0) + Number(r.amount);
         } else if (r.type === 'expense') {
           // For expenses, if it's due, only count the outstanding amount
@@ -377,6 +376,7 @@ export default function SpacesScreen() {
         </View>
         <View style={s.cardRight}>
           <View style={s.cardRow}><Text style={s.cardRowLabel}>saved</Text><Text style={[s.cardRowValue, { color: ACCENT_DARK }]}>{fmtCompact(value)}</Text></View>
+          <View style={s.cardRow}><Text style={s.cardRowLabel}>all time</Text><Text style={[s.cardRowValue, { color: ACCENT_DARK }]}>{fmtCompact(allTime)}</Text></View>
           {budget > 0 && (<>
             <View style={s.cardRow}><Text style={s.cardRowLabel}>goal</Text><Text style={s.cardRowValue}>{fmtCompact(budget)}</Text></View>
             <View style={s.cardRow}><Text style={s.cardRowLabel}>remaining</Text><Text style={[s.cardRowValue, { color: statusColor }]}>{fmtCompact(remaining)}</Text></View>
@@ -410,19 +410,19 @@ export default function SpacesScreen() {
           {/* Left: arrows + date label */}
           <View style={s.dateNav}>
             <TouchableOpacity style={s.dateNavArrow} onPress={() => { const next = dateOffset - 1; setDateOffset(next); saveSetting({ spaces_date_offset: next }); }} activeOpacity={0.7}>
-              <Ionicons name="chevron-back" size={12} color={ACCENT_DARK} />
+              <Ionicons name="chevron-back" size={14} color={ACCENT_DARK} />
             </TouchableOpacity>
             <TouchableOpacity style={s.dateLabelBtn} onPress={openMonthYearModal} activeOpacity={0.8}>
-              <Ionicons name="calendar-outline" size={11} color={ACCENT_DARK} />
+              <Ionicons name="calendar-outline" size={13} color={ACCENT_DARK} />
               <Text style={s.dateLabelText}>{dateLabel}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={s.dateNavArrow} onPress={() => { const next = dateOffset + 1; setDateOffset(next); saveSetting({ spaces_date_offset: next }); }} activeOpacity={0.7}>
-              <Ionicons name="chevron-forward" size={12} color={ACCENT_DARK} />
+              <Ionicons name="chevron-forward" size={14} color={ACCENT_DARK} />
             </TouchableOpacity>
           </View>
           {/* Right: filter button */}
           <TouchableOpacity style={s.modeSelectorBtn} onPress={openDateModal} activeOpacity={0.8}>
-            <Ionicons name="options-outline" size={11} color={ACCENT_DARK} />
+            <Ionicons name="options-outline" size={13} color={ACCENT_DARK} />
             <Text style={s.modeSelectorText}>filter</Text>
           </TouchableOpacity>
         </View>
@@ -773,11 +773,11 @@ const s = StyleSheet.create({
   // ── Date filter ──────────────────────────────────────────────────────────
   dateFilterRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.page, marginTop: 20, marginBottom: 8 },
   dateNav:           { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  modeSelectorBtn:   { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: Radius.pill, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border },
-  modeSelectorText:  { fontFamily: Fonts.monoBold, fontSize: 10, color: ACCENT_DARK },
-  dateNavArrow:      { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border },
-  dateLabelBtn:      { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: Radius.pill, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border },
-  dateLabelText:     { fontFamily: Fonts.monoBold, fontSize: 10, color: ACCENT_DARK },
+  modeSelectorBtn:   { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: Colors.white, borderWidth: 1, borderColor: Colors.borderMid },
+  modeSelectorText:  { fontFamily: Fonts.mono, fontSize: 11, color: Colors.text },
+  dateNavArrow:      { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.surface },
+  dateLabelBtn:      { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: Colors.white, borderWidth: 1, borderColor: Colors.borderMid },
+  dateLabelText:     { fontFamily: Fonts.mono, fontSize: 11, color: Colors.text },
   dateModalLabel:    { fontFamily: Fonts.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.6, textTransform: 'uppercase', marginTop: 16, marginBottom: 8 },
   modeChips:         { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   modeChip:          { paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border },
