@@ -85,6 +85,7 @@ export default function RecordingDetailScreen() {
   const [linkedPayments, setLinkedPayments] = useState<any[]>([]);
   const [linkedPayable, setLinkedPayable] = useState<any>(null);
   const [linkedReceivable, setLinkedReceivable] = useState<any>(null);
+  const [splitBillPayments, setSplitBillPayments] = useState<any[]>([]);
   const [payablePerPerson, setPayablePerPerson] = useState<{ map: Record<string, number>; paidFor: string[] }>({ map: {}, paidFor: [] });
   const [personPayStatus, setPersonPayStatus] = useState<{ person: string; paid: number; total: number }[]>([]);
   const [collectModal, setCollectModal] = useState(false);
@@ -244,6 +245,23 @@ export default function RecordingDetailScreen() {
     if (!recordingId) return;
     const { data: rec } = await supabase.from('recordings').select('type, linked_recording_id').eq('id', recordingId).single();
     if (!rec) return;
+
+    // Always load split bill payments if this recording is linked to a split bill
+    const { data: sbrRow } = await supabase
+      .from('split_bill_recordings')
+      .select('split_bill_id')
+      .eq('recording_id', recordingId)
+      .maybeSingle();
+    if (sbrRow?.split_bill_id) {
+      const { data: sbp } = await supabase
+        .from('split_bill_payments')
+        .select('id, person_name, amount, created_at')
+        .eq('split_bill_id', sbrRow.split_bill_id)
+        .order('created_at', { ascending: false });
+      setSplitBillPayments(sbp ?? []);
+    } else {
+      setSplitBillPayments([]);
+    }
 
     if (rec.type === 'debt' || rec.type === 'due') {
       const paymentType = rec.type === 'debt' ? 'expense' : 'return';
@@ -1475,6 +1493,30 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                   </View>
                 </>
               )}
+            </>
+          )}
+
+          {/* Split bill collections */}
+          {splitBillPayments.length > 0 && (
+            <>
+              <View style={rd.divider} />
+              <View style={rd.sectionRow}>
+                <Text style={rd.sectionHeader}>split bill collections</Text>
+              </View>
+              <View style={{ paddingHorizontal: PAGE }}>
+                {splitBillPayments.map((p: any) => (
+                  <View key={p.id} style={rd.recRow}>
+                    <View style={rd.recIconWrap}><Ionicons name="person-outline" size={14} color={ACCENT_DARK} /></View>
+                    <View style={rd.recMid}>
+                      <Text style={rd.recName}>{p.person_name}</Text>
+                      <Text style={rd.recDate}>{new Date(p.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</Text>
+                    </View>
+                    <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 13, color: ACCENT_DARK }}>
+                      {Number(p.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    </Text>
+                  </View>
+                ))}
+              </View>
             </>
           )}
 

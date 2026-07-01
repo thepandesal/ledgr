@@ -294,11 +294,8 @@ export default function SpaceDetailScreen() {
     const to = new Date(range.to); to.setHours(23, 59, 59);
     return date <= to;
   });
-  const moneyIn  = dateFiltered.filter(r => r.type === 'income' || r.type === 'return').reduce((s, r) => s + Number(r.amount), 0);
-  const moneyOut = dateFiltered.filter(r => r.type === 'expense' || r.type === 'debt' || r.type === 'payment').reduce((s, r) => {
-    const net = r.is_due ? Math.max(0, Number(r.amount) - Number(r.paid_amount ?? 0)) : Number(r.amount);
-    return s + net;
-  }, 0);
+  const moneyIn  = dateFiltered.filter(r => r.type === 'income').reduce((s, r) => s + Number(r.amount), 0);
+  const moneyOut = dateFiltered.filter(r => r.type === 'expense' || r.type === 'debt' || r.type === 'payment').reduce((s, r) => s + Number(r.amount), 0);
   const loansActive        = dateFiltered.filter(r => r.type === 'debt' && r.status !== 'paid').length;
   const receivablesPending = dateFiltered.filter(r =>
     (r.type === 'due' && r.status !== 'paid') ||
@@ -500,10 +497,9 @@ export default function SpaceDetailScreen() {
 
     let totalIn = 0, totalOut = 0;
     sortedGroups.flatMap(g => g.items).forEach((r: any) => {
-      if (r.type === 'income' || r.type === 'return') totalIn += Number(r.amount);
+      if (r.type === 'income') totalIn += Number(r.amount);
       else if (r.type === 'expense' || r.type === 'debt' || r.type === 'payment') {
-        const net = r.is_due ? Math.max(0, Number(r.amount) - Number(r.paid_amount ?? 0)) : Number(r.amount);
-        totalOut += net;
+        totalOut += Number(r.amount);
       }
     });
     const netBalance = totalIn - totalOut;

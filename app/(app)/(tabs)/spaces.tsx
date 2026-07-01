@@ -143,9 +143,7 @@ export default function SpacesScreen() {
         if (r.type === 'income') {
           savedMap[r.space_id] = (savedMap[r.space_id] || 0) + Number(r.amount);
         } else if (r.type === 'expense') {
-          // For expenses, if it's due, only count the outstanding amount
-          const net = r.is_due ? Math.max(0, Number(r.amount) - Number(r.paid_amount ?? 0)) : Number(r.amount);
-          spentMap[r.space_id] = (spentMap[r.space_id] || 0) + net;
+          spentMap[r.space_id] = (spentMap[r.space_id] || 0) + Number(r.amount);
         } else if (r.type === 'debt') {
           spentMap[r.space_id] = (spentMap[r.space_id] || 0) + Number(r.amount);
         } else if (r.type === 'payment') {
