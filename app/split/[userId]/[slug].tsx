@@ -219,10 +219,10 @@ export default function SplitShareSlugPage() {
                 <View style={{ flex: 1 }}>
                   <Text style={s.rowName}>{p.name}</Text>
                   {partiallyPaid && (
-                    <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: '#FFAB91' }}>{fmt(paid)} paid</Text>
+                    <Text style={s.splitMeta}>{fmt(paid)} paid</Text>
                   )}
                   {fullyPaid && (
-                    <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: '#4CAF50' }}>complete</Text>
+                    <Text style={s.splitMeta}>complete</Text>
                   )}
                 </View>
                 <Text style={[s.rowAmount, { color: p.total < 0 ? PEACH : ACCENT_DARK }]}>
@@ -254,8 +254,12 @@ export default function SplitShareSlugPage() {
                     <Text style={[s.rowAmount, { color: deduct ? PEACH : ACCENT_DARK }]}>{deduct ? '-' : '+'}{fmt(Number(item.cost ?? 0))}</Text>
                   </View>
                   {subs.length === 0 && itemPeople.length > 0 && (
-                    <View style={s.itemMeta}>
-                      <Text style={s.splitMeta}>{fmt(Number(item.cost ?? 0) / itemPeople.length)} each · {itemPeople.join(', ')}</Text>
+                    <View style={[s.itemMeta, { flexDirection: 'row', flexWrap: 'wrap', gap: 4 }]}>
+                      {itemPeople.map((person: string, pi: number) => (
+                        <View key={pi} style={{ backgroundColor: ACCENT + '44', borderRadius: 99, paddingHorizontal: 8, paddingVertical: 3 }}>
+                          <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: ACCENT_DARK }}>{person}</Text>
+                        </View>
+                      ))}
                     </View>
                   )}
                   {subs.map((sub, si) => {
@@ -269,7 +273,7 @@ export default function SplitShareSlugPage() {
                             <Text style={s.subName}>{String(sub.name ?? '').toLowerCase()}</Text>
                             <Text style={s.subCost}>{fmt(Number(sub.cost ?? 0))}</Text>
                           </View>
-                          <Text style={s.splitMeta}>{fmt(pp)} each · {subPeople.join(', ')}</Text>
+                          <Text style={s.splitMeta}>{subPeople.join(', ')}</Text>
                         </View>
                       </View>
                     );
