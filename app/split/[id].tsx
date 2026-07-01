@@ -246,7 +246,7 @@ export default function SplitSharePage() {
               const deduct = isDeduct(item.recording_type ?? '');
               return (
                 <View key={ii} style={s.itemCard}>
-                  <View style={s.itemHeader}>
+                  <View style={[s.itemHeader, subs.length === 0 && itemPeople.length > 0 && { paddingBottom: 4 }]}>
                     <View style={[s.rowIconWrap, { backgroundColor: ACCENT + '44' }]}>
                       <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 13, color: ACCENT_DARK }}>{ii + 1}</Text>
                     </View>
