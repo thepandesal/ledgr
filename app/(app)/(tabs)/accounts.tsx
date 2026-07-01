@@ -32,6 +32,8 @@ export default function AccountsScreen() {
   const [editAccount, setEditAccount] = useState<Account | null>(null);
   const [menuModal, setMenuModal] = useState(false);
   const [selected, setSelected] = useState<Account | null>(null);
+  const [cropUri, setCropUri] = useState<string | null>(null);
+  const [onCropDone, setOnCropDone] = useState<((b64: string) => void) | null>(null);
 
   const { data: accounts = [] } = useQuery<Account[]>({
     queryKey: ['accounts', userId],
@@ -104,7 +106,18 @@ export default function AccountsScreen() {
         initial={editAccount}
         onClose={closeModal}
         onSaved={() => { closeModal(); queryClient.invalidateQueries({ queryKey: ['accounts', userId] }); }}
+        onRequestCrop={(uri, cb) => { setCropUri(uri); setOnCropDone(() => cb); }}
       />
+
+      <Modal visible={!!cropUri} transparent={false} animationType="slide" onRequestClose={() => setCropUri(null)}>
+        {cropUri && (
+          <InlineCropModal
+            uri={cropUri}
+            onCrop={(b64) => { onCropDone?.(b64); setCropUri(null); setOnCropDone(null); }}
+            onCancel={() => { setCropUri(null); setOnCropDone(null); }}
+          />
+        )}
+      </Modal>
 
       <ConfirmModal
         visible={menuModal}
@@ -221,8 +234,9 @@ const cs = StyleSheet.create({
 
 // ─── AccountForm ─────────────────────────────────────────────────────────────
 
-function AccountForm({ visible, userId, initial, onClose, onSaved }: {
+function AccountForm({ visible, userId, initial, onClose, onSaved, onRequestCrop }: {
   visible: boolean; userId: string; initial?: Account | null; onClose: () => void; onSaved: () => void;
+  onRequestCrop: (uri: string, cb: (b64: string) => void) => void;
 }) {
   const [bankInput, setBankInput] = useState(initial?.bank ?? '');
   const [suggestions, setSuggestions] = useState<string[]>([]);
@@ -249,13 +263,11 @@ function AccountForm({ visible, userId, initial, onClose, onSaved }: {
     setSuggestions(val.trim() ? DEFAULT_BANKS.filter(b => b.toLowerCase().includes(val.toLowerCase())) : []);
   };
 
-  const [cropUri, setCropUri] = useState<string | null>(null);
-
   const pickQR = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') { Alert.alert('Permission needed', 'Please allow photo access.'); return; }
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: false, quality: 1 });
-    if (!result.canceled && result.assets[0]) setCropUri(result.assets[0].uri);
+    if (!result.canceled && result.assets[0]) onRequestCrop(result.assets[0].uri, (b64) => setQrCode(b64));
   };
 
   const handleSubmit = async () => {
@@ -272,9 +284,6 @@ function AccountForm({ visible, userId, initial, onClose, onSaved }: {
 
   return (
     <>
-      <Modal visible={!!cropUri} transparent={false} animationType="slide" onRequestClose={() => setCropUri(null)}>
-        {cropUri && <InlineCropModal uri={cropUri} onCrop={(b64) => { setQrCode(b64); setCropUri(null); }} onCancel={() => setCropUri(null)} />}
-      </Modal>
       <BottomSheet visible={visible} onClose={onClose} title={initial ? 'edit account' : 'new account'} height="60%">
         <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           {error ? <Text style={f.error}>{error}</Text> : null}
