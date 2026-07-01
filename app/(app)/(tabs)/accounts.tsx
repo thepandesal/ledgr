@@ -1,7 +1,6 @@
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView,
-  TextInput, ActivityIndicator, Alert, Animated, Image,
-  PanResponder, Dimensions,
+  TextInput, ActivityIndicator, Alert, Image, Dimensions, Modal,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../../src/lib/supabase';
@@ -122,128 +121,82 @@ export default function AccountsScreen() {
   );
 }
 
-// ─── CropView ─────────────────────────────────────────────────────────────
+// ─── CropView (Croppie on web) ───────────────────────────────────────────────────────
 
 function CropView({ uri, onCrop, onCancel }: { uri: string; onCrop: (base64: string) => void; onCancel: () => void }) {
-  const [imgNatural, setImgNatural] = useState({ w: 1, h: 1 });
-  const [rendered, setRendered] = useState({ x: 0, y: 0, w: SW, h: SH });
-  const initSize = INIT_CROP;
-  const initX = (SW - initSize) / 2;
-  const initY = (SH - initSize) / 2;
-
-  const boxRef = useRef({ x: initX, y: initY, s: initSize });
-  const animX = useRef(new Animated.Value(initX)).current;
-  const animY = useRef(new Animated.Value(initY)).current;
-  const animS = useRef(new Animated.Value(initSize)).current;
+  const containerRef = useRef<any>(null);
+  const croppieRef = useRef<any>(null);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    Image.getSize(uri, (w, h) => {
-      setImgNatural({ w, h });
-      // Compute how the image is rendered with resizeMode="contain"
-      const imgRatio = w / h;
-      const screenRatio = SW / SH;
-      let rw, rh, rx, ry;
-      if (imgRatio > screenRatio) {
-        rw = SW; rh = SW / imgRatio; rx = 0; ry = (SH - rh) / 2;
-      } else {
-        rh = SH; rw = SH * imgRatio; rx = (SW - rw) / 2; ry = 0;
+    if (typeof window === 'undefined') return;
+
+    // Load Croppie CSS
+    if (!document.getElementById('croppie-css')) {
+      const link = document.createElement('link');
+      link.id = 'croppie-css';
+      link.rel = 'stylesheet';
+      link.href = 'https://cdnjs.cloudflare.com/ajax/libs/croppie/2.6.5/croppie.min.css';
+      document.head.appendChild(link);
+    }
+
+    const initCroppie = () => {
+      if (!containerRef.current || !(window as any).Croppie) return;
+      const size = Math.min(SW, SH) * 0.8;
+      croppieRef.current = new (window as any).Croppie(containerRef.current, {
+        viewport: { width: size * 0.7, height: size * 0.7, type: 'square' },
+        boundary: { width: size, height: size },
+        showZoomer: true,
+        enableOrientation: true,
+      });
+      croppieRef.current.bind({ url: uri }).then(() => setReady(true));
+    };
+
+    if ((window as any).Croppie) {
+      initCroppie();
+    } else {
+      const script = document.createElement('script');
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/croppie/2.6.5/croppie.min.js';
+      script.onload = initCroppie;
+      document.head.appendChild(script);
+    }
+
+    return () => {
+      if (croppieRef.current) {
+        try { croppieRef.current.destroy(); } catch (_) {}
+        croppieRef.current = null;
       }
-      setRendered({ x: rx, y: ry, w: rw, h: rh });
-      // Center crop box on the image
-      const s = Math.min(rw, rh) * 0.7;
-      const x = rx + (rw - s) / 2;
-      const y = ry + (rh - s) / 2;
-      boxRef.current = { x, y, s };
-      animX.setValue(x);
-      animY.setValue(y);
-      animS.setValue(s);
-    });
+    };
   }, [uri]);
 
-  const mode = useRef<'move' | 'resize' | null>(null);
-  const startBox = useRef(boxRef.current);
-
-  const pan = useRef(PanResponder.create({
-    onStartShouldSetPanResponder: () => true,
-    onMoveShouldSetPanResponder: () => true,
-    onPanResponderGrant: (e) => {
-      startBox.current = { ...boxRef.current };
-      const { locationX, locationY } = e.nativeEvent;
-      mode.current = (locationX > startBox.current.s - HANDLE_HIT && locationY > startBox.current.s - HANDLE_HIT) ? 'resize' : 'move';
-    },
-    onPanResponderMove: (_, gs) => {
-      const b = startBox.current;
-      if (mode.current === 'move') {
-        animX.setValue(Math.max(0, Math.min(SW - b.s, b.x + gs.dx)));
-        animY.setValue(Math.max(0, Math.min(SH - b.s, b.y + gs.dy)));
-      } else {
-        animS.setValue(Math.max(MIN_CROP, Math.min(Math.min(SW - b.x, SH - b.y), b.s + gs.dx)));
-      }
-    },
-    onPanResponderRelease: (_, gs) => {
-      const b = startBox.current;
-      const newBox = mode.current === 'move'
-        ? { x: Math.max(0, Math.min(SW - b.s, b.x + gs.dx)), y: Math.max(0, Math.min(SH - b.s, b.y + gs.dy)), s: b.s }
-        : { ...b, s: Math.max(MIN_CROP, Math.min(Math.min(SW - b.x, SH - b.y), b.s + gs.dx)) };
-      boxRef.current = newBox;
-      mode.current = null;
-    },
-  })).current;
-
   const doCrop = async () => {
-    const { x: cx, y: cy, s: cs } = boxRef.current;
-    const { w: iw, h: ih } = imgNatural;
-    const { x: rx, y: ry, w: rw, h: rh } = rendered;
-    // Map screen crop box to natural image coordinates
-    const scaleX = iw / rw;
-    const scaleY = ih / rh;
-    const originX = Math.max(0, (cx - rx) * scaleX);
-    const originY = Math.max(0, (cy - ry) * scaleY);
-    const cropW = Math.min(iw - originX, cs * scaleX);
-    const cropH = Math.min(ih - originY, cs * scaleY);
-    const result = await ImageManipulator.manipulateAsync(
-      uri,
-      [{ crop: { originX, originY, width: cropW, height: cropH } }, { resize: { width: 600, height: 600 } }],
-      { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG, base64: true }
-    );
-    onCrop(`data:image/jpeg;base64,${result.base64}`);
+    if (!croppieRef.current) return;
+    const result = await croppieRef.current.result({ type: 'base64', size: { width: 600, height: 600 }, format: 'jpeg', quality: 0.9 });
+    onCrop(result);
   };
 
+  if (typeof window === 'undefined') return null;
+
   return (
-    <View style={{ flex: 1, backgroundColor: '#000' }}>
-      <Image source={{ uri }} style={{ position: 'absolute', top: 0, left: 0, width: SW, height: SH }} resizeMode="contain" />
-      <Animated.View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: animY, backgroundColor: 'rgba(0,0,0,0.6)' }} pointerEvents="none" />
-      <Animated.View style={{ position: 'absolute', top: animY, width: animX, height: animS, backgroundColor: 'rgba(0,0,0,0.6)' }} pointerEvents="none" />
-      <Animated.View style={{ position: 'absolute', top: animY, left: Animated.add(animX, animS), right: 0, height: animS, backgroundColor: 'rgba(0,0,0,0.6)' }} pointerEvents="none" />
-      <Animated.View style={{ position: 'absolute', top: Animated.add(animY, animS), left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)' }} pointerEvents="none" />
-      <Animated.View style={{ position: 'absolute', left: animX, top: animY, width: animS, height: animS, borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' }} {...pan.panHandlers}>
-        {[0,1,2,3].map(i => {
-          const corners = [
-            { top: 0, left: 0, borderRightWidth: 0, borderBottomWidth: 0 },
-            { top: 0, right: 0, borderLeftWidth: 0, borderBottomWidth: 0 },
-            { bottom: 0, left: 0, borderRightWidth: 0, borderTopWidth: 0 },
-            { bottom: 0, right: 0, borderLeftWidth: 0, borderTopWidth: 0 },
-          ];
-          return <View key={i} style={[{ position: 'absolute', width: 22, height: 22, borderColor: ACCENT, borderWidth: 2.5 }, corners[i]]} />;
-        })}
-        <View style={{ position: 'absolute', bottom: 6, right: 6 }}>
-          <Ionicons name="resize-outline" size={12} color="rgba(255,255,255,0.6)" />
-        </View>
-      </Animated.View>
-      {/* Bottom save button — always visible */}
-      <TouchableOpacity
-        style={{ position: 'absolute', bottom: 48, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: ACCENT, borderRadius: 999, paddingVertical: 14, paddingHorizontal: 32 }}
-        onPress={doCrop}
-      >
-        <Ionicons name="checkmark-circle" size={18} color="#000" />
-        <Text style={{ fontFamily: Fonts.monoBold, fontSize: 14, color: '#000' }}>save crop</Text>
-      </TouchableOpacity>
-      <View style={{ position: 'absolute', top: 52, left: 0, right: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24 }}>
-        <TouchableOpacity onPress={onCancel} style={{ width: 44, height: 44, justifyContent: 'center', alignItems: 'center' }}>
-          <Ionicons name="close" size={24} color="#fff" />
+    <View style={{ flex: 1, backgroundColor: '#111', justifyContent: 'center', alignItems: 'center' }}>
+      {/* Croppie container */}
+      <div ref={containerRef} style={{ width: Math.min(SW, SH) * 0.8, height: Math.min(SW, SH) * 0.8 }} />
+
+      {/* Buttons */}
+      <View style={{ flexDirection: 'row', gap: 12, marginTop: 24 }}>
+        <TouchableOpacity
+          onPress={onCancel}
+          style={{ paddingVertical: 12, paddingHorizontal: 24, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.15)' }}
+        >
+          <Text style={{ fontFamily: Fonts.mono, fontSize: 14, color: '#fff' }}>cancel</Text>
         </TouchableOpacity>
-        <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: 'rgba(255,255,255,0.6)' }}>drag to move · corner to resize</Text>
-        <View style={{ width: 44 }} />
+        <TouchableOpacity
+          onPress={doCrop}
+          style={{ paddingVertical: 12, paddingHorizontal: 32, borderRadius: 999, backgroundColor: ACCENT, opacity: ready ? 1 : 0.4 }}
+          disabled={!ready}
+        >
+          <Text style={{ fontFamily: Fonts.monoBold, fontSize: 14, color: '#000' }}>save crop</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -300,12 +253,13 @@ function AccountForm({ visible, userId, initial, onClose, onSaved }: {
   };
 
   return (
-    <BottomSheet visible={visible} onClose={onClose} title={initial ? 'edit account' : 'new account'} height="60%">
-      {cropUri ? (
-        <View style={StyleSheet.absoluteFill}>
+    <>
+      <Modal visible={!!cropUri} transparent={false} animationType="slide" onRequestClose={() => setCropUri(null)}>
+        {cropUri && (
           <CropView uri={cropUri} onCrop={(b64) => { setQrCode(b64); setCropUri(null); }} onCancel={() => setCropUri(null)} />
-        </View>
-      ) : (
+        )}
+      </Modal>
+      <BottomSheet visible={visible} onClose={onClose} title={initial ? 'edit account' : 'new account'} height="60%">
         <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           {error ? <Text style={f.error}>{error}</Text> : null}
 
@@ -351,8 +305,8 @@ function AccountForm({ visible, userId, initial, onClose, onSaved }: {
             {loading ? <ActivityIndicator color={Colors.white} /> : <Text style={f.saveBtnText}>{initial ? 'save changes' : 'add account'}</Text>}
           </TouchableOpacity>
         </ScrollView>
-      )}
-    </BottomSheet>
+      </BottomSheet>
+    </>
   );
 }
 
