@@ -143,6 +143,12 @@ export default function CropQRScreen() {
           <Ionicons name="checkmark" size={24} color="#0ccfcf" />
         </TouchableOpacity>
       </View>
+
+      {/* Save button at bottom */}
+      <TouchableOpacity style={styles.saveBtn} onPress={crop}>
+        <Ionicons name="checkmark-circle" size={20} color="#000" />
+        <Text style={styles.saveBtnText}>save crop</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -164,5 +170,7 @@ const styles = StyleSheet.create({
   header: { position: 'absolute', top: 52, left: 0, right: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24 },
   headerBtn: { width: 44, height: 44, justifyContent: 'center', alignItems: 'center' },
   headerTitle: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: 'rgba(255,255,255,0.7)' },
+  saveBtn: { position: 'absolute', bottom: 48, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#0ccfcf', borderRadius: 999, paddingVertical: 14, paddingHorizontal: 32 },
+  saveBtnText: { fontFamily: 'RobotoMono_700Bold', fontSize: 14, color: '#000' },
 });
 
