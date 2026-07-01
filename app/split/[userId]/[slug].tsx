@@ -190,11 +190,13 @@ export default function SplitShareSlugPage() {
   return (
     <>
       <ScrollView style={s.container} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
-        <Text style={s.appLabel}>LEDGR</Text>
-        <Text style={s.recName}>{String(recording.name ?? '').toLowerCase()}</Text>
-        <View style={s.metaRow}>
-          <Text style={[s.recAmount, { color: amtColor }]}>{fmt(Number(recording.amount ?? 0))}</Text>
-          {!!formattedDate && <Text style={s.recDate}>{formattedDate}</Text>}
+        <View style={s.waveHeader}>
+          <Text style={s.appLabel}>LEDGR</Text>
+          <Text style={s.recName}>{String(recording.name ?? '').toLowerCase()}</Text>
+          <View style={s.metaRow}>
+            <Text style={[s.recAmount, { color: amtColor }]}>{fmt(Number(recording.amount ?? 0))}</Text>
+            {!!formattedDate && <Text style={s.recDate}>{formattedDate}</Text>}
+          </View>
         </View>
 
         {perPerson.length > 0 && <>
@@ -254,7 +256,7 @@ export default function SplitShareSlugPage() {
                     <Text style={[s.rowAmount, { color: deduct ? PEACH : ACCENT_DARK }]}>{deduct ? '-' : '+'}{fmt(Number(item.cost ?? 0))}</Text>
                   </View>
                   {subs.length === 0 && itemPeople.length > 0 && (
-                    <View style={[s.itemMeta, { flexDirection: 'row', flexWrap: 'wrap', gap: 4 }]}>
+                    <View style={{ paddingHorizontal: 14, paddingBottom: 10, paddingLeft: 60, flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
                       {itemPeople.map((person: string, pi: number) => (
                         <View key={pi} style={{ backgroundColor: ACCENT + '44', borderRadius: 99, paddingHorizontal: 8, paddingVertical: 3 }}>
                           <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: ACCENT_DARK }}>{person}</Text>
@@ -366,14 +368,24 @@ export default function SplitShareSlugPage() {
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.white },
-  scroll:    { paddingHorizontal: PAGE, paddingTop: 48, paddingBottom: 60 },
+  scroll:    { paddingHorizontal: PAGE, paddingBottom: 60 },
   center:    { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.white, gap: 12 },
   emptyText: { fontFamily: Brand.font.mono, fontSize: 13, color: Colors.muted },
-  appLabel:  { fontFamily: Brand.font.appLabel, fontSize: 16, color: ACCENT_DARK, marginBottom: 16, letterSpacing: 1 },
-  recName:   { fontFamily: Brand.font.display, fontSize: 30, color: Colors.text, letterSpacing: -0.5, marginBottom: 8 },
-  metaRow:   { flexDirection: 'row', alignItems: 'baseline', gap: 12, marginBottom: 8 },
+  waveHeader: {
+    backgroundColor: '#B6E1DE',
+    paddingHorizontal: PAGE,
+    paddingTop: 48,
+    paddingBottom: 32,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
+    marginBottom: 8,
+    marginHorizontal: -PAGE,
+  },
+  appLabel:  { fontFamily: Brand.font.appLabel, fontSize: 16, color: '#2D3748', marginBottom: 12, textAlign: 'center' },
+  recName:   { fontFamily: Brand.font.display, fontSize: 28, color: '#2D3748', letterSpacing: -0.5, marginBottom: 8 },
+  metaRow:   { flexDirection: 'row', alignItems: 'baseline', gap: 12 },
   recAmount: { fontFamily: Brand.font.monoBold, fontSize: 22 },
-  recDate:   { fontFamily: Brand.font.mono, fontSize: 11, color: Colors.muted },
+  recDate:   { fontFamily: Brand.font.mono, fontSize: 11, color: '#2D374899' },
   sectionHeader: { ...Brand.type.sectionHeader, marginTop: 28, marginBottom: 10 },
   listBlock: { borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.border, overflow: 'hidden', marginBottom: 4 },
   row:        { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: Colors.border },
