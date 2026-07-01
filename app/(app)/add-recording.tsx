@@ -117,6 +117,9 @@ export default function AddRecordingScreen() {
   const [showExpenseModal, setShowExpenseModal]         = useState(false);
   const [expenseList, setExpenseList]                   = useState<any[]>([]);
 
+  // ── Type dropdown ─────────────────────────────────────────────────────────
+  const [showTypeModal, setShowTypeModal] = useState(false);
+
   // ── Derived ──────────────────────────────────────────────────────────────
   const isLoanType   = type === 'receivable' || type === 'payable';
   const isComboType  = type === 'expense_receivable';
@@ -368,27 +371,25 @@ export default function AddRecordingScreen() {
 
       {/* ── Type selector ── */}
       <FormLabel>type</FormLabel>
-      <View style={{ gap: 6 }}>
-        {TYPE_GROUPS.map(group => (
-          <View key={group.label}>
-            <Text style={{ fontFamily: Fonts.monoBold, fontSize: 9, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 4 }}>{group.label}</Text>
-            <View style={s.typeRow}>
-              {group.types.map(t => (
-                <TouchableOpacity
-                  key={t.key}
-                  style={[s.typeBtn, type === t.key && { backgroundColor: t.color, borderColor: t.color }]}
-                  onPress={() => { setType(t.key); setIsRecurring(false); }}
-                >
-                  <Ionicons name={t.icon as any} size={12} color={type === t.key ? Colors.white : Colors.muted} />
-                  <Text style={[s.typeBtnText, type === t.key && { color: Colors.white, fontFamily: Fonts.monoBold }]}>
-                    {t.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+      <SelectorButton
+        placeholder="select type"
+        onPress={() => setShowTypeModal(true)}
+        hasValue={!!selectedType}
+      >
+        {selectedType && (
+          <View style={s.selectedItem}>
+            <View style={[s.catDot, { backgroundColor: selectedType.color + '33' }]}>
+              <Ionicons name={selectedType.icon as any} size={11} color={selectedType.color} />
+            </View>
+            <View>
+              <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted, textTransform: 'uppercase', letterSpacing: 0.6 }}>
+                {TYPE_GROUPS.find(g => g.types.some((t: any) => t.key === type))?.label}
+              </Text>
+              <Text style={s.selectedItemText}>{selectedType.label}</Text>
             </View>
           </View>
-        ))}
-      </View>
+        )}
+      </SelectorButton>
 
       {/* ── Core info block ── */}
       <FormBlock style={s.infoBlockSpaced}>
@@ -673,6 +674,37 @@ export default function AddRecordingScreen() {
       >
         {loading ? <ActivityIndicator color={Colors.white} /> : <Text style={s.saveBtnText}>save recording</Text>}
       </TouchableOpacity>
+
+      {/* ── Type picker modal ── */}
+      <BottomSheet visible={showTypeModal} onClose={() => setShowTypeModal(false)} sub="recording" title="select type">
+        <ScrollView showsVerticalScrollIndicator={false}>
+          {TYPE_GROUPS.map(group => (
+            <View key={group.label} style={{ marginBottom: 16 }}>
+              <Text style={{ fontFamily: Fonts.monoBold, fontSize: 9, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8 }}>{group.label}</Text>
+              {group.types.map((t: any) => (
+                <TouchableOpacity
+                  key={t.key}
+                  style={[
+                    { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 14, borderRadius: Radius.lg, marginBottom: 6, borderWidth: 1 },
+                    type === t.key
+                      ? { backgroundColor: t.color + '22', borderColor: t.color }
+                      : { backgroundColor: Colors.surface, borderColor: Colors.border },
+                  ]}
+                  onPress={() => { setType(t.key); setIsRecurring(false); setShowTypeModal(false); }}
+                >
+                  <View style={[s.catDot, { backgroundColor: t.color + '33' }]}>
+                    <Ionicons name={t.icon as any} size={13} color={t.color} />
+                  </View>
+                  <Text style={{ fontFamily: type === t.key ? Fonts.monoBold : Fonts.mono, fontSize: 13, color: type === t.key ? t.color : Colors.text }}>
+                    {t.label}
+                  </Text>
+                  {type === t.key && <Ionicons name="checkmark" size={14} color={t.color} style={{ marginLeft: 'auto' }} />}
+                </TouchableOpacity>
+              ))}
+            </View>
+          ))}
+        </ScrollView>
+      </BottomSheet>
 
       {/* ── Category picker modal ── */}
       <BottomSheet visible={showCategoryModal} onClose={() => setShowCategoryModal(false)} sub="recording" title="category">
