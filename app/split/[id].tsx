@@ -423,6 +423,6 @@ const s = StyleSheet.create({
   footer: { fontFamily: Brand.font.mono, fontSize: 10, color: Colors.faint, textAlign: 'center', marginTop: 8 },
 
   overlay: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  qrLarge: { width: 260, height: 260, borderRadius: Radius.lg },
+  qrLarge: { width: '90%' as any, height: undefined, aspectRatio: 1, borderRadius: Radius.lg },
   qrTap:   { fontFamily: Brand.font.mono, fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 16 },
 });
