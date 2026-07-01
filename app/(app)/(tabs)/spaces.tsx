@@ -405,26 +405,6 @@ export default function SpacesScreen() {
   return (
     <SafeAreaView style={s.root}>
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
-        {/* Active / Inactive toggle */}
-        <View style={s.actionRow}>
-          <View style={s.tabToggle}>
-            <TouchableOpacity
-              style={[s.tabBtn, activeTab === 'active' && s.tabBtnActive]}
-              onPress={() => switchTab('active')}
-              activeOpacity={0.8}
-            >
-              <Text style={[s.tabBtnText, activeTab === 'active' && s.tabBtnTextActive]}>active</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[s.tabBtn, activeTab === 'inactive' && s.tabBtnActive]}
-              onPress={() => switchTab('inactive')}
-              activeOpacity={0.8}
-            >
-              <Text style={[s.tabBtnText, activeTab === 'inactive' && s.tabBtnTextActive]}>inactive</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
         {/* Date filter row */}
         <View style={s.dateFilterRow}>
           {/* Left: arrows + date label */}
@@ -440,10 +420,10 @@ export default function SpacesScreen() {
               <Ionicons name="chevron-forward" size={12} color={ACCENT_DARK} />
             </TouchableOpacity>
           </View>
-          {/* Right: mode selector button */}
+          {/* Right: filter button */}
           <TouchableOpacity style={s.modeSelectorBtn} onPress={openDateModal} activeOpacity={0.8}>
             <Ionicons name="options-outline" size={11} color={ACCENT_DARK} />
-            <Text style={s.modeSelectorText}>{dateMode}</Text>
+            <Text style={s.modeSelectorText}>filter</Text>
           </TouchableOpacity>
         </View>
 
@@ -540,7 +520,23 @@ export default function SpacesScreen() {
       />
 
       {/* ── Date filter modal ── */}
-      <BottomSheet visible={dateModalOpen} onClose={closeDateModal} title="date filter" height="50%">
+      <BottomSheet visible={dateModalOpen} onClose={closeDateModal} title="filter" height="55%">
+        {/* Active / Inactive */}
+        <Text style={s.dateModalLabel}>show</Text>
+        <View style={s.tabRow}>
+          {(['active', 'inactive'] as const).map(tab => (
+            <TouchableOpacity key={tab} style={s.tabWrap} onPress={() => switchTab(tab)} activeOpacity={0.75}>
+              <View style={[s.tabCircle, activeTab === tab && s.tabCircleActive]}>
+                <Text style={[s.tabCircleValue, activeTab === tab && s.tabCircleValueActive]}>
+                  {tab === 'active'
+                    ? spaces.filter(sp => sp.is_active !== false).length
+                    : spaces.filter(sp => sp.is_active === false).length}
+                </Text>
+              </View>
+              <Text style={[s.tabLabel, activeTab === tab && s.tabLabelActive]}>{tab}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
         {/* Mode chips */}
         <Text style={s.dateModalLabel}>view by</Text>
         <View style={s.modeChips}>
@@ -726,15 +722,18 @@ const s = StyleSheet.create({
   scroll: { paddingBottom: 60 },
 
   // ── Header ──────────────────────────────────────────────────────────────
-  actionRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.page, marginTop: 20, marginBottom: 8 },
-  tabToggle:       { flexDirection: 'row', backgroundColor: Colors.surface, borderRadius: Radius.pill, padding: 3, borderWidth: 1, borderColor: Colors.border },
-  tabBtn:          { paddingHorizontal: 18, paddingVertical: 6, borderRadius: Radius.pill },
-  tabBtnActive:    { backgroundColor: ACCENT },
-  tabBtnText:      { fontFamily: Fonts.mono, fontSize: 11, color: Colors.muted },
-  tabBtnTextActive:{ fontFamily: Fonts.monoBold, fontSize: 11, color: ACCENT_TEXT },
-
   slideOuter: { overflow: 'hidden' },
   slidePair:  { flexDirection: 'row' },
+
+  // ── Circle tabs (active/inactive) ──────────────────────────────────────────────────────────────────────────────────────
+  tabRow:               { flexDirection: 'row', justifyContent: 'center', gap: 32, paddingVertical: 8 },
+  tabWrap:              { alignItems: 'center' },
+  tabCircle:            { width: 56, height: 56, borderRadius: 28, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.surface },
+  tabCircleActive:      { backgroundColor: ACCENT },
+  tabCircleValue:       { fontFamily: Fonts.monoBold, fontSize: 14, color: Colors.muted },
+  tabCircleValueActive: { color: ACCENT_TEXT },
+  tabLabel:             { fontFamily: 'ChillaxRegular', fontSize: 9, color: Colors.muted, marginTop: 5, letterSpacing: 0.2 },
+  tabLabelActive:       { fontFamily: 'ChillaxMedium', fontSize: 9, color: ACCENT_TEXT },
 
   // ── Empty ────────────────────────────────────────────────────────────────
   emptyWrap: { paddingVertical: 48, alignItems: 'center', paddingHorizontal: Spacing.page },
@@ -772,7 +771,7 @@ const s = StyleSheet.create({
   footer: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.faint, textAlign: 'center', marginTop: 32, paddingHorizontal: Spacing.page },
 
   // ── Date filter ──────────────────────────────────────────────────────────
-  dateFilterRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.page, marginBottom: 8 },
+  dateFilterRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.page, marginTop: 20, marginBottom: 8 },
   dateNav:           { flexDirection: 'row', alignItems: 'center', gap: 4 },
   modeSelectorBtn:   { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: Radius.pill, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border },
   modeSelectorText:  { fontFamily: Fonts.monoBold, fontSize: 10, color: ACCENT_DARK },
