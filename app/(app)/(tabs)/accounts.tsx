@@ -153,7 +153,16 @@ function InlineCropModal({ uri, onCrop, onCancel }: { uri: string; onCrop: (b64:
       setImgNaturalSize({ w, h });
       const ratio = Math.min(SW / w, SH / h);
       const dw = w * ratio, dh = h * ratio;
-      setImgDisplay({ x: (SW - dw) / 2, y: (SH - dh) / 2, w: dw, h: dh });
+      const dx = (SW - dw) / 2, dy = (SH - dh) / 2;
+      setImgDisplay({ x: dx, y: dy, w: dw, h: dh });
+      // reset crop box to fit inside the displayed image
+      const initSize = Math.min(dw, dh) * 0.7;
+      boxX.current = dx + (dw - initSize) / 2;
+      boxY.current = dy + (dh - initSize) / 2;
+      boxSize.current = initSize;
+      animX.setValue(boxX.current);
+      animY.setValue(boxY.current);
+      animSize.setValue(initSize);
     });
   }, [uri]);
 
@@ -162,12 +171,14 @@ function InlineCropModal({ uri, onCrop, onCancel }: { uri: string; onCrop: (b64:
     onMoveShouldSetPanResponder: () => true,
     onPanResponderGrant: () => { startMove.current = { x: boxX.current, y: boxY.current }; },
     onPanResponderMove: (_, gs) => {
-      animX.setValue(Math.max(0, Math.min(SW - boxSize.current, startMove.current.x + gs.dx)));
-      animY.setValue(Math.max(0, Math.min(SH - boxSize.current, startMove.current.y + gs.dy)));
+      const { x: ix, y: iy, w: iw, h: ih } = imgDisplay;
+      animX.setValue(Math.max(ix, Math.min(ix + iw - boxSize.current, startMove.current.x + gs.dx)));
+      animY.setValue(Math.max(iy, Math.min(iy + ih - boxSize.current, startMove.current.y + gs.dy)));
     },
     onPanResponderRelease: (_, gs) => {
-      boxX.current = Math.max(0, Math.min(SW - boxSize.current, startMove.current.x + gs.dx));
-      boxY.current = Math.max(0, Math.min(SH - boxSize.current, startMove.current.y + gs.dy));
+      const { x: ix, y: iy, w: iw, h: ih } = imgDisplay;
+      boxX.current = Math.max(ix, Math.min(ix + iw - boxSize.current, startMove.current.x + gs.dx));
+      boxY.current = Math.max(iy, Math.min(iy + ih - boxSize.current, startMove.current.y + gs.dy));
     },
   })).current;
 
@@ -176,11 +187,14 @@ function InlineCropModal({ uri, onCrop, onCancel }: { uri: string; onCrop: (b64:
     onMoveShouldSetPanResponder: () => true,
     onPanResponderGrant: () => { startSize.current = boxSize.current; },
     onPanResponderMove: (_, gs) => {
-      const s = Math.max(MIN_CROP, Math.min(Math.min(SW - boxX.current, SH - boxY.current), startSize.current + gs.dx));
-      animSize.setValue(s);
+      const { x: ix, y: iy, w: iw, h: ih } = imgDisplay;
+      const maxS = Math.min(ix + iw - boxX.current, iy + ih - boxY.current);
+      animSize.setValue(Math.max(MIN_CROP, Math.min(maxS, startSize.current + gs.dx)));
     },
     onPanResponderRelease: (_, gs) => {
-      boxSize.current = Math.max(MIN_CROP, Math.min(Math.min(SW - boxX.current, SH - boxY.current), startSize.current + gs.dx));
+      const { x: ix, y: iy, w: iw, h: ih } = imgDisplay;
+      const maxS = Math.min(ix + iw - boxX.current, iy + ih - boxY.current);
+      boxSize.current = Math.max(MIN_CROP, Math.min(maxS, startSize.current + gs.dx));
     },
   })).current;
 
