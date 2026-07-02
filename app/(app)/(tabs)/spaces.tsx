@@ -140,7 +140,7 @@ export default function SpacesScreen() {
         }
         
         // Calculate amounts based on type
-        if (r.type === 'income') {
+        if (r.type === 'income' || r.type === 'due') {
           savedMap[r.space_id] = (savedMap[r.space_id] || 0) + Number(r.amount);
         } else if (r.type === 'expense') {
           spentMap[r.space_id] = (spentMap[r.space_id] || 0) + Number(r.amount);
