@@ -139,7 +139,7 @@ function InlineCropModal({ uri, onCrop, onCancel }: { uri: string; onCrop: (b64:
   const [imgNaturalSize, setImgNaturalSize] = useState({ w: 1, h: 1 });
   const [box, setBox] = useState({ x: 0, y: 0, size: INIT_CROP });
   const imgDisplay = useRef({ x: 0, y: 0, w: SW, h: SH });
-  const drag = useRef<{ type: 'move' | 'resize'; startX: number; startY: number; origBox: typeof box } | null>(null);
+  const drag = useRef<{ type: 'move' | 'tl' | 'tr' | 'bl' | 'br'; startX: number; startY: number; origBox: typeof box } | null>(null);
 
   useEffect(() => {
     Image.getSize(uri, (w, h) => {
@@ -174,11 +174,11 @@ function InlineCropModal({ uri, onCrop, onCancel }: { uri: string; onCrop: (b64:
     drag.current = { type: 'move', startX: cx, startY: cy, origBox: box };
   };
 
-  const onResizeStart = (e: any) => {
+  const onResizeStart = (corner: 'tl' | 'tr' | 'bl' | 'br') => (e: any) => {
     e.preventDefault();
     e.stopPropagation();
     const { cx, cy } = getClientXY(e);
-    drag.current = { type: 'resize', startX: cx, startY: cy, origBox: box };
+    drag.current = { type: corner, startX: cx, startY: cy, origBox: box };
   };
 
   useEffect(() => {
@@ -191,8 +191,12 @@ function InlineCropModal({ uri, onCrop, onCancel }: { uri: string; onCrop: (b64:
       if (drag.current.type === 'move') {
         setBox(clampBox(origBox.x + dx, origBox.y + dy, origBox.size));
       } else {
-        const newSize = Math.max(MIN_CROP, origBox.size + Math.max(dx, dy));
-        setBox(clampBox(origBox.x, origBox.y, newSize));
+        const t = drag.current.type;
+        // anchor is the opposite corner — size grows toward drag direction
+        const newSize = Math.max(MIN_CROP, origBox.size + (t === 'tl' ? -Math.min(dx, dy) : t === 'tr' ? Math.max(-dy, dx) : t === 'bl' ? Math.max(dy, -dx) : Math.max(dx, dy)));
+        const nx = (t === 'tl' || t === 'bl') ? origBox.x + origBox.size - newSize : origBox.x;
+        const ny = (t === 'tl' || t === 'tr') ? origBox.y + origBox.size - newSize : origBox.y;
+        setBox(clampBox(nx, ny, newSize));
       }
     };
     const onUp = () => { drag.current = null; };
@@ -240,16 +244,10 @@ function InlineCropModal({ uri, onCrop, onCancel }: { uri: string; onCrop: (b64:
         onTouchStart={onMoveStart}
         style={{ position: 'absolute', left: box.x, top: box.y, width: box.size, height: box.size, border: '1px solid rgba(255,255,255,0.4)', cursor: 'move', boxSizing: 'border-box' }}
       >
-        {/* corners */}
-        {([['top',0,'left',0,'Right','Bottom'],['top',0,'right',0,'Left','Bottom'],['bottom',0,'left',0,'Right','Top'],] as any[]).map(([v1,o1,v2,o2,b1,b2], i) => (
-          <div key={i} style={{ position: 'absolute', [v1]: o1, [v2]: o2, width: CORNER, height: CORNER, borderTop: v1==='top'?'2.5px solid #0ccfcf':'none', borderBottom: v1==='bottom'?'2.5px solid #0ccfcf':'none', [`border${b1}`]: '2.5px solid #0ccfcf', borderRight: 'none', borderLeft: 'none', [`border${b2}`]: 'none' }} />
-        ))}
-        {/* bottom-right resize corner */}
-        <div
-          onMouseDown={onResizeStart}
-          onTouchStart={onResizeStart}
-          style={{ position: 'absolute', bottom: 0, right: 0, width: CORNER, height: CORNER, borderBottom: '2.5px solid #0ccfcf', borderRight: '2.5px solid #0ccfcf', cursor: 'nwse-resize' }}
-        />
+        <div onMouseDown={onResizeStart('tl')} onTouchStart={onResizeStart('tl')} style={{ position: 'absolute', top: 0, left: 0, width: CORNER, height: CORNER, borderTop: '2.5px solid #0ccfcf', borderLeft: '2.5px solid #0ccfcf', cursor: 'nwse-resize' }} />
+        <div onMouseDown={onResizeStart('tr')} onTouchStart={onResizeStart('tr')} style={{ position: 'absolute', top: 0, right: 0, width: CORNER, height: CORNER, borderTop: '2.5px solid #0ccfcf', borderRight: '2.5px solid #0ccfcf', cursor: 'nesw-resize' }} />
+        <div onMouseDown={onResizeStart('bl')} onTouchStart={onResizeStart('bl')} style={{ position: 'absolute', bottom: 0, left: 0, width: CORNER, height: CORNER, borderBottom: '2.5px solid #0ccfcf', borderLeft: '2.5px solid #0ccfcf', cursor: 'nesw-resize' }} />
+        <div onMouseDown={onResizeStart('br')} onTouchStart={onResizeStart('br')} style={{ position: 'absolute', bottom: 0, right: 0, width: CORNER, height: CORNER, borderBottom: '2.5px solid #0ccfcf', borderRight: '2.5px solid #0ccfcf', cursor: 'nwse-resize' }} />
       </div>
 
       {/* header */}
