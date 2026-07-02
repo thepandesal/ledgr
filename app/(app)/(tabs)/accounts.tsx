@@ -1,6 +1,6 @@
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView,
-  TextInput, ActivityIndicator, Alert, Image, Dimensions, Modal, Animated, PanResponder,
+  TextInput, ActivityIndicator, Alert, Image, Dimensions, Modal,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../../src/lib/supabase';
@@ -137,16 +137,9 @@ export default function AccountsScreen() {
 
 function InlineCropModal({ uri, onCrop, onCancel }: { uri: string; onCrop: (b64: string) => void; onCancel: () => void }) {
   const [imgNaturalSize, setImgNaturalSize] = useState({ w: 1, h: 1 });
+  const [box, setBox] = useState({ x: 0, y: 0, size: INIT_CROP });
   const imgDisplay = useRef({ x: 0, y: 0, w: SW, h: SH });
-
-  const boxX = useRef((SW - INIT_CROP) / 2);
-  const boxY = useRef((SH - INIT_CROP) / 2);
-  const boxSize = useRef(INIT_CROP);
-  const animX = useRef(new Animated.Value(boxX.current)).current;
-  const animY = useRef(new Animated.Value(boxY.current)).current;
-  const animSize = useRef(new Animated.Value(boxSize.current)).current;
-  const startMove = useRef({ x: 0, y: 0 });
-  const startSize = useRef(0);
+  const drag = useRef<{ type: 'move' | 'resize'; startX: number; startY: number; origBox: typeof box } | null>(null);
 
   useEffect(() => {
     Image.getSize(uri, (w, h) => {
@@ -155,56 +148,72 @@ function InlineCropModal({ uri, onCrop, onCancel }: { uri: string; onCrop: (b64:
       const dw = w * ratio, dh = h * ratio;
       const dx = (SW - dw) / 2, dy = (SH - dh) / 2;
       imgDisplay.current = { x: dx, y: dy, w: dw, h: dh };
-      // reset crop box to fit inside the displayed image
       const initSize = Math.min(dw, dh) * 0.7;
-      boxX.current = dx + (dw - initSize) / 2;
-      boxY.current = dy + (dh - initSize) / 2;
-      boxSize.current = initSize;
-      animX.setValue(boxX.current);
-      animY.setValue(boxY.current);
-      animSize.setValue(initSize);
+      setBox({ x: dx + (dw - initSize) / 2, y: dy + (dh - initSize) / 2, size: initSize });
     });
   }, [uri]);
 
-  const movePan = useRef(PanResponder.create({
-    onStartShouldSetPanResponder: () => true,
-    onMoveShouldSetPanResponder: () => true,
-    onPanResponderGrant: () => { startMove.current = { x: boxX.current, y: boxY.current }; },
-    onPanResponderMove: (_, gs) => {
-      const { x: ix, y: iy, w: iw, h: ih } = imgDisplay.current;
-      animX.setValue(Math.max(ix, Math.min(ix + iw - boxSize.current, startMove.current.x + gs.dx)));
-      animY.setValue(Math.max(iy, Math.min(iy + ih - boxSize.current, startMove.current.y + gs.dy)));
-    },
-    onPanResponderRelease: (_, gs) => {
-      const { x: ix, y: iy, w: iw, h: ih } = imgDisplay.current;
-      boxX.current = Math.max(ix, Math.min(ix + iw - boxSize.current, startMove.current.x + gs.dx));
-      boxY.current = Math.max(iy, Math.min(iy + ih - boxSize.current, startMove.current.y + gs.dy));
-    },
-  })).current;
+  const clampBox = (x: number, y: number, size: number) => {
+    const { x: ix, y: iy, w: iw, h: ih } = imgDisplay.current;
+    const s = Math.max(MIN_CROP, Math.min(size, iw, ih));
+    return {
+      x: Math.max(ix, Math.min(ix + iw - s, x)),
+      y: Math.max(iy, Math.min(iy + ih - s, y)),
+      size: s,
+    };
+  };
 
-  const resizePan = useRef(PanResponder.create({
-    onStartShouldSetPanResponder: () => true,
-    onMoveShouldSetPanResponder: () => true,
-    onPanResponderGrant: () => { startSize.current = boxSize.current; },
-    onPanResponderMove: (_, gs) => {
-      const { x: ix, y: iy, w: iw, h: ih } = imgDisplay.current;
-      const maxS = Math.min(ix + iw - boxX.current, iy + ih - boxY.current);
-      animSize.setValue(Math.max(MIN_CROP, Math.min(maxS, startSize.current + gs.dx)));
-    },
-    onPanResponderRelease: (_, gs) => {
-      const { x: ix, y: iy, w: iw, h: ih } = imgDisplay.current;
-      const maxS = Math.min(ix + iw - boxX.current, iy + ih - boxY.current);
-      boxSize.current = Math.max(MIN_CROP, Math.min(maxS, startSize.current + gs.dx));
-    },
-  })).current;
+  const getClientXY = (e: any) => {
+    if (e.touches && e.touches[0]) return { cx: e.touches[0].clientX, cy: e.touches[0].clientY };
+    return { cx: e.clientX, cy: e.clientY };
+  };
+
+  const onMoveStart = (e: any) => {
+    e.preventDefault();
+    const { cx, cy } = getClientXY(e);
+    drag.current = { type: 'move', startX: cx, startY: cy, origBox: box };
+  };
+
+  const onResizeStart = (e: any) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const { cx, cy } = getClientXY(e);
+    drag.current = { type: 'resize', startX: cx, startY: cy, origBox: box };
+  };
+
+  useEffect(() => {
+    const onMove = (e: any) => {
+      if (!drag.current) return;
+      const { cx, cy } = getClientXY(e);
+      const dx = cx - drag.current.startX;
+      const dy = cy - drag.current.startY;
+      const { origBox } = drag.current;
+      if (drag.current.type === 'move') {
+        setBox(clampBox(origBox.x + dx, origBox.y + dy, origBox.size));
+      } else {
+        const newSize = Math.max(MIN_CROP, origBox.size + Math.max(dx, dy));
+        setBox(clampBox(origBox.x, origBox.y, newSize));
+      }
+    };
+    const onUp = () => { drag.current = null; };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    window.addEventListener('touchmove', onMove, { passive: false });
+    window.addEventListener('touchend', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      window.removeEventListener('touchmove', onMove);
+      window.removeEventListener('touchend', onUp);
+    };
+  }, [box]);
 
   const doCrop = async () => {
-    const cx = boxX.current, cy = boxY.current, cs = boxSize.current;
     const { x: ix, y: iy, w: iw, h: ih } = imgDisplay.current;
-    const originX = Math.max(0, (cx - ix) / iw * imgNaturalSize.w);
-    const originY = Math.max(0, (cy - iy) / ih * imgNaturalSize.h);
-    const cropW = Math.min(imgNaturalSize.w - originX, cs / iw * imgNaturalSize.w);
-    const cropH = Math.min(imgNaturalSize.h - originY, cs / ih * imgNaturalSize.h);
+    const originX = Math.max(0, (box.x - ix) / iw * imgNaturalSize.w);
+    const originY = Math.max(0, (box.y - iy) / ih * imgNaturalSize.h);
+    const cropW = Math.min(imgNaturalSize.w - originX, box.size / iw * imgNaturalSize.w);
+    const cropH = Math.min(imgNaturalSize.h - originY, box.size / ih * imgNaturalSize.h);
     const result = await ImageManipulator.manipulateAsync(
       uri,
       [{ crop: { originX, originY, width: cropW, height: cropH } }],
@@ -213,19 +222,37 @@ function InlineCropModal({ uri, onCrop, onCancel }: { uri: string; onCrop: (b64:
     onCrop(`data:image/jpeg;base64,${result.base64}`);
   };
 
+  const CORNER = 20;
+
   return (
     <View style={{ flex: 1, backgroundColor: '#000' }}>
       <Image source={{ uri }} style={{ position: 'absolute', top: 0, left: 0, width: SW, height: SH }} resizeMode="contain" />
-      <Animated.View style={{ position: 'absolute', top: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.6)', height: animY }} pointerEvents="none" />
-      <Animated.View style={{ position: 'absolute', backgroundColor: 'rgba(0,0,0,0.6)', top: animY, width: animX, height: animSize }} pointerEvents="none" />
-      <Animated.View style={{ position: 'absolute', right: 0, backgroundColor: 'rgba(0,0,0,0.6)', top: animY, left: Animated.add(animX, animSize), height: animSize }} pointerEvents="none" />
-      <Animated.View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', top: Animated.add(animY, animSize) }} pointerEvents="none" />
-      <Animated.View style={{ position: 'absolute', borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)', left: animX, top: animY, width: animSize, height: animSize }} {...movePan.panHandlers}>
-        <View style={[cs.corner, { top: 0, left: 0, borderRightWidth: 0, borderBottomWidth: 0 }]} />
-        <View style={[cs.corner, { top: 0, right: 0, borderLeftWidth: 0, borderBottomWidth: 0 }]} />
-        <View style={[cs.corner, { bottom: 0, left: 0, borderRightWidth: 0, borderTopWidth: 0 }]} />
-        <View style={[cs.corner, { bottom: 0, right: 0, borderLeftWidth: 0, borderTopWidth: 0 }]} {...resizePan.panHandlers} />
-      </Animated.View>
+
+      {/* dark overlays */}
+      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: box.y, backgroundColor: 'rgba(0,0,0,0.6)' }} />
+      <View style={{ position: 'absolute', top: box.y, left: 0, width: box.x, height: box.size, backgroundColor: 'rgba(0,0,0,0.6)' }} />
+      <View style={{ position: 'absolute', top: box.y, left: box.x + box.size, right: 0, height: box.size, backgroundColor: 'rgba(0,0,0,0.6)' }} />
+      <View style={{ position: 'absolute', top: box.y + box.size, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)' }} />
+
+      {/* crop box — move handle */}
+      <div
+        onMouseDown={onMoveStart}
+        onTouchStart={onMoveStart}
+        style={{ position: 'absolute', left: box.x, top: box.y, width: box.size, height: box.size, border: '1px solid rgba(255,255,255,0.4)', cursor: 'move', boxSizing: 'border-box' }}
+      >
+        {/* corners */}
+        {([['top',0,'left',0,'Right','Bottom'],['top',0,'right',0,'Left','Bottom'],['bottom',0,'left',0,'Right','Top'],] as any[]).map(([v1,o1,v2,o2,b1,b2], i) => (
+          <div key={i} style={{ position: 'absolute', [v1]: o1, [v2]: o2, width: CORNER, height: CORNER, borderTop: v1==='top'?'2.5px solid #0ccfcf':'none', borderBottom: v1==='bottom'?'2.5px solid #0ccfcf':'none', [`border${b1}`]: '2.5px solid #0ccfcf', borderRight: 'none', borderLeft: 'none', [`border${b2}`]: 'none' }} />
+        ))}
+        {/* bottom-right resize corner */}
+        <div
+          onMouseDown={onResizeStart}
+          onTouchStart={onResizeStart}
+          style={{ position: 'absolute', bottom: 0, right: 0, width: CORNER, height: CORNER, borderBottom: '2.5px solid #0ccfcf', borderRight: '2.5px solid #0ccfcf', cursor: 'nwse-resize' }}
+        />
+      </div>
+
+      {/* header */}
       <View style={{ position: 'absolute', top: 52, left: 0, right: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24 }}>
         <TouchableOpacity onPress={onCancel} style={cs.headerBtn}><Ionicons name="close" size={24} color="#fff" /></TouchableOpacity>
         <Text style={{ fontFamily: Fonts.mono, fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>drag to move · corner to resize</Text>
@@ -240,7 +267,6 @@ function InlineCropModal({ uri, onCrop, onCancel }: { uri: string; onCrop: (b64:
 }
 
 const cs = StyleSheet.create({
-  corner:    { position: 'absolute', width: 22, height: 22, borderColor: '#0ccfcf', borderWidth: 2.5 },
   headerBtn: { width: 44, height: 44, justifyContent: 'center', alignItems: 'center' },
 });
 
