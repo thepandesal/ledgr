@@ -348,10 +348,10 @@ export default function SpacesScreen() {
           <Text style={s.cardMeta}>{space.count ?? 0} transaction{(space.count ?? 0) !== 1 ? 's' : ''}</Text>
         </View>
         <View style={s.cardRight}>
-          <View style={s.cardRow}><Text style={s.cardRowLabel}>spend</Text><Text style={[s.cardRowValue, over && { color: Colors.expense }]}>{fmtCompact(value)}</Text></View>
+          <View style={s.cardRow}><Text style={s.cardRowLabel}>money out</Text><Text style={[s.cardRowValue, over && { color: Colors.expense }]}>{fmtCompact(value)}</Text></View>
           {budget > 0 && (<>
-            <View style={s.cardRow}><Text style={s.cardRowLabel}>budget</Text><Text style={s.cardRowValue}>{fmtCompact(budget)}</Text></View>
-            <View style={s.cardRow}><Text style={s.cardRowLabel}>usable</Text><Text style={[s.cardRowValue, { color: statusColor }]}>{fmtCompact(Math.max(remaining, 0))}</Text></View>
+            <View style={s.cardRow}><Text style={s.cardRowLabel}>money in</Text><Text style={s.cardRowValue}>{fmtCompact(budget)}</Text></View>
+            <View style={s.cardRow}><Text style={s.cardRowLabel}>budget</Text><Text style={[s.cardRowValue, { color: statusColor }]}>{fmtCompact(Math.max(remaining, 0))}</Text></View>
           </>)}
         </View>
         <TouchableOpacity onPress={() => { setSelectedSpace(space); setMenuModal(true); setBlur(true); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -750,7 +750,7 @@ const s = StyleSheet.create({
   cardMeta:     { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted },
   cardRight:    { flex: 1, gap: 3 },
   cardRow:      { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  cardRowLabel: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted, letterSpacing: 0.3, width: 60 },
+  cardRowLabel: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted, letterSpacing: 0.3, width: 72 },
   cardRowValue: { fontFamily: Fonts.monoBold, fontSize: 12, color: Colors.text, letterSpacing: -0.2 },
 
   // ── Modal ─────────────────────────────────────────────────────────────────
