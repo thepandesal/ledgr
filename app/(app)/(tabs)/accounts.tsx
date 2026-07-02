@@ -136,8 +136,8 @@ export default function AccountsScreen() {
 // ─── InlineCropModal ─────────────────────────────────────────────────────────
 
 function InlineCropModal({ uri, onCrop, onCancel }: { uri: string; onCrop: (b64: string) => void; onCancel: () => void }) {
-  const [imgDisplay, setImgDisplay] = useState({ x: 0, y: 0, w: SW, h: SH });
   const [imgNaturalSize, setImgNaturalSize] = useState({ w: 1, h: 1 });
+  const imgDisplay = useRef({ x: 0, y: 0, w: SW, h: SH });
 
   const boxX = useRef((SW - INIT_CROP) / 2);
   const boxY = useRef((SH - INIT_CROP) / 2);
@@ -154,7 +154,7 @@ function InlineCropModal({ uri, onCrop, onCancel }: { uri: string; onCrop: (b64:
       const ratio = Math.min(SW / w, SH / h);
       const dw = w * ratio, dh = h * ratio;
       const dx = (SW - dw) / 2, dy = (SH - dh) / 2;
-      setImgDisplay({ x: dx, y: dy, w: dw, h: dh });
+      imgDisplay.current = { x: dx, y: dy, w: dw, h: dh };
       // reset crop box to fit inside the displayed image
       const initSize = Math.min(dw, dh) * 0.7;
       boxX.current = dx + (dw - initSize) / 2;
@@ -171,12 +171,12 @@ function InlineCropModal({ uri, onCrop, onCancel }: { uri: string; onCrop: (b64:
     onMoveShouldSetPanResponder: () => true,
     onPanResponderGrant: () => { startMove.current = { x: boxX.current, y: boxY.current }; },
     onPanResponderMove: (_, gs) => {
-      const { x: ix, y: iy, w: iw, h: ih } = imgDisplay;
+      const { x: ix, y: iy, w: iw, h: ih } = imgDisplay.current;
       animX.setValue(Math.max(ix, Math.min(ix + iw - boxSize.current, startMove.current.x + gs.dx)));
       animY.setValue(Math.max(iy, Math.min(iy + ih - boxSize.current, startMove.current.y + gs.dy)));
     },
     onPanResponderRelease: (_, gs) => {
-      const { x: ix, y: iy, w: iw, h: ih } = imgDisplay;
+      const { x: ix, y: iy, w: iw, h: ih } = imgDisplay.current;
       boxX.current = Math.max(ix, Math.min(ix + iw - boxSize.current, startMove.current.x + gs.dx));
       boxY.current = Math.max(iy, Math.min(iy + ih - boxSize.current, startMove.current.y + gs.dy));
     },
@@ -187,12 +187,12 @@ function InlineCropModal({ uri, onCrop, onCancel }: { uri: string; onCrop: (b64:
     onMoveShouldSetPanResponder: () => true,
     onPanResponderGrant: () => { startSize.current = boxSize.current; },
     onPanResponderMove: (_, gs) => {
-      const { x: ix, y: iy, w: iw, h: ih } = imgDisplay;
+      const { x: ix, y: iy, w: iw, h: ih } = imgDisplay.current;
       const maxS = Math.min(ix + iw - boxX.current, iy + ih - boxY.current);
       animSize.setValue(Math.max(MIN_CROP, Math.min(maxS, startSize.current + gs.dx)));
     },
     onPanResponderRelease: (_, gs) => {
-      const { x: ix, y: iy, w: iw, h: ih } = imgDisplay;
+      const { x: ix, y: iy, w: iw, h: ih } = imgDisplay.current;
       const maxS = Math.min(ix + iw - boxX.current, iy + ih - boxY.current);
       boxSize.current = Math.max(MIN_CROP, Math.min(maxS, startSize.current + gs.dx));
     },
@@ -200,10 +200,11 @@ function InlineCropModal({ uri, onCrop, onCancel }: { uri: string; onCrop: (b64:
 
   const doCrop = async () => {
     const cx = boxX.current, cy = boxY.current, cs = boxSize.current;
-    const originX = Math.max(0, (cx - imgDisplay.x) / imgDisplay.w * imgNaturalSize.w);
-    const originY = Math.max(0, (cy - imgDisplay.y) / imgDisplay.h * imgNaturalSize.h);
-    const cropW = Math.min(imgNaturalSize.w - originX, cs / imgDisplay.w * imgNaturalSize.w);
-    const cropH = Math.min(imgNaturalSize.h - originY, cs / imgDisplay.h * imgNaturalSize.h);
+    const { x: ix, y: iy, w: iw, h: ih } = imgDisplay.current;
+    const originX = Math.max(0, (cx - ix) / iw * imgNaturalSize.w);
+    const originY = Math.max(0, (cy - iy) / ih * imgNaturalSize.h);
+    const cropW = Math.min(imgNaturalSize.w - originX, cs / iw * imgNaturalSize.w);
+    const cropH = Math.min(imgNaturalSize.h - originY, cs / ih * imgNaturalSize.h);
     const result = await ImageManipulator.manipulateAsync(
       uri,
       [{ crop: { originX, originY, width: cropW, height: cropH } }],
