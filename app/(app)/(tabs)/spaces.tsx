@@ -349,10 +349,10 @@ export default function SpacesScreen() {
         </View>
         <View style={s.cardRight}>
           <View style={s.cardRow}><Text style={s.cardRowLabel}>money out</Text><Text style={[s.cardRowValue, over && { color: Colors.expense }]}>{fmtCompact(value)}</Text></View>
-          {budget > 0 && (<>
-            <View style={s.cardRow}><Text style={s.cardRowLabel}>money in</Text><Text style={s.cardRowValue}>{fmtCompact(budget)}</Text></View>
-            <View style={s.cardRow}><Text style={s.cardRowLabel}>budget</Text><Text style={[s.cardRowValue, { color: statusColor }]}>{fmtCompact(Math.max(remaining, 0))}</Text></View>
-          </>)}
+          <View style={s.cardRow}><Text style={s.cardRowLabel}>money in</Text><Text style={s.cardRowValue}>{fmtCompact(space.saved ?? 0)}</Text></View>
+          {budget > 0 && (
+            <View style={s.cardRow}><Text style={s.cardRowLabel}>budget</Text><Text style={[s.cardRowValue, { color: statusColor }]}>{fmtCompact(budget)}</Text></View>
+          )}
         </View>
         <TouchableOpacity onPress={() => { setSelectedSpace(space); setMenuModal(true); setBlur(true); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Ionicons name="ellipsis-horizontal" size={14} color={Colors.muted} />
