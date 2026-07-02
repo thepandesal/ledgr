@@ -107,12 +107,36 @@ export default function SpacesScreen() {
       const toStr   = `${to.getFullYear()}-${String(to.getMonth() + 1).padStart(2, '0')}-${String(to.getDate()).padStart(2, '0')}`;
       
       // Fetch all recordings in date range for this user
-      const [{ data: allRecs }, { data: allTimeRecs }] = await Promise.all([
+      const [{ data: allRecs }, { data: allTimeRecs }, { data: splitBillRecs }] = await Promise.all([
         supabase.from('recordings').select('space_id, amount, type, is_due, paid_amount')
           .eq('user_id', userId).gte('transaction_date', fromStr).lte('transaction_date', toStr),
         supabase.from('recordings').select('space_id, amount, type')
           .eq('user_id', userId).in('type', ['income', 'expense']),
+        supabase.from('split_bill_payments')
+          .select('amount, split_bill_id, created_at')
+          .gte('created_at', fromStr).lte('created_at', toStr + 'T23:59:59'),
       ]);
+
+      // Map split_bill_id → space_id via split_bill_recordings
+      const splitBillIds = [...new Set((splitBillRecs ?? []).map((p: any) => p.split_bill_id))];
+      const splitBillSpaceMap: Record<string, string> = {};
+      if (splitBillIds.length > 0) {
+        const { data: sbrRows } = await supabase
+          .from('split_bill_recordings')
+          .select('split_bill_id, recording_id')
+          .in('split_bill_id', splitBillIds);
+        const recIds = [...new Set((sbrRows ?? []).map((r: any) => r.recording_id))];
+        if (recIds.length > 0) {
+          const { data: recSpaces } = await supabase
+            .from('recordings')
+            .select('id, space_id')
+            .in('id', recIds);
+          (sbrRows ?? []).forEach((sbr: any) => {
+            const rec = (recSpaces ?? []).find((r: any) => r.id === sbr.recording_id);
+            if (rec) splitBillSpaceMap[sbr.split_bill_id] = rec.space_id;
+          });
+        }
+      }
 
       const spentMap: Record<string, number> = {};
       const savedMap: Record<string, number> = {};
@@ -152,9 +176,12 @@ export default function SpacesScreen() {
         // 'due' type is income-like, so we don't add it to spent
       });
       
-      // Debug: log counts per space
-      console.log('[Spaces Query] Count map:', countMap);
-      
+      // Add split bill payments to savedMap
+      (splitBillRecs ?? []).forEach((p: any) => {
+        const spaceId = splitBillSpaceMap[p.split_bill_id];
+        if (spaceId) savedMap[spaceId] = (savedMap[spaceId] || 0) + Number(p.amount);
+      });
+
       return data.map((s: any) => ({ ...s, spent: spentMap[s.id] ?? 0, saved: savedMap[s.id] ?? 0, savedAllTime: savedAllTimeMap[s.id] ?? 0, count: countMap[s.id] ?? 0 })) as SpaceData[];
     },
     enabled: !!userId,
