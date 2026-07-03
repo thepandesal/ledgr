@@ -7,7 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useUser } from '../../src/hooks/useUser';
-import { useSlideScreen } from '../../src/hooks/useSlideScreen';
+import { useScreenAnim } from '@/components/ui/ScreenWrapper';
 import { supabase } from '../../src/lib/supabase';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import BottomSheet from '@/components/ui/BottomSheet';
@@ -110,26 +110,8 @@ function getTypeLabel(type: string, status: string, is_due?: boolean, paid_amoun
   return { label: type, color: Colors.muted };
 }
 
-// ── Component ────────────────────────────────────────────────────────────────
-function smartDateLabel(dateStr: string): string {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  const date  = new Date(y, m - 1, d);
-  const today = new Date();
-  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  const diffDays = Math.floor((todayStart.getTime() - date.getTime()) / 86400000);
-
-  if (diffDays === 0) return 'Today';
-  if (diffDays === 1) return 'Yesterday';
-
-  // Same week (Sun-Sat containing today)
-  const todayDay = todayStart.getDay(); // 0=Sun
-  const weekStart = new Date(todayStart); weekStart.setDate(todayStart.getDate() - todayDay);
-  const weekEnd   = new Date(weekStart);  weekEnd.setDate(weekStart.getDate() + 6);
-  if (date >= weekStart && date <= weekEnd)
-    return date.toLocaleDateString('en-US', { weekday: 'long' });
-
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
+import { smartDateLabel } from '../../src/lib/smartDateLabel';
+import { computeGhosts, getDueDateForCycle, isLoanComplete, type GhostRow } from '../../src/lib/recurringUtils';
 
 export default function SpaceDetailScreen() {
   const { spaceId, name } = useLocalSearchParams<{ spaceId: string; name: string }>();
@@ -138,7 +120,7 @@ export default function SpaceDetailScreen() {
   const { userId } = useUser();
 
   // Slide animation
-  const { slideAnim, handleBack } = useSlideScreen();
+  const { slideAnim, handleBack } = useScreenAnim();
 
   // Load default settings from spaces page
   const { data: spacesSettings } = useQuery({
@@ -182,6 +164,55 @@ export default function SpaceDetailScreen() {
   const [pendingDeleteId,   setPendingDeleteId]   = useState('');
   const [pendingDeleteName, setPendingDeleteName] = useState('');
 
+  // ── Ghost payment modal ────────────────────────────────────────────────────────────
+  const [ghostModal, setGhostModal]       = useState(false);
+  const [ghostTarget, setGhostTarget]     = useState<GhostRow | null>(null);
+  const [ghostAmount, setGhostAmount]     = useState('');
+  const [ghostSaving, setGhostSaving]     = useState(false);
+
+  const openGhostModal = (g: GhostRow) => {
+    setGhostTarget(g);
+    setGhostAmount(String(g.rec.installment_amount));
+    setGhostModal(true);
+  };
+
+  const confirmGhostPayment = async () => {
+    if (!ghostTarget) return;
+    setGhostSaving(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { rec, cycleKey: ck, dueDate } = ghostTarget;
+      const amt = parseFloat(ghostAmount || '0') || rec.installment_amount;
+      const txDate = dueDate.toISOString().split('T')[0];
+
+      await supabase.from('recordings').insert({
+        user_id: user.id,
+        space_id: rec.space_id,
+        name: rec.name,
+        type: rec.type,
+        amount: amt,
+        transaction_date: txDate,
+        status: rec.type === 'expense' ? 'paid' : 'unpaid',
+        category_id: rec.category_id ?? null,
+        recurring_record_id: rec.id,
+        cycle_key: ck,
+      });
+
+      const newTotalPaid = rec.total_paid + amt;
+      const updates: any = { total_paid: newTotalPaid };
+      if (isLoanComplete({ ...rec, total_paid: newTotalPaid })) {
+        updates.status = 'completed';
+      }
+      await supabase.from('recurring_records').update(updates).eq('id', rec.id);
+
+      setGhostModal(false);
+      queryClient.invalidateQueries({ queryKey: ['recordings', spaceId] });
+      queryClient.invalidateQueries({ queryKey: ['recurring-records', spaceId] });
+    } catch (e) { console.log(e); }
+    finally { setGhostSaving(false); }
+  };
+
   // Statement image state
   const [statementLoading, setStatementLoading] = useState(false);
   const [captureHtml, setCaptureHtml] = useState<string | null>(null);
@@ -213,6 +244,39 @@ export default function SpaceDetailScreen() {
     enabled: !!spaceId && (spaceId !== 'all' || !!userId),
   });
 
+  const { data: splitBillPaymentsData = [] } = useQuery({
+    queryKey: ['split-bill-payments', spaceId],
+    queryFn: async () => {
+      const { data: sbrRows } = await supabase
+        .from('split_bill_recordings')
+        .select('split_bill_id, recording_id, recordings!inner(space_id, transaction_date)')
+        .eq('recordings.space_id', spaceId);
+      const billIds = [...new Set((sbrRows ?? []).map((r: any) => r.split_bill_id))];
+      if (billIds.length === 0) return [];
+      // Build map: split_bill_id → transaction_date (from first linked recording)
+      const billDateMap: Record<string, string> = {};
+      (sbrRows ?? []).forEach((r: any) => {
+        if (!billDateMap[r.split_bill_id]) {
+          const rec = Array.isArray(r.recordings) ? r.recordings[0] : r.recordings;
+          if (rec?.transaction_date) billDateMap[r.split_bill_id] = rec.transaction_date;
+        }
+      });
+      const { data: payments } = await supabase
+        .from('split_bill_payments')
+        .select('id, amount, split_bill_id')
+        .eq('status', 'active')
+        .in('split_bill_id', billIds);
+      // Attach parent transaction_date to each payment, deduplicate by id
+      const seen = new Set<string>();
+      return (payments ?? []).filter((p: any) => {
+        if (seen.has(p.id)) return false;
+        seen.add(p.id);
+        return true;
+      }).map((p: any) => ({ ...p, transaction_date: billDateMap[p.split_bill_id] ?? null }));
+    },
+    enabled: !!spaceId && spaceId !== 'all',
+  });
+
   const { data: spaceData } = useQuery({
     queryKey: ['space-budget', spaceId],
     queryFn: async () => {
@@ -239,6 +303,20 @@ export default function SpaceDetailScreen() {
     enabled: !!userId,
   });
 
+  const { data: recurringRecords = [] } = useQuery({
+    queryKey: ['recurring-records', spaceId],
+    queryFn: async () => {
+      if (!spaceId || spaceId === 'all') return [];
+      const { data } = await supabase
+        .from('recurring_records')
+        .select('*')
+        .eq('space_id', spaceId)
+        .eq('status', 'active');
+      return data ?? [];
+    },
+    enabled: !!spaceId && spaceId !== 'all',
+  });
+
   const budget       = spaceData?.budget ?? null;
   const isExpSpace   = (spaceData?.space_type ?? 'expense') === 'expense';
   const isAllCats    = selectedCategories.has('all');
@@ -255,6 +333,7 @@ export default function SpaceDetailScreen() {
 
   const filtered = recordings.filter(r => {
     if (!currentTypes.includes(r.type)) return false;
+    if (r.status === 'voided') return false;
     // When Due tab is selected, only show is_due expenses
     if (!isAll && selectedTabs.has('receivables') && r.type === 'expense' && !r.is_due) return false;
     if (!isAllCats && !selectedCategories.has(r.category_id)) return false;
@@ -286,6 +365,13 @@ export default function SpaceDetailScreen() {
   const paginatedGroups = grouped.slice(0, displayCount);
   const hasMore = displayCount < grouped.length;
 
+  // ── Ghost rows from recurring records ───────────────────────────────────────────────
+  const ghosts: GhostRow[] = computeGhosts(
+    recurringRecords,
+    recordings.filter(r => r.recurring_record_id),
+    new Date()
+  );
+
   // Stats — date-filtered but not tab-filtered
   const dateFiltered = recordings.filter(r => {
     const [y, m, d] = r.transaction_date.split('-').map(Number);
@@ -294,8 +380,16 @@ export default function SpaceDetailScreen() {
     const to = new Date(range.to); to.setHours(23, 59, 59);
     return date <= to;
   });
-  const moneyIn  = dateFiltered.filter(r => r.type === 'income').reduce((s, r) => s + Number(r.amount), 0);
-  const moneyOut = dateFiltered.filter(r => r.type === 'expense' || r.type === 'debt' || r.type === 'payment').reduce((s, r) => s + Number(r.amount), 0);
+  const fromStr = `${range.from.getFullYear()}-${String(range.from.getMonth()+1).padStart(2,'0')}-${String(range.from.getDate()).padStart(2,'0')}`;
+  const toStr   = `${range.to.getFullYear()}-${String(range.to.getMonth()+1).padStart(2,'0')}-${String(range.to.getDate()).padStart(2,'0')}`;
+
+  const splitBillMoneyIn = (splitBillPaymentsData as any[]).filter(p => {
+    if (!p.transaction_date) return false;
+    return p.transaction_date >= fromStr && p.transaction_date <= toStr;
+  }).reduce((s: number, p: any) => s + Number(p.amount), 0);
+
+  const moneyIn  = dateFiltered.filter(r => (r.type === 'income' || r.type === 'due' || r.type === 'return') && r.status !== 'voided').reduce((s, r) => s + Number(r.amount), 0) + splitBillMoneyIn;
+  const moneyOut = dateFiltered.filter(r => (r.type === 'expense' || r.type === 'debt' || r.type === 'payment') && r.status !== 'voided').reduce((s, r) => s + Number(r.amount), 0);
   const loansActive        = dateFiltered.filter(r => r.type === 'debt' && r.status !== 'paid').length;
   const receivablesPending = dateFiltered.filter(r =>
     (r.type === 'due' && r.status !== 'paid') ||
@@ -720,18 +814,18 @@ export default function SpaceDetailScreen() {
         {/* Header */}
         <View style={s.header}>
           <TouchableOpacity onPress={handleBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={s.backBtn}>
-            <Ionicons name="arrow-back" size={20} color={Colors.text} />
+            <Ionicons name="arrow-back" size={20} color="#B6E1DE" />
           </TouchableOpacity>
           <Text style={s.title} numberOfLines={1}>{name}</Text>
           <TouchableOpacity
-            style={[s.addBtn, { backgroundColor: Colors.surface, marginRight: 2 }]}
+            style={s.addBtn}
             onPress={generateStatement}
             activeOpacity={0.8}
             disabled={statementLoading}
           >
             {statementLoading
-              ? <ActivityIndicator size="small" color={Colors.cyan} />
-              : <Ionicons name="document-text-outline" size={16} color={Colors.cyan} />}
+              ? <ActivityIndicator size="small" color="#B6E1DE" />
+              : <Ionicons name="document-text-outline" size={16} color="#B6E1DE" />}
           </TouchableOpacity>
           {spaceId !== 'all' && (
             <TouchableOpacity
@@ -739,7 +833,7 @@ export default function SpaceDetailScreen() {
               onPress={() => router.push({ pathname: '/(app)/add-recording', params: { spaceId, spaceName: name, defaultDate: new Date().toISOString().split('T')[0] } } as any)}
               activeOpacity={0.8}
             >
-              <Ionicons name="add" size={18} color="#fff" />
+              <Ionicons name="add" size={18} color="#B6E1DE" />
             </TouchableOpacity>
           )}
         </View>
@@ -824,6 +918,39 @@ export default function SpaceDetailScreen() {
                 })}
               </View>
             ))
+          )}
+
+          {/* Ghost rows from recurring records */}
+          {ghosts.length > 0 && (
+            <View style={{ marginTop: 8 }}>
+              <View style={s.dateHeaderRow}>
+                <Text style={s.dateHeaderText}>scheduled</Text>
+              </View>
+              {ghosts.map(g => (
+                <TouchableOpacity
+                  key={`${g.rec.id}-${g.cycleKey}`}
+                  style={[s.row, s.ghostRow, g.isOverdue && s.ghostRowOverdue]}
+                  activeOpacity={0.8}
+                  onPress={() => openGhostModal(g)}
+                >
+                  <View style={[s.rowIconWrap, { backgroundColor: g.isOverdue ? '#F9731622' : Colors.surface }]}>
+                    <Ionicons name="repeat-outline" size={18} color={g.isOverdue ? '#F97316' : Colors.muted} />
+                  </View>
+                  <View style={s.rowMid}>
+                    <Text style={[s.rowType, g.isOverdue && { color: '#F97316' }]}>
+                      {g.isOverdue ? 'overdue' : 'scheduled'} · {g.rec.type}
+                    </Text>
+                    <Text style={s.rowName} numberOfLines={1}>{g.rec.name}</Text>
+                    <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted }}>
+                      due {g.dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </Text>
+                  </View>
+                  <Text style={[s.rowAmount, { color: g.isOverdue ? '#F97316' : Colors.muted }]}>
+                    {g.rec.installment_amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           )}
 
           {/* Load more indicator */}
@@ -947,6 +1074,37 @@ export default function SpaceDetailScreen() {
         );
       })()}
 
+      {/* Ghost payment modal */}
+      <BottomSheet visible={ghostModal} onClose={() => setGhostModal(false)} title="record payment">
+        {ghostTarget && (
+          <>
+            <Text style={{ fontFamily: Brand.font.mono, fontSize: 13, color: Colors.text, marginBottom: 4 }}>
+              {ghostTarget.rec.name}
+            </Text>
+            <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: Colors.muted, marginBottom: 16 }}>
+              {ghostTarget.cycleKey} · due {ghostTarget.dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+            </Text>
+            <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 6 }}>amount</Text>
+            <TextInput
+              style={{ fontFamily: Brand.font.mono, fontSize: 16, color: Colors.text, backgroundColor: Colors.surface, borderRadius: Radius.md, paddingHorizontal: 14, paddingVertical: 11, borderWidth: 1, borderColor: Colors.borderMid, marginBottom: 16 }}
+              value={ghostAmount}
+              onChangeText={setGhostAmount}
+              keyboardType="decimal-pad"
+              autoFocus
+            />
+            <TouchableOpacity
+              style={{ backgroundColor: Colors.cyan, borderRadius: Radius.pill, paddingVertical: 14, alignItems: 'center', opacity: ghostSaving ? 0.5 : 1 }}
+              onPress={confirmGhostPayment}
+              disabled={ghostSaving}
+            >
+              <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 14, color: Colors.text }}>
+                {ghostSaving ? 'saving...' : 'record payment'}
+              </Text>
+            </TouchableOpacity>
+          </>
+        )}
+      </BottomSheet>
+
       {/* Delete confirm */}
       <ConfirmModal
         visible={confirmModal}
@@ -964,10 +1122,10 @@ export default function SpaceDetailScreen() {
 
 const s = StyleSheet.create({
   // Header
-  header:  { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 25, paddingTop: 16, paddingBottom: 8, gap: 10, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center' },
-  title:   { flex: 1, fontFamily: Brand.font.display, fontSize: 20, color: Colors.text, letterSpacing: -0.3 },
-  addBtn:  { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.cyan, alignItems: 'center', justifyContent: 'center' },
+  header:  { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 25, paddingTop: 16, paddingBottom: 16, gap: 10, backgroundColor: '#1A1A1A', borderBottomWidth: 1, borderBottomColor: '#333' },
+  backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#B6E1DE22', alignItems: 'center', justifyContent: 'center' },
+  title:   { flex: 1, fontFamily: Brand.font.display, fontSize: 20, color: '#B6E1DE', letterSpacing: -0.3, textAlign: 'center' },
+  addBtn:  { width: 36, height: 36, borderRadius: 18, backgroundColor: '#B6E1DE22', alignItems: 'center', justifyContent: 'center' },
 
   // Scroll
   scroll: { paddingHorizontal: 25, paddingBottom: 80 },
@@ -1030,4 +1188,7 @@ const s = StyleSheet.create({
   // Load more
   loadMoreWrap: { alignItems: 'center', paddingVertical: 20 },
   loadMoreText: { fontFamily: Fonts.mono, fontSize: 11, color: Colors.muted },
+  // Ghost rows
+  ghostRow:        { borderStyle: 'dashed', borderWidth: 1, borderColor: Colors.borderMid, borderRadius: Radius.md, marginBottom: 4, backgroundColor: Colors.surface },
+  ghostRowOverdue: { borderColor: '#F97316', backgroundColor: '#F9731608' },
 });

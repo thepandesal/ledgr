@@ -113,30 +113,21 @@ export default function SpacesScreen() {
         supabase.from('recordings').select('space_id, amount, type')
           .eq('user_id', userId).in('type', ['income', 'expense']),
         supabase.from('split_bill_payments')
-          .select('amount, split_bill_id, created_at')
-          .gte('created_at', fromStr).lte('created_at', toStr + 'T23:59:59'),
+          .select('id, amount, split_bill_id, split_bill_recordings!inner(recordings!inner(space_id, transaction_date, user_id))')
+          .eq('status', 'active')
+          .eq('split_bill_recordings.recordings.user_id', userId),
       ]);
 
-      // Map split_bill_id → space_id via split_bill_recordings
-      const splitBillIds = [...new Set((splitBillRecs ?? []).map((p: any) => p.split_bill_id))];
-      const splitBillSpaceMap: Record<string, string> = {};
-      if (splitBillIds.length > 0) {
-        const { data: sbrRows } = await supabase
-          .from('split_bill_recordings')
-          .select('split_bill_id, recording_id')
-          .in('split_bill_id', splitBillIds);
-        const recIds = [...new Set((sbrRows ?? []).map((r: any) => r.recording_id))];
-        if (recIds.length > 0) {
-          const { data: recSpaces } = await supabase
-            .from('recordings')
-            .select('id, space_id')
-            .in('id', recIds);
-          (sbrRows ?? []).forEach((sbr: any) => {
-            const rec = (recSpaces ?? []).find((r: any) => r.id === sbr.recording_id);
-            if (rec) splitBillSpaceMap[sbr.split_bill_id] = rec.space_id;
-          });
+      // Build a deduplicated map: payment id → { spaceId, transactionDate }
+      const splitBillPaymentMap: Record<string, { spaceId: string; date: string }> = {};
+      (splitBillRecs ?? []).forEach((p: any) => {
+        if (splitBillPaymentMap[p.id]) return;
+        const sbr = Array.isArray(p.split_bill_recordings) ? p.split_bill_recordings[0] : p.split_bill_recordings;
+        const rec = sbr ? (Array.isArray(sbr.recordings) ? sbr.recordings[0] : sbr.recordings) : null;
+        if (rec?.space_id && rec?.transaction_date) {
+          splitBillPaymentMap[p.id] = { spaceId: rec.space_id, date: rec.transaction_date };
         }
-      }
+      });
 
       const spentMap: Record<string, number> = {};
       const savedMap: Record<string, number> = {};
@@ -157,6 +148,8 @@ export default function SpacesScreen() {
       console.log('[Spaces Query] Total recordings fetched:', (allRecs ?? []).length);
       
       (allRecs ?? []).forEach((r: any) => {
+        // Skip voided recordings entirely
+        if (r.status === 'voided') return;
         // Only count primary transaction types (income, expense, debt, due)
         // Exclude payment and return to match space-detail page
         if (['income', 'expense', 'debt', 'due'].includes(r.type)) {
@@ -176,10 +169,11 @@ export default function SpacesScreen() {
         // 'due' type is income-like, so we don't add it to spent
       });
       
-      // Add split bill payments to savedMap
-      (splitBillRecs ?? []).forEach((p: any) => {
-        const spaceId = splitBillSpaceMap[p.split_bill_id];
-        if (spaceId) savedMap[spaceId] = (savedMap[spaceId] || 0) + Number(p.amount);
+      // Add split bill payments to savedMap — filtered by parent recording's transaction_date
+      Object.entries(splitBillPaymentMap).forEach(([paymentId, { spaceId, date }]) => {
+        if (date < fromStr || date > toStr) return;
+        const p = (splitBillRecs ?? []).find((x: any) => x.id === paymentId);
+        if (p) savedMap[spaceId] = (savedMap[spaceId] || 0) + Number(p.amount);
       });
 
       return data.map((s: any) => ({ ...s, spent: spentMap[s.id] ?? 0, saved: savedMap[s.id] ?? 0, savedAllTime: savedAllTimeMap[s.id] ?? 0, count: countMap[s.id] ?? 0 })) as SpaceData[];
@@ -375,8 +369,8 @@ export default function SpacesScreen() {
           <Text style={s.cardMeta}>{space.count ?? 0} transaction{(space.count ?? 0) !== 1 ? 's' : ''}</Text>
         </View>
         <View style={s.cardRight}>
-          <View style={s.cardRow}><Text style={s.cardRowLabel}>money out</Text><Text style={[s.cardRowValue, over && { color: Colors.expense }]}>{fmtCompact(value)}</Text></View>
           <View style={s.cardRow}><Text style={s.cardRowLabel}>money in</Text><Text style={s.cardRowValue}>{fmtCompact(space.saved ?? 0)}</Text></View>
+          <View style={s.cardRow}><Text style={s.cardRowLabel}>money out</Text><Text style={[s.cardRowValue, over && { color: Colors.expense }]}>{fmtCompact(value)}</Text></View>
           {budget > 0 && (
             <View style={s.cardRow}><Text style={s.cardRowLabel}>budget</Text><Text style={[s.cardRowValue, { color: statusColor }]}>{fmtCompact(budget)}</Text></View>
           )}
@@ -434,7 +428,6 @@ export default function SpacesScreen() {
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
         {/* Date filter row */}
         <View style={s.dateFilterRow}>
-          {/* Left: arrows + date label */}
           <View style={s.dateNav}>
             <TouchableOpacity style={s.dateNavArrow} onPress={() => { const next = dateOffset - 1; setDateOffset(next); saveSetting({ spaces_date_offset: next }); }} activeOpacity={0.7}>
               <Ionicons name="chevron-back" size={14} color={ACCENT_DARK} />
@@ -447,11 +440,16 @@ export default function SpacesScreen() {
               <Ionicons name="chevron-forward" size={14} color={ACCENT_DARK} />
             </TouchableOpacity>
           </View>
-          {/* Right: filter button */}
-          <TouchableOpacity style={s.modeSelectorBtn} onPress={openDateModal} activeOpacity={0.8}>
-            <Ionicons name="options-outline" size={13} color={ACCENT_DARK} />
-            <Text style={s.modeSelectorText}>filter</Text>
-          </TouchableOpacity>
+          <View style={{ gap: 6, alignItems: 'flex-end' }}>
+            <TouchableOpacity style={s.modeSelectorBtn} onPress={openCreate} activeOpacity={0.8}>
+              <Ionicons name="add" size={13} color={ACCENT_DARK} />
+              <Text style={s.modeSelectorText}>new space</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.modeSelectorBtn} onPress={openDateModal} activeOpacity={0.8}>
+              <Ionicons name="options-outline" size={13} color={ACCENT_DARK} />
+              <Text style={s.modeSelectorText}>filter</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* ── Empty ── */}

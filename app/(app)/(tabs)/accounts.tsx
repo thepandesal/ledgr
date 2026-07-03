@@ -79,16 +79,30 @@ export default function AccountsScreen() {
                 onLongPress={() => { setSelected(account); setMenuModal(true); }}
               >
                 <View style={s.cardLeft}>
+                  <Text style={s.cardBank}>{account.bank}</Text>
+                  <Text style={s.cardHolder}>{account.holder_name}</Text>
+                  <View style={s.cardNumberRow}>
+                    <Text style={s.cardNumber}>{account.account_number}</Text>
+                    <TouchableOpacity
+                      onPress={() => {
+                        if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                          navigator.clipboard.writeText(account.account_number);
+                        }
+                        Alert.alert('Copied', account.account_number);
+                      }}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Ionicons name="copy-outline" size={13} color={Colors.muted} />
+                    </TouchableOpacity>
+                  </View>
                   <Text style={s.cardName} numberOfLines={1}>{account.account_name}</Text>
-                  <Text style={s.cardMeta}>{account.holder_name} · {account.bank}</Text>
-                  <Text style={s.cardNumber}>•••• {account.account_number?.slice(-4) ?? ''}</Text>
                 </View>
                 <View style={s.cardRight}>
                   {account.qr_code
                     ? <Image source={{ uri: account.qr_code }} style={s.qrThumb} resizeMode="cover" />
-                    : <View style={s.qrEmpty}><Ionicons name="qr-code-outline" size={16} color={Colors.faint} /></View>
+                    : <View style={s.qrEmpty}><Ionicons name="qr-code-outline" size={20} color={Colors.faint} /></View>
                   }
-                  <TouchableOpacity onPress={() => { setSelected(account); setMenuModal(true); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <TouchableOpacity onPress={() => { setSelected(account); setMenuModal(true); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ marginTop: 6 }}>
                     <Ionicons name="ellipsis-horizontal" size={15} color={Colors.muted} />
                   </TouchableOpacity>
                 </View>
@@ -374,14 +388,16 @@ function AccountForm({ visible, userId, initial, onClose, onSaved, onRequestCrop
 const s = StyleSheet.create({
   scroll:     { paddingTop: 20, paddingBottom: 60 },
   list:       { marginBottom: 16 },
-  card:       { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, paddingHorizontal: Spacing.page, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  cardLeft:   { flex: 1, gap: 3 },
-  cardName:   { fontFamily: 'ChillaxMedium', fontSize: 14, color: Colors.text },
-  cardMeta:   { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted },
-  cardNumber: { fontFamily: Fonts.monoBold, fontSize: 11, color: Colors.text, letterSpacing: 1 },
-  cardRight:  { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  qrThumb:    { width: 36, height: 36, borderRadius: Radius.sm },
-  qrEmpty:    { width: 36, height: 36, borderRadius: Radius.sm, backgroundColor: Colors.input, justifyContent: 'center', alignItems: 'center' },
+  card:          { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingVertical: 16, paddingHorizontal: Spacing.page, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  cardLeft:      { flex: 1, gap: 3 },
+  cardBank:      { fontFamily: Fonts.monoBold, fontSize: 13, color: Colors.text, letterSpacing: 0.2 },
+  cardHolder:    { fontFamily: Fonts.mono, fontSize: 11, color: Colors.muted },
+  cardNumberRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  cardNumber:    { fontFamily: Fonts.monoBold, fontSize: 12, color: Colors.text, letterSpacing: 1 },
+  cardName:      { fontFamily: Fonts.mono, fontSize: 10, color: Colors.faint },
+  cardRight:     { alignItems: 'center', gap: 4 },
+  qrThumb:       { width: 56, height: 56, borderRadius: Radius.sm },
+  qrEmpty:       { width: 56, height: 56, borderRadius: Radius.sm, backgroundColor: Colors.input, justifyContent: 'center', alignItems: 'center' },
   emptyBox:   { alignItems: 'center', gap: 8, paddingVertical: 48, paddingHorizontal: Spacing.page },
   emptyText:  { fontFamily: Fonts.mono, fontSize: 13, color: Colors.muted },
   footer:     { fontFamily: Fonts.mono, fontSize: 10, color: Colors.faint, textAlign: 'center', marginTop: 24, paddingHorizontal: Spacing.page },

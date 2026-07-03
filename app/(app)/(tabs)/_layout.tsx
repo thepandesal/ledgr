@@ -1,6 +1,6 @@
 import { View, TouchableOpacity, Text, StyleSheet, Animated, Dimensions, Platform, SafeAreaView, ScrollView, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useState, useRef, memo, useCallback } from 'react';
+import { useState, useRef, memo, useCallback, useEffect } from 'react';
 import { BlurView } from 'expo-blur';
 import SpacesScreen from './spaces';
 import AccountsScreen from './accounts';
@@ -12,16 +12,15 @@ import { Colors, Fonts, Radius, Spacing } from '@/components/ui/theme';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../../src/lib/supabase';
 import { useUser } from '../../../src/hooks/useUser';
-import Svg, { Path } from 'react-native-svg';
 
 export { BlurContext } from '../../../src/lib/BlurContext';
 import { BlurContext } from '../../../src/lib/BlurContext';
 
 // ── Brand tokens ─────────────────────────────────────────────────────────────
-const HEADER_BG        = '#B6E1DE'; // wave header background
-const HEADER_TEXT      = '#2D3748'; // dark grey text on light header bg
-const HEADER_TEXT_DIM  = '#2D374899'; // subtitle on header
-const HEADER_BTN_BG    = '#2D374822'; // add button bg on header
+const HEADER_BG        = '#1A1A1A'; // header background
+const HEADER_TEXT      = '#B6E1DE'; // teal text on dark header bg
+const HEADER_TEXT_DIM  = '#B6E1DE99';
+const HEADER_BTN_BG    = '#B6E1DE22';
 const NAV_ACCENT       = '#282C2A'; // active nav icon/label
 const NAV_INACTIVE     = '#9CA3AF'; // inactive nav icon
 const BUBBLE_ACTIVE_BG = '#EEF2FB'; // bubble active item bg
@@ -49,11 +48,12 @@ const TAB_META: Record<string, { title: string; subtitle: string }> = {
 };
 
 const OTHERS_ITEMS = [
-  { key: 'receipts',    label: 'Receipts',     icon: 'receipt-outline',    route: null },
-  { key: 'bill-split',  label: 'Bill Split',   icon: 'people-outline',     route: null },
-  { key: 'categories',  label: 'Categories',   icon: 'pricetag-outline',   route: null },
-  { key: 'loans',       label: 'Loans',        icon: 'cash-outline',       route: '/(app)/loans' },
-  { key: 'receivables', label: 'Receivables',  icon: 'arrow-undo-outline', route: '/(app)/receivables' },
+  { key: 'receipts',           label: 'Receipts',       icon: 'receipt-outline',       route: null },
+  { key: 'bill-split',         label: 'Bill Split',     icon: 'people-outline',        route: null },
+  { key: 'categories',         label: 'Categories',     icon: 'pricetag-outline',      route: null },
+  { key: 'loans',              label: 'Loans',          icon: 'cash-outline',          route: '/(app)/loans' },
+  { key: 'receivables',        label: 'Receivables',    icon: 'arrow-undo-outline',    route: '/(app)/receivables' },
+  { key: 'notifications-page', label: 'Notifications',  icon: 'notifications-outline', route: '/(app)/notifications' },
 ];
 
 const SLIDE_KEYS = ['spaces', 'accounts', 'dashboard', 'categories', 'receipts', 'bill-split'];
@@ -206,6 +206,36 @@ export default function TabsLayout() {
   const bubbleAnim  = useRef(new Animated.Value(0)).current;
   const bubbleScale = useRef(new Animated.Value(0.92)).current;
 
+  // ── Unread notification badge ──────────────────────────────────────────────────
+  const { userId } = useUser();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  const fetchUnread = useCallback(async () => {
+    if (!userId) return;
+    const { count } = await supabase
+      .from('notifications')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('is_read', false);
+    setUnreadCount(count ?? 0);
+  }, [userId]);
+
+  useEffect(() => {
+    fetchUnread();
+    if (!userId) return;
+    // Realtime subscription — badge updates live on new notification
+    const channel = supabase
+      .channel('notifications-badge')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'notifications',
+        filter: `user_id=eq.${userId}`,
+      }, () => fetchUnread())
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [userId, fetchUnread]);
+
   const slideAnims = useRef<Record<string, Animated.Value>>(
     Object.fromEntries(SLIDE_KEYS.map((k, i) => [k, new Animated.Value(i === 0 ? 0 : width)]))
   ).current;
@@ -228,13 +258,9 @@ export default function TabsLayout() {
       Animated.timing(outgoing, { toValue: -width, duration: 320, useNativeDriver: true }),
     ]).start(() => { outgoing?.setValue(width); });
 
-    // Defer state update to next frame so re-render doesn't block animation start
-    requestAnimationFrame(() => {
+    Animated.timing(titleAnim, { toValue: 0, duration: 180, useNativeDriver: true }).start(() => {
       setActiveTab(key);
-      Animated.sequence([
-        Animated.timing(titleAnim, { toValue: 0, duration: 150, useNativeDriver: true }),
-        Animated.timing(titleAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
-      ]).start();
+      Animated.timing(titleAnim, { toValue: 1, duration: 280, useNativeDriver: true }).start();
     });
   }, []);
 
@@ -261,6 +287,7 @@ export default function TabsLayout() {
 
   const handleOthersItem = (item: typeof OTHERS_ITEMS[0]) => {
     closeOthers();
+    if (item.key === 'notifications-page') setUnreadCount(0);
     if (item.route) {
       router.push(item.route as any);
     } else {
@@ -271,29 +298,18 @@ export default function TabsLayout() {
   const isOthersActive = OTHERS_ITEMS.some(i => i.key === activeTab) || othersOpen;
 
   return (
-    <BlurContext.Provider value={{ setBlur, registerAdd, unregisterAdd, activeTab }}>
+    <BlurContext.Provider value={{ setBlur, registerAdd, unregisterAdd, activeTab, __hasProvider: true }}>
     <View style={s.container}>
 
-      {/* ── Shared sticky wave header ── */}
+      {/* ── Shared flat header ── */}
       <View style={s.waveBg}>
-        <Text style={s.appLabel}>LEDGR</Text>
-        <View style={s.waveTitleRow}>
-          <Animated.View style={{ opacity: titleAnim, flex: 1 }}>
-            <Text style={s.pageTitle}>{TAB_META[activeTab]?.title ?? activeTab}</Text>
-            <Text style={s.pageSubtitle}>{TAB_META[activeTab]?.subtitle ?? ''}</Text>
-          </Animated.View>
-          {addHandlers.current[activeTab] && (
-            <TouchableOpacity style={s.addBtn} onPress={() => addHandlers.current[activeTab]?.()} activeOpacity={0.8}>
-              <Ionicons name="add" size={20} color={HEADER_TEXT} />
-            </TouchableOpacity>
-          )}
+        <View style={s.appLabel}>
+          <Text style={s.appLabelText}>L</Text>
         </View>
-        <Svg viewBox={`0 0 ${W} 64`} width={W} height={64} style={s.wave} preserveAspectRatio="none">
-          <Path
-            d={`M0,32 C${W*0.15},64 ${W*0.35},0 ${W*0.5},32 C${W*0.65},64 ${W*0.85},0 ${W},32 L${W},64 L0,64 Z`}
-            fill={Colors.white}
-          />
-        </Svg>
+        <Animated.View style={[s.waveTitleRow, { opacity: titleAnim }]}>
+          <Text style={s.pageTitle}>{TAB_META[activeTab]?.title ?? activeTab}</Text>
+        </Animated.View>
+        <View style={{ width: 36 }} />
       </View>
 
       <View style={s.content}>
@@ -345,10 +361,16 @@ export default function TabsLayout() {
       <View style={s.navBar}>
         {MAIN_TABS.map(tab => {
           const isActive = tab.key === 'others' ? isOthersActive : activeTab === tab.key;
+          const showBadge = tab.key === 'others' && unreadCount > 0;
           return (
             <TouchableOpacity key={tab.key} style={s.navItem} onPress={() => handleNavPress(tab.key)} activeOpacity={0.7}>
               <View style={[s.navIconWrap, isActive && s.navIconWrapActive]}>
                 <Ionicons name={tab.icon as any} size={22} color={isActive ? NAV_ACCENT : NAV_INACTIVE} />
+                {showBadge && (
+                  <View style={s.navBadge}>
+                    <Text style={s.navBadgeText}>{unreadCount > 9 ? '9+' : String(unreadCount)}</Text>
+                  </View>
+                )}
               </View>
               <Text style={[s.navLabel, isActive && s.navLabelActive]}>{tab.label}</Text>
             </TouchableOpacity>
@@ -401,14 +423,15 @@ const s = StyleSheet.create({
   content:   { flex: 1, position: 'relative' },
   screen:    { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: Colors.white },
 
-  // ── Shared wave header
-  waveBg:       { backgroundColor: HEADER_BG, paddingHorizontal: Spacing.page, paddingTop: 28, paddingBottom: 60, zIndex: 10 },
-  wave:         { position: 'absolute', bottom: -1, left: 0, right: 0, height: 64, zIndex: 10 },
-  waveTitleRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
-  appLabel:     { fontFamily: 'MuseoModerno_Black', fontSize: 20, color: HEADER_TEXT, marginBottom: 12 },
-  pageTitle:    { fontFamily: 'CalSans', fontSize: 32, color: HEADER_TEXT, letterSpacing: -0.5, marginBottom: 4 },
-  pageSubtitle: { fontFamily: 'ChillaxRegular', fontSize: 13, color: HEADER_TEXT_DIM },
-  addBtn:       { width: 36, height: 36, borderRadius: 18, backgroundColor: HEADER_BTN_BG, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
+  // ── Shared header
+  waveBg:       { backgroundColor: HEADER_BG, paddingHorizontal: Spacing.page, paddingTop: 28, paddingBottom: 16, zIndex: 10, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#333' },
+  appLabel:     { width: 36, height: 36, borderRadius: 18, backgroundColor: '#B6E1DE22', alignItems: 'center', justifyContent: 'center' },
+  appLabelText: { fontFamily: 'MuseoModerno_Black', fontSize: 18, color: HEADER_TEXT },
+  pageTitle:    { flex: 1, fontFamily: 'CalSans', fontSize: 20, color: HEADER_TEXT, letterSpacing: -0.3, textAlign: 'center' },
+  pageSubtitle: { display: 'none' as any },
+  waveTitleRow: { flex: 1, flexDirection: 'row', alignItems: 'center' },
+  wave:         { display: 'none' as any },
+  addBtn:       { width: 36, height: 36, borderRadius: 18, backgroundColor: HEADER_BTN_BG, alignItems: 'center', justifyContent: 'center' },
 
   navBar: {
     flexDirection: 'row',
@@ -425,6 +448,8 @@ const s = StyleSheet.create({
   navIconWrapActive: {},
   navLabel:       { fontFamily: 'ChillaxRegular', fontSize: 10, color: NAV_INACTIVE, letterSpacing: 0.4 },
   navLabelActive: { fontFamily: 'ChillaxMedium',  fontSize: 10, color: NAV_ACCENT },
+  navBadge: { position: 'absolute', top: -2, right: -4, minWidth: 16, height: 16, borderRadius: 8, backgroundColor: '#ed6a6a', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
+  navBadgeText: { fontFamily: 'ChillaxMedium', fontSize: 9, color: '#fff', lineHeight: 14 },
 
   // Bubble
   bubbleWrap: {

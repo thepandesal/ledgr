@@ -5,9 +5,11 @@ export const BlurContext = createContext<{
   registerAdd: (tab: string, fn: () => void) => void;
   unregisterAdd: (tab: string) => void;
   activeTab: string;
+  __hasProvider?: boolean;
 }>({
   setBlur: () => {},
   registerAdd: () => {},
   unregisterAdd: () => {},
   activeTab: 'spaces',
+  __hasProvider: false,
 });

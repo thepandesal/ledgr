@@ -172,6 +172,8 @@ export default function SplitShareSlugPage() {
   };
 
   const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2 });
+  const { width: screenW } = useWindowDimensions();
+  const qrSize = screenW * 0.9;
 
   if (loading) return <View style={s.center}><ActivityIndicator color={ACCENT_DARK} /></View>;
   if (notFound || !recording) return (
@@ -186,8 +188,6 @@ export default function SplitShareSlugPage() {
     ? new Date(recording.transaction_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
     : '';
   const grandTotal = perPerson.reduce((sum, p) => sum + p.total, 0);
-  const { width: screenW } = useWindowDimensions();
-  const qrSize = screenW * 0.9;
 
   return (
     <>

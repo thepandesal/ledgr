@@ -3,7 +3,7 @@ import {
   SafeAreaView, TextInput, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useUser } from '../../../src/hooks/useUser';
 import { supabase } from '../../../src/lib/supabase';
@@ -37,6 +37,20 @@ export default function BillSplitScreen() {
   const [displayCount, setDisplayCount] = useState(10);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'all' | 'ongoing' | 'closed'>('all');
+
+  // ── Date filter (monthly) ─────────────────────────────────────────────
+  const [monthOffset, setMonthOffset] = useState(0);
+
+  const { from: monthFrom, to: monthTo, label: monthLabel } = useMemo(() => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = now.getMonth() + monthOffset;
+    const from = new Date(y, m, 1);
+    const to   = new Date(y, m + 1, 0);
+    const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const d = new Date(y, m, 1);
+    return { from, to, label: `${months[d.getMonth()]} ${d.getFullYear()}` };
+  }, [monthOffset]);
 
   const { data: bills = [], isLoading } = useQuery<SplitBillRow[]>({
     queryKey: ['split-bills', userId],
@@ -95,8 +109,29 @@ export default function BillSplitScreen() {
 
   const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-  const filteredBills = statusFilter === 'all' ? bills : bills.filter(b => b.status === statusFilter);
-  const paginatedBills = filteredBills.slice(0, displayCount);
+  const filteredBills = useMemo(() => {
+    return bills.filter(b => {
+      const d = new Date(b.created_at);
+      if (d < monthFrom || d > monthTo) return false;
+      if (statusFilter !== 'all' && b.status !== statusFilter) return false;
+      return true;
+    });
+  }, [bills, monthFrom, monthTo, statusFilter]);
+
+  // Group paginated bills by date
+  const grouped = useMemo(() => {
+    const paged = filteredBills.slice(0, displayCount);
+    const map: Record<string, SplitBillRow[]> = {};
+    paged.forEach(b => {
+      const d = new Date(b.created_at);
+      const key = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      if (!map[key]) map[key] = [];
+      map[key].push(b);
+    });
+    // Preserve insertion order (already sorted desc)
+    return Object.entries(map);
+  }, [filteredBills, displayCount]);
+
   const hasMore = displayCount < filteredBills.length;
 
   const handleScroll = (event: any) => {
@@ -126,49 +161,71 @@ export default function BillSplitScreen() {
           <ActivityIndicator color={Brand.color.accent} style={{ marginTop: 40 }} />
         ) : (
           <>
-            {/* Status filter */}
-            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
-              {(['all', 'ongoing', 'closed'] as const).map(f => (
-                <TouchableOpacity
-                  key={f}
-                  style={[s.filterChip, statusFilter === f && s.filterChipActive]}
-                  onPress={() => { setStatusFilter(f); setDisplayCount(10); }}
-                >
-                  <Text style={[s.filterChipText, statusFilter === f && s.filterChipTextActive]}>{f}</Text>
+            {/* Date filter row */}
+            <View style={s.dateFilterRow}>
+              <View style={s.dateNav}>
+                <TouchableOpacity style={s.dateNavArrow} onPress={() => { setMonthOffset(o => o - 1); setDisplayCount(10); }} activeOpacity={0.7}>
+                  <Ionicons name="chevron-back" size={14} color={Brand.color.accentDark} />
                 </TouchableOpacity>
-              ))}
+                <View style={s.dateLabelBtn}>
+                  <Ionicons name="calendar-outline" size={13} color={Brand.color.accentDark} />
+                  <Text style={s.dateLabelText}>{monthLabel}</Text>
+                </View>
+                <TouchableOpacity style={s.dateNavArrow} onPress={() => { setMonthOffset(o => o + 1); setDisplayCount(10); }} activeOpacity={0.7}>
+                  <Ionicons name="chevron-forward" size={14} color={Brand.color.accentDark} />
+                </TouchableOpacity>
+              </View>
+              {/* Status filter */}
+              <View style={{ flexDirection: 'row', gap: 6 }}>
+                {(['all', 'ongoing', 'closed'] as const).map(f => (
+                  <TouchableOpacity
+                    key={f}
+                    style={[s.filterChip, statusFilter === f && s.filterChipActive]}
+                    onPress={() => { setStatusFilter(f); setDisplayCount(10); }}
+                  >
+                    <Text style={[s.filterChipText, statusFilter === f && s.filterChipTextActive]}>{f}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
             {filteredBills.length === 0 ? (
               <View style={s.emptyWrap}>
                 <Ionicons name="people-outline" size={32} color={Colors.faint} />
-                <Text style={Brand.type.emptyText}>{bills.length === 0 ? 'no split bills yet — tap + to create one' : `no ${statusFilter} split bills`}</Text>
+                <Text style={Brand.type.emptyText}>{bills.length === 0 ? 'no split bills yet — tap + to create one' : `no ${statusFilter === 'all' ? '' : statusFilter + ' '}split bills in ${monthLabel}`}</Text>
               </View>
             ) : (
               <View style={s.list}>
-                {paginatedBills.map(bill => (
-                  <TouchableOpacity
-                    key={bill.id}
-                    style={s.card}
-                    activeOpacity={0.85}
-                    onPress={() => router.push({ pathname: '/(app)/split-bill-detail', params: { splitBillId: bill.id, name: bill.name } } as any)}
-                  >
-                    <View style={s.cardIconWrap}>
-                      <Ionicons name="people-outline" size={18} color={Brand.color.headerText} />
+                {grouped.map(([dateLabel, groupBills]) => (
+                  <View key={dateLabel}>
+                    <View style={s.dateHeaderRow}>
+                      <Text style={s.dateHeaderText}>{dateLabel}</Text>
                     </View>
-                    <View style={s.cardMid}>
-                      <Text style={s.cardName} numberOfLines={1}>{bill.name}</Text>
-                      <Text style={s.cardMeta}>
-                        {bill.recording_count} recording{bill.recording_count !== 1 ? 's' : ''} · {bill.people_count} {bill.people_count !== 1 ? 'people' : 'person'}
-                      </Text>
-                    </View>
-                    <View style={[s.statusBadge, bill.status === 'closed' && s.statusBadgeClosed]}>
-                      <Text style={[s.statusBadgeText, bill.status === 'closed' && s.statusBadgeTextClosed]}>{bill.status}</Text>
-                    </View>
-                    <Text style={s.cardAmount}>{fmt(bill.total_amount)}</Text>
-                    <TouchableOpacity onPress={() => { setSelected(bill); setMenuModal(true); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ padding: 4 }}>
-                      <Ionicons name="ellipsis-horizontal" size={15} color={Colors.muted} />
-                    </TouchableOpacity>
-                  </TouchableOpacity>
+                    {groupBills.map(bill => (
+                      <TouchableOpacity
+                        key={bill.id}
+                        style={s.card}
+                        activeOpacity={0.85}
+                        onPress={() => router.push({ pathname: '/(app)/split-bill-detail', params: { splitBillId: bill.id, name: bill.name } } as any)}
+                      >
+                        <View style={s.cardIconWrap}>
+                          <Ionicons name="people-outline" size={18} color={Brand.color.headerText} />
+                        </View>
+                        <View style={s.cardMid}>
+                          <Text style={s.cardName} numberOfLines={1}>{bill.name}</Text>
+                          <Text style={s.cardMeta}>
+                            {bill.recording_count} recording{bill.recording_count !== 1 ? 's' : ''} · {bill.people_count} {bill.people_count !== 1 ? 'people' : 'person'}
+                          </Text>
+                        </View>
+                        <View style={[s.statusBadge, bill.status === 'closed' && s.statusBadgeClosed]}>
+                          <Text style={[s.statusBadgeText, bill.status === 'closed' && s.statusBadgeTextClosed]}>{bill.status}</Text>
+                        </View>
+                        <Text style={s.cardAmount}>{fmt(bill.total_amount)}</Text>
+                        <TouchableOpacity onPress={() => { setSelected(bill); setMenuModal(true); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ padding: 4 }}>
+                          <Ionicons name="ellipsis-horizontal" size={15} color={Colors.muted} />
+                        </TouchableOpacity>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
                 ))}
                 {hasMore && (
                   <View style={s.loadMoreWrap}>
@@ -228,7 +285,10 @@ const s = StyleSheet.create({
 
   emptyWrap: { alignItems: 'center', gap: 12, paddingVertical: 48 },
 
-  list: { gap: Brand.spacing.gap },
+  list: {},
+
+  dateHeaderRow:  { marginTop: 12, marginBottom: 6, paddingTop: 12 },
+  dateHeaderText: { fontFamily: Brand.font.mono, fontSize: 10, color: Colors.muted, letterSpacing: 1.4, textTransform: 'uppercase' },
 
   card:        { backgroundColor: Colors.white, borderRadius: Brand.radius.card, paddingVertical: Brand.spacing.card, flexDirection: 'row', alignItems: 'center', gap: 14, borderBottomWidth: 1, borderBottomColor: Colors.border },
   cardIconWrap:{ width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', backgroundColor: Brand.color.headerBg },
@@ -241,6 +301,12 @@ const s = StyleSheet.create({
   filterChipActive:   { backgroundColor: Brand.color.accent, borderColor: Brand.color.accent },
   filterChipText:     { fontFamily: Brand.font.mono, fontSize: 12, color: Colors.muted },
   filterChipTextActive: { fontFamily: Brand.font.monoBold, fontSize: 12, color: Brand.color.accentText },
+
+  dateFilterRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
+  dateNav:        { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  dateNavArrow:   { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.surface },
+  dateLabelBtn:   { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: Colors.white, borderWidth: 1, borderColor: Colors.borderMid },
+  dateLabelText:  { fontFamily: Brand.font.mono, fontSize: 11, color: Colors.text },
 
   statusBadge:         { paddingHorizontal: 8, paddingVertical: 3, borderRadius: Radius.pill, backgroundColor: Brand.color.accent + '44' },
   statusBadgeClosed:   { backgroundColor: Colors.surface },

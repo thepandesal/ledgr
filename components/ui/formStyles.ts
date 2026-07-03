@@ -24,7 +24,6 @@ const formStyles = StyleSheet.create({
     borderTopRightRadius: 24,
     padding: 24,
     paddingBottom: 0,
-    height: '50%',
   },
 
   // ─── Header ─────────────────────────────────────────────────────────────────

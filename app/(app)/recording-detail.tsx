@@ -1,5 +1,6 @@
 import AddItemModal from './AddItemModal';
 import { setPendingFocusDate } from './space-detail';
+import { useScreenAnim } from '@/components/ui/ScreenWrapper';
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Animated, Dimensions, ScrollView, TextInput, Modal, Platform, Image, Share } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,6 +18,7 @@ import ReceivableModal from '@/components/modals/ReceivableModal';
 import formStyles from '@/components/ui/formStyles';
 import { Colors, Radius } from '@/components/ui/theme';
 import { Brand } from '../../src/lib/brand';
+import { writeOff } from '../../src/lib/writeOff';
 
 const ACCENT      = Brand.color.accent;
 const ACCENT_DARK = Brand.color.accentDark;
@@ -33,7 +35,7 @@ interface Item { id: string; name: string; cost: number; people: string[]; subit
 export default function RecordingDetailScreen() {
   const { recordingId } = useLocalSearchParams<{ recordingId: string }>();
   const router = useRouter();
-  const slideAnim = useRef(new Animated.Value(width)).current;
+  const { slideAnim, handleBack } = useScreenAnim();
 
   const [recording, setRecording] = useState<any>(null);
   const [people, setPeople] = useState<string[]>([]);
@@ -116,6 +118,53 @@ export default function RecordingDetailScreen() {
   const [cancelDueConfirm, setCancelDueConfirm] = useState(false);
   const [cancelDueLoading, setCancelDueLoading] = useState(false);
 
+  // Write-off state
+  const [writeOffModal, setWriteOffModal] = useState(false);
+  const [writeOffReason, setWriteOffReason] = useState('');
+  const [writeOffLoading, setWriteOffLoading] = useState(false);
+
+  // Overpayment state
+  const [overpaymentModal, setOverpaymentModal] = useState(false);
+  const [overpaymentAmount, setOverpaymentAmount] = useState(0);
+
+  const confirmOverpaymentIncome = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    await supabase.from('recordings').insert({
+      user_id: user.id,
+      space_id: recording?.space_id ?? null,
+      name: `${recording?.name ?? 'recording'} · overpayment`,
+      type: 'income',
+      amount: overpaymentAmount,
+      transaction_date: new Date().toISOString().split('T')[0],
+      status: 'received',
+    });
+    setOverpaymentModal(false);
+  };
+
+  const confirmWriteOff = async () => {
+    if (!recording) return;
+    setWriteOffLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const remaining = Math.max(0, Number(recording.amount) - Number(recording.paid_amount ?? 0));
+      await writeOff({
+        parentRecordingId: recordingId as string,
+        parentName: recording.name,
+        amount: remaining,
+        spaceId: recording.space_id ?? null,
+        userId: user.id,
+        reason: writeOffReason,
+      });
+      setRecording((prev: any) => ({ ...prev, status: 'paid' }));
+      setWriteOffModal(false);
+      setWriteOffReason('');
+      loadPaymentData();
+    } catch (e) { console.log(e); }
+    finally { setWriteOffLoading(false); }
+  };
+
   // Create receivable from expense
   const [receivableModal, setReceivableModal] = useState(false);
   const [receivableMode, setReceivableMode] = useState<'full' | 'manual' | 'split'>('full');
@@ -145,6 +194,7 @@ export default function RecordingDetailScreen() {
   const [splitBillModal, setSplitBillModal] = useState(false);
   const [splitBillName, setSplitBillName] = useState('');
   const [existingSplitBills, setExistingSplitBills] = useState<any[]>([]);
+
 
   const loadLinkedSplitBill = async () => {
     if (!recordingId) return;
@@ -218,15 +268,12 @@ export default function RecordingDetailScreen() {
         }).eq('id', linkedPayable.id);
       }
       if (recordingDate) setPendingFocusDate(recordingDate);
-      Animated.timing(slideAnim, { toValue: width, duration: 250, useNativeDriver: false }).start(() => {
-        router.back();
-      });
+      handleBack();
     } catch (e) { console.log(e); }
     finally { setDeleteLoading(false); }
   };
 
   useEffect(() => {
-    Animated.timing(slideAnim, { toValue: 0, duration: 280, useNativeDriver: false }).start();
     loadRecording();
     loadContacts();
     loadPeople();
@@ -269,12 +316,18 @@ export default function RecordingDetailScreen() {
     if (rec.type === 'debt' || rec.type === 'due') {
       const paymentType = rec.type === 'debt' ? 'expense' : 'return';
       const { data: payments } = await supabase.from('recordings')
-        .select('id, name, amount, transaction_date, payment_to, payment_from_account_id, accounts:payment_from_account_id(account_name, bank)')
+        .select('id, name, amount, transaction_date, is_write_off, payment_to, payment_from_account_id, accounts:payment_from_account_id(account_name, bank)')
         .eq('linked_recording_id', recordingId).eq('type', paymentType).order('transaction_date', { ascending: false });
-      if (payments) {
-        setLinkedPayments(payments);
+      const { data: writeOffPayments } = await supabase.from('recordings')
+        .select('id, name, amount, transaction_date, is_write_off')
+        .eq('linked_recording_id', recordingId).eq('is_write_off', true)
+        .order('transaction_date', { ascending: false });
+      const allPayments = [...(payments ?? []), ...(writeOffPayments ?? [])]
+        .sort((a, b) => (b.transaction_date ?? '').localeCompare(a.transaction_date ?? ''));
+      if (allPayments.length > 0) {
+        setLinkedPayments(allPayments);
         // Load breakdowns for all payment records to build per-person status
-        const paymentIds = payments.map((p: any) => p.id);
+        const paymentIds = (payments ?? []).map((p: any) => p.id);
         if (paymentIds.length > 0) {
           const { data: breakdowns } = await supabase.from('recording_breakdowns')
             .select('person, amount, account_id, recording_id').in('recording_id', paymentIds);
@@ -331,11 +384,17 @@ export default function RecordingDetailScreen() {
       }
     } else if (rec.type === 'expense') {
       const { data: returnPayments } = await supabase.from('recordings')
-        .select('id, name, amount, transaction_date, payment_to, payment_from_account_id, accounts:payment_from_account_id(account_name, bank)')
+        .select('id, name, amount, transaction_date, is_write_off, payment_to, payment_from_account_id, accounts:payment_from_account_id(account_name, bank)')
         .eq('linked_recording_id', recordingId).eq('type', 'return').order('transaction_date', { ascending: false });
-      if (returnPayments && returnPayments.length > 0) {
-        setLinkedPayments(returnPayments);
-        const totalCollected = returnPayments.reduce((s: number, p: any) => s + Number(p.amount), 0);
+      const { data: writeOffPayments } = await supabase.from('recordings')
+        .select('id, name, amount, transaction_date, is_write_off')
+        .eq('linked_recording_id', recordingId).eq('is_write_off', true)
+        .order('transaction_date', { ascending: false });
+      const allPayments = [...(returnPayments ?? []), ...(writeOffPayments ?? [])]
+        .sort((a, b) => (b.transaction_date ?? '').localeCompare(a.transaction_date ?? ''));
+      if (allPayments.length > 0) {
+        setLinkedPayments(allPayments);
+        const totalCollected = (returnPayments ?? []).reduce((s: number, p: any) => s + Number(p.amount), 0);
         setRecording((prev: any) => prev ? { ...prev, paid_amount: totalCollected } : prev);
       }
       const { data: recv } = await supabase.from('recordings').select('id, name').eq('linked_recording_id', recordingId).eq('type', 'due').maybeSingle();
@@ -400,14 +459,21 @@ export default function RecordingDetailScreen() {
     setCollectDueLoading(true);
     try {
       const prevPaid = Number(recording.paid_amount ?? 0);
+      const total = Number(recording.amount ?? 0);
       const newPaid = prevPaid + amount;
+      const cappedPaid = Math.min(newPaid, total);
+      const excess = newPaid - total;
       const newStatus = collectDueComplete ? 'paid' : 'partial';
       await supabase.from('recordings').update({
-        paid_amount: newPaid,
+        paid_amount: cappedPaid,
         status: newStatus,
       }).eq('id', recordingId);
-      setRecording((prev: any) => ({ ...prev, paid_amount: newPaid, status: newStatus }));
+      setRecording((prev: any) => ({ ...prev, paid_amount: cappedPaid, status: newStatus }));
       setCollectDueModal(false);
+      if (excess > 0.01) {
+        setOverpaymentAmount(Math.round(excess * 100) / 100);
+        setOverpaymentModal(true);
+      }
     } catch (e) { console.log(e); }
     finally { setCollectDueLoading(false); }
   };
@@ -509,14 +575,21 @@ export default function RecordingDetailScreen() {
       }
 
       const prevPaid = Number(recording.paid_amount ?? 0);
+      const total = Number(recording.amount ?? 0);
       const newPaid = prevPaid + amount;
+      const cappedPaid = Math.min(newPaid, total);
+      const excess = newPaid - total;
       await supabase.from('recordings').update({
         status: collectComplete ? 'paid' : 'partial',
-        paid_amount: newPaid,
+        paid_amount: cappedPaid,
       }).eq('id', recordingId);
-      setRecording((prev: any) => ({ ...prev, status: collectComplete ? 'paid' : 'partial', paid_amount: newPaid }));
+      setRecording((prev: any) => ({ ...prev, status: collectComplete ? 'paid' : 'partial', paid_amount: cappedPaid }));
       setCollectModal(false);
       loadPaymentData();
+      if (excess > 0.01) {
+        setOverpaymentAmount(Math.round(excess * 100) / 100);
+        setOverpaymentModal(true);
+      }
     } catch (e) { console.log(e); }
     finally { setCollectLoading(false); }
   };
@@ -606,14 +679,21 @@ export default function RecordingDetailScreen() {
       }
 
       const prevPaid = Number(recording.paid_amount ?? 0);
+      const total = Number(recording.amount ?? 0);
       const newPaid = prevPaid + amount;
+      const cappedPaid = Math.min(newPaid, total);
+      const excess = newPaid - total;
       await supabase.from('recordings').update({
         status: payComplete ? 'paid' : 'partial',
-        paid_amount: newPaid,
+        paid_amount: cappedPaid,
       }).eq('id', recordingId);
-      setRecording((prev: any) => ({ ...prev, status: payComplete ? 'paid' : 'partial', paid_amount: newPaid }));
+      setRecording((prev: any) => ({ ...prev, status: payComplete ? 'paid' : 'partial', paid_amount: cappedPaid }));
       setPayModal(false);
       loadPaymentData();
+      if (excess > 0.01) {
+        setOverpaymentAmount(Math.round(excess * 100) / 100);
+        setOverpaymentModal(true);
+      }
     } catch (e) { console.log(e); }
     finally { setPayLoading(false); }
   };
@@ -969,9 +1049,6 @@ export default function RecordingDetailScreen() {
     finally { setShareLoading(false); }
   };
 
-  const handleBack = () => {
-    Animated.timing(slideAnim, { toValue: width, duration: 250, useNativeDriver: false }).start(() => router.back());
-  };
 
   const openEditModal = async () => {
     setEditDate(recording?.transaction_date ?? '');
@@ -1210,6 +1287,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
   };
 
   const typeLabel = (type: string, status: string) => {
+    if (recording?.is_write_off) return 'Write-off';
     if (type === 'debt') {
       if (status === 'paid')    return 'Debt · Paid';
       if (status === 'partial') return 'Debt · Partially Paid';
@@ -1248,11 +1326,11 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
         {/* Header */}
         <View style={rd.header}>
           <TouchableOpacity onPress={handleBack} style={rd.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="arrow-back" size={20} color={Colors.text} />
+            <Ionicons name="arrow-back" size={20} color="#B6E1DE" />
           </TouchableOpacity>
           <Text style={rd.title} numberOfLines={1}>{truncate(recording?.name ?? '', MAX_NAME_CHARS).toLowerCase()}</Text>
           <TouchableOpacity onPress={openEditModal} style={{ padding: 4 }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="create-outline" size={16} color={Colors.muted} />
+            <Ionicons name="create-outline" size={16} color="#B6E1DE" />
           </TouchableOpacity>
           <View style={rd.amountBadge}>
             <Text style={[rd.amountBadgeText, { color: amountColor() }]}>{displayAmount()}</Text>
@@ -1261,33 +1339,36 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
 
         <ScrollView contentContainerStyle={rd.scroll} showsVerticalScrollIndicator={false}>
           <View style={{ height: 8 }} />
-          {/* Hero */}
-          <View style={rd.heroBlock}>
-            <Text style={rd.heroLabel}>{typeLabel(recording?.type ?? '', recording?.status ?? '')}</Text>
-            <Text style={rd.heroDate}>{formatDate(recording?.transaction_date)}{recording?.account?.account_name ? ` · ${recording.account.account_name}` : ''}</Text>
-            {recording?.is_due && Number(recording?.paid_amount ?? 0) > 0 && (
-              <Text style={rd.heroDate}>collected: {Number(recording.paid_amount).toLocaleString('en-US', { minimumFractionDigits: 2 })} / {Number(recording.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+          {/* Summary grid */}
+          <View style={rd.summaryGrid}>
+            <View style={rd.summaryCell}>
+              <Text style={rd.summaryLabel}>amount</Text>
+              <Text style={[rd.summaryValue, { color: amountColor() }]}>{Number(recording?.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+            </View>
+            <View style={rd.summaryCell}>
+              <Text style={rd.summaryLabel}>type</Text>
+              <Text style={rd.summaryValue}>{typeLabel(recording?.type ?? '', recording?.status ?? '')}</Text>
+            </View>
+            <View style={rd.summaryCell}>
+              <Text style={rd.summaryLabel}>date</Text>
+              <Text style={rd.summaryValue}>{formatDate(recording?.transaction_date)}</Text>
+            </View>
+            <View style={rd.summaryCell}>
+              <Text style={rd.summaryLabel}>status</Text>
+              <Text style={rd.summaryValue}>{recording?.status ?? '—'}</Text>
+            </View>
+            {(recording?.is_due || recording?.type === 'due' || recording?.type === 'debt') && (
+              <View style={rd.summaryCell}>
+                <Text style={rd.summaryLabel}>{recording?.type === 'debt' ? 'paid' : 'collected'}</Text>
+                <Text style={rd.summaryValue}>
+                  {Number(recording?.paid_amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}/{Number(recording?.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                </Text>
+              </View>
             )}
-            {recording?.is_due && Number(recording?.amount) > 0 && (() => {
-              const total = Number(recording.amount);
-              const paid = Number(recording.paid_amount ?? 0);
-              const pct = Math.min(paid / total, 1);
-              const fullyCollected = paid >= total - 0.01;
-              return (
-                <View style={{ marginTop: 8, gap: 4 }}>
-                  <View style={{ height: 3, backgroundColor: Colors.border, borderRadius: 2, overflow: 'hidden' }}>
-                    <View style={{ height: 3, width: `${pct * 100}%` as any, backgroundColor: fullyCollected ? ACCENT_DARK : PEACH, borderRadius: 2 }} />
-                  </View>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                    <Text style={{ fontFamily: Brand.font.mono, fontSize: 9, color: Colors.muted }}>{paid.toLocaleString('en-US', { minimumFractionDigits: 2 })} collected</Text>
-                    {fullyCollected
-                      ? <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 9, color: ACCENT_DARK }}>fully collected ✓</Text>
-                      : <Text style={{ fontFamily: Brand.font.mono, fontSize: 9, color: Colors.muted }}>{Math.max(0, total - paid).toLocaleString('en-US', { minimumFractionDigits: 2 })} remaining</Text>
-                    }
-                  </View>
-                </View>
-              );
-            })()}
+            <View style={rd.summaryCell}>
+              <Text style={rd.summaryLabel}>category</Text>
+              <Text style={rd.summaryValue}>{recording?.categories?.name ?? '—'}</Text>
+            </View>
           </View>
 
           {/* Actions */}
@@ -1368,6 +1449,24 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
               <Ionicons name="trash-outline" size={13} color={Colors.danger} />
               <Text style={[rd.actionChipText, { color: Colors.danger }]}>delete</Text>
             </TouchableOpacity>
+            {/* Write-off chip — visible when there is an unpaid remainder */}
+            {(() => {
+              const isWriteOffable =
+                (recording?.type === 'due' || recording?.type === 'debt' ||
+                 (recording?.type === 'expense' && recording?.is_due)) &&
+                recording?.status !== 'paid';
+              const remaining = Math.max(0, Number(recording?.amount ?? 0) - Number(recording?.paid_amount ?? 0));
+              if (!isWriteOffable || remaining <= 0) return null;
+              return (
+                <TouchableOpacity
+                  style={[rd.actionChip, { backgroundColor: '#92909022', borderWidth: 1, borderColor: '#92909044' }]}
+                  onPress={() => { setWriteOffReason(''); setWriteOffModal(true); }}
+                >
+                  <Ionicons name="close-circle-outline" size={13} color={Colors.muted} />
+                  <Text style={[rd.actionChipText, { color: Colors.muted }]}>write off</Text>
+                </TouchableOpacity>
+              );
+            })()}
           </ScrollView>
 
           {/* Receipt */}
@@ -1402,43 +1501,23 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
             <View style={rd.emptyWrap}><Text style={{ fontFamily: Brand.font.mono, fontSize: 12, color: Colors.muted }}>no receipt attached</Text></View>
           )}
 
-          {/* Information */}
+          {/* Other Information */}
           <View style={rd.divider} />
           <View style={rd.sectionRow}>
-            <Text style={rd.sectionHeader}>information</Text>
+            <Text style={rd.sectionHeader}>other information</Text>
           </View>
           <View style={{ paddingHorizontal: PAGE }}>
-            <View style={rd.infoRow}>
-              <Text style={rd.infoLabel}>date</Text>
-              <Text style={rd.infoValue}>{formatDate(recording?.transaction_date)}</Text>
-            </View>
-            <View style={rd.infoRow}>
-              <Text style={rd.infoLabel}>type</Text>
-              <Text style={rd.infoValue}>{typeLabel(recording?.type ?? '', recording?.status ?? '')}</Text>
-            </View>
-            <View style={rd.infoRow}>
-              <Text style={rd.infoLabel}>amount</Text>
-              <Text style={rd.infoValue}>{Number(recording?.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
-            </View>
-            <View style={rd.infoRow}>
-              <Text style={rd.infoLabel}>status</Text>
-              <Text style={rd.infoValue}>{recording?.status ?? '—'}</Text>
-            </View>
             <View style={rd.infoRow}>
               <Text style={rd.infoLabel}>account</Text>
               <Text style={rd.infoValue}>{truncate(recording?.account?.account_name ?? '—', 20)}</Text>
             </View>
             <View style={rd.infoRow}>
-              <Text style={rd.infoLabel}>category</Text>
-              <Text style={rd.infoValue}>{recording?.categories?.name ?? '—'}</Text>
-            </View>
-            <View style={rd.infoRow}>
               <Text style={rd.infoLabel}>{recording?.type === 'debt' ? 'paying' : 'owes you'}</Text>
               <Text style={rd.infoValue}>{recording?.person_name ?? '—'}</Text>
             </View>
-            <View style={[rd.infoRow, { flexDirection: 'column', alignItems: 'flex-start', gap: 4 }]}>
+            <View style={rd.infoRow}>
               <Text style={rd.infoLabel}>notes</Text>
-              <Text style={{ fontFamily: Brand.font.mono, fontSize: 12, color: Colors.text, lineHeight: 18 }}>{recording?.notes ?? '—'}</Text>
+              <Text style={{ fontFamily: Brand.font.mono, fontSize: 12, color: Colors.text, lineHeight: 18, flex: 1, textAlign: 'right' }}>{recording?.notes ?? '—'}</Text>
             </View>
             {linkedPayable && (
               <TouchableOpacity style={rd.infoRow} onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: linkedPayable.id } } as any)}>
@@ -1469,14 +1548,17 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
               </View>
               <View style={{ paddingHorizontal: PAGE }}>
                 {linkedPayments.map((p: any, i: number) => (
-                  <TouchableOpacity key={p.id} style={rd.recRow} onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: p.id } } as any)}>
-                    <View style={rd.recIconWrap}><Ionicons name="cash-outline" size={14} color={ACCENT_DARK} /></View>
-                    <View style={rd.recMid}>
-                      <Text style={rd.recName}>{Number(p.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
-                      <Text style={rd.recDate}>{formatDate(p.transaction_date)}{p.accounts?.account_name ? ` · ${p.accounts.account_name}` : ''}</Text>
-                      {p.payment_to && <Text style={[rd.recDate, { color: ACCENT_DARK }]}>{p.payment_to}</Text>}
+                  <TouchableOpacity key={p.id} style={[rd.recRow, p.is_write_off && { opacity: 0.6 }]} onPress={() => !p.is_write_off && router.push({ pathname: '/(app)/recording-detail', params: { recordingId: p.id } } as any)}>
+                    <View style={[rd.recIconWrap, p.is_write_off && { backgroundColor: Colors.surface }]}>
+                      <Ionicons name={p.is_write_off ? 'close-circle-outline' : 'cash-outline'} size={14} color={p.is_write_off ? Colors.muted : ACCENT_DARK} />
                     </View>
-                    <Ionicons name="chevron-forward" size={13} color={Colors.muted} />
+                    <View style={rd.recMid}>
+                      <Text style={[rd.recName, p.is_write_off && { color: Colors.muted }]}>{Number(p.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+                      <Text style={rd.recDate}>{formatDate(p.transaction_date)}{p.accounts?.account_name ? ` · ${p.accounts.account_name}` : ''}</Text>
+                      {p.is_write_off && <Text style={{ fontFamily: Brand.font.mono, fontSize: 9, color: Colors.muted }}>write-off</Text>}
+                      {p.payment_to && !p.is_write_off && <Text style={[rd.recDate, { color: ACCENT_DARK }]}>{p.payment_to}</Text>}
+                    </View>
+                    {!p.is_write_off && <Ionicons name="chevron-forward" size={13} color={Colors.muted} />}
                   </TouchableOpacity>
                 ))}
               </View>
@@ -1562,7 +1644,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
       </SafeAreaView>
 
       {/* Split bill modal */}
-      <BottomSheet visible={splitBillModal} onClose={() => setSplitBillModal(false)} title="split bill" height="50%">
+      <BottomSheet visible={splitBillModal} onClose={() => setSplitBillModal(false)} title="split bill">
         <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: Colors.muted, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.6 }}>split bill name</Text>
         <TextInput
           style={{ fontFamily: Brand.font.mono, fontSize: 15, color: Colors.text, backgroundColor: Colors.surface, borderRadius: Radius.md, paddingHorizontal: 14, paddingVertical: 11, borderWidth: 1, borderColor: Colors.borderMid, marginBottom: 12 }}
@@ -1576,20 +1658,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
           <Ionicons name="add-circle-outline" size={15} color={ACCENT_DARK} />
           <Text style={rd.doneBtnText}>create new split bill</Text>
         </TouchableOpacity>
-        {existingSplitBills.length > 0 && (
-          <>
-            <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8, marginTop: 16 }}>add to existing</Text>
-            <ScrollView style={{ maxHeight: 240 }} showsVerticalScrollIndicator={false}>
-              {existingSplitBills.map((bill: any) => (
-                <TouchableOpacity key={bill.id} style={rd.recRow} onPress={() => linkToExistingSplitBill(bill)}>
-                  <View style={rd.recIconWrap}><Ionicons name="people-outline" size={14} color={ACCENT_DARK} /></View>
-                  <Text style={[rd.recName, { flex: 1 }]}>{bill.name}</Text>
-                  <Ionicons name="chevron-forward" size={13} color={Colors.muted} />
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </>
-        )}
+
       </BottomSheet>
 
       {tooltip && (
@@ -1925,6 +1994,64 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
         </View>
       </Modal>
 
+      {/* Overpayment modal */}
+      <BottomSheet visible={overpaymentModal} onClose={() => setOverpaymentModal(false)} title="overpayment detected">
+        <Text style={{ fontFamily: Brand.font.mono, fontSize: 13, color: Colors.text, marginBottom: 4 }}>
+          {overpaymentAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })} was paid over the full amount.
+        </Text>
+        <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: Colors.muted, marginBottom: 16 }}>
+          the recording has been marked as fully paid. what would you like to do with the excess?
+        </Text>
+        <TouchableOpacity style={rd.doneBtn} onPress={confirmOverpaymentIncome}>
+          <Text style={rd.doneBtnText}>record as income</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[rd.doneBtn, { backgroundColor: Colors.surface, marginTop: 8 }]} onPress={() => setOverpaymentModal(false)}>
+          <Text style={[rd.doneBtnText, { color: Colors.muted }]}>ignore</Text>
+        </TouchableOpacity>
+      </BottomSheet>
+
+      {/* Write-off modal */}
+      <BottomSheet visible={writeOffModal} onClose={() => setWriteOffModal(false)} title="write off">
+        {writeOffModal && (() => {
+          const remaining = Math.max(0, Number(recording?.amount ?? 0) - Number(recording?.paid_amount ?? 0));
+          return (
+            <>
+              <Text style={{ fontFamily: Brand.font.mono, fontSize: 13, color: Colors.text, marginBottom: 4 }}>
+                {recording?.name}
+              </Text>
+              <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 15, color: Colors.muted, marginBottom: 4 }}>
+                {remaining.toLocaleString('en-US', { minimumFractionDigits: 2 })} will be written off
+              </Text>
+              <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: Colors.muted, marginBottom: 16 }}>
+                this records the unpaid remainder as a bad debt expense and marks the original as paid. the write-off will appear in your expenses under the "Write-offs" category.
+              </Text>
+              <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 6 }}>reason (optional)</Text>
+              <TextInput
+                style={{ fontFamily: Brand.font.mono, fontSize: 15, color: Colors.text, backgroundColor: Colors.surface, borderRadius: Radius.md, paddingHorizontal: 14, paddingVertical: 11, borderWidth: 1, borderColor: Colors.borderMid, marginBottom: 4 }}
+                placeholder="e.g. person stopped responding"
+                placeholderTextColor={Colors.faint}
+                value={writeOffReason}
+                onChangeText={setWriteOffReason}
+                autoFocus
+              />
+              <TouchableOpacity
+                style={[rd.doneBtn, { marginTop: 12, backgroundColor: '#92909022', opacity: writeOffLoading ? 0.5 : 1 }]}
+                onPress={confirmWriteOff}
+                disabled={writeOffLoading}
+              >
+                <Text style={[rd.doneBtnText, { color: Colors.muted }]}>{writeOffLoading ? 'writing off...' : 'confirm write-off'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[rd.doneBtn, { backgroundColor: Colors.surface, marginTop: 8 }]}
+                onPress={() => setWriteOffModal(false)}
+              >
+                <Text style={[rd.doneBtnText, { color: Colors.muted }]}>cancel</Text>
+              </TouchableOpacity>
+            </>
+          );
+        })()}
+      </BottomSheet>
+
       {/* Hidden WebView for image capture - native only */}
       {captureHtml && Platform.OS !== 'web' && (() => {
         const { WebView } = require('react-native-webview');
@@ -1945,17 +2072,23 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
 
 const rd = StyleSheet.create({
   // Container
-  header:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: PAGE, paddingTop: 16, paddingBottom: 8, gap: 10, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  backBtn:    { width: 34, height: 34, borderRadius: 17, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center' },
-  title:      { flex: 1, fontFamily: Brand.font.display, fontSize: 20, color: Colors.text, letterSpacing: -0.3 },
-  amountBadge:     { backgroundColor: ACCENT + '44', borderRadius: Radius.pill, paddingHorizontal: 12, paddingVertical: 5 },
+  header:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: PAGE, paddingTop: 16, paddingBottom: 16, gap: 10, backgroundColor: '#1A1A1A', borderBottomWidth: 1, borderBottomColor: '#333' },
+  backBtn:    { width: 34, height: 34, borderRadius: 17, backgroundColor: '#B6E1DE22', alignItems: 'center', justifyContent: 'center' },
+  title:      { flex: 1, fontFamily: Brand.font.display, fontSize: 20, color: '#B6E1DE', letterSpacing: -0.3, textAlign: 'center' },
+  amountBadge:     { backgroundColor: '#B6E1DE22', borderRadius: Radius.pill, paddingHorizontal: 12, paddingVertical: 5 },
   amountBadgeText: { fontFamily: Brand.font.monoBold, fontSize: 13 },
   scroll:     { paddingBottom: 80 },
 
-  // Hero
+  // Hero (kept for compat but unused)
   heroBlock:  { paddingHorizontal: PAGE, paddingTop: 12, paddingBottom: 4 },
   heroLabel:  { fontFamily: Brand.font.monoBold, fontSize: 10, color: ACCENT_DARK, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 2 },
   heroDate:   { fontFamily: Brand.font.mono, fontSize: 11, color: Colors.muted, marginTop: 1 },
+
+  // Summary grid
+  summaryGrid:  { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: PAGE, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  summaryCell:  { width: '50%', paddingVertical: 8, paddingRight: 8 },
+  summaryLabel: { fontFamily: Brand.font.mono, fontSize: 10, color: Colors.muted, letterSpacing: 0.4, textTransform: 'uppercase', marginBottom: 3 },
+  summaryValue: { fontFamily: Brand.font.monoBold, fontSize: 13, color: Colors.text },
 
   // Divider
   divider:    { height: 8, backgroundColor: Colors.surface, marginHorizontal: -PAGE },

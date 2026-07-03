@@ -66,25 +66,7 @@ function getRangeForPreset(preset: Preset, cutoffDay: number, offset = 0): { fro
 
 const MODAL_HEIGHT = '50%';
 
-function smartDateLabel(dateStr: string): string {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  const date  = new Date(y, m - 1, d);
-  const today = new Date();
-  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  const diffDays = Math.floor((todayStart.getTime() - date.getTime()) / 86400000);
-
-  if (diffDays === 0) return 'Today';
-  if (diffDays === 1) return 'Yesterday';
-
-  // Same week (Sun-Sat containing today)
-  const todayDay = todayStart.getDay(); // 0=Sun
-  const weekStart = new Date(todayStart); weekStart.setDate(todayStart.getDate() - todayDay);
-  const weekEnd   = new Date(weekStart);  weekEnd.setDate(weekStart.getDate() + 6);
-  if (date >= weekStart && date <= weekEnd)
-    return date.toLocaleDateString('en-US', { weekday: 'long' });
-
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
+import { smartDateLabel } from '../../../src/lib/smartDateLabel';
 
 export default function DashboardScreen() {
   const router    = useRouter();
@@ -298,6 +280,7 @@ export default function DashboardScreen() {
 
   const filtered = recordings.filter(r => {
     if (!effectiveTypes.includes(r.type)) return false;
+    if (r.status === 'voided') return false;
     // When Due tab is selected, only show is_due expenses (not all expenses)
     if (!isAll && selectedTabs.has('receivables') && r.type === 'expense' && !r.is_due) return false;
     if (!isAllSpaces     && !selectedSpaces.has(r.space_id))                    return false;
@@ -343,6 +326,7 @@ export default function DashboardScreen() {
   const activeTabData = ACTIVITY_TABS.find(t => t.key === (isAll ? 'all' : [...selectedTabs][0])) ?? ACTIVITY_TABS[0];
   const allRecordings = (types: string[]) => recordings.filter(r => {
     if (!types.includes(r.type)) return false;
+    if (r.status === 'voided') return false;
     if (!isAllSpaces && !selectedSpaces.has(r.space_id)) return false;
     const [y, m, d] = r.transaction_date.split('-').map(Number);
     const date = new Date(y, m - 1, d);
@@ -364,9 +348,9 @@ export default function DashboardScreen() {
 
   const fmt     = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2 });
   const fmtAbbr = (n: number) => {
-    if (n >= 1_000_000) return (n / 1_000_000).toLocaleString('en-US', { maximumFractionDigits: 2 }) + 'M';
+    if (n >= 1_000_000) return (n / 1_000_000).toLocaleString('en-US', { maximumFractionDigits: 1 }) + 'M';
     if (n >= 1_000)     return (n / 1_000).toLocaleString('en-US', { maximumFractionDigits: 1 }) + 'K';
-    return n.toLocaleString('en-US', { minimumFractionDigits: 2 });
+    return n.toLocaleString('en-US', { maximumFractionDigits: 0 });
   };
   const fmtShort = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   const fmtFull  = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -484,6 +468,7 @@ export default function DashboardScreen() {
   };
 
   const typeLabel = (r: any) => {
+    if (r.is_write_off) return { label: 'write-off', color: Colors.muted };
     if (r.type === 'income')  return { label: 'income',  color: ACCENT };
     if (r.type === 'expense') return { label: r.is_due ? 'expense · due' : 'expense', color: PEACH };
     if (r.type === 'debt')    return r.status === 'paid'
