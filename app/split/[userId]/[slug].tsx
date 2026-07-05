@@ -16,6 +16,7 @@ export default function SplitShareSlugPage() {
   const { userId, slug } = useLocalSearchParams<{ userId: string; slug: string }>();
   const [loading, setLoading]               = useState(true);
   const [notFound, setNotFound]             = useState(false);
+  const [billClosed, setBillClosed]         = useState(false);
   const [recording, setRecording]           = useState<any>(null);
   const [perPerson, setPerPerson]           = useState<{ name: string; total: number }[]>([]);
   const [items, setItems]                   = useState<any[]>([]);
@@ -62,7 +63,7 @@ export default function SplitShareSlugPage() {
 
     if (splitBillId) {
       const [billRes, splitsRes, itemsRes, recsRes, adjRes, paymentsRes] = await Promise.all([
-        supabase.from('split_bills').select('id, name').eq('id', splitBillId).single(),
+        supabase.from('split_bills').select('id, name, status').eq('id', splitBillId).single(),
         supabase.from('bill_splits').select('person_name').eq('split_bill_id', splitBillId).order('created_at'),
         supabase.from('split_items').select('*, split_subitems(*)').eq('split_bill_id', splitBillId).order('created_at'),
         supabase.from('split_bill_recordings').select('amount_contributed, recording:recording_id(id, name, amount, type, transaction_date)').eq('split_bill_id', splitBillId),
@@ -70,6 +71,7 @@ export default function SplitShareSlugPage() {
         supabase.from('split_bill_payments').select('*').eq('split_bill_id', splitBillId).order('created_at'),
       ]);
       if (!billRes.data) { setNotFound(true); setLoading(false); return; }
+      if (billRes.data.status === 'closed') setBillClosed(true);
       const firstRec = (recsRes.data ?? []).map((r: any) => ({ ...r, recording: Array.isArray(r.recording) ? r.recording[0] : r.recording }))[0]?.recording;
       setRecording(firstRec ? { ...firstRec, name: billRes.data.name } : { name: billRes.data.name, amount: 0, type: 'expense', transaction_date: '' });
       if (accountIds.length > 0) {
@@ -256,6 +258,13 @@ export default function SplitShareSlugPage() {
       <ScrollView style={s.container} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
         <Text style={s.recName}>{String(recording.name ?? '').toLowerCase()}</Text>
         {!!formattedDate && <Text style={s.recDate}>{formattedDate}</Text>}
+
+        {billClosed && (
+          <View style={{ backgroundColor: '#FFAB9122', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 16, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Ionicons name="lock-closed-outline" size={14} color="#FFAB91" />
+            <Text style={{ fontFamily: Brand.font.mono, fontSize: 12, color: '#FFAB91', flex: 1 }}>this split bill has been closed by the owner</Text>
+          </View>
+        )}
 
         {perPerson.length > 0 && <>
           <Text style={s.sectionHeader}>per person pay</Text>
