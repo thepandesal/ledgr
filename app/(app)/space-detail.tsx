@@ -508,8 +508,13 @@ export default function SpaceDetailScreen() {
 
   useFocusEffect(useCallback(() => {
     if (!spaceId) return;
-    queryClient.invalidateQueries({ queryKey: ['recordings', spaceId] });
-    queryClient.invalidateQueries({ queryKey: ['spaces-settings', userId] });
+    // Only refetch if data is older than 30s, so navigating back doesn't always reload
+    const state = queryClient.getQueryState(['recordings', spaceId, userId]);
+    const age = state?.dataUpdatedAt ? Date.now() - state.dataUpdatedAt : Infinity;
+    if (age > 30_000) {
+      queryClient.invalidateQueries({ queryKey: ['recordings', spaceId] });
+      queryClient.invalidateQueries({ queryKey: ['spaces-settings', userId] });
+    }
     setDisplayCount(10);
     setPendingFocusDate(null);
   }, [spaceId, userId]));
