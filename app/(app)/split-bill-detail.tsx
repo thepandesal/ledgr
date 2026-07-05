@@ -2061,6 +2061,23 @@ export default function SplitBillDetailScreen() {
             <Text style={[s.recDate, { marginBottom: 8 }]}>
               {selectedRecording?.recording?.name} · {selectedRecording?.recording?.type} · {fmt(Number(selectedRecording?.amount_contributed))}
             </Text>
+            {/* Existing items for this recording */}
+            {(() => {
+              const existing = items.filter((i: any) => i.recording_id === selectedRecording?.recording?.id);
+              if (existing.length === 0) return null;
+              return (
+                <View style={{ marginBottom: 12 }}>
+                  <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 6 }}>already added</Text>
+                  {existing.map((item: any, i: number) => (
+                    <View key={item.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: Colors.border }}>
+                      <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: ACCENT_DARK, backgroundColor: ACCENT + '44', width: 20, height: 20, borderRadius: 10, textAlign: 'center', lineHeight: 20 }}>{i + 1}</Text>
+                      <Text style={{ flex: 1, fontFamily: Brand.font.mono, fontSize: 13, color: Colors.muted }} numberOfLines={1}>{item.name}</Text>
+                      <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 13, color: Colors.muted }}>{fmt(Number(item.cost))}</Text>
+                    </View>
+                  ))}
+                </View>
+              );
+            })()}
             {/* Budget bar */}
             {(() => {
               const recTotal = Number(selectedRecording?.amount_contributed ?? 0);
