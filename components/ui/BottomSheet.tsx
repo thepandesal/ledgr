@@ -50,6 +50,7 @@ export default function BottomSheet({ visible, onClose, sub, title, children }: 
       </Animated.View>
 
       <View style={s.centeredWrap} pointerEvents="box-none">
+        <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
         <Animated.View style={[s.card, { opacity: opacityAnim, transform: [{ scale: scaleAnim }] }]}>
           <View style={formStyles.header}>
             <View>
