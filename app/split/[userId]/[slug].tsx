@@ -64,7 +64,7 @@ export default function SplitShareSlugPage() {
         supabase.from('split_bills').select('id, name').eq('id', splitBillId).single(),
         supabase.from('bill_splits').select('person_name').eq('split_bill_id', splitBillId).order('created_at'),
         supabase.from('split_items').select('*, split_subitems(*)').eq('split_bill_id', splitBillId).order('created_at'),
-        supabase.from('split_bill_recordings').select('amount_contributed, recording:recording_id(name, amount, type, transaction_date)').eq('split_bill_id', splitBillId),
+        supabase.from('split_bill_recordings').select('amount_contributed, recording:recording_id(id, name, amount, type, transaction_date)').eq('split_bill_id', splitBillId),
         supabase.from('split_adjustments').select('*').eq('split_bill_id', splitBillId),
         supabase.from('split_bill_payments').select('*').eq('split_bill_id', splitBillId).order('created_at'),
       ]);
