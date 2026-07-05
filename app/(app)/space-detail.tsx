@@ -914,6 +914,7 @@ export default function SpaceDetailScreen() {
       body: `${String(name)} — role: ${inviteRole}`,
       data: { spaceId, spaceName: String(name) },
       is_read: false,
+      status: 'new',
     });
     refetchMembers();
     setInviteSaving(false);

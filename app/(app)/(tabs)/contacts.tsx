@@ -64,7 +64,7 @@ export default function ContactsScreen() {
     await supabase.from('friendships').insert({ requester_id: userId, receiver_id: addResult.id, status: 'pending' });
     await supabase.from('notifications').insert({
       user_id: addResult.id, type: 'friend_request',
-      title: 'new friend request', body: 'someone wants to add you as a friend', is_read: false,
+      title: 'new friend request', body: 'someone wants to add you as a friend', is_read: false, status: 'new',
     });
     setAddSending(false);
     setAddSuccess(true);
@@ -147,7 +147,7 @@ export default function ContactsScreen() {
     if (accept && req) {
       await supabase.from('notifications').insert({
         user_id: req.requester_id, type: 'friend_request_accepted',
-        title: 'friend request accepted', body: 'your friend request was accepted', is_read: false,
+        title: 'friend request accepted', body: 'your friend request was accepted', is_read: false, status: 'new',
       });
     }
     queryClient.invalidateQueries({ queryKey: ['friend-requests-incoming', userId] });

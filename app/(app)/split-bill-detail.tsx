@@ -143,6 +143,7 @@ export default function SplitBillDetailScreen() {
       body: `${String(name)} — your share is ${amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
       data: { splitBillId, splitBillName: String(name) },
       is_read: false,
+      status: 'new',
     });
     queryClient.invalidateQueries({ queryKey: ['split-bill-invites', splitBillId] });
     setSendingInvite(false);

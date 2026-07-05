@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../src/lib/supabase';
 import { useUser } from '../../src/hooks/useUser';
-import { Colors, Radius, Spacing } from '@/components/ui/theme';
+import { Colors } from '@/components/ui/theme';
 import { Brand } from '../../src/lib/brand';
 
 const ACCENT      = Brand.color.accent;
@@ -53,31 +53,33 @@ export default function NotificationsScreen() {
         .order('created_at', { ascending: false });
       setNotifications(data ?? []);
       setLoading(false);
-
-      // Mark all as read in one batch
-      if (data && data.some((n: any) => !n.is_read)) {
+      // Mark all 'new' → 'saw' when page is opened
+      if (data && data.some((n: any) => n.status === 'new')) {
         await supabase
           .from('notifications')
-          .update({ is_read: true, read: true })
+          .update({ status: 'saw', is_read: true, read: true })
           .eq('user_id', userId)
-          .eq('is_read', false);
+          .eq('status', 'new');
+        setNotifications(prev => prev.map(n => n.status === 'new' ? { ...n, status: 'saw' } : n));
       }
     })();
   }, [userId]);
 
-  const handleTap = (n: any) => {
+  const handleTap = async (n: any) => {
+    // Mark as opened
+    if (n.status !== 'opened') {
+      await supabase.from('notifications').update({ status: 'opened' }).eq('id', n.id);
+      setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, status: 'opened' } : x));
+    }
     const data = n.data ?? {};
     if (n.type === 'friend_request' || n.type === 'friend_request_accepted') {
-      router.push('/(app)/(tabs)/contacts' as any);
-      return;
+      router.push('/(app)/(tabs)/contacts' as any); return;
     }
     if (n.type === 'split_bill_invite' && data.splitBillId) {
-      router.push({ pathname: '/(app)/split-bill-detail', params: { splitBillId: data.splitBillId, name: data.splitBillName ?? 'split bill' } } as any);
-      return;
+      router.push({ pathname: '/(app)/split-bill-detail', params: { splitBillId: data.splitBillId, name: data.splitBillName ?? 'split bill' } } as any); return;
     }
     if (n.type === 'space_invite') {
-      router.push('/(app)/(tabs)/spaces' as any);
-      return;
+      router.push('/(app)/(tabs)/spaces' as any); return;
     }
     if (data.recordingId) {
       router.push({ pathname: '/(app)/recording-detail', params: { recordingId: data.recordingId } } as any);
@@ -88,7 +90,6 @@ export default function NotificationsScreen() {
     }
   };
 
-  // Group by Today / Yesterday / Earlier
   const groups: { label: string; items: any[] }[] = [];
   notifications.forEach(n => {
     const label = smartGroup(n.created_at);
@@ -111,39 +112,42 @@ export default function NotificationsScreen() {
         </View>
       ) : (
         <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
-            {groups.map(group => (
-              <View key={group.label}>
-                <Text style={s.groupLabel}>{group.label}</Text>
-                {group.items.map(n => {
-                  const icon = TYPE_ICON[n.type] ?? TYPE_ICON.default;
-                  const isUnread = !n.is_read;
-                  return (
-                    <TouchableOpacity
-                      key={n.id}
-                      style={[s.row, isUnread && s.rowUnread]}
-                      activeOpacity={0.8}
-                      onPress={() => handleTap(n)}
-                    >
-                      <View style={[s.iconWrap, isUnread && s.iconWrapUnread]}>
-                        <Ionicons name={icon as any} size={18} color={isUnread ? ACCENT_DARK : Colors.muted} />
-                      </View>
-                      <View style={s.mid}>
-                        <Text style={[s.rowTitle, isUnread && s.rowTitleUnread]} numberOfLines={1}>
-                          {n.title}
-                        </Text>
-                        {n.body ? (
-                          <Text style={s.rowBody} numberOfLines={2}>{n.body}</Text>
-                        ) : null}
-                      </View>
+          {groups.map(group => (
+            <View key={group.label}>
+              <Text style={s.groupLabel}>{group.label}</Text>
+              {group.items.map(n => {
+                const icon = TYPE_ICON[n.type] ?? TYPE_ICON.default;
+                const isNew = n.status === 'new';
+                const isSaw = n.status === 'saw';
+                const highlighted = isNew || isSaw;
+                return (
+                  <TouchableOpacity
+                    key={n.id}
+                    style={[s.row, isNew && s.rowNew, isSaw && s.rowSaw]}
+                    activeOpacity={0.8}
+                    onPress={() => handleTap(n)}
+                  >
+                    <View style={[s.iconWrap, highlighted && s.iconWrapHighlighted]}>
+                      <Ionicons name={icon as any} size={18} color={highlighted ? ACCENT_DARK : Colors.muted} />
+                    </View>
+                    <View style={s.mid}>
+                      <Text style={[s.rowTitle, highlighted && s.rowTitleHighlighted]} numberOfLines={1}>
+                        {n.title}
+                      </Text>
+                      {n.body ? <Text style={s.rowBody} numberOfLines={2}>{n.body}</Text> : null}
+                    </View>
+                    <View style={{ alignItems: 'flex-end', gap: 4 }}>
                       <Text style={s.time}>{fmt(n.created_at)}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            ))}
-            <View style={{ height: 40 }} />
-          </ScrollView>
-        )}
+                      {isNew && <View style={s.newDot} />}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          ))}
+          <View style={{ height: 40 }} />
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 }
@@ -159,25 +163,17 @@ const s = StyleSheet.create({
     paddingHorizontal: PAGE, paddingTop: 20, paddingBottom: 6,
   },
 
-  row: {
-    flexDirection: 'row', alignItems: 'flex-start', gap: 12,
-    paddingVertical: 14, paddingHorizontal: PAGE,
-    borderBottomWidth: 1, borderBottomColor: Colors.border,
-    backgroundColor: Colors.white,
-  },
-  rowUnread: { backgroundColor: ACCENT + '12' },
+  row:     { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingVertical: 14, paddingHorizontal: PAGE, borderBottomWidth: 1, borderBottomColor: Colors.border, backgroundColor: Colors.white },
+  rowNew:  { backgroundColor: ACCENT + '22' },
+  rowSaw:  { backgroundColor: ACCENT + '0C' },
 
-  iconWrap: {
-    width: 36, height: 36, borderRadius: 18,
-    backgroundColor: Colors.surface,
-    alignItems: 'center', justifyContent: 'center',
-    flexShrink: 0, marginTop: 1,
-  },
-  iconWrapUnread: { backgroundColor: ACCENT + '44' },
+  iconWrap:            { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 },
+  iconWrapHighlighted: { backgroundColor: ACCENT + '44' },
 
-  mid:           { flex: 1, gap: 3 },
-  rowTitle:      { fontFamily: Brand.font.monoBold, fontSize: 13, color: Colors.muted },
-  rowTitleUnread:{ color: Colors.text },
-  rowBody:       { fontFamily: Brand.font.mono, fontSize: 11, color: Colors.muted, lineHeight: 16 },
-  time:          { fontFamily: Brand.font.mono, fontSize: 10, color: Colors.faint, marginTop: 2, flexShrink: 0 },
+  mid:                 { flex: 1, gap: 3 },
+  rowTitle:            { fontFamily: Brand.font.monoBold, fontSize: 13, color: Colors.muted },
+  rowTitleHighlighted: { color: Colors.text },
+  rowBody:             { fontFamily: Brand.font.mono, fontSize: 11, color: Colors.muted, lineHeight: 16 },
+  time:                { fontFamily: Brand.font.mono, fontSize: 10, color: Colors.faint },
+  newDot:              { width: 7, height: 7, borderRadius: 4, backgroundColor: ACCENT_DARK },
 });
