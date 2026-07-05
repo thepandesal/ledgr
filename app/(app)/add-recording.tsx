@@ -7,7 +7,7 @@
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
   TextInput, ActivityIndicator, Switch, FlatList, Image, Alert,
-  Platform, useWindowDimensions,
+  Modal, KeyboardAvoidingView, Platform, useWindowDimensions,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -432,14 +432,18 @@ export default function AddRecordingScreen() {
   // ─── Render ─────────────────────────────────────────────────────────────
 
   const { height: winHeight } = useWindowDimensions();
-  const baseHeight = Platform.OS === 'web' && vpHeightRef.current > 0 ? vpHeightRef.current : winHeight;
+  const baseHeight = vpHeightRef.current > 0 ? vpHeightRef.current : winHeight;
   const sheetMaxHeight = keyboardHeight > 0 ? baseHeight * 0.8 : baseHeight * 0.92;
 
   return (
-    <View style={s.overlay} pointerEvents="box-none">
-      <TouchableOpacity style={s.backdropTouch} activeOpacity={1} onPress={() => router.back()}>
-        {Platform.OS !== 'web' && <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />}
-      </TouchableOpacity>
+    <Modal visible animationType="slide" transparent onRequestClose={() => router.back()}>
+      {Platform.OS === 'web' ? (
+        <TouchableOpacity style={s.backdrop} activeOpacity={1} onPress={() => router.back()} />
+      ) : (
+        <TouchableOpacity style={s.backdrop} activeOpacity={1} onPress={() => router.back()}>
+          <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
+        </TouchableOpacity>
+      )}
       <View style={[formStyles.sheet, { maxHeight: sheetMaxHeight }]}>
           {/* Header */}
           <View style={formStyles.header}>
@@ -938,19 +942,14 @@ export default function AddRecordingScreen() {
 
       </ScrollView>
         </View>
-    </View>
+    </Modal>
   );
 }
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'flex-end',
-    zIndex: 1000,
-  },
-  backdropTouch: {
+  backdrop: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.3)',
   },

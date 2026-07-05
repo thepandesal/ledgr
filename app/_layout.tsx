@@ -61,6 +61,19 @@ export default function RootLayout() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
+    // Prevent RN Web Modal from shifting page layout by reserving scrollbar gutter
+    if (typeof document !== 'undefined') {
+      const id = 'rnw-modal-no-shift';
+      if (!document.getElementById(id)) {
+        const style = document.createElement('style');
+        style.id = id;
+        style.textContent = 'html { overflow-y: scroll; } body { overflow: visible !important; }';
+        document.head.appendChild(style);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
     if (!fontsLoaded) return;
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('[auth] event:', event, 'session:', !!session);
