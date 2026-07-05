@@ -107,19 +107,20 @@ export default function SplitShareSlugPage() {
       setPerPerson(Object.entries(perPersonMap).map(([name, total]) => ({ name, total })));
       setPaymentHistory(paymentsRes.data ?? []);
 
-      // Load receipt photos attached to this split bill
+      // Load receipt photos — from split bill directly, or from linked recordings
       const { data: receiptEntry } = await supabase
         .from('receipt_entries')
         .select('id')
         .eq('split_bill_id', splitBillId)
         .maybeSingle();
+      let allReceiptUrls: string[] = [];
       if (receiptEntry?.id) {
         const { data: photos } = await supabase
           .from('receipt_photos')
           .select('storage_path, url')
           .eq('entry_id', receiptEntry.id)
           .order('created_at');
-        if (photos && photos.length > 0) {
+        if (photos) {
           const urls = await Promise.all(photos.map(async (p: any) => {
             if (p.url) return p.url;
             if (p.storage_path) {
@@ -128,9 +129,39 @@ export default function SplitShareSlugPage() {
             }
             return '';
           }));
-          setSplitReceiptPhotos(urls.filter(Boolean));
+          allReceiptUrls = [...allReceiptUrls, ...urls.filter(Boolean)];
         }
       }
+      // Also load from recordings linked to this split bill
+      const recIds = (recsRes.data ?? []).map((r: any) => {
+        const rec = Array.isArray(r.recording) ? r.recording[0] : r.recording;
+        return rec?.id;
+      }).filter(Boolean);
+      if (recIds.length > 0) {
+        const { data: recEntries } = await supabase
+          .from('receipt_entries')
+          .select('id')
+          .in('recording_id', recIds);
+        for (const entry of recEntries ?? []) {
+          const { data: photos } = await supabase
+            .from('receipt_photos')
+            .select('storage_path, url')
+            .eq('entry_id', entry.id)
+            .order('created_at');
+          if (photos) {
+            const urls = await Promise.all(photos.map(async (p: any) => {
+              if (p.url) return p.url;
+              if (p.storage_path) {
+                const { data } = await supabase.storage.from('receipts').createSignedUrl(p.storage_path, 3600);
+                return data?.signedUrl ?? '';
+              }
+              return '';
+            }));
+            allReceiptUrls = [...allReceiptUrls, ...urls.filter(Boolean)];
+          }
+        }
+      }
+      if (allReceiptUrls.length > 0) setSplitReceiptPhotos(allReceiptUrls);
 
       setLoading(false);
       return;
