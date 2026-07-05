@@ -732,7 +732,7 @@ export default function SplitBillDetailScreen() {
           const people: string[] = item.people ?? [];
           const perPerson = people.length > 0 ? Number(item.cost) / people.length : 0;
           const peopleSection = people.length > 0
-            ? `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:11px;font-weight:600;color:${color};margin-bottom:3px">${d ? '-' : ''}${perPerson.toLocaleString('en-US', { minimumFractionDigits: 2 })} each</div>`+
+            ? `<div style="font-family:monospace;font-size:11px;color:${color};margin-bottom:3px">${d ? '-' : ''}${perPerson.toLocaleString('en-US', { minimumFractionDigits: 2 })} each</div>`+
               `<div style="display:flex;flex-wrap:wrap;gap:4px">`+
               people.map((p: string) => `<span style="background:#B6E1DE44;border-radius:99px;padding:2px 8px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:10px;color:#2A7A6F">${p}</span>`).join('') +
               `</div>`

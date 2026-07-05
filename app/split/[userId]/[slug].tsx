@@ -341,7 +341,7 @@ export default function SplitShareSlugPage() {
                             </View>
                             {subs.length === 0 && itemPeople.length > 0 && (
                               <View style={{ marginTop: 2, gap: 3 }}>
-                                <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: deduct ? PEACH : ACCENT_DARK }}>
+                                <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: deduct ? PEACH : ACCENT_DARK }}>
                                   {fmt(perPersonCost)} each
                                 </Text>
                                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
