@@ -521,8 +521,8 @@ export default function SpaceDetailScreen() {
 
   const confirmDelete = async () => {
     await supabase.from('recordings').delete().eq('id', pendingDeleteId);
-    queryClient.invalidateQueries({ queryKey: ['recordings', spaceId] });
     setConfirmModal(false);
+    queryClient.refetchQueries({ queryKey: ['recordings', spaceId] });
   };
 
   const navigateRange = (dir: 1 | -1) => {
