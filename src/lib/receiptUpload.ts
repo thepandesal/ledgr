@@ -10,6 +10,8 @@ const R2_BUCKET = process.env.EXPO_PUBLIC_R2_BUCKET!;
 const R2_PUBLIC_URL = process.env.EXPO_PUBLIC_R2_PUBLIC_URL!;
 
 export const compressImage = async (uri: string): Promise<string> => {
+  // ImageManipulator is unreliable on web — skip compression and return as-is
+  if (Platform.OS === 'web') return uri;
   const r = await ImageManipulator.manipulateAsync(
     uri,
     [{ resize: { width: 1200 } }],
