@@ -251,9 +251,22 @@ export default function AddRecordingScreen({ inlineProps }: {
   const addFromGallery = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') { Alert.alert('Permission needed', 'Photo library access required.'); return; }
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsMultipleSelection: true, quality: 1 });
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsMultipleSelection: true, quality: 1, base64: false });
     if (!result.canceled) {
-      setReceiptPhotos(prev => [...prev, ...result.assets.map(a => a.uri)]);
+      // On web, blob: URIs get revoked after the picker closes.
+      // Convert to data: URLs immediately so they survive until save.
+      const uris = await Promise.all(result.assets.map(async (a) => {
+        if (typeof window !== 'undefined' && a.uri.startsWith('blob:')) {
+          const blob = await fetch(a.uri).then(r => r.blob());
+          return await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(blob);
+          });
+        }
+        return a.uri;
+      }));
+      setReceiptPhotos(prev => [...prev, ...uris]);
     }
   };
 
