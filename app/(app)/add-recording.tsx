@@ -432,7 +432,7 @@ export default function AddRecordingScreen() {
         <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => router.back()}>
           <BlurView intensity={40} tint="dark" style={{ flex: 1 }} />
         </TouchableOpacity>
-        <View style={[formStyles.sheet, Platform.OS === 'web' && keyboardHeight > 0 ? { maxHeight: screenHeight - keyboardHeight - 20 } : {}]}>
+        <View style={[formStyles.sheet, Platform.OS === 'web' && keyboardHeight > 0 ? { maxHeight: '80%' } : {}]}>
           {/* Header */}
           <View style={formStyles.header}>
             <View>

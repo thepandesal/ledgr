@@ -62,7 +62,7 @@ export default function BottomSheet({ visible, onClose, sub, title, height, maxH
   }, [visible]);
 
   const sheetStyle = Platform.OS === 'web' && keyboardHeight > 0
-    ? { maxHeight: screenHeight - keyboardHeight - 20 }
+    ? { maxHeight: '80%' }
     : height ? { height, maxHeight: height } : { maxHeight };
 
   return (
