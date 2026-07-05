@@ -33,19 +33,46 @@ export default function BottomSheet({ visible, onClose, sub, title, height, maxH
   const { height: screenHeight } = useWindowDimensions();
 
   // On web/Safari, listen for visualViewport resize (keyboard appearing)
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
+  const naturalHeightRef = useRef(0);
   useEffect(() => {
     if (Platform.OS !== 'web') return;
     const vv = (window as any).visualViewport;
     if (!vv) return;
-    const naturalHeight = vv.height;
+    // Track the largest seen height as the "natural" (no-keyboard) height
+    naturalHeightRef.current = Math.max(naturalHeightRef.current, vv.height);
     const onResize = () => {
-      const diff = naturalHeight - vv.height;
-      setKeyboardHeight(diff > 100 ? diff : 0);
+      naturalHeightRef.current = Math.max(naturalHeightRef.current, vv.height);
+      const diff = naturalHeightRef.current - vv.height;
+      setKeyboardOpen(diff > 100);
     };
     vv.addEventListener('resize', onResize);
     return () => vv.removeEventListener('resize', onResize);
   }, []);
+
+  // Prevent body scroll-lock from shifting the page on web (mobile Safari)
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    if (visible) {
+      const scrollY = window.scrollY;
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.width = '100%';
+    } else {
+      const top = document.body.style.top;
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      if (top) window.scrollTo(0, -parseInt(top));
+    }
+    return () => {
+      const top = document.body.style.top;
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      if (top) window.scrollTo(0, -parseInt(top));
+    };
+  }, [visible]);
 
   const blurAnim = useRef(new Animated.Value(0)).current;
   const [blurMounted, setBlurMounted] = useState(false);
@@ -65,7 +92,7 @@ export default function BottomSheet({ visible, onClose, sub, title, height, maxH
     }
   }, [visible]);
 
-  const sheetStyle = Platform.OS === 'web' && keyboardHeight > 0
+  const sheetStyle = Platform.OS === 'web' && keyboardOpen
     ? { maxHeight: '80%' }
     : height ? { height, maxHeight: height } : { maxHeight };
 
@@ -76,7 +103,7 @@ export default function BottomSheet({ visible, onClose, sub, title, height, maxH
         <Animated.View style={[s.blur, { opacity: blurAnim }]} pointerEvents="none" />
       )}
 
-      <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
         <KeyboardAvoidingView
           style={[s.flex, s.justify]}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -100,7 +127,7 @@ export default function BottomSheet({ visible, onClose, sub, title, height, maxH
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
               keyboardDismissMode="interactive"
-              contentContainerStyle={[s.content, Platform.OS === 'web' && keyboardHeight > 0 && { paddingBottom: 120 }]}
+              contentContainerStyle={[s.content, Platform.OS === 'web' && keyboardOpen && { paddingBottom: 120 }]}
             >
               {children}
             </ScrollView>
