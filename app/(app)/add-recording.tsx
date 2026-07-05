@@ -139,7 +139,8 @@ export default function AddRecordingScreen() {
     if (Platform.OS !== 'web') return;
     const vv = (window as any).visualViewport;
     if (!vv) return;
-    const onResize = () => setKeyboardHeight(Math.max(0, window.innerHeight - vv.height));
+    const naturalHeight = vv.height;
+    const onResize = () => { const diff = naturalHeight - vv.height; setKeyboardHeight(diff > 100 ? diff : 0); };
     vv.addEventListener('resize', onResize);
     return () => vv.removeEventListener('resize', onResize);
   }, []);
