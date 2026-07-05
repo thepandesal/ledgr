@@ -15,6 +15,7 @@ import BottomSheet from '@/components/ui/BottomSheet';
 import { useScreenAnim } from '@/components/ui/ScreenWrapper';
 import itemStyles from '@/components/ui/itemStyles';
 import { Brand } from '../../src/lib/brand';
+import { ocrReceiptImage, parseReceiptText, type ParsedItem } from '../../src/lib/receiptParser';
 
 const ACCENT      = Brand.color.accent;      // light mint — backgrounds/chips only
 const ACCENT_DARK = Brand.color.accentDark;  // #2A7A6F — text/icons on white
@@ -315,11 +316,20 @@ export default function SplitBillDetailScreen() {
   };
   // Step 1: pick recording → Step 2: add item rows → tap saved item to assign people
   const [addItemModal, setAddItemModal]           = useState(false);
-  const [itemStep, setItemStep]                   = useState<'pick-type' | 'pick-recording' | 'add-items' | 'manual'>('pick-type');
+  const [itemStep, setItemStep]                   = useState<'pick-type' | 'pick-recording' | 'add-items' | 'manual' | 'parse-choice' | 'parsing' | 'parse-review'>('pick-type');
   const [selectedRecording, setSelectedRecording] = useState<any>(null);
   const [itemRows, setItemRows]                   = useState<{ name: string; cost: string }[]>([{ name: '', cost: '' }]);
   const [savingItem, setSavingItem]               = useState(false);
   const [manualItemType, setManualItemType]        = useState<'receivable' | 'payable'>('receivable');
+
+  // ── Receipt parser state ──────────────────────────────────────────────────
+  const [parseReceiptPhotos, setParseReceiptPhotos] = useState<{ id: string; url: string }[]>([]);
+  const [parsedItems, setParsedItems]               = useState<{ name: string; cost: string }[]>([]);
+  const [parsedTotal, setParsedTotal]               = useState<number | null>(null);
+  const [parsePhotoIndex, setParsePhotoIndex]       = useState(0);
+  const [parseEnlargeModal, setParseEnlargeModal]   = useState(false);
+  const [parseLoading, setParseLoading]             = useState(false);
+  const [parseError, setParseError]                 = useState('');
 
   // assign-people sheet (tap an existing item)
   const [assignItem, setAssignItem]   = useState<any>(null);
@@ -347,13 +357,143 @@ export default function SplitBillDetailScreen() {
     setItemStep('pick-type');
     setSelectedRecording(null);
     setItemRows([{ name: '', cost: '' }]);
+    setParsedItems([]);
+    setParsedTotal(null);
+    setParseReceiptPhotos([]);
+    setParseError('');
     setAddItemModal(true);
   };
 
-  const handlePickRecording = (lr: any) => {
+  const handlePickRecording = async (lr: any) => {
     setSelectedRecording(lr);
     setItemRows([{ name: '', cost: '' }]);
-    setItemStep('add-items');
+
+    // Check if this recording already has receipt photos
+    const recId = lr.recording?.id;
+    if (!recId) { setItemStep('add-items'); return; }
+
+    const { data: entries } = await supabase
+      .from('receipt_entries')
+      .select('id')
+      .eq('recording_id', recId)
+      .limit(1);
+
+    if (entries && entries.length > 0) {
+      // Has receipt — load photos and go straight to parse choice
+      const { data: photos } = await supabase
+        .from('receipt_photos')
+        .select('id, storage_path, url')
+        .eq('entry_id', entries[0].id)
+        .order('created_at');
+      const urls = await Promise.all((photos ?? []).map(async (p: any) => {
+        let url = p.url ?? '';
+        if (!url && p.storage_path) {
+          const { data } = await supabase.storage.from('receipts').createSignedUrl(p.storage_path, 3600);
+          url = data?.signedUrl ?? '';
+        }
+        return { id: p.id, url };
+      }));
+      setParseReceiptPhotos(urls.filter(p => p.url));
+      setItemStep('parse-choice');
+    } else {
+      // No receipt — go to parse choice (will offer upload)
+      setParseReceiptPhotos([]);
+      setItemStep('parse-choice');
+    }
+  };
+
+  const handleParseReceipt = async (photos: { id: string; url: string }[]) => {
+    if (photos.length === 0) return;
+    setParseLoading(true);
+    setParseError('');
+    setItemStep('parsing');
+    try {
+      // Parse the first photo (primary receipt image)
+      const result = await ocrReceiptImage(photos[0].url);
+      if (result.items.length === 0) {
+        setParseError('no items detected — try a clearer photo or add manually');
+        setItemStep('parse-choice');
+      } else {
+        setParsedItems(result.items.map(i => ({ name: i.name, cost: String(i.price) })));
+        setParsedTotal(result.detectedTotal);
+        setParsePhotoIndex(0);
+        setItemStep('parse-review');
+      }
+    } catch (e) {
+      setParseError('failed to read receipt — try again or add manually');
+      setItemStep('parse-choice');
+    } finally {
+      setParseLoading(false);
+    }
+  };
+
+  const handleUploadReceiptForParse = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') return;
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 });
+    if (result.canceled || !result.assets[0]) return;
+    setParseLoading(true);
+    setItemStep('parsing');
+    try {
+      // Upload to the recording's receipt entry
+      const recId = selectedRecording?.recording?.id;
+      if (recId) {
+        let entryId: string | null = null;
+        const { data: existing } = await supabase.from('receipt_entries').select('id').eq('recording_id', recId).limit(1);
+        if (existing && existing.length > 0) {
+          entryId = existing[0].id;
+        } else {
+          const { data: entry } = await supabase.from('receipt_entries').insert({ user_id: userId, note: selectedRecording?.recording?.name ?? '', recording_id: recId }).select().maybeSingle();
+          entryId = entry?.id ?? null;
+        }
+        if (entryId) {
+          const compressed = await compressImage(result.assets[0].uri);
+          await uploadReceiptPhoto(compressed, entryId);
+        }
+      }
+      const result2 = await ocrReceiptImage(result.assets[0].uri);
+      if (result2.items.length === 0) {
+        setParseError('no items detected — try a clearer photo or add manually');
+        setItemStep('parse-choice');
+      } else {
+        setParseReceiptPhotos([{ id: 'uploaded', url: result.assets[0].uri }]);
+        setParsedItems(result2.items.map(i => ({ name: i.name, cost: String(i.price) })));
+        setParsedTotal(result2.detectedTotal);
+        setParsePhotoIndex(0);
+        setItemStep('parse-review');
+      }
+    } catch (e) {
+      setParseError('failed to read receipt — try again or add manually');
+      setItemStep('parse-choice');
+    } finally {
+      setParseLoading(false);
+    }
+  };
+
+  const saveParsedItems = async () => {
+    const valid = parsedItems.filter(r => r.name.trim() && r.cost && parseFloat(r.cost) > 0);
+    if (!valid.length) return;
+    const recTotal = Number(selectedRecording?.amount_contributed ?? 0);
+    const alreadyUsed = items
+      .filter((i: any) => i.recording_id === selectedRecording?.recording?.id)
+      .reduce((s: number, i: any) => s + Number(i.cost), 0);
+    const newTotal = valid.reduce((s, r) => s + parseFloat(r.cost || '0'), 0);
+    if (recTotal > 0 && alreadyUsed + newTotal > recTotal + 0.01) return;
+    setSavingItem(true);
+    const recType = selectedRecording?.recording?.type ?? 'expense';
+    await supabase.from('split_items').insert(
+      valid.map(r => ({
+        split_bill_id: splitBillId,
+        recording_id: selectedRecording?.recording?.id ?? null,
+        user_id: userId,
+        name: r.name.trim(),
+        cost: parseFloat(r.cost),
+        recording_type: recType,
+      }))
+    );
+    setSavingItem(false);
+    setAddItemModal(false);
+    refetchItems();
   };
 
   const saveManualItems = async () => {
@@ -1980,10 +2120,176 @@ export default function SplitBillDetailScreen() {
               );
             })()}
           </ScrollView>
+        ) : itemStep === 'parse-choice' ? (
+          <ScrollView showsVerticalScrollIndicator={false}>
+            <Text style={[s.recDate, { marginBottom: 12 }]}>
+              {selectedRecording?.recording?.name} · {fmt(Number(selectedRecording?.amount_contributed))}
+            </Text>
+            {parseError ? (
+              <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: Colors.expense, marginBottom: 12 }}>{parseError}</Text>
+            ) : null}
+            {parseReceiptPhotos.length > 0 ? (
+              <TouchableOpacity
+                style={[s.recPickRow, { borderBottomWidth: 0, backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: 16, marginBottom: 10 }]}
+                onPress={() => handleParseReceipt(parseReceiptPhotos)}
+              >
+                <View style={[s.recIconWrap, { backgroundColor: ACCENT + '22' }]}>
+                  <Ionicons name="scan-outline" size={16} color={ACCENT_DARK} />
+                </View>
+                <View style={s.recMid}>
+                  <Text style={s.recName}>parse existing receipt</Text>
+                  <Text style={s.recDate}>{parseReceiptPhotos.length} photo{parseReceiptPhotos.length !== 1 ? 's' : ''} found</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={14} color={Colors.muted} />
+              </TouchableOpacity>
+            ) : null}
+            <TouchableOpacity
+              style={[s.recPickRow, { borderBottomWidth: 0, backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: 16, marginBottom: 10 }]}
+              onPress={handleUploadReceiptForParse}
+            >
+              <View style={[s.recIconWrap, { backgroundColor: ACCENT + '22' }]}>
+                <Ionicons name="camera-outline" size={16} color={ACCENT_DARK} />
+              </View>
+              <View style={s.recMid}>
+                <Text style={s.recName}>upload & parse receipt</Text>
+                <Text style={s.recDate}>upload a photo and scan for items</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={14} color={Colors.muted} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[s.recPickRow, { borderBottomWidth: 0, backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: 16 }]}
+              onPress={() => { setItemRows([{ name: '', cost: '' }]); setItemStep('add-items'); }}
+            >
+              <View style={[s.recIconWrap, { backgroundColor: '#FFAB9122' }]}>
+                <Ionicons name="create-outline" size={16} color="#FFAB91" />
+              </View>
+              <View style={s.recMid}>
+                <Text style={s.recName}>add manually</Text>
+                <Text style={s.recDate}>type items yourself</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={14} color={Colors.muted} />
+            </TouchableOpacity>
+            <TouchableOpacity style={[s.doneBtn, { backgroundColor: Colors.surface, marginTop: 16 }]} onPress={() => setItemStep('pick-recording')}>
+              <Text style={[s.doneBtnText, { color: Colors.muted }]}>back</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        ) : itemStep === 'parsing' ? (
+          <View style={{ alignItems: 'center', paddingVertical: 40, gap: 16 }}>
+            <ActivityIndicator color={ACCENT_DARK} size="large" />
+            <Text style={{ fontFamily: Brand.font.mono, fontSize: 13, color: Colors.muted }}>reading receipt...</Text>
+          </View>
+        ) : itemStep === 'parse-review' ? (
+          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            {/* Receipt photos */}
+            {parseReceiptPhotos.length > 0 && (
+              <>
+                <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8 }}>receipt</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }} style={{ marginBottom: 16 }}>
+                  {parseReceiptPhotos.map((p, idx) => (
+                    <TouchableOpacity key={p.id} onPress={() => { setParsePhotoIndex(idx); setParseEnlargeModal(true); }} activeOpacity={0.85}>
+                      <Image source={{ uri: p.url }} style={{ width: 100, height: 100, borderRadius: Radius.md, backgroundColor: Colors.surface }} resizeMode="cover" />
+                      <View style={{ position: 'absolute', bottom: 4, right: 4, backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 4, padding: 2 }}>
+                        <Ionicons name="expand-outline" size={10} color="#fff" />
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </>
+            )}
+
+            {/* Totals checker */}
+            {(() => {
+              const parsedSum = parsedItems.reduce((s, r) => s + (parseFloat(r.cost || '0') || 0), 0);
+              const recTotal = Number(selectedRecording?.amount_contributed ?? 0);
+              const diff = parsedTotal ? Math.abs(parsedSum - parsedTotal) : null;
+              const overRec = recTotal > 0 && parsedSum > recTotal + 0.01;
+              return (
+                <View style={{ backgroundColor: Colors.surface, borderRadius: Radius.md, padding: 12, marginBottom: 16, gap: 6 }}>
+                  <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 4 }}>totals check</Text>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: Colors.muted }}>items sum</Text>
+                    <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 11, color: Colors.text }}>{fmt(parsedSum)}</Text>
+                  </View>
+                  {parsedTotal ? (
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                      <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: Colors.muted }}>receipt total</Text>
+                      <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 11, color: diff && diff > 0.5 ? Colors.expense : ACCENT_DARK }}>{fmt(parsedTotal)}</Text>
+                    </View>
+                  ) : null}
+                  {recTotal > 0 && (
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                      <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: Colors.muted }}>recording amount</Text>
+                      <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 11, color: overRec ? Colors.expense : Colors.text }}>{fmt(recTotal)}</Text>
+                    </View>
+                  )}
+                  {diff && diff > 0.5 ? (
+                    <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: Colors.expense, marginTop: 2 }}>⚠ items sum differs from receipt total by {fmt(diff)} — check for missing items</Text>
+                  ) : parsedTotal ? (
+                    <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: ACCENT_DARK, marginTop: 2 }}>✓ items match receipt total</Text>
+                  ) : null}
+                </View>
+              );
+            })()}
+
+            {/* Editable parsed items */}
+            <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8 }}>parsed items — edit if needed</Text>
+            {parsedItems.map((row, i) => (
+              <View key={i} style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
+                <TextInput
+                  style={[s.itemFormInput, { flex: 1 }]}
+                  value={row.name}
+                  onChangeText={v => setParsedItems(prev => prev.map((r, idx) => idx === i ? { ...r, name: v } : r))}
+                  placeholder="item name"
+                  placeholderTextColor={Colors.faint}
+                />
+                <TextInput
+                  style={[s.itemFormInput, { width: 90, textAlign: 'right' }]}
+                  value={row.cost}
+                  onChangeText={v => setParsedItems(prev => prev.map((r, idx) => idx === i ? { ...r, cost: v } : r))}
+                  keyboardType="decimal-pad"
+                  placeholder="0.00"
+                  placeholderTextColor={Colors.faint}
+                />
+                <TouchableOpacity onPress={() => setParsedItems(prev => prev.filter((_, idx) => idx !== i))} style={{ justifyContent: 'center', padding: 4 }}>
+                  <Ionicons name="close" size={14} color={Colors.faint} />
+                </TouchableOpacity>
+              </View>
+            ))}
+            <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 8 }} onPress={() => setParsedItems(prev => [...prev, { name: '', cost: '' }])}>
+              <Ionicons name="add" size={13} color={ACCENT_DARK} />
+              <Text style={{ fontFamily: Brand.font.mono, fontSize: 12, color: ACCENT_DARK }}>add item</Text>
+            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+              <TouchableOpacity style={[s.doneBtn, { flex: 1, backgroundColor: Colors.surface, marginTop: 0 }]} onPress={() => setItemStep('parse-choice')}>
+                <Text style={[s.doneBtnText, { color: Colors.muted }]}>back</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[s.doneBtn, { flex: 2, marginTop: 0, opacity: savingItem || !parsedItems.some(r => r.name.trim() && r.cost) ? 0.4 : 1 }]}
+                onPress={saveParsedItems}
+                disabled={savingItem || !parsedItems.some(r => r.name.trim() && r.cost)}
+              >
+                <Text style={s.doneBtnText}>{savingItem ? 'saving...' : 'save items'}</Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
         )}
       </BottomSheet>
 
-      {/* Assign people sheet */}
+      {/* Receipt enlarge modal */}
+      <Modal visible={parseEnlargeModal} transparent animationType="fade" onRequestClose={() => setParseEnlargeModal(false)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center', alignItems: 'center' }}>
+          <TouchableOpacity style={{ position: 'absolute', top: 52, right: 24, zIndex: 10 }} onPress={() => setParseEnlargeModal(false)}>
+            <Ionicons name="close" size={26} color="#fff" />
+          </TouchableOpacity>
+          {parseReceiptPhotos[parsePhotoIndex] && (
+            <Image
+              source={{ uri: parseReceiptPhotos[parsePhotoIndex].url }}
+              style={{ width: '90%', height: '80%', borderRadius: 12 }}
+              resizeMode="contain"
+            />
+          )}
+        </View>
+      </Modal>
       <BottomSheet visible={!!assignItem} onClose={() => setAssignItem(null)} title="assign people">
         {assignItem && (() => {
           const deduct = isDeductType(assignItem.recording_type);

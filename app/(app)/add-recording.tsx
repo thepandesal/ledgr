@@ -7,7 +7,7 @@
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
   TextInput, ActivityIndicator, Switch, FlatList, Image, Alert,
-  Modal, KeyboardAvoidingView, Platform,
+  Modal, KeyboardAvoidingView, Platform, useWindowDimensions,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -131,6 +131,18 @@ export default function AddRecordingScreen() {
   const [accounts, setAccounts]               = useState<any[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<any>(null);
   const [selectedAccount, setSelectedAccount]   = useState<any>(null);
+
+  // ── Safari keyboard fix ───────────────────────────────────────────────────
+  const { height: screenHeight } = useWindowDimensions();
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    const vv = (window as any).visualViewport;
+    if (!vv) return;
+    const onResize = () => setKeyboardHeight(Math.max(0, window.innerHeight - vv.height));
+    vv.addEventListener('resize', onResize);
+    return () => vv.removeEventListener('resize', onResize);
+  }, []);
 
   // ── Picker modals ────────────────────────────────────────────────────────
   const [showCategoryModal, setShowCategoryModal] = useState(false);
@@ -420,7 +432,7 @@ export default function AddRecordingScreen() {
         <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => router.back()}>
           <BlurView intensity={40} tint="dark" style={{ flex: 1 }} />
         </TouchableOpacity>
-        <View style={formStyles.sheet}>
+        <View style={[formStyles.sheet, Platform.OS === 'web' && keyboardHeight > 0 ? { maxHeight: screenHeight - keyboardHeight - 20 } : {}]}>
           {/* Header */}
           <View style={formStyles.header}>
             <View>
@@ -431,7 +443,7 @@ export default function AddRecordingScreen() {
               <Ionicons name="close" size={20} color="#929090" />
             </TouchableOpacity>
           </View>
-          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 32, gap: 8 }} style={{ flex: 1 }}>
+          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" contentContainerStyle={{ paddingBottom: Platform.OS === 'web' ? 120 : 32, gap: 8 }} style={{ flex: 1 }}>
 
       {/* ── Receipt reference carousel ── */}
       {receiptPhotos.length > 0 && (
