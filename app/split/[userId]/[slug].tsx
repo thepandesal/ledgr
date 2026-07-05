@@ -331,26 +331,30 @@ export default function SplitShareSlugPage() {
                     return (
                       <View key={ii} style={s.itemCard}>
                         <View style={[s.itemHeader, { paddingBottom: itemPeople.length > 0 ? 4 : 12 }]}>
-                          <View style={[s.rowIconWrap, { backgroundColor: ACCENT + '44' }]}>
+                          <View style={[s.rowIconWrap, { backgroundColor: ACCENT + '44', alignSelf: 'flex-start', marginTop: 2 }]}>
                             <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 13, color: ACCENT_DARK }}>{ii + 1}</Text>
                           </View>
-                          <Text style={s.rowName}>{String(item.name ?? '').toLowerCase()}</Text>
-                          <Text style={[s.rowAmount, { color: deduct ? PEACH : ACCENT_DARK }]}>{deduct ? '-' : '+'}{fmt(Number(item.cost ?? 0))}</Text>
-                        </View>
-                        {subs.length === 0 && itemPeople.length > 0 && (
-                          <View style={{ paddingLeft: 60, paddingRight: 14, paddingBottom: 10, gap: 4 }}>
-                            <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: deduct ? PEACH : ACCENT_DARK }}>
-                              {deduct ? '-' : '+'}{fmt(perPersonCost)} each
-                            </Text>
-                            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
-                              {itemPeople.map((person: string, pi: number) => (
-                                <View key={pi} style={{ backgroundColor: ACCENT + '44', borderRadius: 99, paddingHorizontal: 8, paddingVertical: 3 }}>
-                                  <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: ACCENT_DARK }}>{person}</Text>
-                                </View>
-                              ))}
+                          <View style={{ flex: 1 }}>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                              <Text style={[s.rowName, { flex: 1 }]}>{String(item.name ?? '').toLowerCase()}</Text>
+                              <Text style={[s.rowAmount, { color: deduct ? PEACH : ACCENT_DARK }]}>{deduct ? '-' : ''}{fmt(Number(item.cost ?? 0))}</Text>
                             </View>
+                            {subs.length === 0 && itemPeople.length > 0 && (
+                              <View style={{ marginTop: 2, gap: 3 }}>
+                                <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: deduct ? PEACH : ACCENT_DARK }}>
+                                  {fmt(perPersonCost)} each
+                                </Text>
+                                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
+                                  {itemPeople.map((person: string, pi: number) => (
+                                    <View key={pi} style={{ backgroundColor: ACCENT + '44', borderRadius: 99, paddingHorizontal: 8, paddingVertical: 3 }}>
+                                      <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: ACCENT_DARK }}>{person}</Text>
+                                    </View>
+                                  ))}
+                                </View>
+                              </View>
+                            )}
                           </View>
-                        )}
+                        </View>
                         {subs.map((sub: any, si: number) => {
                           const subPeople: any[] = sub.people ?? [];
                           const pp = subPeople.length > 0 ? Number(sub.cost ?? 0) / subPeople.length : Number(sub.cost ?? 0);

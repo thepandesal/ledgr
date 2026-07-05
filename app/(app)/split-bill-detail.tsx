@@ -732,18 +732,20 @@ export default function SplitBillDetailScreen() {
           const people: string[] = item.people ?? [];
           const perPerson = people.length > 0 ? Number(item.cost) / people.length : 0;
           const peopleSection = people.length > 0
-            ? `<div style="padding:0 14px 10px 58px">`+
-              `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:11px;font-weight:600;color:${color};margin-bottom:4px">${d ? '-' : '+'}${perPerson.toLocaleString('en-US', { minimumFractionDigits: 2 })} each</div>`+
+            ? `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:11px;font-weight:600;color:${color};margin-bottom:3px">${d ? '-' : ''}${perPerson.toLocaleString('en-US', { minimumFractionDigits: 2 })} each</div>`+
               `<div style="display:flex;flex-wrap:wrap;gap:4px">`+
               people.map((p: string) => `<span style="background:#B6E1DE44;border-radius:99px;padding:2px 8px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:10px;color:#2A7A6F">${p}</span>`).join('') +
-              `</div></div>`
+              `</div>`
             : '';
-          return `<div style="border-bottom:1px solid #f0f0f0">`+
-            `<div style="display:flex;align-items:center;gap:12px;padding:12px 14px">`+
-            `<div style="width:32px;height:32px;border-radius:50%;background:#B6E1DE44;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:monospace;font-size:13px;color:#2A7A6F;font-weight:700">${ii + 1}</div>`+
+          return `<div style="border-bottom:1px solid #f0f0f0;padding:12px 14px;display:flex;align-items:flex-start;gap:12px">`+
+            `<div style="width:32px;height:32px;border-radius:50%;background:#B6E1DE44;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:monospace;font-size:13px;color:#2A7A6F;font-weight:700;margin-top:2px">${ii + 1}</div>`+
+            `<div style="flex:1">`+
+            `<div style="display:flex;justify-content:space-between;align-items:flex-start">`+
             `<span style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:13px;color:#425252;flex:1">${item.name}</span>`+
-            `<span style="font-family:monospace;font-size:13px;font-weight:700;color:${color}">${d ? '-' : '+'}${Number(item.cost).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>`+
-            `</div>${peopleSection}</div>`;
+            `<span style="font-family:monospace;font-size:13px;font-weight:700;color:${color};margin-left:8px">${d ? '-' : ''}${Number(item.cost).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>`+
+            `</div>`+
+            (people.length > 0 ? `<div style="margin-top:4px">${peopleSection}</div>` : '') +
+            `</div></div>`;
         }).join('');
         return groupHeader + rows;
       }).join('');
