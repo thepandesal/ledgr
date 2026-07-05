@@ -421,9 +421,111 @@ export default function SpacesScreen() {
   const savingsSpaces   = activeTab === 'active' ? savingsActive : savingsInactive;
   const motivation = MOTIVATIONS[new Date().getDay() % MOTIVATIONS.length];
 
+  // ── Pending space invites (as invitee) ─────────────────────────────────────────────
+  const { data: pendingInvites = [], refetch: refetchInvites } = useQuery<{ id: string; space_id: string; role: string; spaceName: string; ownerName: string }[]>({
+    queryKey: ['pending-space-invites', userId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('space_members')
+        .select('id, space_id, role, invited_by')
+        .eq('user_id', userId)
+        .eq('status', 'pending');
+      if (!data || data.length === 0) return [];
+      const spaceIds = data.map((m: any) => m.space_id);
+      const { data: spaces } = await supabase.from('spaces').select('id, name').in('id', spaceIds);
+      const ownerNames = await Promise.all(
+        data.map((m: any) =>
+          supabase.rpc('get_user_display_name', { user_id: m.invited_by }).then(({ data: n }) => ({ id: m.id, name: n ?? 'unknown' }))
+        )
+      );
+      return data.map((m: any) => ({
+        id: m.id,
+        space_id: m.space_id,
+        role: m.role,
+        spaceName: (spaces ?? []).find((s: any) => s.id === m.space_id)?.name ?? 'unknown space',
+        ownerName: ownerNames.find(o => o.id === m.id)?.name ?? 'unknown',
+      }));
+    },
+    enabled: !!userId,
+  });
+
+  const [respondingInvite, setRespondingInvite] = useState<string | null>(null);
+
+  const respondToSpaceInvite = async (id: string, accept: boolean) => {
+    setRespondingInvite(id);
+    await supabase.from('space_members').update({ status: accept ? 'accepted' : 'declined' }).eq('id', id);
+    refetchInvites();
+    queryClient.invalidateQueries({ queryKey: ['shared-spaces', userId] });
+    setRespondingInvite(null);
+  };
+  const { data: sharedSpaces = [] } = useQuery<(SpaceData & { role: string; ownerName: string })[]>({
+    queryKey: ['shared-spaces', userId],
+    queryFn: async () => {
+      const { data: members } = await supabase
+        .from('space_members')
+        .select('space_id, role')
+        .eq('user_id', userId)
+        .eq('status', 'accepted');
+      if (!members || members.length === 0) return [];
+      const spaceIds = members.map((m: any) => m.space_id);
+      const { data: spaceRows } = await supabase
+        .from('spaces')
+        .select('id, name, color, icon, budget, space_type, savings_target_date, is_active, user_id')
+        .in('id', spaceIds);
+      if (!spaceRows) return [];
+      const ownerIds = [...new Set(spaceRows.map((s: any) => s.user_id))];
+      const ownerNames = await Promise.all(
+        ownerIds.map((id: string) =>
+          supabase.rpc('get_user_display_name', { user_id: id }).then(({ data }) => ({ id, name: data ?? 'unknown' }))
+        )
+      );
+      return spaceRows.map((sp: any) => {
+        const member = members.find((m: any) => m.space_id === sp.id);
+        const owner = ownerNames.find((o: any) => o.id === sp.user_id);
+        return { ...sp, spent: 0, saved: 0, savedAllTime: 0, count: 0, role: member?.role ?? 'viewer', ownerName: owner?.name ?? 'unknown' };
+      });
+    },
+    enabled: !!userId,
+  });
+
   return (
     <SafeAreaView style={s.root}>
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+        {/* Pending space invites */}
+        {pendingInvites.length > 0 && (
+          <View style={{ paddingHorizontal: Spacing.page, paddingTop: 16, gap: 8 }}>
+            <Text style={s.sectionHeader}>space invites</Text>
+            {pendingInvites.map(invite => (
+              <View key={invite.id} style={{ backgroundColor: ACCENT + '22', borderRadius: Radius.lg, padding: 14, gap: 8 }}>
+                <View style={{ gap: 2 }}>
+                  <Text style={{ fontFamily: 'ChillaxMedium', fontSize: 13, color: Colors.text }}>{invite.spaceName}</Text>
+                  <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted }}>
+                    from {invite.ownerName} · role: {invite.role}
+                  </Text>
+                </View>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <TouchableOpacity
+                    style={{ flex: 1, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: Colors.surface, alignItems: 'center', borderWidth: 1, borderColor: Colors.borderMid }}
+                    onPress={() => respondToSpaceInvite(invite.id, false)}
+                    disabled={respondingInvite === invite.id}
+                  >
+                    <Text style={{ fontFamily: Fonts.monoBold, fontSize: 12, color: Colors.muted }}>decline</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={{ flex: 2, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: ACCENT_DARK, alignItems: 'center' }}
+                    onPress={() => respondToSpaceInvite(invite.id, true)}
+                    disabled={respondingInvite === invite.id}
+                  >
+                    {respondingInvite === invite.id
+                      ? <ActivityIndicator size="small" color={Colors.white} />
+                      : <Text style={{ fontFamily: Fonts.monoBold, fontSize: 12, color: Colors.white }}>accept</Text>}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
+
         {/* Date filter row */}
         <View style={s.dateFilterRow}>
           <TouchableOpacity style={s.modeSelectorBtn} onPress={openDateModal} activeOpacity={0.8}>
@@ -500,6 +602,36 @@ export default function SpacesScreen() {
         )}
 
         <Text style={s.footer}>managed by LEDGR</Text>
+
+        {/* ── Shared spaces ── */}
+        {sharedSpaces.length > 0 && (
+          <>
+            <Text style={[s.sectionHeader, { marginTop: 24 }]}>shared spaces</Text>
+            <View style={s.list}>
+              {sharedSpaces.map((space: any) => {
+                const isExpense = (space.space_type ?? 'expense') === 'expense';
+                return (
+                  <TouchableOpacity
+                    key={space.id}
+                    style={s.card}
+                    activeOpacity={0.85}
+                    onPress={() => router.push({ pathname: '/(app)/space-detail', params: { spaceId: space.id, name: space.name, color: space.color } })}
+                  >
+                    <View style={s.cardLeft}>
+                      <Text style={s.cardName}>{String(space.name).toLowerCase()}</Text>
+                      <Text style={s.cardMeta}>{isExpense ? 'expense tracker' : 'savings tracker'}</Text>
+                      <Text style={[s.cardMeta, { color: ACCENT_DARK }]}>{space.role}</Text>
+                    </View>
+                    <View style={s.cardRight}>
+                      <Text style={[s.cardMeta, { color: Colors.muted }]}>by {space.ownerName}</Text>
+                    </View>
+                    <Ionicons name="people-outline" size={14} color={Colors.muted} />
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </>
+        )}
       </ScrollView>
 
       {/* ── Create / Edit modal ── */}

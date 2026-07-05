@@ -6,7 +6,15 @@ interface UseUserResult {
   user: User | null;
   userId: string;
   userName: string;
+  profileCode: string;
   loading: boolean;
+}
+
+function generateProfileCode(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = 'LDGR-';
+  for (let i = 0; i < 4; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  return code;
 }
 
 /**
@@ -36,10 +44,35 @@ export function useUser(): UseUserResult {
     return () => subscription.unsubscribe();
   }, []);
 
+  const [profileCode, setProfileCode] = useState('');
+
+  useEffect(() => {
+    if (!user?.id) return;
+    supabase
+      .from('user_settings')
+      .select('profile_code')
+      .eq('user_id', user.id)
+      .maybeSingle()
+      .then(async ({ data, error }) => {
+        if (data?.profile_code) {
+          setProfileCode(data.profile_code);
+          return;
+        }
+        // No code yet — generate and save
+        const code = generateProfileCode();
+        const { error: upsertError } = await supabase.from('user_settings').upsert(
+          { user_id: user.id, profile_code: code, updated_at: new Date().toISOString() },
+          { onConflict: 'user_id' }
+        );
+        if (!upsertError) setProfileCode(code);
+      });
+  }, [user?.id]);
+
   return {
     user,
     userId: user?.id ?? '',
     userName: user?.user_metadata?.full_name ?? '',
+    profileCode,
     loading,
   };
 }

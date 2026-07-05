@@ -834,6 +834,97 @@ export default function SpaceDetailScreen() {
     }
   };
 
+  // ── Space ownership + members ──────────────────────────────────────────────────
+  const { data: spaceOwner } = useQuery<string>({
+    queryKey: ['space-owner', spaceId],
+    queryFn: async () => {
+      const { data } = await supabase.from('spaces').select('user_id').eq('id', spaceId).single();
+      return data?.user_id ?? '';
+    },
+    enabled: !!spaceId && spaceId !== 'all',
+  });
+  const isOwner = spaceOwner === userId;
+
+  const { data: members = [], refetch: refetchMembers } = useQuery<{ id: string; user_id: string; role: string; status: string; name: string }[]>({
+    queryKey: ['space-members', spaceId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('space_members')
+        .select('id, user_id, role, status')
+        .eq('space_id', spaceId);
+      if (!data || data.length === 0) return [];
+      const names = await Promise.all(
+        data.map((m: any) =>
+          supabase.rpc('get_user_display_name', { user_id: m.user_id }).then(({ data: n }) => ({ ...m, name: n ?? 'unknown' }))
+        )
+      );
+      return names;
+    },
+    enabled: !!spaceId && spaceId !== 'all',
+  });
+
+  // role for this user in this space (null = owner)
+  const myMembership = members.find(m => m.user_id === userId);
+  const myRole = isOwner ? 'owner' : (myMembership?.status === 'accepted' ? myMembership.role : null);
+  const canAddRecordings = myRole === 'owner' || myRole === 'co-owner';
+  const canViewOnly = myRole === 'viewer';
+
+  const [membersModal, setMembersModal] = useState(false);
+  const [inviteModal, setInviteModal] = useState(false);
+  const [inviteFriends, setInviteFriends] = useState<{ id: string; name: string }[]>([]);
+  const [inviteFriendId, setInviteFriendId] = useState('');
+  const [inviteRole, setInviteRole] = useState<'co-owner' | 'viewer'>('viewer');
+  const [inviteSaving, setInviteSaving] = useState(false);
+
+  const openInviteModal = async () => {
+    const { data: friendships } = await supabase
+      .from('friendships')
+      .select('requester_id, receiver_id')
+      .eq('status', 'accepted')
+      .or(`requester_id.eq.${userId},receiver_id.eq.${userId}`);
+    if (!friendships || friendships.length === 0) { setInviteFriends([]); setInviteModal(true); return; }
+    const friendIds = friendships.map((f: any) => f.requester_id === userId ? f.receiver_id : f.requester_id);
+    const alreadyMemberIds = members.map(m => m.user_id);
+    const eligible = friendIds.filter((id: string) => !alreadyMemberIds.includes(id));
+    const names = await Promise.all(
+      eligible.map((id: string) =>
+        supabase.rpc('get_user_display_name', { user_id: id }).then(({ data: n }) => ({ id, name: n ?? 'unknown' }))
+      )
+    );
+    setInviteFriends(names);
+    setInviteFriendId(names[0]?.id ?? '');
+    setInviteRole('viewer');
+    setInviteModal(true);
+  };
+
+  const sendSpaceInvite = async () => {
+    if (!inviteFriendId) return;
+    setInviteSaving(true);
+    await supabase.from('space_members').insert({
+      space_id: spaceId,
+      user_id: inviteFriendId,
+      role: inviteRole,
+      invited_by: userId,
+      status: 'pending',
+    });
+    await supabase.from('notifications').insert({
+      user_id: inviteFriendId,
+      type: 'space_invite',
+      title: 'you\'ve been invited to a shared space',
+      body: `${String(name)} — role: ${inviteRole}`,
+      data: { spaceId, spaceName: String(name) },
+      is_read: false,
+    });
+    refetchMembers();
+    setInviteSaving(false);
+    setInviteModal(false);
+  };
+
+  const removeMember = async (memberId: string) => {
+    await supabase.from('space_members').delete().eq('id', memberId);
+    refetchMembers();
+  };
+
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <Animated.View style={[{ flex: 1, backgroundColor: Colors.white }, { transform: [{ translateX: slideAnim }] }]}>
@@ -845,6 +936,16 @@ export default function SpaceDetailScreen() {
             <Ionicons name="arrow-back" size={20} color="#B6E1DE" />
           </TouchableOpacity>
           <Text style={s.title} numberOfLines={1}>{name}</Text>
+          {canViewOnly && (
+            <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: Radius.pill, backgroundColor: '#B6E1DE22' }}>
+              <Text style={{ fontFamily: Brand.font.mono, fontSize: 9, color: '#B6E1DE', letterSpacing: 0.5 }}>viewer</Text>
+            </View>
+          )}
+          {myRole === 'co-owner' && (
+            <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: Radius.pill, backgroundColor: '#B6E1DE22' }}>
+              <Text style={{ fontFamily: Brand.font.mono, fontSize: 9, color: '#B6E1DE', letterSpacing: 0.5 }}>co-owner</Text>
+            </View>
+          )}
           <TouchableOpacity
             style={s.addBtn}
             onPress={generateStatement}
@@ -855,13 +956,18 @@ export default function SpaceDetailScreen() {
               ? <ActivityIndicator size="small" color="#B6E1DE" />
               : <Ionicons name="document-text-outline" size={16} color="#B6E1DE" />}
           </TouchableOpacity>
-          {spaceId !== 'all' && (
+          {spaceId !== 'all' && canAddRecordings && (
             <TouchableOpacity
               style={s.addBtn}
               onPress={() => setShowAddModal(true)}
               activeOpacity={0.8}
             >
               <Ionicons name="add" size={18} color="#B6E1DE" />
+            </TouchableOpacity>
+          )}
+          {isOwner && spaceId !== 'all' && (
+            <TouchableOpacity style={s.addBtn} onPress={() => setMembersModal(true)} activeOpacity={0.8}>
+              <Ionicons name="people-outline" size={16} color="#B6E1DE" />
             </TouchableOpacity>
           )}
         </View>
@@ -933,7 +1039,7 @@ export default function SpaceDetailScreen() {
                       style={s.row}
                       activeOpacity={0.85}
                       onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: item.id } } as any)}
-                      onLongPress={() => { setPendingDeleteId(item.id); setPendingDeleteName(item.name); setConfirmModal(true); }}
+                      onLongPress={() => { if (!canAddRecordings) return; setPendingDeleteId(item.id); setPendingDeleteName(item.name); setConfirmModal(true); }}
                     >
                       <View style={s.rowIconWrap}>
                         <Ionicons name={(item.categories?.icon ?? 'ellipse-outline') as any} size={18} color={Colors.cyan} />
@@ -1141,6 +1247,86 @@ export default function SpaceDetailScreen() {
               <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 14, color: Colors.text }}>
                 {ghostSaving ? 'saving...' : 'record payment'}
               </Text>
+            </TouchableOpacity>
+          </>
+        )}
+      </BottomSheet>
+
+      {/* Members modal */}
+      <BottomSheet visible={membersModal} onClose={() => setMembersModal(false)} title="members" maxHeight="60%">
+        {isOwner && (
+          <TouchableOpacity
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-end', paddingHorizontal: 12, paddingVertical: 6, borderRadius: Radius.pill, backgroundColor: Colors.cyan + '33', marginBottom: 12 }}
+            onPress={() => { setMembersModal(false); openInviteModal(); }}
+          >
+            <Ionicons name="person-add-outline" size={13} color={Colors.cyan} />
+            <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 12, color: Colors.cyan }}>invite friend</Text>
+          </TouchableOpacity>
+        )}
+        {members.length === 0 ? (
+          <Text style={{ fontFamily: Brand.font.mono, fontSize: 12, color: Colors.muted }}>no members yet</Text>
+        ) : (
+          members.map(m => (
+            <View key={m.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border }}>
+              <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: Colors.cyan + '33', justifyContent: 'center', alignItems: 'center' }}>
+                <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 13, color: Colors.cyan }}>{m.name.charAt(0).toUpperCase()}</Text>
+              </View>
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={{ fontFamily: Brand.font.heading, fontSize: 13, color: Colors.text }}>{m.name}</Text>
+                <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: Colors.muted }}>{m.role} · {m.status}</Text>
+              </View>
+              {isOwner && (
+                <TouchableOpacity onPress={() => removeMember(m.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Ionicons name="close" size={14} color={Colors.muted} />
+                </TouchableOpacity>
+              )}
+            </View>
+          ))
+        )}
+      </BottomSheet>
+
+      {/* Invite modal */}
+      <BottomSheet visible={inviteModal} onClose={() => setInviteModal(false)} title="invite to space">
+        {inviteFriends.length === 0 ? (
+          <Text style={{ fontFamily: Brand.font.mono, fontSize: 12, color: Colors.muted }}>
+            no friends available to invite — add friends first from the contacts page.
+          </Text>
+        ) : (
+          <>
+            <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8 }}>friend</Text>
+            <ScrollView style={{ maxHeight: 160 }} showsVerticalScrollIndicator={false}>
+              {inviteFriends.map(f => (
+                <TouchableOpacity
+                  key={f.id}
+                  style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 10 }}
+                  onPress={() => setInviteFriendId(f.id)}
+                >
+                  <Ionicons name={inviteFriendId === f.id ? 'radio-button-on' : 'radio-button-off'} size={16} color={inviteFriendId === f.id ? Colors.cyan : Colors.faint} />
+                  <Text style={{ fontFamily: Brand.font.heading, fontSize: 13, color: Colors.text }}>{f.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginTop: 16, marginBottom: 8 }}>role</Text>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              {(['viewer', 'co-owner'] as const).map(r => (
+                <TouchableOpacity
+                  key={r}
+                  style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, borderWidth: 1, borderColor: inviteRole === r ? Colors.cyan : Colors.borderMid, backgroundColor: inviteRole === r ? Colors.cyan + '33' : Colors.surface }}
+                  onPress={() => setInviteRole(r)}
+                >
+                  <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 12, color: inviteRole === r ? Colors.cyan : Colors.muted }}>{r}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: Colors.muted, marginTop: 8 }}>
+              {inviteRole === 'co-owner' ? 'can add recordings and invite members' : 'can view recordings only'}
+            </Text>
+            <TouchableOpacity
+              style={{ backgroundColor: Colors.cyan + '44', borderRadius: Radius.pill, paddingVertical: 14, alignItems: 'center', marginTop: 20, opacity: inviteSaving || !inviteFriendId ? 0.5 : 1 }}
+              onPress={sendSpaceInvite}
+              disabled={inviteSaving || !inviteFriendId}
+            >
+              <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 14, color: Colors.cyan }}>{inviteSaving ? 'sending...' : 'send invite'}</Text>
             </TouchableOpacity>
           </>
         )}

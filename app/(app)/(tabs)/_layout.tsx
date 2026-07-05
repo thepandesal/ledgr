@@ -1,11 +1,12 @@
-import { View, TouchableOpacity, Text, StyleSheet, Animated, Dimensions, Platform, SafeAreaView, ScrollView, useWindowDimensions } from 'react-native';
+import { View, TouchableOpacity, Text, StyleSheet, Animated, Dimensions, Platform, SafeAreaView, ScrollView, useWindowDimensions, Clipboard } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useState, useRef, memo, useCallback, useEffect } from 'react';
+import { useState, useRef, memo, useCallback, useEffect }from 'react';
 import { BlurView } from 'expo-blur';
 import SpacesScreen from './spaces';
 import AccountsScreen from './accounts';
 import BillSplitScreen from './bill-split';
 import ReceiptsScreen from './receipts';
+import ContactsScreen from './contacts';
 import CategoriesScreen from './categories';
 import DashboardScreen from './dashboard';
 import { Colors, Fonts, Radius, Spacing } from '@/components/ui/theme';
@@ -41,7 +42,8 @@ const TAB_META: Record<string, { title: string; subtitle: string }> = {
   dashboard:     { title: 'activities', subtitle: 'all your recordings in one place' },
   notifications: { title: 'profile',   subtitle: 'your account details'            },
   receipts:      { title: 'receipts',   subtitle: 'your paper trail, digitized'     },
-  'bill-split':  { title: 'split bills', subtitle: 'split expenses with friends'    },
+  'bill-split':  { title: 'split bill',  subtitle: 'split expenses with friends'    },
+  contacts:      { title: 'contacts',   subtitle: 'your friends & contacts'         },
   categories:    { title: 'categories', subtitle: 'organize your recordings'        },
   loans:         { title: 'loans',      subtitle: 'payables & borrowings'           },
   receivables:   { title: 'receivables', subtitle: 'money owed to you'             },
@@ -49,14 +51,15 @@ const TAB_META: Record<string, { title: string; subtitle: string }> = {
 
 const OTHERS_ITEMS = [
   { key: 'receipts',           label: 'Receipts',       icon: 'receipt-outline',       route: null },
-  { key: 'bill-split',         label: 'Bill Split',     icon: 'people-outline',        route: null },
+  { key: 'bill-split',         label: 'Split Bill',     icon: 'people-outline',        route: null },
+  { key: 'contacts',           label: 'Contacts',       icon: 'people-circle-outline', route: null },
   { key: 'categories',         label: 'Categories',     icon: 'pricetag-outline',      route: null },
   { key: 'loans',              label: 'Loans',          icon: 'cash-outline',          route: '/(app)/loans' },
   { key: 'receivables',        label: 'Receivables',    icon: 'arrow-undo-outline',    route: '/(app)/receivables' },
   { key: 'notifications-page', label: 'Notifications',  icon: 'notifications-outline', route: '/(app)/notifications' },
 ];
 
-const SLIDE_KEYS = ['spaces', 'accounts', 'dashboard', 'categories', 'receipts', 'bill-split'];
+const SLIDE_KEYS = ['spaces', 'accounts', 'dashboard', 'categories', 'receipts', 'bill-split', 'contacts'];
 
 const PROFILE_BG       = '#F7F8FA';
 const PROFILE_TITLE    = '#1A1A2E';
@@ -70,6 +73,7 @@ const MemoBillSplit  = memo(BillSplitScreen);
 const MemoReceipts   = memo(ReceiptsScreen);
 const MemoCategories = memo(CategoriesScreen);
 const MemoDashboard  = memo(DashboardScreen);
+const MemoContacts   = memo(ContactsScreen);
 
 const SCREENS: Record<string, React.ReactNode> = {
   spaces:       <MemoSpaces />,
@@ -78,12 +82,25 @@ const SCREENS: Record<string, React.ReactNode> = {
   categories:   <MemoCategories />,
   'bill-split': <MemoBillSplit />,
   receipts:     <MemoReceipts />,
+  contacts:     <MemoContacts />,
 };
 
 function ProfileScreen() {
   const router = useRouter();
-  const { user, userName } = useUser();
+  const { user, userName, profileCode } = useUser();
+  const [codeCopied, setCodeCopied] = useState(false);
   const email = user?.email ?? '';
+
+  const copyCode = () => {
+    if (!profileCode) return;
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(profileCode).then(() => { setCodeCopied(true); setTimeout(() => setCodeCopied(false), 2000); });
+    } else {
+      Clipboard.setString(profileCode);
+      setCodeCopied(true);
+      setTimeout(() => setCodeCopied(false), 2000);
+    }
+  };
   const joinedDate = user?.created_at
     ? new Date(user.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
     : '';
@@ -157,6 +174,15 @@ function ProfileScreen() {
               <Text style={[p.rowValue, { color: HEADER_BG }]}>Active</Text>
             </View>
           </View>
+          <View style={p.divider} />
+          <TouchableOpacity style={p.row} onPress={copyCode} activeOpacity={0.7}>
+            <View style={p.rowIcon}><Ionicons name="qr-code-outline" size={16} color={Colors.muted} /></View>
+            <View style={p.rowBody}>
+              <Text style={p.rowLabel}>Profile Code</Text>
+              <Text style={[p.rowValue, { fontFamily: Fonts.monoBold, letterSpacing: 1.5 }]}>{profileCode || '—'}</Text>
+            </View>
+            <Ionicons name={codeCopied ? 'checkmark-circle' : 'copy-outline'} size={16} color={codeCopied ? HEADER_BG : Colors.faint} />
+          </TouchableOpacity>
         </View>
 
         {/* Actions */}
@@ -174,7 +200,7 @@ function ProfileScreen() {
     </SafeAreaView>
   );
 }
-const MemoProfile = memo(ProfileScreen);
+const MemoProfile = ProfileScreen;
 
 export default function TabsLayout() {
   const router = useRouter();

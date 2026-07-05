@@ -16,12 +16,16 @@ const ACCENT_DARK = Brand.color.accentDark;
 const PAGE        = 20;
 
 const TYPE_ICON: Record<string, string> = {
-  recurring_due:    'repeat-outline',
-  recurring_debt:   'repeat-outline',
-  overdue:          'alert-circle-outline',
-  payment_received: 'checkmark-circle-outline',
-  weekly_summary:   'bar-chart-outline',
-  default:          'notifications-outline',
+  recurring_due:           'repeat-outline',
+  recurring_debt:          'repeat-outline',
+  overdue:                 'alert-circle-outline',
+  payment_received:        'checkmark-circle-outline',
+  weekly_summary:          'bar-chart-outline',
+  friend_request:          'person-add-outline',
+  friend_request_accepted: 'people-outline',
+  split_bill_invite:       'receipt-outline',
+  space_invite:            'grid-outline',
+  default:                 'notifications-outline',
 };
 
 function smartGroup(dateStr: string): string {
@@ -65,6 +69,18 @@ export default function NotificationsScreen() {
 
   const handleTap = (n: any) => {
     const data = n.data ?? {};
+    if (n.type === 'friend_request' || n.type === 'friend_request_accepted') {
+      router.push('/(app)/(tabs)/contacts' as any);
+      return;
+    }
+    if (n.type === 'split_bill_invite' && data.splitBillId) {
+      router.push({ pathname: '/(app)/split-bill-detail', params: { splitBillId: data.splitBillId, name: data.splitBillName ?? 'split bill' } } as any);
+      return;
+    }
+    if (n.type === 'space_invite') {
+      router.push('/(app)/(tabs)/spaces' as any);
+      return;
+    }
     if (data.recordingId) {
       router.push({ pathname: '/(app)/recording-detail', params: { recordingId: data.recordingId } } as any);
     } else if (data.recurringRecordId) {

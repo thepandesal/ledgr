@@ -123,6 +123,31 @@ export default function SplitBillDetailScreen() {
   const [contacts, setContacts] = useState<string[]>([]);
   const [contactsVisible, setContactsVisible] = useState(5);
   const [peopleVisible, setPeopleVisible] = useState(10);
+  const [pendingInvitePerson, setPendingInvitePerson] = useState<{ name: string; friendId: string } | null>(null);
+  const [sendingInvite, setSendingInvite] = useState(false);
+
+  const sendInvite = async (personName: string, friendId: string, amount: number) => {
+    setSendingInvite(true);
+    await supabase.from('split_bill_invites').insert({
+      split_bill_id: splitBillId,
+      inviter_user_id: userId,
+      invitee_user_id: friendId,
+      person_name: personName,
+      amount,
+      status: 'pending',
+    });
+    await supabase.from('notifications').insert({
+      user_id: friendId,
+      type: 'split_bill_invite',
+      title: 'you\'ve been added to a split bill',
+      body: `${String(name)} — your share is ${amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
+      data: { splitBillId, splitBillName: String(name) },
+      is_read: false,
+    });
+    queryClient.invalidateQueries({ queryKey: ['split-bill-invites', splitBillId] });
+    setSendingInvite(false);
+    setPendingInvitePerson(null);
+  };
 
   // ── Receipt state ─────────────────────────────────────────────────────────
   const [linkedReceipt, setLinkedReceipt]   = useState<any>(null);
@@ -236,6 +261,114 @@ export default function SplitBillDetailScreen() {
 
   const filledPeople = people.map((p: any) => p.person_name);
 
+  // ── My invite (as invitee) ──────────────────────────────────────────────────
+  const { data: myInvite, refetch: refetchMyInvite } = useQuery<any>({
+    queryKey: ['my-split-bill-invite', splitBillId, userId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('split_bill_invites')
+        .select('id, person_name, amount, status')
+        .eq('split_bill_id', splitBillId)
+        .eq('invitee_user_id', userId)
+        .maybeSingle();
+      return data ?? null;
+    },
+    enabled: !!splitBillId && !!userId,
+  });
+
+  const [acceptModal, setAcceptModal] = useState(false);
+  const [acceptSpaces, setAcceptSpaces] = useState<any[]>([]);
+  const [acceptCategories, setAcceptCategories] = useState<any[]>([]);
+  const [acceptSpaceId, setAcceptSpaceId] = useState('');
+  const [acceptCategoryId, setAcceptCategoryId] = useState('');
+  const [acceptSaving, setAcceptSaving] = useState(false);
+
+  const openAcceptModal = async () => {
+    const [{ data: spaces }, { data: cats }] = await Promise.all([
+      supabase.from('spaces').select('id, name').eq('user_id', userId).eq('is_active', true).order('name'),
+      supabase.from('categories').select('id, name').eq('user_id', userId).order('name'),
+    ]);
+    setAcceptSpaces(spaces ?? []);
+    setAcceptCategories(cats ?? []);
+    setAcceptSpaceId(spaces?.[0]?.id ?? '');
+    setAcceptCategoryId('');
+    setAcceptModal(true);
+  };
+
+  const confirmAccept = async () => {
+    if (!myInvite || !acceptSpaceId) return;
+    setAcceptSaving(true);
+    const today = new Date().toISOString().split('T')[0];
+    const { data: rec } = await supabase.from('recordings').insert({
+      user_id: userId,
+      space_id: acceptSpaceId,
+      name: String(name),
+      type: 'debt',
+      amount: myInvite.amount,
+      transaction_date: today,
+      status: 'unpaid',
+      category_id: acceptCategoryId || null,
+    }).select('id').single();
+    await supabase.from('split_bill_invites').update({
+      status: 'accepted',
+      accepted_space_id: acceptSpaceId,
+      accepted_category_id: acceptCategoryId || null,
+      created_recording_id: rec?.id ?? null,
+    }).eq('id', myInvite.id);
+    queryClient.invalidateQueries({ queryKey: ['split-bill-invites', splitBillId] });
+    queryClient.invalidateQueries({ queryKey: ['my-split-bill-invite', splitBillId, userId] });
+    setAcceptSaving(false);
+    setAcceptModal(false);
+  };
+
+  const confirmDecline = async () => {
+    if (!myInvite) return;
+    await supabase.from('split_bill_invites').update({ status: 'declined' }).eq('id', myInvite.id);
+    queryClient.invalidateQueries({ queryKey: ['split-bill-invites', splitBillId] });
+    refetchMyInvite();
+  };
+  const { data: invites = [] } = useQuery<{ person_name: string; status: string }[]>({
+    queryKey: ['split-bill-invites', splitBillId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('split_bill_invites')
+        .select('person_name, status')
+        .eq('split_bill_id', splitBillId);
+      return data ?? [];
+    },
+    enabled: !!splitBillId,
+  });
+
+  const getInviteStatus = (personName: string) =>
+    invites.find(i => i.person_name.toLowerCase() === personName.toLowerCase())?.status ?? null;
+
+  // ── Friends list (for invite matching) ─────────────────────────────────────────────
+  const { data: friends = [] } = useQuery<{ id: string; name: string }[]>({
+    queryKey: ['friends', userId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('friendships')
+        .select('id, requester_id, receiver_id')
+        .eq('status', 'accepted')
+        .or(`requester_id.eq.${userId},receiver_id.eq.${userId}`);
+      if (!data || data.length === 0) return [];
+      const friendIds = data.map((r: any) =>
+        r.requester_id === userId ? r.receiver_id : r.requester_id
+      );
+      const names = await Promise.all(
+        friendIds.map((id: string) =>
+          supabase.rpc('get_user_display_name', { user_id: id }).then(({ data }) => ({ id, name: data ?? '' }))
+        )
+      );
+      return names.filter(n => n.name);
+    },
+    enabled: !!userId,
+  });
+
+  // find a friend whose name matches the typed name
+  const findMatchingFriend = (name: string) =>
+    friends.find(f => f.name.toLowerCase() === name.trim().toLowerCase()) ?? null;
+
   useEffect(() => {
     if (!userId) return;
     supabase.from('contacts').select('name').eq('user_id', userId).order('name')
@@ -260,9 +393,16 @@ export default function SplitBillDetailScreen() {
   };
 
   const handleAddPersonSubmit = async () => {
-    const name = tagInputVal.trim();
-    if (name) await savePerson(name);
+    const personName = tagInputVal.trim();
+    if (!personName) return;
+    await savePerson(personName);
     setTagInputVal('');
+    // check if this name matches a friend — if so, prompt invite
+    const match = findMatchingFriend(personName);
+    const alreadyInvited = invites.some(i => i.person_name.toLowerCase() === personName.toLowerCase());
+    if (match && !alreadyInvited) {
+      setPendingInvitePerson({ name: personName, friendId: match.id });
+    }
   };
 
   // ── Add recording state ──────────────────────────────────────────────────
@@ -1567,7 +1707,40 @@ export default function SplitBillDetailScreen() {
         <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
           <View style={{ height: 8 }} />
 
-          {/* Actions section */}
+          {/* Invite banner — shown to invitee only */}
+          {myInvite && myInvite.status === 'pending' && (
+            <View style={{ backgroundColor: ACCENT + '33', borderRadius: Radius.lg, padding: 16, marginBottom: 12, gap: 8 }}>
+              <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 13, color: ACCENT_DARK }}>
+                you've been added to this split bill
+              </Text>
+              <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: Colors.text }}>
+                your share: {fmt(Number(myInvite.amount))}
+              </Text>
+              <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: Colors.muted }}>
+                accept to create a debt recording on your end.
+              </Text>
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
+                <TouchableOpacity
+                  style={{ flex: 1, paddingVertical: 10, borderRadius: Radius.pill, backgroundColor: Colors.surface, alignItems: 'center', borderWidth: 1, borderColor: Colors.borderMid }}
+                  onPress={confirmDecline}
+                >
+                  <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 12, color: Colors.muted }}>decline</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={{ flex: 2, paddingVertical: 10, borderRadius: Radius.pill, backgroundColor: ACCENT_DARK, alignItems: 'center' }}
+                  onPress={openAcceptModal}
+                >
+                  <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 12, color: Colors.white }}>accept</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+          {myInvite && myInvite.status === 'accepted' && (
+            <View style={{ backgroundColor: ACCENT + '22', borderRadius: Radius.lg, padding: 12, marginBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Ionicons name="checkmark-circle" size={16} color={ACCENT_DARK} />
+              <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: ACCENT_DARK }}>you accepted this split bill — debt recorded</Text>
+            </View>
+          )}
           <View style={s.sectionRow}>
             <Text style={s.sectionHeader}>actions</Text>
             <View style={{ flexDirection: 'row', gap: 6 }}>
@@ -1727,16 +1900,22 @@ export default function SplitBillDetailScreen() {
             </View>
           ) : (
             <View style={s.chipWrap}>
-              {people.slice(0, peopleVisible).map((p: any) => (
+              {people.slice(0, peopleVisible).map((p: any) => {
+                const inviteStatus = getInviteStatus(p.person_name);
+                return (
                 <View key={p.id} style={s.personChip}>
                   <Text style={s.personChipText}>{p.person_name}</Text>
+                  {inviteStatus === 'pending'  && <Ionicons name="time-outline"           size={11} color="#F59E0B" />}
+                  {inviteStatus === 'accepted' && <Ionicons name="checkmark-circle"       size={11} color={ACCENT_DARK} />}
+                  {inviteStatus === 'declined' && <Ionicons name="close-circle-outline"   size={11} color={Colors.muted} />}
                   {billStatus === 'ongoing' && (
                     <TouchableOpacity onPress={() => removePerson(p.id)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
                       <Ionicons name="close" size={11} color={Colors.muted} />
                     </TouchableOpacity>
                   )}
                 </View>
-              ))}
+                );
+              })}
               {peopleVisible < people.length && (
                 <TouchableOpacity
                   style={[s.personChip, { backgroundColor: Colors.surface }]}
@@ -2525,6 +2704,37 @@ export default function SplitBillDetailScreen() {
         </TouchableOpacity>
       </BottomSheet>
 
+      {/* Friend invite prompt */}
+      <BottomSheet visible={!!pendingInvitePerson} onClose={() => setPendingInvitePerson(null)} title="link to friend?">
+        {pendingInvitePerson && (() => {
+          const totals = computeTotals();
+          const amount = Math.abs(totals[pendingInvitePerson.name] ?? 0);
+          return (
+            <>
+              <Text style={{ fontFamily: Brand.font.mono, fontSize: 13, color: Colors.text, marginBottom: 4 }}>
+                {pendingInvitePerson.name} is one of your friends.
+              </Text>
+              <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: Colors.muted, marginBottom: 16 }}>
+                send them an invite? they'll see this split bill and their share ({amount > 0 ? amount.toLocaleString('en-US', { minimumFractionDigits: 2 }) : 'tbd'}) as a debt on their end.
+              </Text>
+              <TouchableOpacity
+                style={[s.doneBtn, { opacity: sendingInvite ? 0.5 : 1 }]}
+                onPress={() => sendInvite(pendingInvitePerson.name, pendingInvitePerson.friendId, amount)}
+                disabled={sendingInvite}
+              >
+                <Text style={s.doneBtnText}>{sendingInvite ? 'sending...' : 'send invite'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[s.doneBtn, { backgroundColor: Colors.surface, marginTop: 8 }]}
+                onPress={() => setPendingInvitePerson(null)}
+              >
+                <Text style={[s.doneBtnText, { color: Colors.muted }]}>skip</Text>
+              </TouchableOpacity>
+            </>
+          );
+        })()}
+      </BottomSheet>
+
       {/* Add recording modal */}
       <BottomSheet visible={addRecModal} onClose={() => setAddRecModal(false)} title="link a recording" maxHeight="70%">
         {/* Tabs */}
@@ -3188,6 +3398,57 @@ export default function SplitBillDetailScreen() {
         <TouchableOpacity style={s.doneBtn} onPress={() => setRemoveRecordingBlockedModal(false)}>
           <Text style={s.doneBtnText}>ok</Text>
         </TouchableOpacity>
+      </BottomSheet>
+
+      {/* Accept invite modal */}
+      <BottomSheet visible={acceptModal} onClose={() => setAcceptModal(false)} title="accept split bill invite" maxHeight="60%">
+        {myInvite && (
+          <>
+            <Text style={{ fontFamily: Brand.font.mono, fontSize: 12, color: Colors.muted, marginBottom: 16 }}>
+              a debt of {fmt(Number(myInvite.amount))} will be created. pick where to store it.
+            </Text>
+            <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8 }}>space</Text>
+            <ScrollView style={{ maxHeight: 160 }} showsVerticalScrollIndicator={false}>
+              {acceptSpaces.map((sp: any) => (
+                <TouchableOpacity
+                  key={sp.id}
+                  style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 10 }}
+                  onPress={() => setAcceptSpaceId(sp.id)}
+                >
+                  <Ionicons name={acceptSpaceId === sp.id ? 'radio-button-on' : 'radio-button-off'} size={16} color={acceptSpaceId === sp.id ? ACCENT_DARK : Colors.faint} />
+                  <Text style={{ fontFamily: Brand.font.heading, fontSize: 13, color: Colors.text }}>{sp.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginTop: 16, marginBottom: 8 }}>category <Text style={{ fontFamily: Brand.font.mono, textTransform: 'none' }}>(optional)</Text></Text>
+            <ScrollView style={{ maxHeight: 120 }} showsVerticalScrollIndicator={false}>
+              <TouchableOpacity
+                style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 10 }}
+                onPress={() => setAcceptCategoryId('')}
+              >
+                <Ionicons name={!acceptCategoryId ? 'radio-button-on' : 'radio-button-off'} size={16} color={!acceptCategoryId ? ACCENT_DARK : Colors.faint} />
+                <Text style={{ fontFamily: Brand.font.mono, fontSize: 13, color: Colors.muted }}>none</Text>
+              </TouchableOpacity>
+              {acceptCategories.map((cat: any) => (
+                <TouchableOpacity
+                  key={cat.id}
+                  style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 10 }}
+                  onPress={() => setAcceptCategoryId(cat.id)}
+                >
+                  <Ionicons name={acceptCategoryId === cat.id ? 'radio-button-on' : 'radio-button-off'} size={16} color={acceptCategoryId === cat.id ? ACCENT_DARK : Colors.faint} />
+                  <Text style={{ fontFamily: Brand.font.heading, fontSize: 13, color: Colors.text }}>{cat.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity
+              style={[s.doneBtn, { opacity: acceptSaving || !acceptSpaceId ? 0.5 : 1 }]}
+              onPress={confirmAccept}
+              disabled={acceptSaving || !acceptSpaceId}
+            >
+              <Text style={s.doneBtnText}>{acceptSaving ? 'saving...' : 'confirm & create debt'}</Text>
+            </TouchableOpacity>
+          </>
+        )}
       </BottomSheet>
 
       {/* Over-budget overlay — inside Animated.View, shown above BottomSheet via zIndex */}
