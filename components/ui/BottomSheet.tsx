@@ -42,27 +42,29 @@ export default function BottomSheet({ visible, onClose, sub, title, height, maxH
     if (Platform.OS !== 'web') return;
     const vv = (window as any).visualViewport;
     if (!vv) return;
-    naturalHeightRef.current = Math.max(naturalHeightRef.current, vv.height);
-    setVpHeight(naturalHeightRef.current);
+    // Capture the full screen height when no keyboard is open.
+    // window.screen.height is the physical screen height, unaffected by keyboard.
+    const fullHeight = window.screen.height;
+    naturalHeightRef.current = fullHeight;
+    setVpHeight(fullHeight);
     const onResize = () => {
-      naturalHeightRef.current = Math.max(naturalHeightRef.current, vv.height);
       const diff = naturalHeightRef.current - vv.height;
       setKeyboardOpen(diff > 100);
-      setVpHeight(naturalHeightRef.current);
     };
     vv.addEventListener('resize', onResize);
     return () => vv.removeEventListener('resize', onResize);
   }, []);
 
   // Inject a one-time CSS rule to stop RN Web's Modal from adding overflow:hidden
-  // to the body, which causes a scrollbar-width shift on the page behind the modal.
+  // to the body, which causes a layout shift on the page behind the modal.
+  // overflow-y: scroll keeps the scrollbar gutter always reserved so width never changes.
   useEffect(() => {
     if (Platform.OS !== 'web') return;
     const id = 'rnw-modal-no-shift';
     if (!document.getElementById(id)) {
       const style = document.createElement('style');
       style.id = id;
-      style.textContent = 'body { overflow: auto !important; }';
+      style.textContent = 'body { overflow-y: scroll !important; }';
       document.head.appendChild(style);
     }
   }, []);
