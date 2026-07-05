@@ -19,6 +19,7 @@ export default function SplitShareSlugPage() {
   const [recording, setRecording]           = useState<any>(null);
   const [perPerson, setPerPerson]           = useState<{ name: string; total: number }[]>([]);
   const [items, setItems]                   = useState<any[]>([]);
+  const [linkedRecordings, setLinkedRecordings] = useState<any[]>([]);
   const [payments, setPayments]             = useState<any[]>([]);
   const [paymentHistory, setPaymentHistory] = useState<any[]>([]);
   const [receiptId, setReceiptId]           = useState<string | null>(null);
@@ -77,6 +78,8 @@ export default function SplitShareSlugPage() {
       }
       const loadedItems = (itemsRes.data ?? []).map((item: any) => ({ ...item, subitems: item.split_subitems ?? [] }));
       setItems(loadedItems);
+      const linkedRecs = (recsRes.data ?? []).map((r: any) => ({ ...r, recording: Array.isArray(r.recording) ? r.recording[0] : r.recording }));
+      setLinkedRecordings(linkedRecs);
       const people = (splitsRes.data ?? []).map((r: any) => r.person_name);
       const adjs = adjRes.data ?? [];
       const perPersonMap: Record<string, number> = {};
@@ -299,47 +302,77 @@ export default function SplitShareSlugPage() {
         {items.length > 0 && <>
           <Text style={s.sectionHeader}>item breakdown</Text>
           <View style={s.listBlock}>
-            {items.map((item, ii) => {
-              const subs: any[] = item.subitems ?? [];
-              const itemPeople: any[] = item.people ?? [];
-              const deduct = isDeduct(item.recording_type ?? '');
-              return (
-                <View key={ii} style={s.itemCard}>
-                  <View style={[s.itemHeader, subs.length === 0 && itemPeople.length > 0 && { paddingBottom: 4 }]}>
-                    <View style={[s.rowIconWrap, { backgroundColor: ACCENT + '44' }]}>
-                      <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 13, color: ACCENT_DARK }}>{ii + 1}</Text>
-                    </View>
-                    <Text style={s.rowName}>{String(item.name ?? '').toLowerCase()}</Text>
-                    <Text style={[s.rowAmount, { color: deduct ? PEACH : ACCENT_DARK }]}>{deduct ? '-' : '+'}{fmt(Number(item.cost ?? 0))}</Text>
-                  </View>
-                  {subs.length === 0 && itemPeople.length > 0 && (
-                    <View style={{ paddingLeft: 60, paddingRight: 14, paddingBottom: 10, flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
-                      {itemPeople.map((person: string, pi: number) => (
-                        <View key={pi} style={{ backgroundColor: ACCENT + '44', borderRadius: 99, paddingHorizontal: 8, paddingVertical: 3 }}>
-                          <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: ACCENT_DARK }}>{person}</Text>
-                        </View>
-                      ))}
+            {(() => {
+              // Group items by recording_id
+              const groups: { recName: string; recId: string | null; items: any[] }[] = [];
+              items.forEach((item: any) => {
+                const key = item.recording_id ?? '__manual__';
+                const existing = groups.find(g => g.recId === key);
+                if (existing) { existing.items.push(item); }
+                else {
+                  // find recording name from recsRes if available — use item.recording_type as fallback label
+                  groups.push({ recId: key, recName: key === '__manual__' ? 'manual' : '', items: [item] });
+                }
+              });
+              return groups.map((group, gi) => (
+                <View key={gi}>
+                  {groups.length > 1 && (
+                    <View style={{ paddingHorizontal: 14, paddingTop: 10, paddingBottom: 4, backgroundColor: ACCENT + '22' }}>
+                      <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: ACCENT_DARK, textTransform: 'uppercase', letterSpacing: 0.6 }}>
+                        {group.recId === '__manual__' ? 'manual' : linkedRecordings.find(lr => lr.recording?.id === group.recId)?.recording?.name ?? group.items[0]?.recording_type ?? 'items'}
+                      </Text>
                     </View>
                   )}
-                  {subs.map((sub, si) => {
-                    const subPeople: any[] = sub.people ?? [];
-                    const pp = subPeople.length > 0 ? Number(sub.cost ?? 0) / subPeople.length : Number(sub.cost ?? 0);
+                  {group.items.map((item: any, ii: number) => {
+                    const subs: any[] = item.subitems ?? [];
+                    const itemPeople: any[] = item.people ?? [];
+                    const deduct = isDeduct(item.recording_type ?? '');
+                    const perPersonCost = itemPeople.length > 0 ? Number(item.cost ?? 0) / itemPeople.length : 0;
                     return (
-                      <View key={si} style={s.subRow}>
-                        <Text style={s.arrow}>↳</Text>
-                        <View style={{ flex: 1 }}>
-                          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                            <Text style={s.subName}>{String(sub.name ?? '').toLowerCase()}</Text>
-                            <Text style={s.subCost}>{fmt(Number(sub.cost ?? 0))}</Text>
+                      <View key={ii} style={s.itemCard}>
+                        <View style={[s.itemHeader, { paddingBottom: itemPeople.length > 0 ? 4 : 12 }]}>
+                          <View style={[s.rowIconWrap, { backgroundColor: ACCENT + '44' }]}>
+                            <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 13, color: ACCENT_DARK }}>{ii + 1}</Text>
                           </View>
-                          <Text style={s.splitMeta}>{subPeople.join(', ')}</Text>
+                          <Text style={s.rowName}>{String(item.name ?? '').toLowerCase()}</Text>
+                          <Text style={[s.rowAmount, { color: deduct ? PEACH : ACCENT_DARK }]}>{deduct ? '-' : '+'}{fmt(Number(item.cost ?? 0))}</Text>
                         </View>
+                        {subs.length === 0 && itemPeople.length > 0 && (
+                          <View style={{ paddingLeft: 60, paddingRight: 14, paddingBottom: 10, gap: 4 }}>
+                            <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: deduct ? PEACH : ACCENT_DARK }}>
+                              {deduct ? '-' : '+'}{fmt(perPersonCost)} each
+                            </Text>
+                            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
+                              {itemPeople.map((person: string, pi: number) => (
+                                <View key={pi} style={{ backgroundColor: ACCENT + '44', borderRadius: 99, paddingHorizontal: 8, paddingVertical: 3 }}>
+                                  <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: ACCENT_DARK }}>{person}</Text>
+                                </View>
+                              ))}
+                            </View>
+                          </View>
+                        )}
+                        {subs.map((sub: any, si: number) => {
+                          const subPeople: any[] = sub.people ?? [];
+                          const pp = subPeople.length > 0 ? Number(sub.cost ?? 0) / subPeople.length : Number(sub.cost ?? 0);
+                          return (
+                            <View key={si} style={s.subRow}>
+                              <Text style={s.arrow}>↳</Text>
+                              <View style={{ flex: 1 }}>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                  <Text style={s.subName}>{String(sub.name ?? '').toLowerCase()}</Text>
+                                  <Text style={s.subCost}>{fmt(Number(sub.cost ?? 0))}</Text>
+                                </View>
+                                <Text style={s.splitMeta}>{fmt(pp)} each · {subPeople.join(', ')}</Text>
+                              </View>
+                            </View>
+                          );
+                        })}
                       </View>
                     );
                   })}
                 </View>
-              );
-            })}
+              ));
+            })()}
           </View>
         </>}
 

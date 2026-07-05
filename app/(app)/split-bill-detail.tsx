@@ -711,21 +711,41 @@ export default function SplitBillDetailScreen() {
         `</div>`;
 
       // Item rows — matching share page style
-      const itemRowsHtml = items.map((item: any, ii: number) => {
-        const d = isDeductType(item.recording_type);
-        const color = d ? '#FFAB91' : '#2A7A6F';
-        const peopleTags = (item.people ?? []).length > 0
-          ? `<div style="padding:0 14px 10px 58px;display:flex;flex-wrap:wrap;gap:4px">`+
-            (item.people ?? []).map((person: string) =>
-              `<span style="background:#B6E1DE44;border-radius:99px;padding:2px 8px;font-family:monospace;font-size:10px;color:#2A7A6F">${person}</span>`
-            ).join('') + `</div>`
+            // Group items by recording
+      const recGroups: { recId: string | null; recName: string; items: any[] }[] = [];
+      items.forEach((item: any) => {
+        const key = item.recording_id ?? null;
+        const existing = recGroups.find(g => g.recId === key);
+        if (existing) { existing.items.push(item); }
+        else {
+          const lr = linkedRecordings.find((l: any) => l.recording?.id === key);
+          recGroups.push({ recId: key, recName: lr?.recording?.name ?? (key ? '' : 'manual'), items: [item] });
+        }
+      });
+      const itemRowsHtml = recGroups.map((group) => {
+        const groupHeader = recGroups.length > 1
+          ? `<div style="padding:8px 14px;background:#B6E1DE22;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:10px;font-weight:600;color:#2A7A6F;text-transform:uppercase;letter-spacing:0.5px">${group.recName}</div>`
           : '';
-        return `<div style="border-bottom:1px solid #f0f0f0">`+
-          `<div style="display:flex;align-items:center;gap:12px;padding:12px 14px">`+
-          `<div style="width:32px;height:32px;border-radius:50%;background:#B6E1DE44;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:monospace;font-size:13px;color:#2A7A6F;font-weight:700">${ii + 1}</div>`+
-          `<span style="font-family:-apple-system,sans-serif;font-size:13px;color:#425252;flex:1">${item.name}</span>`+
-          `<span style="font-family:monospace;font-size:13px;font-weight:700;color:${color}">${d ? '-' : '+'}${Number(item.cost).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>`+
-          `</div>${peopleTags}</div>`;
+        const rows = group.items.map((item: any, ii: number) => {
+          const d = isDeductType(item.recording_type);
+          const color = d ? '#FFAB91' : '#2A7A6F';
+          const people: string[] = item.people ?? [];
+          const perPerson = people.length > 0 ? Number(item.cost) / people.length : 0;
+          const peopleSection = people.length > 0
+            ? `<div style="padding:0 14px 10px 58px">`+
+              `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:11px;font-weight:600;color:${color};margin-bottom:4px">${d ? '-' : '+'}${perPerson.toLocaleString('en-US', { minimumFractionDigits: 2 })} each</div>`+
+              `<div style="display:flex;flex-wrap:wrap;gap:4px">`+
+              people.map((p: string) => `<span style="background:#B6E1DE44;border-radius:99px;padding:2px 8px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:10px;color:#2A7A6F">${p}</span>`).join('') +
+              `</div></div>`
+            : '';
+          return `<div style="border-bottom:1px solid #f0f0f0">`+
+            `<div style="display:flex;align-items:center;gap:12px;padding:12px 14px">`+
+            `<div style="width:32px;height:32px;border-radius:50%;background:#B6E1DE44;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:monospace;font-size:13px;color:#2A7A6F;font-weight:700">${ii + 1}</div>`+
+            `<span style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:13px;color:#425252;flex:1">${item.name}</span>`+
+            `<span style="font-family:monospace;font-size:13px;font-weight:700;color:${color}">${d ? '-' : '+'}${Number(item.cost).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>`+
+            `</div>${peopleSection}</div>`;
+        }).join('');
+        return groupHeader + rows;
       }).join('');
 
       // Payment info — matching share page style
