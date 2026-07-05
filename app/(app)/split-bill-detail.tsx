@@ -1924,7 +1924,40 @@ export default function SplitBillDetailScreen() {
       </SafeAreaView>
 
       {/* Add item modal */}
-      <BottomSheet visible={addItemModal} onClose={() => setAddItemModal(false)} title="add items" maxHeight="65%">
+      <BottomSheet visible={addItemModal} onClose={() => { setAddItemModal(false); setEditingParsedItem(null); }} title="add items" maxHeight="65%">
+        {/* Edit field overlay — inside BottomSheet so it renders above it */}
+        {editingParsedItem && (
+          <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24, zIndex: 999 }}>
+            <TouchableOpacity style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} activeOpacity={1} onPress={() => setEditingParsedItem(null)} />
+            <View style={{ width: '100%', backgroundColor: Colors.white, borderRadius: 20, padding: 24, gap: 12 }}>
+              <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 11, color: Colors.muted, textTransform: 'uppercase', letterSpacing: 0.8 }}>
+                {editingParsedItem.field === 'name' ? 'item name' : 'item cost'}
+              </Text>
+              <TextInput
+                style={[s.itemFormInput, { fontSize: 16 }]}
+                value={editingParsedItem.value}
+                onChangeText={v => setEditingParsedItem(prev => prev ? { ...prev, value: v } : null)}
+                keyboardType={editingParsedItem.field === 'cost' ? 'decimal-pad' : 'default'}
+                autoFocus
+                selectTextOnFocus
+              />
+              <TouchableOpacity
+                style={[s.doneBtn, { marginTop: 0 }]}
+                onPress={() => {
+                  const { idx, field, value } = editingParsedItem;
+                  if (itemStep === 'parse-review') {
+                    setParsedItems(prev => prev.map((r, i) => i === idx ? { ...r, [field]: value } : r));
+                  } else {
+                    setItemRows(prev => prev.map((r, i) => i === idx ? { ...r, [field]: value } : r));
+                  }
+                  setEditingParsedItem(null);
+                }}
+              >
+                <Text style={s.doneBtnText}>done</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
         {itemStep === 'pick-type' ? (
           <View style={{ gap: 12 }}>
             <Text style={{ fontFamily: Brand.font.mono, fontSize: 12, color: Colors.muted, marginBottom: 4 }}>how do you want to add items?</Text>
@@ -1972,16 +2005,16 @@ export default function SplitBillDetailScreen() {
               ))}
             </View>
             {itemRows.map((row, i) => (
-              <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.border }}>
+              <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border }}>
                 <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: ACCENT_DARK, backgroundColor: ACCENT + '44', width: 20, height: 20, borderRadius: 10, textAlign: 'center', lineHeight: 20 }}>{i + 1}</Text>
-                <TouchableOpacity style={{ flex: 1, backgroundColor: Colors.surface, borderRadius: Radius.md, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: Colors.borderMid }} onPress={() => setEditingParsedItem({ idx: i, field: 'name', value: row.name })}>
-                  <Text style={{ fontFamily: Brand.font.mono, fontSize: 13, color: row.name ? Colors.text : Colors.faint }} numberOfLines={1}>{row.name || 'tap to set name'}</Text>
+                <TouchableOpacity style={{ flex: 1 }} onPress={() => setEditingParsedItem({ idx: i, field: 'name', value: row.name })}>
+                  <Text style={{ fontFamily: Brand.font.mono, fontSize: 13, color: row.name ? Colors.text : Colors.faint }} numberOfLines={1}>{row.name || 'add name'}</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={{ backgroundColor: Colors.surface, borderRadius: Radius.md, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: Colors.borderMid, minWidth: 72, alignItems: 'flex-end' }} onPress={() => setEditingParsedItem({ idx: i, field: 'cost', value: row.cost })}>
+                <TouchableOpacity onPress={() => setEditingParsedItem({ idx: i, field: 'cost', value: row.cost })}>
                   <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 13, color: row.cost ? Colors.text : Colors.faint }}>{row.cost || '0.00'}</Text>
                 </TouchableOpacity>
                 {itemRows.length > 1 && (
-                  <TouchableOpacity onPress={() => setItemRows(prev => prev.filter((_, idx) => idx !== i))} style={{ justifyContent: 'center', padding: 4 }}>
+                  <TouchableOpacity onPress={() => setItemRows(prev => prev.filter((_, idx) => idx !== i))} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                     <Ionicons name="close" size={14} color={Colors.faint} />
                   </TouchableOpacity>
                 )}
@@ -2060,16 +2093,16 @@ export default function SplitBillDetailScreen() {
               const runningTotal = itemRows.slice(0, i + 1).reduce((s, r) => s + parseFloat(r.cost || '0'), 0);
               const rowOver = recTotal > 0 && alreadyUsed + runningTotal > recTotal + 0.01;
               return (
-                <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.border }}>
+                <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border }}>
                   <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: ACCENT_DARK, backgroundColor: ACCENT + '44', width: 20, height: 20, borderRadius: 10, textAlign: 'center', lineHeight: 20 }}>{i + 1}</Text>
-                  <TouchableOpacity style={{ flex: 1, backgroundColor: Colors.surface, borderRadius: Radius.md, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: Colors.borderMid }} onPress={() => setEditingParsedItem({ idx: i, field: 'name', value: row.name })}>
-                    <Text style={{ fontFamily: Brand.font.mono, fontSize: 13, color: row.name ? Colors.text : Colors.faint }} numberOfLines={1}>{row.name || 'tap to set name'}</Text>
+                  <TouchableOpacity style={{ flex: 1 }} onPress={() => setEditingParsedItem({ idx: i, field: 'name', value: row.name })}>
+                    <Text style={{ fontFamily: Brand.font.mono, fontSize: 13, color: row.name ? Colors.text : Colors.faint }} numberOfLines={1}>{row.name || 'add name'}</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={{ backgroundColor: Colors.surface, borderRadius: Radius.md, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: rowOver ? Colors.expense : Colors.borderMid, minWidth: 72, alignItems: 'flex-end' }} onPress={() => setEditingParsedItem({ idx: i, field: 'cost', value: row.cost })}>
+                  <TouchableOpacity onPress={() => setEditingParsedItem({ idx: i, field: 'cost', value: row.cost })}>
                     <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 13, color: rowOver ? Colors.expense : row.cost ? Colors.text : Colors.faint }}>{row.cost || '0.00'}</Text>
                   </TouchableOpacity>
                   {itemRows.length > 1 && (
-                    <TouchableOpacity onPress={() => setItemRows(prev => prev.filter((_, idx) => idx !== i))} style={{ justifyContent: 'center', padding: 4 }}>
+                    <TouchableOpacity onPress={() => setItemRows(prev => prev.filter((_, idx) => idx !== i))} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                       <Ionicons name="close" size={14} color={Colors.faint} />
                     </TouchableOpacity>
                   )}
@@ -2237,28 +2270,22 @@ export default function SplitBillDetailScreen() {
               );
             })()}
 
-            {/* Editable parsed items — tap badges to edit */}
-            <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8 }}>parsed items — tap to edit</Text>
+            {/* Editable parsed items — tap to edit */}
+            <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8 }}>parsed items</Text>
             {parsedItems.map((row, i) => (
-              <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.border }}>
+              <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border }}>
                 <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: ACCENT_DARK, backgroundColor: ACCENT + '44', width: 20, height: 20, borderRadius: 10, textAlign: 'center', lineHeight: 20 }}>{i + 1}</Text>
-                <TouchableOpacity
-                  style={{ flex: 1, backgroundColor: Colors.surface, borderRadius: Radius.md, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: Colors.borderMid }}
-                  onPress={() => setEditingParsedItem({ idx: i, field: 'name', value: row.name })}
-                >
+                <TouchableOpacity style={{ flex: 1 }} onPress={() => setEditingParsedItem({ idx: i, field: 'name', value: row.name })}>
                   <Text style={{ fontFamily: Brand.font.mono, fontSize: 13, color: row.name ? Colors.text : Colors.faint }} numberOfLines={1}>
-                    {row.name || 'tap to edit name'}
+                    {row.name || 'add name'}
                   </Text>
                 </TouchableOpacity>
-                <TouchableOpacity
-                  style={{ backgroundColor: Colors.surface, borderRadius: Radius.md, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: Colors.borderMid, minWidth: 72, alignItems: 'flex-end' }}
-                  onPress={() => setEditingParsedItem({ idx: i, field: 'cost', value: row.cost })}
-                >
+                <TouchableOpacity onPress={() => setEditingParsedItem({ idx: i, field: 'cost', value: row.cost })}>
                   <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 13, color: row.cost ? Colors.text : Colors.faint }}>
                     {row.cost || '0.00'}
                   </Text>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => setParsedItems(prev => prev.filter((_, idx) => idx !== i))} style={{ padding: 4 }}>
+                <TouchableOpacity onPress={() => setParsedItems(prev => prev.filter((_, idx) => idx !== i))} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                   <Ionicons name="close" size={14} color={Colors.faint} />
                 </TouchableOpacity>
               </View>
@@ -3053,41 +3080,7 @@ export default function SplitBillDetailScreen() {
         </TouchableOpacity>
       </BottomSheet>
 
-      {/* Edit parsed item field modal — MUST be last */}
-      {editingParsedItem && (
-        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32, zIndex: 9999 }}>
-          <TouchableOpacity style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} activeOpacity={1} onPress={() => setEditingParsedItem(null)} />
-          <View style={{ width: '100%', backgroundColor: Colors.white, borderRadius: 20, padding: 24, gap: 12 }}>
-            <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 13, color: Colors.muted, textTransform: 'uppercase', letterSpacing: 0.8 }}>
-              {editingParsedItem.field === 'name' ? 'item name' : 'item cost'}
-            </Text>
-            <TextInput
-              style={[s.itemFormInput, { fontSize: 18 }]}
-              value={editingParsedItem.value}
-              onChangeText={v => setEditingParsedItem(prev => prev ? { ...prev, value: v } : null)}
-              keyboardType={editingParsedItem.field === 'cost' ? 'decimal-pad' : 'default'}
-              autoFocus
-              selectTextOnFocus
-            />
-            <TouchableOpacity
-              style={[s.doneBtn, { marginTop: 0 }]}
-              onPress={() => {
-                const { idx, field, value } = editingParsedItem;
-                if (itemStep === 'parse-review') {
-                  setParsedItems(prev => prev.map((r, i) => i === idx ? { ...r, [field]: value } : r));
-                } else {
-                  setItemRows(prev => prev.map((r, i) => i === idx ? { ...r, [field]: value } : r));
-                }
-                setEditingParsedItem(null);
-              }}
-            >
-              <Text style={s.doneBtnText}>done</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
-
-      {/* Over-budget modal — MUST be last */}
+      {/* Over-budget overlay — inside Animated.View, shown above BottomSheet via zIndex */}
       {parseOverBudgetModal && (
         <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32, zIndex: 9999 }}>
           <TouchableOpacity style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} activeOpacity={1} onPress={() => setParseOverBudgetModal(false)} />
