@@ -42,32 +42,33 @@ export default function BottomSheet({ visible, onClose, sub, title, height, maxH
     if (Platform.OS !== 'web') return;
     const vv = (window as any).visualViewport;
     if (!vv) return;
-    // Capture the full screen height when no keyboard is open.
-    // window.screen.height is the physical screen height, unaffected by keyboard.
-    const fullHeight = window.screen.height;
-    naturalHeightRef.current = fullHeight;
-    setVpHeight(fullHeight);
+    // vv.height at mount is the full viewport height before any keyboard opens.
+    naturalHeightRef.current = vv.height;
+    setVpHeight(vv.height);
     const onResize = () => {
-      const diff = naturalHeightRef.current - vv.height;
-      setKeyboardOpen(diff > 100);
+      // When keyboard opens vv.height shrinks; track the max as the natural height.
+      if (vv.height > naturalHeightRef.current) {
+        naturalHeightRef.current = vv.height;
+        setVpHeight(vv.height);
+      }
+      setKeyboardOpen(naturalHeightRef.current - vv.height > 100);
     };
     vv.addEventListener('resize', onResize);
     return () => vv.removeEventListener('resize', onResize);
   }, []);
 
-  // Inject a one-time CSS rule to stop RN Web's Modal from adding overflow:hidden
-  // to the body, which causes a layout shift on the page behind the modal.
-  // overflow-y: scroll keeps the scrollbar gutter always reserved so width never changes.
+  // Prevent the layout shift (page moves left) that RN Web causes when a Modal
+  // sets overflow:hidden on the body and removes the scrollbar gutter.
+  // We compensate by padding-right with the scrollbar width before it disappears.
   useEffect(() => {
     if (Platform.OS !== 'web') return;
-    const id = 'rnw-modal-no-shift';
-    if (!document.getElementById(id)) {
-      const style = document.createElement('style');
-      style.id = id;
-      style.textContent = 'body { overflow-y: scroll !important; }';
-      document.head.appendChild(style);
+    if (!visible) return;
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+    if (scrollbarWidth > 0) {
+      document.body.style.paddingRight = `${scrollbarWidth}px`;
     }
-  }, []);
+    return () => { document.body.style.paddingRight = ''; };
+  }, [visible]);
 
   const blurAnim = useRef(new Animated.Value(0)).current;
   const [blurMounted, setBlurMounted] = useState(false);
