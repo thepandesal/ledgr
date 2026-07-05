@@ -14,6 +14,7 @@ import BottomSheet from '@/components/ui/BottomSheet';
 import ActivityTabs, { ACTIVITY_TABS, ActivityTab } from '@/components/ui/ActivityTabs';
 import { Colors, Fonts, Radius } from '@/components/ui/theme';
 import { Brand } from '../../src/lib/brand';
+import AddRecordingScreen from './add-recording';
 
 // ── Module-level pending focus date ─────────────────────────────────────────
 export let pendingFocusDate: string | null = null;
@@ -163,6 +164,8 @@ export default function SpaceDetailScreen() {
   // Delete state
   const [pendingDeleteId,   setPendingDeleteId]   = useState('');
   const [pendingDeleteName, setPendingDeleteName] = useState('');
+
+  const [showAddModal, setShowAddModal] = useState(false);
 
   // ── Ghost payment modal ────────────────────────────────────────────────────────────
   const [ghostModal, setGhostModal]       = useState(false);
@@ -850,7 +853,7 @@ export default function SpaceDetailScreen() {
           {spaceId !== 'all' && (
             <TouchableOpacity
               style={s.addBtn}
-              onPress={() => router.push({ pathname: '/(app)/add-recording', params: { spaceId, spaceName: name, defaultDate: new Date().toISOString().split('T')[0] } } as any)}
+              onPress={() => setShowAddModal(true)}
               activeOpacity={0.8}
             >
               <Ionicons name="add" size={18} color="#B6E1DE" />
@@ -996,6 +999,10 @@ export default function SpaceDetailScreen() {
           <View style={{ height: 80 }} />
         </ScrollView>
       </SafeAreaView>
+
+      {showAddModal && (
+        <AddRecordingScreen inlineProps={{ spaceId: spaceId as string, spaceName: name as string, defaultDate: new Date().toISOString().split('T')[0], onClose: () => { setShowAddModal(false); queryClient.invalidateQueries({ queryKey: ['recordings', spaceId] }); } }} />
+      )}
 
       {/* Date modal */}
       <BottomSheet visible={showDateModal} onClose={() => setShowDateModal(false)} title="date range" height={MODAL_HEIGHT}>

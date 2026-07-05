@@ -72,10 +72,18 @@ const FREQUENCIES = ['daily', 'weekly', 'monthly', 'yearly'];
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export default function AddRecordingScreen() {
-  const { spaceId, spaceName, defaultDate, editId, receiptId } =
-    useLocalSearchParams<{ spaceId: string; spaceName: string; defaultDate: string; editId: string; receiptId?: string }>();
+export default function AddRecordingScreen({ inlineProps }: {
+  inlineProps?: { spaceId: string; spaceName: string; defaultDate: string; onClose: () => void };
+}) {
+  const params = useLocalSearchParams<{ spaceId: string; spaceName: string; defaultDate: string; editId: string; receiptId?: string }>();
   const router = useRouter();
+
+  const spaceId   = inlineProps?.spaceId   ?? params.spaceId;
+  const spaceName = inlineProps?.spaceName ?? params.spaceName;
+  const defaultDate = inlineProps?.defaultDate ?? params.defaultDate;
+  const editId    = params.editId;
+  const receiptId = params.receiptId;
+  const handleClose = inlineProps?.onClose ?? (() => router.back());
 
   // ── Form state ──────────────────────────────────────────────────────────
   const [recName, setRecName]   = useState('');
@@ -281,7 +289,7 @@ export default function AddRecordingScreen() {
         });
         if (err) throw err;
         setPendingFocusDate(loanStartDate);
-        router.back();
+        handleClose();
         return;
       }
 
@@ -327,7 +335,7 @@ export default function AddRecordingScreen() {
           });
           if (recErr) throw recErr;
           setPendingFocusDate(date);
-          router.back();
+          handleClose();
           return;
         }
         const { data: newRec, error: err } = await supabase.from('recordings').insert({
@@ -388,7 +396,7 @@ export default function AddRecordingScreen() {
       }
 
       setPendingFocusDate(date);
-      router.back();
+      handleClose();
     } catch (e: any) {
       setError(e.message);
       setLoading(false);
@@ -414,8 +422,8 @@ export default function AddRecordingScreen() {
   // ─── Render ─────────────────────────────────────────────────────────────
 
   return (
-    <Modal visible animationType="fade" transparent onRequestClose={() => router.back()}>
-      <TouchableOpacity style={s.backdrop} activeOpacity={1} onPress={() => router.back()} />
+    <Modal visible animationType="fade" transparent onRequestClose={handleClose}>
+      <TouchableOpacity style={s.backdrop} activeOpacity={1} onPress={handleClose} />
       <View style={s.centeredWrap} pointerEvents="box-none">
       <View style={s.card}>
           {/* Header */}
@@ -424,7 +432,7 @@ export default function AddRecordingScreen() {
               {spaceName ? <Text style={formStyles.headerSub}>{spaceName.toLowerCase()}</Text> : null}
               <Text style={formStyles.headerTitle}>{editId ? 'edit recording' : 'new recording'}</Text>
             </View>
-            <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <TouchableOpacity onPress={handleClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <Ionicons name="close" size={20} color="#929090" />
             </TouchableOpacity>
           </View>
