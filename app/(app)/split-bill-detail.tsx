@@ -2240,15 +2240,31 @@ export default function SplitBillDetailScreen() {
             {(() => {
               const parsedSum = parsedItems.reduce((s, r) => s + (parseFloat(r.cost || '0') || 0), 0);
               const recTotal = Number(selectedRecording?.amount_contributed ?? 0);
+              const alreadyUsed = items
+                .filter((i: any) => i.recording_id === selectedRecording?.recording?.id)
+                .reduce((s: number, i: any) => s + Number(i.cost), 0);
+              const totalWithExisting = alreadyUsed + parsedSum;
               const diff = parsedTotal ? Math.abs(parsedSum - parsedTotal) : null;
-              const overRec = recTotal > 0 && parsedSum > recTotal + 0.01;
+              const overRec = recTotal > 0 && totalWithExisting > recTotal + 0.01;
               return (
                 <View style={{ backgroundColor: Colors.surface, borderRadius: Radius.md, padding: 12, marginBottom: 16, gap: 6 }}>
                   <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 4 }}>totals check</Text>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                    <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: Colors.muted }}>items sum</Text>
+                    <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: Colors.muted }}>new items sum</Text>
                     <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 11, color: Colors.text }}>{fmt(parsedSum)}</Text>
                   </View>
+                  {alreadyUsed > 0 && (
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                      <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: Colors.muted }}>already allocated</Text>
+                      <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 11, color: Colors.muted }}>{fmt(alreadyUsed)}</Text>
+                    </View>
+                  )}
+                  {alreadyUsed > 0 && (
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                      <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: Colors.muted }}>total after save</Text>
+                      <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 11, color: overRec ? Colors.expense : Colors.text }}>{fmt(totalWithExisting)}</Text>
+                    </View>
+                  )}
                   {parsedTotal ? (
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                       <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: Colors.muted }}>receipt total</Text>
@@ -2266,6 +2282,9 @@ export default function SplitBillDetailScreen() {
                   ) : parsedTotal ? (
                     <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: ACCENT_DARK, marginTop: 2 }}>✓ items match receipt total</Text>
                   ) : null}
+                  {overRec && (
+                    <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: Colors.expense, marginTop: 2 }}>⚠ total exceeds recording amount</Text>
+                  )}
                 </View>
               );
             })()}

@@ -422,6 +422,7 @@ export default function SplitShareSlugPage() {
 
       <Modal visible={receiptModal} transparent animationType="slide" onRequestClose={() => setReceiptModal(false)}>
         <BlurView intensity={60} tint="dark" style={s.overlay}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setReceiptModal(false)} />
           <TouchableOpacity style={{ position: 'absolute', top: 56, right: 24, zIndex: 10 }} onPress={() => setReceiptModal(false)}>
             <Ionicons name="close" size={26} color="#fff" />
           </TouchableOpacity>
