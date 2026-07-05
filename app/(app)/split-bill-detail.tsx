@@ -2180,20 +2180,25 @@ export default function SplitBillDetailScreen() {
                 </ScrollView>
                 {/* Inline enlarge — renders inside BottomSheet so it stacks correctly */}
                 {parseEnlargeModal && parseReceiptPhotos[parsePhotoIndex] && (
-                  <TouchableOpacity
-                    style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center', alignItems: 'center', zIndex: 999 }}
-                    activeOpacity={1}
-                    onPress={() => setParseEnlargeModal(false)}
-                  >
-                    <TouchableOpacity style={{ position: 'absolute', top: 12, right: 12 }} onPress={() => setParseEnlargeModal(false)}>
-                      <Ionicons name="close" size={24} color="#fff" />
-                    </TouchableOpacity>
+                  <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center', alignItems: 'center', zIndex: 999 }}>
+                    <TouchableOpacity
+                      style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+                      activeOpacity={1}
+                      onPress={() => setParseEnlargeModal(false)}
+                    />
                     <Image
                       source={{ uri: parseReceiptPhotos[parsePhotoIndex].url }}
                       style={{ width: '100%', height: '90%', borderRadius: 8 }}
                       resizeMode="contain"
                     />
-                  </TouchableOpacity>
+                    <TouchableOpacity
+                      style={{ position: 'absolute', top: 12, right: 12, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 20, padding: 6, zIndex: 1000 }}
+                      onPress={() => setParseEnlargeModal(false)}
+                      hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                    >
+                      <Ionicons name="close" size={20} color="#fff" />
+                    </TouchableOpacity>
+                  </View>
                 )}
               </>
             )}
