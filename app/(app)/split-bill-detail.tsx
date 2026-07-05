@@ -3054,24 +3054,24 @@ export default function SplitBillDetailScreen() {
       </BottomSheet>
 
       {/* Edit parsed item field modal — MUST be last */}
-      <Modal visible={!!editingParsedItem} transparent animationType="fade" onRequestClose={() => setEditingParsedItem(null)}>
-        <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32 }} activeOpacity={1} onPress={() => setEditingParsedItem(null)}>
-          <TouchableOpacity activeOpacity={1} style={{ width: '100%', backgroundColor: Colors.white, borderRadius: 20, padding: 24, gap: 12 }}>
+      {editingParsedItem && (
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32, zIndex: 9999 }}>
+          <TouchableOpacity style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} activeOpacity={1} onPress={() => setEditingParsedItem(null)} />
+          <View style={{ width: '100%', backgroundColor: Colors.white, borderRadius: 20, padding: 24, gap: 12 }}>
             <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 13, color: Colors.muted, textTransform: 'uppercase', letterSpacing: 0.8 }}>
-              {editingParsedItem?.field === 'name' ? 'item name' : 'item cost'}
+              {editingParsedItem.field === 'name' ? 'item name' : 'item cost'}
             </Text>
             <TextInput
               style={[s.itemFormInput, { fontSize: 18 }]}
-              value={editingParsedItem?.value ?? ''}
+              value={editingParsedItem.value}
               onChangeText={v => setEditingParsedItem(prev => prev ? { ...prev, value: v } : null)}
-              keyboardType={editingParsedItem?.field === 'cost' ? 'decimal-pad' : 'default'}
+              keyboardType={editingParsedItem.field === 'cost' ? 'decimal-pad' : 'default'}
               autoFocus
               selectTextOnFocus
             />
             <TouchableOpacity
               style={[s.doneBtn, { marginTop: 0 }]}
               onPress={() => {
-                if (!editingParsedItem) return;
                 const { idx, field, value } = editingParsedItem;
                 if (itemStep === 'parse-review') {
                   setParsedItems(prev => prev.map((r, i) => i === idx ? { ...r, [field]: value } : r));
@@ -3083,14 +3083,15 @@ export default function SplitBillDetailScreen() {
             >
               <Text style={s.doneBtnText}>done</Text>
             </TouchableOpacity>
-          </TouchableOpacity>
-        </TouchableOpacity>
-      </Modal>
+          </View>
+        </View>
+      )}
 
       {/* Over-budget modal — MUST be last */}
-      <Modal visible={parseOverBudgetModal} transparent animationType="fade" onRequestClose={() => setParseOverBudgetModal(false)}>
-        <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32 }} activeOpacity={1} onPress={() => setParseOverBudgetModal(false)}>
-          <TouchableOpacity activeOpacity={1} style={{ width: '100%', backgroundColor: Colors.white, borderRadius: 20, padding: 24, gap: 12 }}>
+      {parseOverBudgetModal && (
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32, zIndex: 9999 }}>
+          <TouchableOpacity style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} activeOpacity={1} onPress={() => setParseOverBudgetModal(false)} />
+          <View style={{ width: '100%', backgroundColor: Colors.white, borderRadius: 20, padding: 24, gap: 12 }}>
             <Text style={{ fontFamily: Brand.font.display, fontSize: 20, color: Colors.text }}>items over budget</Text>
             <Text style={{ fontFamily: Brand.font.mono, fontSize: 13, color: Colors.muted }}>
               the sum of items exceeds the recording amount. please reduce item costs before saving.
@@ -3098,9 +3099,9 @@ export default function SplitBillDetailScreen() {
             <TouchableOpacity style={[s.doneBtn, { marginTop: 0 }]} onPress={() => setParseOverBudgetModal(false)}>
               <Text style={s.doneBtnText}>ok, i'll fix it</Text>
             </TouchableOpacity>
-          </TouchableOpacity>
-        </TouchableOpacity>
-      </Modal>
+          </View>
+        </View>
+      )}
 
     </Animated.View>
   );
