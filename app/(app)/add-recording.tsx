@@ -443,7 +443,7 @@ export default function AddRecordingScreen() {
               <Ionicons name="close" size={20} color="#929090" />
             </TouchableOpacity>
           </View>
-          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" contentContainerStyle={{ paddingBottom: Platform.OS === 'web' ? 120 : 32, gap: 8 }} style={{ flex: 1 }}>
+          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" contentContainerStyle={{ paddingBottom: Platform.OS === 'web' && keyboardHeight > 0 ? 120 : 32, gap: 8 }} style={{ flex: 1 }}>
 
       {/* ── Receipt reference carousel ── */}
       {receiptPhotos.length > 0 && (

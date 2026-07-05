@@ -96,7 +96,7 @@ export default function BottomSheet({ visible, onClose, sub, title, height, maxH
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
               keyboardDismissMode="interactive"
-              contentContainerStyle={s.content}
+              contentContainerStyle={[s.content, Platform.OS === 'web' && keyboardHeight > 0 && { paddingBottom: 120 }]}
             >
               {children}
             </ScrollView>
@@ -111,7 +111,7 @@ export default function BottomSheet({ visible, onClose, sub, title, height, maxH
 const s = StyleSheet.create({
   flex:    { flex: 1 },
   justify: { justifyContent: 'flex-end' },
-  content: { paddingBottom: Platform.OS === 'web' ? 120 : 16 },
+  content: { paddingBottom: 16 },
   blur: {
     ...StyleSheet.absoluteFillObject,
     backdropFilter: 'blur(8px)',
