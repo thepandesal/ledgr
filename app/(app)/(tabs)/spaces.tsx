@@ -456,10 +456,12 @@ export default function SpacesScreen() {
     await supabase.from('space_members').update({ status: accept ? 'accepted' : 'declined' }).eq('id', id);
     refetchInvites();
     queryClient.invalidateQueries({ queryKey: ['shared-spaces', userId] });
+    queryClient.invalidateQueries({ queryKey: ['pending-space-invites', userId] });
     setRespondingInvite(null);
   };
   const { data: sharedSpaces = [] } = useQuery<(SpaceData & { role: string; ownerName: string })[]>({
     queryKey: ['shared-spaces', userId],
+    staleTime: 0,
     queryFn: async () => {
       const { data: members } = await supabase
         .from('space_members')
