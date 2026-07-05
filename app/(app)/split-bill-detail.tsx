@@ -1972,23 +1972,14 @@ export default function SplitBillDetailScreen() {
               ))}
             </View>
             {itemRows.map((row, i) => (
-              <View key={i} style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
-                <TextInput
-                  style={[s.itemFormInput, { flex: 1 }]}
-                  placeholder="item name"
-                  placeholderTextColor={Colors.faint}
-                  value={row.name}
-                  onChangeText={v => setItemRows(prev => prev.map((r, idx) => idx === i ? { ...r, name: v } : r))}
-                  autoFocus={i === 0}
-                />
-                <TextInput
-                  style={[s.itemFormInput, { width: 90, textAlign: 'right' }]}
-                  placeholder="0.00"
-                  placeholderTextColor={Colors.faint}
-                  value={row.cost}
-                  onChangeText={v => setItemRows(prev => prev.map((r, idx) => idx === i ? { ...r, cost: v } : r))}
-                  keyboardType="decimal-pad"
-                />
+              <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.border }}>
+                <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: ACCENT_DARK, backgroundColor: ACCENT + '44', width: 20, height: 20, borderRadius: 10, textAlign: 'center', lineHeight: 20 }}>{i + 1}</Text>
+                <TouchableOpacity style={{ flex: 1, backgroundColor: Colors.surface, borderRadius: Radius.md, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: Colors.borderMid }} onPress={() => setEditingParsedItem({ idx: i, field: 'name', value: row.name })}>
+                  <Text style={{ fontFamily: Brand.font.mono, fontSize: 13, color: row.name ? Colors.text : Colors.faint }} numberOfLines={1}>{row.name || 'tap to set name'}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={{ backgroundColor: Colors.surface, borderRadius: Radius.md, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: Colors.borderMid, minWidth: 72, alignItems: 'flex-end' }} onPress={() => setEditingParsedItem({ idx: i, field: 'cost', value: row.cost })}>
+                  <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 13, color: row.cost ? Colors.text : Colors.faint }}>{row.cost || '0.00'}</Text>
+                </TouchableOpacity>
                 {itemRows.length > 1 && (
                   <TouchableOpacity onPress={() => setItemRows(prev => prev.filter((_, idx) => idx !== i))} style={{ justifyContent: 'center', padding: 4 }}>
                     <Ionicons name="close" size={14} color={Colors.faint} />
@@ -2069,29 +2060,20 @@ export default function SplitBillDetailScreen() {
               const runningTotal = itemRows.slice(0, i + 1).reduce((s, r) => s + parseFloat(r.cost || '0'), 0);
               const rowOver = recTotal > 0 && alreadyUsed + runningTotal > recTotal + 0.01;
               return (
-              <View key={i} style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
-                <TextInput
-                  style={[s.itemFormInput, { flex: 1 }]}
-                  placeholder="item name"
-                  placeholderTextColor={Colors.faint}
-                  value={row.name}
-                  onChangeText={v => setItemRows(prev => prev.map((r, idx) => idx === i ? { ...r, name: v } : r))}
-                  autoFocus={i === 0}
-                />
-                <TextInput
-                  style={[s.itemFormInput, { width: 90, textAlign: 'right', color: rowOver ? Colors.expense : Colors.text }]}
-                  placeholder="0.00"
-                  placeholderTextColor={Colors.faint}
-                  value={row.cost}
-                  onChangeText={v => setItemRows(prev => prev.map((r, idx) => idx === i ? { ...r, cost: v } : r))}
-                  keyboardType="decimal-pad"
-                />
-                {itemRows.length > 1 && (
-                  <TouchableOpacity onPress={() => setItemRows(prev => prev.filter((_, idx) => idx !== i))} style={{ justifyContent: 'center', padding: 4 }}>
-                    <Ionicons name="close" size={14} color={Colors.faint} />
+                <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.border }}>
+                  <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: ACCENT_DARK, backgroundColor: ACCENT + '44', width: 20, height: 20, borderRadius: 10, textAlign: 'center', lineHeight: 20 }}>{i + 1}</Text>
+                  <TouchableOpacity style={{ flex: 1, backgroundColor: Colors.surface, borderRadius: Radius.md, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: Colors.borderMid }} onPress={() => setEditingParsedItem({ idx: i, field: 'name', value: row.name })}>
+                    <Text style={{ fontFamily: Brand.font.mono, fontSize: 13, color: row.name ? Colors.text : Colors.faint }} numberOfLines={1}>{row.name || 'tap to set name'}</Text>
                   </TouchableOpacity>
-                )}
-              </View>
+                  <TouchableOpacity style={{ backgroundColor: Colors.surface, borderRadius: Radius.md, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: rowOver ? Colors.expense : Colors.borderMid, minWidth: 72, alignItems: 'flex-end' }} onPress={() => setEditingParsedItem({ idx: i, field: 'cost', value: row.cost })}>
+                    <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 13, color: rowOver ? Colors.expense : row.cost ? Colors.text : Colors.faint }}>{row.cost || '0.00'}</Text>
+                  </TouchableOpacity>
+                  {itemRows.length > 1 && (
+                    <TouchableOpacity onPress={() => setItemRows(prev => prev.filter((_, idx) => idx !== i))} style={{ justifyContent: 'center', padding: 4 }}>
+                      <Ionicons name="close" size={14} color={Colors.faint} />
+                    </TouchableOpacity>
+                  )}
+                </View>
               );
             })}
             <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 8 }} onPress={() => setItemRows(prev => [...prev, { name: '', cost: '' }])}>
@@ -2188,7 +2170,7 @@ export default function SplitBillDetailScreen() {
                 <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8 }}>receipt</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }} style={{ marginBottom: 16 }}>
                   {parseReceiptPhotos.map((p, idx) => (
-                    <TouchableOpacity key={p.id} onPress={() => { setParsePhotoIndex(idx); setParseEnlargeModal(true); }} activeOpacity={0.85}>
+                    <TouchableOpacity key={p.id} onPress={() => setParsePhotoIndex(idx === parsePhotoIndex && parseEnlargeModal ? -1 : idx) || setParseEnlargeModal(true)} activeOpacity={0.85}>
                       <Image source={{ uri: p.url }} style={{ width: 100, height: 100, borderRadius: Radius.md, backgroundColor: Colors.surface }} resizeMode="cover" />
                       <View style={{ position: 'absolute', bottom: 4, right: 4, backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 4, padding: 2 }}>
                         <Ionicons name="expand-outline" size={10} color="#fff" />
@@ -2196,6 +2178,23 @@ export default function SplitBillDetailScreen() {
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
+                {/* Inline enlarge — renders inside BottomSheet so it stacks correctly */}
+                {parseEnlargeModal && parseReceiptPhotos[parsePhotoIndex] && (
+                  <TouchableOpacity
+                    style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center', alignItems: 'center', zIndex: 999 }}
+                    activeOpacity={1}
+                    onPress={() => setParseEnlargeModal(false)}
+                  >
+                    <TouchableOpacity style={{ position: 'absolute', top: 12, right: 12 }} onPress={() => setParseEnlargeModal(false)}>
+                      <Ionicons name="close" size={24} color="#fff" />
+                    </TouchableOpacity>
+                    <Image
+                      source={{ uri: parseReceiptPhotos[parsePhotoIndex].url }}
+                      style={{ width: '100%', height: '90%', borderRadius: 8 }}
+                      resizeMode="contain"
+                    />
+                  </TouchableOpacity>
+                )}
               </>
             )}
 
@@ -3049,22 +3048,6 @@ export default function SplitBillDetailScreen() {
         </TouchableOpacity>
       </BottomSheet>
 
-      {/* Receipt enlarge modal — MUST be last so it renders above all BottomSheets */}
-      <Modal visible={parseEnlargeModal} transparent animationType="fade" onRequestClose={() => setParseEnlargeModal(false)}>
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.97)', justifyContent: 'center', alignItems: 'center' }}>
-          <TouchableOpacity style={{ position: 'absolute', top: 52, right: 24, zIndex: 10 }} onPress={() => setParseEnlargeModal(false)}>
-            <Ionicons name="close" size={26} color="#fff" />
-          </TouchableOpacity>
-          {parseReceiptPhotos[parsePhotoIndex] && (
-            <Image
-              source={{ uri: parseReceiptPhotos[parsePhotoIndex].url }}
-              style={{ width: '90%', height: '80%', borderRadius: 12 }}
-              resizeMode="contain"
-            />
-          )}
-        </View>
-      </Modal>
-
       {/* Edit parsed item field modal — MUST be last */}
       <Modal visible={!!editingParsedItem} transparent animationType="fade" onRequestClose={() => setEditingParsedItem(null)}>
         <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32 }} activeOpacity={1} onPress={() => setEditingParsedItem(null)}>
@@ -3085,7 +3068,11 @@ export default function SplitBillDetailScreen() {
               onPress={() => {
                 if (!editingParsedItem) return;
                 const { idx, field, value } = editingParsedItem;
-                setParsedItems(prev => prev.map((r, i) => i === idx ? { ...r, [field]: value } : r));
+                if (itemStep === 'parse-review') {
+                  setParsedItems(prev => prev.map((r, i) => i === idx ? { ...r, [field]: value } : r));
+                } else {
+                  setItemRows(prev => prev.map((r, i) => i === idx ? { ...r, [field]: value } : r));
+                }
                 setEditingParsedItem(null);
               }}
             >
