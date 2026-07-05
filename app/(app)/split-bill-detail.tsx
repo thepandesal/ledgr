@@ -330,6 +330,8 @@ export default function SplitBillDetailScreen() {
   const [parseEnlargeModal, setParseEnlargeModal]   = useState(false);
   const [parseLoading, setParseLoading]             = useState(false);
   const [parseError, setParseError]                 = useState('');
+  const [parseOverBudgetModal, setParseOverBudgetModal] = useState(false);
+  const [editingParsedItem, setEditingParsedItem]   = useState<{ idx: number; field: 'name' | 'cost'; value: string } | null>(null);
 
   // assign-people sheet (tap an existing item)
   const [assignItem, setAssignItem]   = useState<any>(null);
@@ -478,7 +480,7 @@ export default function SplitBillDetailScreen() {
       .filter((i: any) => i.recording_id === selectedRecording?.recording?.id)
       .reduce((s: number, i: any) => s + Number(i.cost), 0);
     const newTotal = valid.reduce((s, r) => s + parseFloat(r.cost || '0'), 0);
-    if (recTotal > 0 && alreadyUsed + newTotal > recTotal + 0.01) return;
+    if (recTotal > 0 && alreadyUsed + newTotal > recTotal + 0.01) { setParseOverBudgetModal(true); return; }
     setSavingItem(true);
     const recType = selectedRecording?.recording?.type ?? 'expense';
     await supabase.from('split_items').insert(
@@ -2231,26 +2233,28 @@ export default function SplitBillDetailScreen() {
               );
             })()}
 
-            {/* Editable parsed items */}
-            <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8 }}>parsed items — edit if needed</Text>
+            {/* Editable parsed items — tap badges to edit */}
+            <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8 }}>parsed items — tap to edit</Text>
             {parsedItems.map((row, i) => (
-              <View key={i} style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
-                <TextInput
-                  style={[s.itemFormInput, { flex: 1 }]}
-                  value={row.name}
-                  onChangeText={v => setParsedItems(prev => prev.map((r, idx) => idx === i ? { ...r, name: v } : r))}
-                  placeholder="item name"
-                  placeholderTextColor={Colors.faint}
-                />
-                <TextInput
-                  style={[s.itemFormInput, { width: 90, textAlign: 'right' }]}
-                  value={row.cost}
-                  onChangeText={v => setParsedItems(prev => prev.map((r, idx) => idx === i ? { ...r, cost: v } : r))}
-                  keyboardType="decimal-pad"
-                  placeholder="0.00"
-                  placeholderTextColor={Colors.faint}
-                />
-                <TouchableOpacity onPress={() => setParsedItems(prev => prev.filter((_, idx) => idx !== i))} style={{ justifyContent: 'center', padding: 4 }}>
+              <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.border }}>
+                <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: ACCENT_DARK, backgroundColor: ACCENT + '44', width: 20, height: 20, borderRadius: 10, textAlign: 'center', lineHeight: 20 }}>{i + 1}</Text>
+                <TouchableOpacity
+                  style={{ flex: 1, backgroundColor: Colors.surface, borderRadius: Radius.md, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: Colors.borderMid }}
+                  onPress={() => setEditingParsedItem({ idx: i, field: 'name', value: row.name })}
+                >
+                  <Text style={{ fontFamily: Brand.font.mono, fontSize: 13, color: row.name ? Colors.text : Colors.faint }} numberOfLines={1}>
+                    {row.name || 'tap to edit name'}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={{ backgroundColor: Colors.surface, borderRadius: Radius.md, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: Colors.borderMid, minWidth: 72, alignItems: 'flex-end' }}
+                  onPress={() => setEditingParsedItem({ idx: i, field: 'cost', value: row.cost })}
+                >
+                  <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 13, color: row.cost ? Colors.text : Colors.faint }}>
+                    {row.cost || '0.00'}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => setParsedItems(prev => prev.filter((_, idx) => idx !== i))} style={{ padding: 4 }}>
                   <Ionicons name="close" size={14} color={Colors.faint} />
                 </TouchableOpacity>
               </View>
@@ -2264,7 +2268,7 @@ export default function SplitBillDetailScreen() {
                 <Text style={[s.doneBtnText, { color: Colors.muted }]}>back</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[s.doneBtn, { flex: 2, marginTop: 0, opacity: savingItem || !parsedItems.some(r => r.name.trim() && r.cost) ? 0.4 : 1 }]}
+                style={[s.doneBtn, { flex: 2, marginTop: 0, opacity: savingItem || !parsedItems.some(r => r.name.trim() && r.cost) || (() => { const recTotal = Number(selectedRecording?.amount_contributed ?? 0); const alreadyUsed = items.filter((i: any) => i.recording_id === selectedRecording?.recording?.id).reduce((s: number, i: any) => s + Number(i.cost), 0); const newTotal = parsedItems.reduce((s, r) => s + parseFloat(r.cost || '0'), 0); return recTotal > 0 && alreadyUsed + newTotal > recTotal + 0.01; })() ? 0.4 : 1 }]}
                 onPress={saveParsedItems}
                 disabled={savingItem || !parsedItems.some(r => r.name.trim() && r.cost)}
               >
@@ -2275,9 +2279,9 @@ export default function SplitBillDetailScreen() {
         ) : null}
       </BottomSheet>
 
-      {/* Receipt enlarge modal */}
+      {/* Receipt enlarge modal — rendered at top level with high zIndex so it appears above BottomSheet */}
       <Modal visible={parseEnlargeModal} transparent animationType="fade" onRequestClose={() => setParseEnlargeModal(false)}>
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center', alignItems: 'center' }}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.97)', justifyContent: 'center', alignItems: 'center', zIndex: 9999 }}>
           <TouchableOpacity style={{ position: 'absolute', top: 52, right: 24, zIndex: 10 }} onPress={() => setParseEnlargeModal(false)}>
             <Ionicons name="close" size={26} color="#fff" />
           </TouchableOpacity>
@@ -2289,6 +2293,51 @@ export default function SplitBillDetailScreen() {
             />
           )}
         </View>
+      </Modal>
+
+      {/* Edit parsed item field modal */}
+      <Modal visible={!!editingParsedItem} transparent animationType="fade" onRequestClose={() => setEditingParsedItem(null)}>
+        <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32 }} activeOpacity={1} onPress={() => setEditingParsedItem(null)}>
+          <TouchableOpacity activeOpacity={1} style={{ width: '100%', backgroundColor: Colors.white, borderRadius: 20, padding: 24, gap: 12 }}>
+            <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 13, color: Colors.muted, textTransform: 'uppercase', letterSpacing: 0.8 }}>
+              {editingParsedItem?.field === 'name' ? 'item name' : 'item cost'}
+            </Text>
+            <TextInput
+              style={[s.itemFormInput, { fontSize: 18 }]}
+              value={editingParsedItem?.value ?? ''}
+              onChangeText={v => setEditingParsedItem(prev => prev ? { ...prev, value: v } : null)}
+              keyboardType={editingParsedItem?.field === 'cost' ? 'decimal-pad' : 'default'}
+              autoFocus
+              selectTextOnFocus
+            />
+            <TouchableOpacity
+              style={[s.doneBtn, { marginTop: 0 }]}
+              onPress={() => {
+                if (!editingParsedItem) return;
+                const { idx, field, value } = editingParsedItem;
+                setParsedItems(prev => prev.map((r, i) => i === idx ? { ...r, [field]: value } : r));
+                setEditingParsedItem(null);
+              }}
+            >
+              <Text style={s.doneBtnText}>done</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Over-budget modal */}
+      <Modal visible={parseOverBudgetModal} transparent animationType="fade" onRequestClose={() => setParseOverBudgetModal(false)}>
+        <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32 }} activeOpacity={1} onPress={() => setParseOverBudgetModal(false)}>
+          <TouchableOpacity activeOpacity={1} style={{ width: '100%', backgroundColor: Colors.white, borderRadius: 20, padding: 24, gap: 12 }}>
+            <Text style={{ fontFamily: Brand.font.display, fontSize: 20, color: Colors.text }}>items over budget</Text>
+            <Text style={{ fontFamily: Brand.font.mono, fontSize: 13, color: Colors.muted }}>
+              the sum of items exceeds the recording amount. please reduce item costs before saving.
+            </Text>
+            <TouchableOpacity style={[s.doneBtn, { marginTop: 0 }]} onPress={() => setParseOverBudgetModal(false)}>
+              <Text style={s.doneBtnText}>ok, i'll fix it</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
       </Modal>
       <BottomSheet visible={!!assignItem} onClose={() => setAssignItem(null)} title="assign people">
         {assignItem && (() => {
