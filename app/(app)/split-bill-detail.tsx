@@ -332,6 +332,7 @@ export default function SplitBillDetailScreen() {
   const [parseError, setParseError]                 = useState('');
   const [parseOverBudgetModal, setParseOverBudgetModal] = useState(false);
   const [editingParsedItem, setEditingParsedItem]   = useState<{ idx: number; field: 'name' | 'cost'; value: string } | null>(null);
+  const [editingExistingItem, setEditingExistingItem] = useState<{ item: any; field: 'name' | 'cost'; value: string } | null>(null);
 
   // assign-people sheet (tap an existing item)
   const [assignItem, setAssignItem]   = useState<any>(null);
@@ -555,6 +556,14 @@ export default function SplitBillDetailScreen() {
 
   const deleteItem = async (id: string) => {
     await supabase.from('split_items').delete().eq('id', id);
+    refetchItems();
+  };
+
+  const saveExistingItem = async () => {
+    if (!editingExistingItem) return;
+    const { item, field, value } = editingExistingItem;
+    await supabase.from('split_items').update({ [field]: field === 'cost' ? parseFloat(value) || 0 : value.trim() }).eq('id', item.id);
+    setEditingExistingItem(null);
     refetchItems();
   };
 
@@ -1926,31 +1935,44 @@ export default function SplitBillDetailScreen() {
       {/* Add item modal */}
       <BottomSheet visible={addItemModal} onClose={() => { setAddItemModal(false); setEditingParsedItem(null); }} title="add items" maxHeight="65%">
         {/* Edit field overlay — inside BottomSheet so it renders above it */}
-        {editingParsedItem && (
+        {(editingParsedItem || editingExistingItem) && (
           <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24, zIndex: 999 }}>
-            <TouchableOpacity style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} activeOpacity={1} onPress={() => setEditingParsedItem(null)} />
+            <TouchableOpacity style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} activeOpacity={1} onPress={() => { setEditingParsedItem(null); setEditingExistingItem(null); }} />
             <View style={{ width: '100%', backgroundColor: Colors.white, borderRadius: 20, padding: 24, gap: 12 }}>
               <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 11, color: Colors.muted, textTransform: 'uppercase', letterSpacing: 0.8 }}>
-                {editingParsedItem.field === 'name' ? 'item name' : 'item cost'}
+                {(editingParsedItem?.field ?? editingExistingItem?.field) === 'name' ? 'item name' : 'item cost'}
               </Text>
               <TextInput
                 style={[s.itemFormInput, { fontSize: 16 }]}
-                value={editingParsedItem.value}
-                onChangeText={v => setEditingParsedItem(prev => prev ? { ...prev, value: v } : null)}
-                keyboardType={editingParsedItem.field === 'cost' ? 'decimal-pad' : 'default'}
+                value={editingParsedItem?.value ?? editingExistingItem?.value ?? ''}
+                onChangeText={v => {
+                  if (editingParsedItem) setEditingParsedItem(prev => prev ? { ...prev, value: v } : null);
+                  else setEditingExistingItem(prev => prev ? { ...prev, value: v } : null);
+                }}
+                keyboardType={(editingParsedItem?.field ?? editingExistingItem?.field) === 'cost' ? 'decimal-pad' : 'default'}
                 autoFocus
                 selectTextOnFocus
               />
               <TouchableOpacity
                 style={[s.doneBtn, { marginTop: 0 }]}
-                onPress={() => {
-                  const { idx, field, value } = editingParsedItem;
-                  if (itemStep === 'parse-review') {
-                    setParsedItems(prev => prev.map((r, i) => i === idx ? { ...r, [field]: value } : r));
-                  } else {
-                    setItemRows(prev => prev.map((r, i) => i === idx ? { ...r, [field]: value } : r));
+                onPress={async () => {
+                  if (editingParsedItem) {
+                    const { idx, field, value } = editingParsedItem;
+                    if (itemStep === 'parse-review') {
+                      setParsedItems(prev => prev.map((r, i) => i === idx ? { ...r, [field]: value } : r));
+                    } else {
+                      setItemRows(prev => prev.map((r, i) => i === idx ? { ...r, [field]: value } : r));
+                    }
+                    setEditingParsedItem(null);
+                  } else if (editingExistingItem) {
+                    const { item, field, value } = editingExistingItem;
+                    const update = field === 'cost'
+                      ? { cost: parseFloat(value) || 0 }
+                      : { name: value.trim() };
+                    await supabase.from('split_items').update(update).eq('id', item.id);
+                    refetchItems();
+                    setEditingExistingItem(null);
                   }
-                  setEditingParsedItem(null);
                 }}
               >
                 <Text style={s.doneBtnText}>done</Text>
@@ -2071,8 +2093,15 @@ export default function SplitBillDetailScreen() {
                   {existing.map((item: any, i: number) => (
                     <View key={item.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: Colors.border }}>
                       <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: ACCENT_DARK, backgroundColor: ACCENT + '44', width: 20, height: 20, borderRadius: 10, textAlign: 'center', lineHeight: 20 }}>{i + 1}</Text>
-                      <Text style={{ flex: 1, fontFamily: Brand.font.mono, fontSize: 13, color: Colors.muted }} numberOfLines={1}>{item.name}</Text>
-                      <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 13, color: Colors.muted }}>{fmt(Number(item.cost))}</Text>
+                      <TouchableOpacity style={{ flex: 1 }} onPress={() => setEditingExistingItem({ item, field: 'name', value: item.name })}>
+                        <Text style={{ fontFamily: Brand.font.mono, fontSize: 13, color: Colors.text }} numberOfLines={1}>{item.name}</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => setEditingExistingItem({ item, field: 'cost', value: String(item.cost) })}>
+                        <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 13, color: Colors.text }}>{fmt(Number(item.cost))}</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => deleteItem(item.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                        <Ionicons name="close" size={14} color={Colors.faint} />
+                      </TouchableOpacity>
                     </View>
                   ))}
                 </View>
