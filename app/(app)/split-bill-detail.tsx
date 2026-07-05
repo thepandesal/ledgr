@@ -764,7 +764,6 @@ export default function SplitBillDetailScreen() {
       const html = `<!DOCTYPE html><html><head><meta charset="utf-8">`+
         `<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#fff;padding:32px;width:480px}</style>`+
         `</head><body>`+
-        `<div style="font-family:monospace;font-size:13px;font-weight:700;color:#2A7A6F;letter-spacing:1px;margin-bottom:16px">LEDGR</div>`+
         `<div style="font-size:30px;font-weight:600;color:#425252;letter-spacing:-0.5px;margin-bottom:4px">${String(name).toLowerCase()}</div>`+
         `<div style="font-family:monospace;font-size:12px;color:#929090;margin-bottom:20px">${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>`+
         sectionLabel('per person pay') + block(personRowsHtml + totalRowHtml) +
