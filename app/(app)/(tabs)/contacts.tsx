@@ -128,6 +128,38 @@ export default function ContactsScreen() {
     queryClient.invalidateQueries({ queryKey: ['friend-requests-outgoing', userId] });
   };
 
+  // ── Outgoing pending requests ──────────────────────────────────────────────
+  const { data: outgoing = [] } = useQuery<{ id: string; receiver_name: string; receiver_code: string }[]>({
+    queryKey: ['friend-requests-outgoing', userId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('friendships')
+        .select('id, receiver_id')
+        .eq('requester_id', userId)
+        .eq('status', 'pending');
+      if (!data || data.length === 0) return [];
+      const ids = data.map((r: any) => r.receiver_id);
+      const { data: settings } = await supabase
+        .from('user_settings').select('user_id, profile_code').in('user_id', ids);
+      const names = await Promise.all(
+        ids.map((id: string) =>
+          supabase.rpc('get_user_display_name', { user_id: id }).then(({ data: n }) => ({ id, name: n ?? 'unknown' }))
+        )
+      );
+      return data.map((r: any) => {
+        const setting = (settings ?? []).find((s: any) => s.user_id === r.receiver_id);
+        const nameRow = names.find((n: any) => n.id === r.receiver_id);
+        return { id: r.id, receiver_name: nameRow?.name ?? 'unknown', receiver_code: setting?.profile_code ?? '' };
+      });
+    },
+    enabled: !!userId,
+  });
+
+  const cancelRequest = async (id: string) => {
+    await supabase.from('friendships').delete().eq('id', id);
+    queryClient.invalidateQueries({ queryKey: ['friend-requests-outgoing', userId] });
+  };
+
   // ── Friends (accepted) ──────────────────────────────────────────────────
   const { data: friends = [] } = useQuery<{ id: string; name: string; code: string }[]>({
     queryKey: ['friends', userId],
@@ -313,6 +345,28 @@ export default function ContactsScreen() {
             <Text style={s.addBtnText}>add friend</Text>
           </TouchableOpacity>
         </View>
+        {/* Outgoing pending */}
+        {outgoing.length > 0 && (
+          <View style={s.list}>
+            {outgoing.map(req => (
+              <View key={req.id} style={s.row}>
+                <View style={s.avatar}>
+                  <Text style={s.avatarText}>{req.receiver_name.charAt(0).toUpperCase()}</Text>
+                </View>
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text style={s.name}>{req.receiver_name}</Text>
+                  <Text style={s.code}>{req.receiver_code} · pending</Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => cancelRequest(req.id)}
+                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                >
+                  <Ionicons name="close-circle-outline" size={16} color={Colors.muted} />
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+        )}
 
         {/* Outgoing pending requests */}
         {outgoing.length > 0 && (

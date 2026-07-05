@@ -7,7 +7,6 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../src/lib/supabase';
 import { useUser } from '../../src/hooks/useUser';
-import { useScreenAnim } from '@/components/ui/ScreenWrapper';
 import { Colors, Radius, Spacing } from '@/components/ui/theme';
 import { Brand } from '../../src/lib/brand';
 
@@ -41,7 +40,6 @@ function smartGroup(dateStr: string): string {
 export default function NotificationsScreen() {
   const router = useRouter();
   const { userId } = useUser();
-  const { slideAnim, handleBack } = useScreenAnim();
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -103,26 +101,16 @@ export default function NotificationsScreen() {
     new Date(dateStr).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 
   return (
-    <View style={{ flex: 1, backgroundColor: Colors.white }}>
-      <SafeAreaView style={{ flex: 1 }}>
-        {/* Header */}
-        <View style={s.header}>
-          <TouchableOpacity onPress={handleBack} style={s.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="arrow-back" size={20} color="#B6E1DE" />
-          </TouchableOpacity>
-          <Text style={s.title}>notifications</Text>
-          <View style={{ width: 34 }} />
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white }}>
+      {loading ? (
+        <ActivityIndicator color={ACCENT_DARK} style={{ marginTop: 40 }} />
+      ) : notifications.length === 0 ? (
+        <View style={s.emptyWrap}>
+          <Ionicons name="notifications-off-outline" size={36} color={Colors.faint} />
+          <Text style={s.emptyText}>no notifications yet</Text>
         </View>
-
-        {loading ? (
-          <ActivityIndicator color={ACCENT_DARK} style={{ marginTop: 40 }} />
-        ) : notifications.length === 0 ? (
-          <View style={s.emptyWrap}>
-            <Ionicons name="notifications-off-outline" size={36} color={Colors.faint} />
-            <Text style={s.emptyText}>no notifications yet</Text>
-          </View>
-        ) : (
-          <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+      ) : (
+        <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
             {groups.map(group => (
               <View key={group.label}>
                 <Text style={s.groupLabel}>{group.label}</Text>
@@ -156,16 +144,11 @@ export default function NotificationsScreen() {
             <View style={{ height: 40 }} />
           </ScrollView>
         )}
-      </SafeAreaView>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const s = StyleSheet.create({
-  header:  { flexDirection: 'row', alignItems: 'center', paddingHorizontal: PAGE, paddingTop: 16, paddingBottom: 16, gap: 10, backgroundColor: '#1A1A1A', borderBottomWidth: 1, borderBottomColor: '#333' },
-  backBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#B6E1DE22', alignItems: 'center', justifyContent: 'center' },
-  title:   { flex: 1, fontFamily: Brand.font.display, fontSize: 20, color: '#B6E1DE', letterSpacing: -0.3, textAlign: 'center' },
-
   scroll:    { paddingBottom: 60 },
   emptyWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, paddingTop: 80 },
   emptyText: { fontFamily: Brand.font.mono, fontSize: 13, color: Colors.muted },
