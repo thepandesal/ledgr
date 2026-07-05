@@ -138,6 +138,7 @@ export default function AddRecordingScreen({ inlineProps }: {
   const [accounts, setAccounts]               = useState<any[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<any>(null);
   const [selectedAccount, setSelectedAccount]   = useState<any>(null);
+  const [personSuggestions, setPersonSuggestions] = useState<string[]>([]);
 
   // ── Picker modals ────────────────────────────────────────────────────────
   const [showCategoryModal, setShowCategoryModal] = useState(false);
@@ -189,6 +190,19 @@ export default function AddRecordingScreen({ inlineProps }: {
     ]);
     if (cats.data) setCategories(cats.data);
     if (accs.data) setAccounts(accs.data);
+
+    // Load person suggestions: manual contacts + friends
+    const [{ data: contactsData }, { data: friendships }] = await Promise.all([
+      supabase.from('contacts').select('name').eq('user_id', user.id).order('name'),
+      supabase.from('friendships').select('requester_id, receiver_id').eq('status', 'accepted').or(`requester_id.eq.${user.id},receiver_id.eq.${user.id}`),
+    ]);
+    const contactNames = (contactsData ?? []).map((c: any) => c.name);
+    const friendIds = (friendships ?? []).map((f: any) => f.requester_id === user.id ? f.receiver_id : f.requester_id);
+    const friendNames = await Promise.all(friendIds.map((id: string) =>
+      supabase.rpc('get_user_display_name', { user_id: id }).then(({ data: n }) => n ?? '')
+    ));
+    const allNames = [...new Set([...friendNames.filter(Boolean), ...contactNames])].sort();
+    setPersonSuggestions(allNames);
 
     // Load space budget if adding a new expense
     if (!editId && spaceId) {
@@ -579,6 +593,17 @@ export default function AddRecordingScreen({ inlineProps }: {
               onChangeText={setPersonName}
             />
           </FormRow>
+          {personSuggestions.length > 0 && (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingVertical: 8 }}>
+              {personSuggestions
+                .filter(n => !personName.trim() || n.toLowerCase().includes(personName.toLowerCase()))
+                .map(n => (
+                  <TouchableOpacity key={n} style={s.suggestionChip} onPress={() => setPersonName(n)}>
+                    <Text style={s.suggestionChipText}>{n}</Text>
+                  </TouchableOpacity>
+                ))}
+            </ScrollView>
+          )}
         </FormBlock>
       )}
 
@@ -588,6 +613,17 @@ export default function AddRecordingScreen({ inlineProps }: {
           <FormRow label="owes you">
             <TextInput style={s.inlineInput} placeholder="e.g. john" placeholderTextColor={Colors.faint} value={personName} onChangeText={setPersonName} />
           </FormRow>
+          {personSuggestions.length > 0 && (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingVertical: 8 }}>
+              {personSuggestions
+                .filter(n => !personName.trim() || n.toLowerCase().includes(personName.toLowerCase()))
+                .map(n => (
+                  <TouchableOpacity key={n} style={s.suggestionChip} onPress={() => setPersonName(n)}>
+                    <Text style={s.suggestionChipText}>{n}</Text>
+                  </TouchableOpacity>
+                ))}
+            </ScrollView>
+          )}
         </FormBlock>
       )}
 
@@ -1003,5 +1039,7 @@ const s = StyleSheet.create({
   loanSummaryRow:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   loanSummaryLabel:{ fontFamily: Fonts.mono, fontSize: 11, color: Colors.muted },
   loanSummaryValue:{ fontFamily: Fonts.monoBold, fontSize: 12, color: Colors.text },
+  suggestionChip:     { paddingHorizontal: 12, paddingVertical: 6, borderRadius: Radius.pill, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.borderMid },
+  suggestionChipText: { fontFamily: Fonts.mono, fontSize: 12, color: Colors.text },
 });
 
