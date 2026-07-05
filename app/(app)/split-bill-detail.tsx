@@ -823,11 +823,18 @@ export default function SplitBillDetailScreen() {
           height: body.scrollHeight, windowHeight: body.scrollHeight,
         });
         document.body.removeChild(iframe);
-        canvas.toBlob((blob: Blob | null) => {
+        canvas.toBlob(async (blob: Blob | null) => {
           if (!blob) return;
+          const fileName = `${String(name).replace(/\s+/g, '-')}-split.png`;
+          if (typeof navigator !== 'undefined' && (navigator as any).share && (navigator as any).canShare) {
+            const file = new File([blob], fileName, { type: 'image/png' });
+            if ((navigator as any).canShare({ files: [file] })) {
+              try { await (navigator as any).share({ files: [file], title: fileName }); return; } catch (_) {}
+            }
+          }
           const url = URL.createObjectURL(blob);
           const a = document.createElement('a');
-          a.href = url; a.download = `${String(name).replace(/\s+/g, '-')}-split.png`;
+          a.href = url; a.download = fileName;
           document.body.appendChild(a); a.click();
           document.body.removeChild(a); URL.revokeObjectURL(url);
         }, 'image/png');
