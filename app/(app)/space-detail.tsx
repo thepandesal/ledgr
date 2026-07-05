@@ -238,10 +238,10 @@ export default function SpaceDetailScreen() {
         .select('*, categories:category_id(name,color,icon)');
       if (spaceId === 'all') {
         if (!userId) return [];
-        const { data } = await query.eq('user_id', userId).order('transaction_date', { ascending: false });
+        const { data } = await query.eq('user_id', userId).order('transaction_date', { ascending: false }).order('created_at', { ascending: false });
         return normalize(data ?? []);
       }
-      const { data } = await query.eq('space_id', spaceId).order('transaction_date', { ascending: false });
+      const { data } = await query.eq('space_id', spaceId).order('transaction_date', { ascending: false }).order('created_at', { ascending: false });
       return normalize(data ?? []);
     },
     enabled: !!spaceId && (spaceId !== 'all' || !!userId),
