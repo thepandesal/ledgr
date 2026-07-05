@@ -1,19 +1,3 @@
-/**
- * BottomSheet.tsx
- * Bottom sheet rendered as an absolutely-positioned overlay (no Modal).
- * Using RN Web's Modal is unreliable on mobile Safari — it creates a new
- * stacking context whose height is tied to window.innerHeight, which Safari
- * shrinks/restores unpredictably with the keyboard, and it injects
- * overflow:hidden on <body> causing a layout-shift on the page behind it.
- *
- * By rendering directly in the tree we stay in the normal document flow,
- * visualViewport events work correctly, and there is no body mutation.
- *
- * Blur behaviour:
- * - Inside a BlurContext (tab screens) → calls setBlur(true/false) on the root overlay
- * - Outside BlurContext (detail screens) → renders its own fade-in backdrop
- */
-
 import {
   View, Text, StyleSheet, TouchableOpacity,
   ScrollView, Platform, Animated, useWindowDimensions,
@@ -38,8 +22,6 @@ export default function BottomSheet({ visible, onClose, sub, title, height, maxH
   const hasContext = !!__hasProvider;
   const { height: screenHeight } = useWindowDimensions();
 
-  // On web, track the real viewport height via visualViewport so we can compute
-  // sheet heights correctly even when Safari shrinks window.innerHeight with the keyboard.
   const [vpHeight, setVpHeight] = useState<number | null>(null);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   const naturalHeightRef = useRef(0);
@@ -60,24 +42,16 @@ export default function BottomSheet({ visible, onClose, sub, title, height, maxH
     return () => vv.removeEventListener('resize', onResize);
   }, []);
 
-  // slideAnim: 0 = hidden (translated fully below screen), 1 = visible
-  const slideAnim = useRef(new Animated.Value(0)).current;
-  const [mounted, setMounted] = useState(false);
   const blurAnim = useRef(new Animated.Value(0)).current;
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     if (hasContext) setBlur(visible);
     if (visible) {
       setMounted(true);
-      Animated.parallel([
-        Animated.timing(slideAnim, { toValue: 1, duration: 280, useNativeDriver: true }),
-        Animated.timing(blurAnim,  { toValue: 1, duration: 250, useNativeDriver: true }),
-      ]).start();
+      Animated.timing(blurAnim, { toValue: 1, duration: 250, useNativeDriver: true }).start();
     } else {
-      Animated.parallel([
-        Animated.timing(slideAnim, { toValue: 0, duration: 220, useNativeDriver: true }),
-        Animated.timing(blurAnim,  { toValue: 0, duration: 200, useNativeDriver: true }),
-      ]).start(() => setMounted(false));
+      Animated.timing(blurAnim, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => setMounted(false));
     }
   }, [visible]);
 
@@ -95,18 +69,17 @@ export default function BottomSheet({ visible, onClose, sub, title, height, maxH
       ? resolveHeight(height)
       : resolveHeight(maxHeight);
 
-  // Translate by full screen height so the sheet always starts fully below screen
-  // regardless of its actual content height.
-  const translateY = slideAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [baseHeight, 0],
-  });
-
   if (!mounted) return null;
+
+  // On web use CSS transition so translateY('100%') works correctly —
+  // it's relative to the element's own height, always fully off-screen.
+  const webSlideStyle = Platform.OS === 'web' ? {
+    transform: [{ translateY: visible ? '0%' : '100%' } as any],
+    transition: 'transform 0.28s cubic-bezier(0.32, 0.72, 0, 1)',
+  } : {};
 
   return (
     <View style={s.overlay} pointerEvents="box-none">
-      {/* Backdrop — only rendered when outside BlurContext */}
       {!hasContext && (
         <Animated.View style={[s.backdrop, { opacity: blurAnim }]} pointerEvents="auto">
           <TouchableOpacity style={s.flex} activeOpacity={1} onPress={onClose} />
@@ -116,12 +89,7 @@ export default function BottomSheet({ visible, onClose, sub, title, height, maxH
         <TouchableOpacity style={s.flex} activeOpacity={1} onPress={onClose} />
       )}
 
-      <Animated.View
-        style={[
-          formStyles.sheet,
-          { maxHeight: sheetMaxHeight, transform: [{ translateY }] },
-        ]}
-      >
+      <Animated.View style={[formStyles.sheet, { maxHeight: sheetMaxHeight }, webSlideStyle]}>
         <View style={formStyles.header}>
           <View>
             {sub ? <Text style={formStyles.headerSub}>{sub}</Text> : null}
