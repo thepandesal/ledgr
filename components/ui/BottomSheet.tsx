@@ -60,14 +60,13 @@ export default function BottomSheet({ visible, onClose, sub, title, height, maxH
     return () => vv.removeEventListener('resize', onResize);
   }, []);
 
+  // slideAnim: 0 = hidden (translated fully below screen), 1 = visible
   const slideAnim = useRef(new Animated.Value(0)).current;
   const [mounted, setMounted] = useState(false);
-
   const blurAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (hasContext) setBlur(visible);
-
     if (visible) {
       setMounted(true);
       Animated.parallel([
@@ -96,9 +95,11 @@ export default function BottomSheet({ visible, onClose, sub, title, height, maxH
       ? resolveHeight(height)
       : resolveHeight(maxHeight);
 
+  // Translate by full screen height so the sheet always starts fully below screen
+  // regardless of its actual content height.
   const translateY = slideAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [sheetMaxHeight, 0],
+    outputRange: [baseHeight, 0],
   });
 
   if (!mounted) return null;
