@@ -61,24 +61,13 @@ export default function RootLayout() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    // RN Web sets document.body.style.overflow = 'hidden' when a Modal opens,
-    // which removes the scrollbar and shifts the page left. We patch the setter
-    // to ignore that specific mutation.
     if (typeof document === 'undefined') return;
-    const originalSetProperty = document.body.style.setProperty.bind(document.body.style);
-    document.body.style.setProperty = (prop: string, value: string, priority?: string) => {
-      if (prop === 'overflow' && value === 'hidden') return;
-      originalSetProperty(prop, value, priority);
-    };
-    // Also cover direct assignment via the overflow setter
-    const proto = Object.getPrototypeOf(document.body.style);
-    const descriptor = Object.getOwnPropertyDescriptor(proto, 'overflow');
-    if (descriptor?.set) {
-      Object.defineProperty(document.body.style, 'overflow', {
-        set(v: string) { if (v !== 'hidden') descriptor.set!.call(this, v); },
-        get() { return descriptor.get!.call(this); },
-        configurable: true,
-      });
+    const id = 'no-scroll-shift';
+    if (!document.getElementById(id)) {
+      const style = document.createElement('style');
+      style.id = id;
+      style.textContent = 'html { scrollbar-gutter: stable; overflow-y: scroll; }';
+      document.head.appendChild(style);
     }
   }, []);
 
