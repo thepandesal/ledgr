@@ -1,16 +1,22 @@
 /**
  * BottomSheet.tsx
- * Bottom sheet modal that auto-sizes to content, capped at maxHeight (default 50%).
- * Pass `height` prop to force a fixed height instead.
+ * Bottom sheet rendered as an absolutely-positioned overlay (no Modal).
+ * Using RN Web's Modal is unreliable on mobile Safari — it creates a new
+ * stacking context whose height is tied to window.innerHeight, which Safari
+ * shrinks/restores unpredictably with the keyboard, and it injects
+ * overflow:hidden on <body> causing a layout-shift on the page behind it.
+ *
+ * By rendering directly in the tree we stay in the normal document flow,
+ * visualViewport events work correctly, and there is no body mutation.
  *
  * Blur behaviour:
  * - Inside a BlurContext (tab screens) → calls setBlur(true/false) on the root overlay
- * - Outside BlurContext (detail screens) → renders its own fade-in blur overlay
+ * - Outside BlurContext (detail screens) → renders its own fade-in backdrop
  */
 
 import {
-  View, Text, StyleSheet, TouchableOpacity, Modal,
-  ScrollView, KeyboardAvoidingView, Platform, Animated, useWindowDimensions,
+  View, Text, StyleSheet, TouchableOpacity,
+  ScrollView, Platform, Animated, useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useContext, useEffect, useRef, useState } from 'react';
@@ -32,9 +38,8 @@ export default function BottomSheet({ visible, onClose, sub, title, height, maxH
   const hasContext = !!__hasProvider;
   const { height: screenHeight } = useWindowDimensions();
 
-  // Track real screen height via visualViewport to compute pixel-based sheet heights.
-  // Percentages are unreliable on mobile Safari because the Modal container height
-  // is tied to window.innerHeight which shrinks with the keyboard and may not restore.
+  // On web, track the real viewport height via visualViewport so we can compute
+  // sheet heights correctly even when Safari shrinks window.innerHeight with the keyboard.
   const [vpHeight, setVpHeight] = useState<number | null>(null);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   const naturalHeightRef = useRef(0);
@@ -42,11 +47,9 @@ export default function BottomSheet({ visible, onClose, sub, title, height, maxH
     if (Platform.OS !== 'web') return;
     const vv = (window as any).visualViewport;
     if (!vv) return;
-    // vv.height at mount is the full viewport height before any keyboard opens.
     naturalHeightRef.current = vv.height;
     setVpHeight(vv.height);
     const onResize = () => {
-      // When keyboard opens vv.height shrinks; track the max as the natural height.
       if (vv.height > naturalHeightRef.current) {
         naturalHeightRef.current = vv.height;
         setVpHeight(vv.height);
@@ -57,105 +60,103 @@ export default function BottomSheet({ visible, onClose, sub, title, height, maxH
     return () => vv.removeEventListener('resize', onResize);
   }, []);
 
-  // Prevent the layout shift (page moves left) that RN Web causes when a Modal
-  // sets overflow:hidden on the body and removes the scrollbar gutter.
-  // We compensate by padding-right with the scrollbar width before it disappears.
-  useEffect(() => {
-    if (Platform.OS !== 'web') return;
-    if (!visible) return;
-    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
-    if (scrollbarWidth > 0) {
-      document.body.style.paddingRight = `${scrollbarWidth}px`;
-    }
-    return () => { document.body.style.paddingRight = ''; };
-  }, [visible]);
+  const slideAnim = useRef(new Animated.Value(0)).current;
+  const [mounted, setMounted] = useState(false);
 
   const blurAnim = useRef(new Animated.Value(0)).current;
-  const [blurMounted, setBlurMounted] = useState(false);
 
   useEffect(() => {
-    if (hasContext) {
-      // Delegate to root BlurContext overlay
-      setBlur(visible);
+    if (hasContext) setBlur(visible);
+
+    if (visible) {
+      setMounted(true);
+      Animated.parallel([
+        Animated.timing(slideAnim, { toValue: 1, duration: 280, useNativeDriver: true }),
+        Animated.timing(blurAnim,  { toValue: 1, duration: 250, useNativeDriver: true }),
+      ]).start();
     } else {
-      // Own internal blur
-      if (visible) {
-        setBlurMounted(true);
-        Animated.timing(blurAnim, { toValue: 1, duration: 250, useNativeDriver: true }).start();
-      } else {
-        Animated.timing(blurAnim, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => setBlurMounted(false));
-      }
+      Animated.parallel([
+        Animated.timing(slideAnim, { toValue: 0, duration: 220, useNativeDriver: true }),
+        Animated.timing(blurAnim,  { toValue: 0, duration: 200, useNativeDriver: true }),
+      ]).start(() => setMounted(false));
     }
   }, [visible]);
 
-  // Compute pixel heights from the real screen height so percentages are always
-  // relative to the full screen, not the (potentially shrunken) Modal container.
   const baseHeight = Platform.OS === 'web' && vpHeight ? vpHeight : screenHeight;
   const resolveHeight = (val: string | number) => {
     if (typeof val === 'number') return val;
-    if (typeof val === 'string' && val.endsWith('%')) {
+    if (typeof val === 'string' && val.endsWith('%'))
       return baseHeight * (parseFloat(val) / 100);
-    }
     return val;
   };
-  const sheetStyle = keyboardOpen
-    ? { maxHeight: resolveHeight('80%') }
+
+  const sheetMaxHeight = keyboardOpen
+    ? resolveHeight('80%')
     : height
-      ? { height: resolveHeight(height), maxHeight: resolveHeight(height) }
-      : { maxHeight: resolveHeight(maxHeight) };
+      ? resolveHeight(height)
+      : resolveHeight(maxHeight);
+
+  const translateY = slideAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [sheetMaxHeight, 0],
+  });
+
+  if (!mounted) return null;
 
   return (
-    <>
-      {/* Own blur — only used when outside BlurContext */}
-      {!hasContext && blurMounted && (
-        <Animated.View style={[s.blur, { opacity: blurAnim }]} pointerEvents="none" />
+    <View style={s.overlay} pointerEvents="box-none">
+      {/* Backdrop — only rendered when outside BlurContext */}
+      {!hasContext && (
+        <Animated.View style={[s.backdrop, { opacity: blurAnim }]} pointerEvents="auto">
+          <TouchableOpacity style={s.flex} activeOpacity={1} onPress={onClose} />
+        </Animated.View>
+      )}
+      {hasContext && (
+        <TouchableOpacity style={s.flex} activeOpacity={1} onPress={onClose} />
       )}
 
-      <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
-        <KeyboardAvoidingView
-          style={[s.flex, s.justify]}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
-        >
-          <TouchableOpacity style={s.flex} activeOpacity={1} onPress={onClose} />
-
-          <View style={[formStyles.sheet, sheetStyle]}>
-            <View style={formStyles.header}>
-              <View>
-                {sub ? <Text style={formStyles.headerSub}>{sub}</Text> : null}
-                <Text style={formStyles.headerTitle}>{title}</Text>
-              </View>
-              <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Ionicons name="close" size={20} color="#929090" />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView
-              style={s.flex}
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-              keyboardDismissMode="interactive"
-              contentContainerStyle={[s.content, keyboardOpen && { paddingBottom: 120 }]}
-            >
-              {children}
-            </ScrollView>
+      <Animated.View
+        style={[
+          formStyles.sheet,
+          { maxHeight: sheetMaxHeight, transform: [{ translateY }] },
+        ]}
+      >
+        <View style={formStyles.header}>
+          <View>
+            {sub ? <Text style={formStyles.headerSub}>{sub}</Text> : null}
+            <Text style={formStyles.headerTitle}>{title}</Text>
           </View>
-        </KeyboardAvoidingView>
-      </Modal>
-    </>
+          <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name="close" size={20} color="#929090" />
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView
+          style={s.flex}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+          contentContainerStyle={[s.content, keyboardOpen && { paddingBottom: 120 }]}
+        >
+          {children}
+        </ScrollView>
+      </Animated.View>
+    </View>
   );
 }
 
-
 const s = StyleSheet.create({
   flex:    { flex: 1 },
-  justify: { justifyContent: 'flex-end' },
-  content: { paddingBottom: 16 },
-  blur: {
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'flex-end',
+    zIndex: 1000,
+  },
+  backdrop: {
     ...StyleSheet.absoluteFillObject,
     backdropFilter: 'blur(8px)',
     WebkitBackdropFilter: 'blur(8px)',
     backgroundColor: 'rgba(0,0,0,0.05)',
-    zIndex: 999,
   } as any,
+  content: { paddingBottom: 16 },
 });

@@ -7,11 +7,11 @@
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
   TextInput, ActivityIndicator, Switch, FlatList, Image, Alert,
-  Modal, KeyboardAvoidingView, Platform, useWindowDimensions,
+  Platform, useWindowDimensions,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../../src/lib/supabase';
 import * as ImagePicker from 'expo-image-picker';
 import { compressImage, uploadReceiptPhoto } from '../../src/lib/receiptUpload';
@@ -133,14 +133,18 @@ export default function AddRecordingScreen() {
   const [selectedAccount, setSelectedAccount]   = useState<any>(null);
 
   // ── Safari keyboard fix ───────────────────────────────────────────────────
-  const { height: screenHeight } = useWindowDimensions();
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const vpHeightRef = useRef(0);
   useEffect(() => {
     if (Platform.OS !== 'web') return;
     const vv = (window as any).visualViewport;
     if (!vv) return;
-    const naturalHeight = vv.height;
-    const onResize = () => { const diff = naturalHeight - vv.height; setKeyboardHeight(diff > 100 ? diff : 0); };
+    vpHeightRef.current = vv.height;
+    const onResize = () => {
+      if (vv.height > vpHeightRef.current) vpHeightRef.current = vv.height;
+      const diff = vpHeightRef.current - vv.height;
+      setKeyboardHeight(diff > 100 ? diff : 0);
+    };
     vv.addEventListener('resize', onResize);
     return () => vv.removeEventListener('resize', onResize);
   }, []);
@@ -427,13 +431,16 @@ export default function AddRecordingScreen() {
 
   // ─── Render ─────────────────────────────────────────────────────────────
 
+  const { height: winHeight } = useWindowDimensions();
+  const baseHeight = Platform.OS === 'web' && vpHeightRef.current > 0 ? vpHeightRef.current : winHeight;
+  const sheetMaxHeight = keyboardHeight > 0 ? baseHeight * 0.8 : baseHeight * 0.92;
+
   return (
-    <Modal visible animationType="slide" transparent onRequestClose={() => router.back()}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => router.back()}>
-          <BlurView intensity={40} tint="dark" style={{ flex: 1 }} />
-        </TouchableOpacity>
-        <View style={[formStyles.sheet, Platform.OS === 'web' && keyboardHeight > 0 ? { maxHeight: '80%' } : {}]}>
+    <View style={s.overlay} pointerEvents="box-none">
+      <TouchableOpacity style={s.backdropTouch} activeOpacity={1} onPress={() => router.back()}>
+        {Platform.OS !== 'web' && <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />}
+      </TouchableOpacity>
+      <View style={[formStyles.sheet, { maxHeight: sheetMaxHeight }]}>
           {/* Header */}
           <View style={formStyles.header}>
             <View>
@@ -931,14 +938,22 @@ export default function AddRecordingScreen() {
 
       </ScrollView>
         </View>
-      </KeyboardAvoidingView>
-    </Modal>
+    </View>
   );
 }
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'flex-end',
+    zIndex: 1000,
+  },
+  backdropTouch: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
   photoThumbWrap:  { position: 'relative', marginRight: 8 },
   photoRemoveBtn:  { position: 'absolute', top: -6, right: -6, backgroundColor: Colors.white, borderRadius: 99 },
   receiptThumb:    { width: 64, height: 64, borderRadius: Radius.md },
