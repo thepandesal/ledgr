@@ -23,7 +23,9 @@ export default function SplitShareSlugPage() {
   const [paymentHistory, setPaymentHistory] = useState<any[]>([]);
   const [receiptId, setReceiptId]           = useState<string | null>(null);
   const [receiptPhotos, setReceiptPhotos]   = useState<string[]>([]);
+  const [splitReceiptPhotos, setSplitReceiptPhotos] = useState<string[]>([]);
   const [receiptModal, setReceiptModal]     = useState(false);
+  const [receiptModalPhotos, setReceiptModalPhotos] = useState<string[]>([]);
   const [receiptLoading, setReceiptLoading] = useState(false);
   const [qrModal, setQrModal]               = useState(false);
   const [qrModalAcc, setQrModalAcc]         = useState<any>(null);
@@ -104,6 +106,32 @@ export default function SplitShareSlugPage() {
       });
       setPerPerson(Object.entries(perPersonMap).map(([name, total]) => ({ name, total })));
       setPaymentHistory(paymentsRes.data ?? []);
+
+      // Load receipt photos attached to this split bill
+      const { data: receiptEntry } = await supabase
+        .from('receipt_entries')
+        .select('id')
+        .eq('split_bill_id', splitBillId)
+        .maybeSingle();
+      if (receiptEntry?.id) {
+        const { data: photos } = await supabase
+          .from('receipt_photos')
+          .select('storage_path, url')
+          .eq('entry_id', receiptEntry.id)
+          .order('created_at');
+        if (photos && photos.length > 0) {
+          const urls = await Promise.all(photos.map(async (p: any) => {
+            if (p.url) return p.url;
+            if (p.storage_path) {
+              const { data } = await supabase.storage.from('receipts').createSignedUrl(p.storage_path, 3600);
+              return data?.signedUrl ?? '';
+            }
+            return '';
+          }));
+          setSplitReceiptPhotos(urls.filter(Boolean));
+        }
+      }
+
       setLoading(false);
       return;
     }
@@ -284,9 +312,33 @@ export default function SplitShareSlugPage() {
           </View>
         </>}
 
+        {splitReceiptPhotos.length > 0 && <>
+          <Text style={s.sectionHeader}>receipts</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 4 }}>
+            {splitReceiptPhotos.map((url, i) => (
+              <TouchableOpacity key={i} onPress={() => { setReceiptModalPhotos(splitReceiptPhotos); setReceiptModal(true); }} activeOpacity={0.85}>
+                <Image source={{ uri: url }} style={{ width: 90, height: 90, borderRadius: Radius.md, backgroundColor: Colors.surface }} resizeMode="cover" />
+              </TouchableOpacity>
+            ))}
+          </View>
+        </>}
+
         {receiptId && <>
           <Text style={s.sectionHeader}>receipt</Text>
-          <TouchableOpacity style={s.actionBtn} onPress={openReceipt} activeOpacity={0.8}>
+          <TouchableOpacity style={s.actionBtn} onPress={async () => {
+            setReceiptLoading(true);
+            setReceiptModal(true);
+            const { data: photos } = await supabase.from('receipt_photos').select('storage_path, url').eq('entry_id', receiptId).order('created_at');
+            if (photos && photos.length > 0) {
+              const urls = await Promise.all(photos.map(async (p: any) => {
+                if (p.url) return p.url;
+                if (p.storage_path) { const { data } = await supabase.storage.from('receipts').createSignedUrl(p.storage_path, 3600); return data?.signedUrl ?? ''; }
+                return '';
+              }));
+              setReceiptModalPhotos(urls.filter(Boolean));
+            }
+            setReceiptLoading(false);
+          }} activeOpacity={0.8}>
             <Ionicons name="receipt-outline" size={15} color={ACCENT_DARK} />
             <Text style={s.actionBtnText}>view receipt photos</Text>
             <Ionicons name="chevron-forward" size={13} color={ACCENT_DARK} />
@@ -342,11 +394,11 @@ export default function SplitShareSlugPage() {
           <TouchableOpacity style={{ position: 'absolute', top: 56, right: 24, zIndex: 10 }} onPress={() => setReceiptModal(false)}>
             <Ionicons name="close" size={26} color="#fff" />
           </TouchableOpacity>
-          {receiptLoading ? <ActivityIndicator color="#fff" /> : receiptPhotos.length === 0 ? (
+          {receiptLoading ? <ActivityIndicator color="#fff" /> : receiptModalPhotos.length === 0 ? (
             <Text style={{ fontFamily: Brand.font.mono, fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>no photos found</Text>
           ) : (
             <ScrollView style={{ width: '100%' }} contentContainerStyle={{ padding: 24, paddingTop: 80, gap: 16 }} showsVerticalScrollIndicator={false}>
-              {receiptPhotos.map((url, i) => (
+              {receiptModalPhotos.map((url, i) => (
                 <Image key={i} source={{ uri: url }} style={{ width: '100%', aspectRatio: 3 / 4, borderRadius: 12 }} resizeMode="contain" />
               ))}
             </ScrollView>
