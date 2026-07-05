@@ -32,47 +32,40 @@ export default function BottomSheet({ visible, onClose, sub, title, height, maxH
   const hasContext = !!__hasProvider;
   const { height: screenHeight } = useWindowDimensions();
 
-  // On web/Safari, listen for visualViewport resize (keyboard appearing)
+  // Track real screen height via visualViewport to compute pixel-based sheet heights.
+  // Percentages are unreliable on mobile Safari because the Modal container height
+  // is tied to window.innerHeight which shrinks with the keyboard and may not restore.
+  const [vpHeight, setVpHeight] = useState<number | null>(null);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   const naturalHeightRef = useRef(0);
   useEffect(() => {
     if (Platform.OS !== 'web') return;
     const vv = (window as any).visualViewport;
     if (!vv) return;
-    // Track the largest seen height as the "natural" (no-keyboard) height
     naturalHeightRef.current = Math.max(naturalHeightRef.current, vv.height);
+    setVpHeight(naturalHeightRef.current);
     const onResize = () => {
       naturalHeightRef.current = Math.max(naturalHeightRef.current, vv.height);
       const diff = naturalHeightRef.current - vv.height;
       setKeyboardOpen(diff > 100);
+      setVpHeight(naturalHeightRef.current);
     };
     vv.addEventListener('resize', onResize);
     return () => vv.removeEventListener('resize', onResize);
   }, []);
 
-  // Prevent body scroll-lock from shifting the page on web (mobile Safari)
+  // Inject a one-time CSS rule to stop RN Web's Modal from adding overflow:hidden
+  // to the body, which causes a scrollbar-width shift on the page behind the modal.
   useEffect(() => {
     if (Platform.OS !== 'web') return;
-    if (visible) {
-      const scrollY = window.scrollY;
-      document.body.style.position = 'fixed';
-      document.body.style.top = `-${scrollY}px`;
-      document.body.style.width = '100%';
-    } else {
-      const top = document.body.style.top;
-      document.body.style.position = '';
-      document.body.style.top = '';
-      document.body.style.width = '';
-      if (top) window.scrollTo(0, -parseInt(top));
+    const id = 'rnw-modal-no-shift';
+    if (!document.getElementById(id)) {
+      const style = document.createElement('style');
+      style.id = id;
+      style.textContent = 'body { overflow: auto !important; }';
+      document.head.appendChild(style);
     }
-    return () => {
-      const top = document.body.style.top;
-      document.body.style.position = '';
-      document.body.style.top = '';
-      document.body.style.width = '';
-      if (top) window.scrollTo(0, -parseInt(top));
-    };
-  }, [visible]);
+  }, []);
 
   const blurAnim = useRef(new Animated.Value(0)).current;
   const [blurMounted, setBlurMounted] = useState(false);
@@ -92,9 +85,21 @@ export default function BottomSheet({ visible, onClose, sub, title, height, maxH
     }
   }, [visible]);
 
-  const sheetStyle = Platform.OS === 'web' && keyboardOpen
-    ? { maxHeight: '80%' }
-    : height ? { height, maxHeight: height } : { maxHeight };
+  // Compute pixel heights from the real screen height so percentages are always
+  // relative to the full screen, not the (potentially shrunken) Modal container.
+  const baseHeight = Platform.OS === 'web' && vpHeight ? vpHeight : screenHeight;
+  const resolveHeight = (val: string | number) => {
+    if (typeof val === 'number') return val;
+    if (typeof val === 'string' && val.endsWith('%')) {
+      return baseHeight * (parseFloat(val) / 100);
+    }
+    return val;
+  };
+  const sheetStyle = keyboardOpen
+    ? { maxHeight: resolveHeight('80%') }
+    : height
+      ? { height: resolveHeight(height), maxHeight: resolveHeight(height) }
+      : { maxHeight: resolveHeight(maxHeight) };
 
   return (
     <>
@@ -127,7 +132,7 @@ export default function BottomSheet({ visible, onClose, sub, title, height, maxH
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
               keyboardDismissMode="interactive"
-              contentContainerStyle={[s.content, Platform.OS === 'web' && keyboardOpen && { paddingBottom: 120 }]}
+              contentContainerStyle={[s.content, keyboardOpen && { paddingBottom: 120 }]}
             >
               {children}
             </ScrollView>
