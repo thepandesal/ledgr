@@ -86,8 +86,8 @@ export default function RootLayout() {
     if (!fontsLoaded) return;
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('[auth] event:', event, 'session:', !!session);
-      // Don't redirect if on split share page
       const path = typeof window !== 'undefined' ? window.location.pathname : '';
+      // Don't redirect if on split share page
       if (path.startsWith('/split/')) { setReady(true); return; }
       if (!session) {
         setReady(true);
@@ -97,7 +97,11 @@ export default function RootLayout() {
         router.replace('/onboarding');
       } else {
         setReady(true);
-        router.replace('/(app)/(tabs)');
+        // If already inside the app (e.g. restoring after minimize), don't redirect.
+        // Let Expo Router stay on the current URL.
+        if (!path || path === '/' || path === '/index') {
+          router.replace('/(app)/(tabs)');
+        }
       }
     });
     return () => subscription.unsubscribe();
