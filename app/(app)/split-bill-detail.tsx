@@ -2030,7 +2030,7 @@ export default function SplitBillDetailScreen() {
               );
             })}
           </ScrollView>
-        ) : (
+        ) : itemStep === 'add-items' ? (
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             <Text style={[s.recDate, { marginBottom: 8 }]}>
               {selectedRecording?.recording?.name} · {selectedRecording?.recording?.type} · {fmt(Number(selectedRecording?.amount_contributed))}
@@ -2272,7 +2272,7 @@ export default function SplitBillDetailScreen() {
               </TouchableOpacity>
             </View>
           </ScrollView>
-        )}
+        ) : null}
       </BottomSheet>
 
       {/* Receipt enlarge modal */}
