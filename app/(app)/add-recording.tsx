@@ -7,15 +7,14 @@
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
   TextInput, ActivityIndicator, Switch, FlatList, Image, Alert,
-  Modal, KeyboardAvoidingView, Platform, useWindowDimensions,
+  Modal, Animated,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '../../src/lib/supabase';
 import * as ImagePicker from 'expo-image-picker';
 import { compressImage, uploadReceiptPhoto } from '../../src/lib/receiptUpload';
-import { BlurView } from 'expo-blur';
 import { setPendingFocusDate } from './space-detail';
 
 import {
@@ -131,23 +130,6 @@ export default function AddRecordingScreen() {
   const [accounts, setAccounts]               = useState<any[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<any>(null);
   const [selectedAccount, setSelectedAccount]   = useState<any>(null);
-
-  // ── Safari keyboard fix ───────────────────────────────────────────────────
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
-  const vpHeightRef = useRef(0);
-  useEffect(() => {
-    if (Platform.OS !== 'web') return;
-    const vv = (window as any).visualViewport;
-    if (!vv) return;
-    vpHeightRef.current = vv.height;
-    const onResize = () => {
-      if (vv.height > vpHeightRef.current) vpHeightRef.current = vv.height;
-      const diff = vpHeightRef.current - vv.height;
-      setKeyboardHeight(diff > 100 ? diff : 0);
-    };
-    vv.addEventListener('resize', onResize);
-    return () => vv.removeEventListener('resize', onResize);
-  }, []);
 
   // ── Picker modals ────────────────────────────────────────────────────────
   const [showCategoryModal, setShowCategoryModal] = useState(false);
@@ -431,20 +413,11 @@ export default function AddRecordingScreen() {
 
   // ─── Render ─────────────────────────────────────────────────────────────
 
-  const { height: winHeight } = useWindowDimensions();
-  const baseHeight = vpHeightRef.current > 0 ? vpHeightRef.current : winHeight;
-  const sheetMaxHeight = keyboardHeight > 0 ? baseHeight * 0.8 : baseHeight * 0.92;
-
   return (
-    <Modal visible animationType="slide" transparent onRequestClose={() => router.back()}>
-      {Platform.OS === 'web' ? (
-        <TouchableOpacity style={s.backdrop} activeOpacity={1} onPress={() => router.back()} />
-      ) : (
-        <TouchableOpacity style={s.backdrop} activeOpacity={1} onPress={() => router.back()}>
-          <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
-        </TouchableOpacity>
-      )}
-      <View style={[formStyles.sheet, { maxHeight: sheetMaxHeight }]}>
+    <Modal visible animationType="fade" transparent onRequestClose={() => router.back()}>
+      <TouchableOpacity style={s.backdrop} activeOpacity={1} onPress={() => router.back()} />
+      <View style={s.centeredWrap} pointerEvents="box-none">
+      <View style={s.card}>
           {/* Header */}
           <View style={formStyles.header}>
             <View>
@@ -455,7 +428,7 @@ export default function AddRecordingScreen() {
               <Ionicons name="close" size={20} color="#929090" />
             </TouchableOpacity>
           </View>
-          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" contentContainerStyle={{ paddingBottom: Platform.OS === 'web' && keyboardHeight > 0 ? 120 : 32, gap: 8 }} style={{ flex: 1 }}>
+          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" contentContainerStyle={{ paddingBottom: 32, gap: 8 }} style={{ flex: 1 }}>
 
       {/* ── Receipt reference carousel ── */}
       {receiptPhotos.length > 0 && (
@@ -941,7 +914,8 @@ export default function AddRecordingScreen() {
       </BottomSheet>
 
       </ScrollView>
-        </View>
+      </View>
+      </View>
     </Modal>
   );
 }
@@ -951,7 +925,23 @@ export default function AddRecordingScreen() {
 const s = StyleSheet.create({
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.3)',
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  centeredWrap: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    pointerEvents: 'box-none',
+  },
+  card: {
+    width: '100%',
+    maxWidth: 480,
+    maxHeight: '85%',
+    backgroundColor: '#ffffff',
+    borderRadius: 24,
+    padding: 24,
+    paddingBottom: 0,
   },
   photoThumbWrap:  { position: 'relative', marginRight: 8 },
   photoRemoveBtn:  { position: 'absolute', top: -6, right: -6, backgroundColor: Colors.white, borderRadius: 99 },
