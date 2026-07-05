@@ -10,7 +10,7 @@
 
 import {
   View, Text, StyleSheet, TouchableOpacity, Modal,
-  ScrollView, KeyboardAvoidingView, Platform, Animated,
+  ScrollView, KeyboardAvoidingView, Platform, Animated, useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useContext, useEffect, useRef, useState } from 'react';
@@ -30,6 +30,18 @@ interface Props {
 export default function BottomSheet({ visible, onClose, sub, title, height, maxHeight = '50%', children }: Props) {
   const { setBlur, __hasProvider } = useContext(BlurContext);
   const hasContext = !!__hasProvider;
+  const { height: screenHeight } = useWindowDimensions();
+
+  // On web/Safari, listen for visualViewport resize (keyboard appearing)
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    const vv = (window as any).visualViewport;
+    if (!vv) return;
+    const onResize = () => setKeyboardHeight(Math.max(0, window.innerHeight - vv.height));
+    vv.addEventListener('resize', onResize);
+    return () => vv.removeEventListener('resize', onResize);
+  }, []);
 
   const blurAnim = useRef(new Animated.Value(0)).current;
   const [blurMounted, setBlurMounted] = useState(false);
@@ -49,7 +61,9 @@ export default function BottomSheet({ visible, onClose, sub, title, height, maxH
     }
   }, [visible]);
 
-  const sheetStyle = height ? { height, maxHeight: height } : { maxHeight };
+  const sheetStyle = Platform.OS === 'web' && keyboardHeight > 0
+    ? { maxHeight: screenHeight - keyboardHeight - 20 }
+    : height ? { height, maxHeight: height } : { maxHeight };
 
   return (
     <>
@@ -62,6 +76,7 @@ export default function BottomSheet({ visible, onClose, sub, title, height, maxH
         <KeyboardAvoidingView
           style={[s.flex, s.justify]}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
         >
           <TouchableOpacity style={s.flex} activeOpacity={1} onPress={onClose} />
 
@@ -80,6 +95,7 @@ export default function BottomSheet({ visible, onClose, sub, title, height, maxH
               style={s.flex}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="interactive"
               contentContainerStyle={s.content}
             >
               {children}
@@ -95,7 +111,7 @@ export default function BottomSheet({ visible, onClose, sub, title, height, maxH
 const s = StyleSheet.create({
   flex:    { flex: 1 },
   justify: { justifyContent: 'flex-end' },
-  content: { paddingBottom: 16 },
+  content: { paddingBottom: Platform.OS === 'web' ? 120 : 16 },
   blur: {
     ...StyleSheet.absoluteFillObject,
     backdropFilter: 'blur(8px)',

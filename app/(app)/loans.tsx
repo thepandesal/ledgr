@@ -5,36 +5,53 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useUser } from '../../src/hooks/useUser';
 import { supabase } from '../../src/lib/supabase';
-import ConfirmModal from '@/components/ui/ConfirmModal';
-import pageStyles from '@/components/ui/pageStyles';
+import BottomSheet from '@/components/ui/BottomSheet';
 import { Colors, Fonts, Radius, Spacing } from '@/components/ui/theme';
+import { Brand } from '../../src/lib/brand';
 
-const { width } = Dimensions.get('window');
+const ACCENT      = Brand.color.accent;
+const ACCENT_DARK = Brand.color.accentDark;
+const ACCENT_TEXT = Brand.color.accentText;
+const PEACH       = '#FFAB91';
+
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 function isSameDay(a: Date, b: Date) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
+const fmt  = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmtC = (n: number) => {
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
+  if (n >= 1_000)     return (n / 1_000).toFixed(1) + 'K';
+  return fmt(n);
+};
+
 export default function LoansScreen() {
   const router = useRouter();
-  const slideAnim = useRef(new Animated.Value(width)).current;
+  const queryClient = useQueryClient();
   const { userId } = useUser();
-
-  const [activeFilters, setActiveFilters] = useState<string[]>([]);
-  const [dateFrom, setDateFrom] = useState<Date | null>(null);
-  const [dateTo, setDateTo] = useState<Date | null>(null);
-  const [showPicker, setShowPicker] = useState(false);
-  const [pickerMonth, setPickerMonth] = useState(new Date().getMonth());
-  const [pickerYear, setPickerYear] = useState(new Date().getFullYear());
-  const [pickingDate, setPickingDate] = useState<'from' | 'to'>('from');
+  const slideAnim = useRef(new Animated.Value(Dimensions.get('window').width)).current;
 
   useEffect(() => {
     Animated.timing(slideAnim, { toValue: 0, duration: 280, useNativeDriver: false }).start();
   }, []);
+
+  const handleBack = () => {
+    Animated.timing(slideAnim, { toValue: Dimensions.get('window').width, duration: 250, useNativeDriver: false }).start(() => router.back());
+  };
+
+  const [statusFilter, setStatusFilter] = useState<'all' | 'unpaid' | 'partial' | 'paid'>('all');
+  const [showPicker, setShowPicker] = useState(false);
+  const [dateFrom, setDateFrom] = useState<Date | null>(null);
+  const [dateTo,   setDateTo]   = useState<Date | null>(null);
+  const [pickerMonth, setPickerMonth] = useState(new Date().getMonth());
+  const [pickerYear,  setPickerYear]  = useState(new Date().getFullYear());
+  const [pickingDate, setPickingDate] = useState<'from' | 'to'>('from');
 
   const { data: loans = [], isLoading } = useQuery({
     queryKey: ['loans', userId],
@@ -43,256 +60,256 @@ export default function LoansScreen() {
         .from('recordings')
         .select('*, categories:category_id(name, color, icon), account:account_id(account_name, bank)')
         .eq('user_id', userId)
-        .eq('type', 'payable')
+        .eq('type', 'debt')
         .order('transaction_date', { ascending: false });
       return (data ?? []).map((r: any) => ({
         ...r,
         categories: Array.isArray(r.categories) ? r.categories[0] : r.categories,
-        account: Array.isArray(r.account) ? r.account[0] : r.account,
+        account:    Array.isArray(r.account)     ? r.account[0]     : r.account,
       }));
     },
     enabled: !!userId,
   });
 
   const filtered = loans.filter(r => {
-    if (activeFilters.length > 0) {
-      const isPaid = r.status === 'paid';
-      const isOngoing = r.status !== 'paid';
-      const matchPaid = activeFilters.includes('paid') && isPaid;
-      const matchOngoing = activeFilters.includes('ongoing') && isOngoing;
-      const matchUnpaid = activeFilters.includes('unpaid') && r.status !== 'paid';
-      if (!matchPaid && !matchOngoing && !matchUnpaid) return false;
-    }
+    if (statusFilter !== 'all' && r.status !== statusFilter) return false;
     if (dateFrom || dateTo) {
-      const parts = r.transaction_date.split('-');
-      const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-      if (dateFrom && d < dateFrom) return false;
-      if (dateTo) {
-        const to = new Date(dateTo); to.setHours(23, 59, 59);
-        if (d > to) return false;
-      }
+      const [y, m, d] = r.transaction_date.split('-').map(Number);
+      const date = new Date(y, m - 1, d);
+      if (dateFrom && date < dateFrom) return false;
+      if (dateTo) { const to = new Date(dateTo); to.setHours(23,59,59); if (date > to) return false; }
     }
     return true;
   });
 
-  const totalUnpaid = filtered.filter(r => r.status !== 'paid').reduce((s, r) => s + Number(r.amount), 0);
-  const totalPaid = filtered.filter(r => r.status === 'paid').reduce((s, r) => s + Number(r.amount), 0);
-  const countOngoing = filtered.filter(r => r.status !== 'paid').length;
+  const totalUnpaid  = loans.filter(r => r.status !== 'paid').reduce((s, r) => s + Number(r.amount), 0);
+  const totalPaid    = loans.filter(r => r.status === 'paid').reduce((s, r) => s + Number(r.amount), 0);
+  const countOngoing = loans.filter(r => r.status !== 'paid').length;
 
   const handleDayPress = (day: number) => {
     const d = new Date(pickerYear, pickerMonth, day);
-    if (pickingDate === 'from') {
-      setDateFrom(d);
-      setDateTo(null);
-      setPickingDate('to');
-    } else {
-      if (dateFrom && d < dateFrom) {
-        setDateFrom(d);
-        setPickingDate('to');
-      } else {
-        setDateTo(d);
-        setShowPicker(false);
-        setPickingDate('from');
-      }
+    if (pickingDate === 'from') { setDateFrom(d); setDateTo(null); setPickingDate('to'); }
+    else {
+      if (dateFrom && d < dateFrom) { setDateFrom(d); setPickingDate('to'); }
+      else { setDateTo(d); setShowPicker(false); setPickingDate('from'); }
     }
   };
 
   const clearDates = () => { setDateFrom(null); setDateTo(null); setPickingDate('from'); };
 
-  const isInRange = (day: number) => {
-    if (!dateFrom || !dateTo) return false;
-    const d = new Date(pickerYear, pickerMonth, day);
-    return d >= dateFrom && d <= dateTo;
-  };
+  const isInRange   = (day: number) => { if (!dateFrom || !dateTo) return false; const d = new Date(pickerYear, pickerMonth, day); return d >= dateFrom && d <= dateTo; };
+  const isRangeEdge = (day: number) => { const d = new Date(pickerYear, pickerMonth, day); return !!(dateFrom && isSameDay(d, dateFrom)) || !!(dateTo && isSameDay(d, dateTo)); };
 
-  const isRangeEdge = (day: number) => {
-    const d = new Date(pickerYear, pickerMonth, day);
-    return (dateFrom && isSameDay(d, dateFrom)) || (dateTo && isSameDay(d, dateTo));
-  };
+  const dateLabel = !dateFrom && !dateTo
+    ? 'all time'
+    : dateFrom && !dateTo
+      ? `from ${dateFrom.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+      : `${dateFrom!.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${dateTo!.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
 
-  const dateLabel = () => {
-    if (!dateFrom && !dateTo) return 'all time';
-    if (dateFrom && !dateTo) return `from ${dateFrom.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
-    return `${dateFrom!.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${dateTo!.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
-  };
-
-  const statusColor = (status: string) => {
-    if (status === 'paid') return Colors.income;
-    if (status === 'partial') return Colors.cyan;
-    return Colors.pending;
-  };
-
-  const statusBg = (status: string) => {
-    if (status === 'paid') return '#f0fff8';
-    if (status === 'partial') return '#f0f8ff';
-    return '#f8edfd';
-  };
-
-  const firstDay = new Date(pickerYear, pickerMonth, 1).getDay();
+  const firstDay    = new Date(pickerYear, pickerMonth, 1).getDay();
   const daysInMonth = new Date(pickerYear, pickerMonth + 1, 0).getDate();
-  const cells = Array(firstDay).fill(null).concat(Array.from({ length: daysInMonth }, (_, i) => i + 1));
+  const cells       = Array(firstDay).fill(null).concat(Array.from({ length: daysInMonth }, (_, i) => i + 1));
+
+  // Group filtered by date
+  const grouped: { label: string; items: any[] }[] = [];
+  filtered.forEach(r => {
+    const [y, m, d] = r.transaction_date.split('-').map(Number);
+    const date = new Date(y, m - 1, d);
+    const label = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const existing = grouped.find(g => g.label === label);
+    if (existing) existing.items.push(r);
+    else grouped.push({ label, items: [r] });
+  });
 
   return (
-    <Animated.View style={[pageStyles.container, { transform: [{ translateX: slideAnim }] }]}>
-      <SafeAreaView style={pageStyles.inner}>
-        <TouchableOpacity onPress={() => {
-          Animated.timing(slideAnim, { toValue: width, duration: 250, useNativeDriver: false }).start(() => router.back());
-        }} style={pageStyles.backBtn}>
-          <Ionicons name="arrow-back" size={22} color={Colors.muted} />
-        </TouchableOpacity>
+    <Animated.View style={[{ flex: 1, backgroundColor: Colors.white }, { transform: [{ translateX: slideAnim }] }]}>
+      <SafeAreaView style={{ flex: 1 }}>
 
         {/* Header */}
-        <View style={{ paddingHorizontal: Spacing.page, marginBottom: 16 }}>
-          <Text style={s.pageTitle}>loans</Text>
-          <Text style={s.pageSubtitle}>your payables, tracked.</Text>
+        <View style={s.header}>
+          <TouchableOpacity onPress={handleBack} style={s.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name="arrow-back" size={20} color="#B6E1DE" />
+          </TouchableOpacity>
+          <Text style={s.title}>loans</Text>
+          <TouchableOpacity style={s.headerBtn} onPress={() => { setPickingDate('from'); setShowPicker(true); }} activeOpacity={0.8}>
+            <Ionicons name="calendar-outline" size={16} color="#B6E1DE" />
+          </TouchableOpacity>
         </View>
 
-        {/* Stats as filter toggles */}
-        <View style={{ flexDirection: 'row', gap: 8, marginHorizontal: Spacing.page, marginBottom: 16 }}>
+        {/* Stats row */}
+        <View style={s.statsRow}>
           {[
-            { key: 'ongoing', label: 'ongoing', value: countOngoing, color: Colors.pending },
-            { key: 'unpaid',  label: 'unpaid total', value: totalUnpaid.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }), color: Colors.expense },
-            { key: 'paid',    label: 'paid total', value: totalPaid.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }), color: Colors.income },
-          ].map((st) => {
-            const isActive = activeFilters.includes(st.key);
+            { key: 'all',     label: 'all',     value: String(loans.length),  color: Colors.text },
+            { key: 'unpaid',  label: 'unpaid',  value: fmtC(totalUnpaid),     color: PEACH },
+            { key: 'partial', label: 'partial', value: String(loans.filter(r => r.status === 'partial').length), color: ACCENT_DARK },
+            { key: 'paid',    label: 'paid',    value: fmtC(totalPaid),       color: ACCENT_DARK },
+          ].map(st => {
+            const active = statusFilter === st.key;
             return (
               <TouchableOpacity
                 key={st.key}
-                style={[s.statCard, isActive && { borderColor: Colors.cyan, backgroundColor: Colors.cyan + '18' }]}
-                onPress={() => setActiveFilters(prev => isActive ? prev.filter(k => k !== st.key) : [...prev, st.key])}
-                activeOpacity={0.7}
+                style={[s.statCard, active && s.statCardActive]}
+                onPress={() => setStatusFilter(st.key as any)}
+                activeOpacity={0.75}
               >
-                <Text style={[s.statValue, { color: isActive ? Colors.cyan : st.color }]}>{st.value}</Text>
-                <Text style={[s.statLabel, isActive && { color: Colors.cyan }]}>{st.label}</Text>
+                <Text style={[s.statValue, { color: active ? ACCENT_DARK : st.color }]}>{st.value}</Text>
+                <Text style={[s.statLabel, active && { color: ACCENT_DARK }]}>{st.label}</Text>
               </TouchableOpacity>
             );
           })}
         </View>
 
-        {/* Date range */}
-        <View style={{ paddingHorizontal: Spacing.page, marginBottom: 12 }}>
-          <TouchableOpacity style={s.dateRangeBtn} onPress={() => { setPickingDate('from'); setShowPicker(true); }}>
-            <Ionicons name="calendar-outline" size={14} color={dateFrom ? Colors.cyan : Colors.muted} />
-            <Text style={[s.dateRangeBtnText, dateFrom && { color: Colors.cyan }]}>{dateLabel()}</Text>
-            {(dateFrom || dateTo) && (
-              <TouchableOpacity onPress={clearDates} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Ionicons name="close-circle" size={14} color={Colors.muted} />
-              </TouchableOpacity>
-            )}
-          </TouchableOpacity>
-        </View>
+        {/* Date range label */}
+        {(dateFrom || dateTo) && (
+          <View style={s.dateRow}>
+            <Ionicons name="calendar-outline" size={12} color={ACCENT_DARK} />
+            <Text style={s.dateRowText}>{dateLabel}</Text>
+            <TouchableOpacity onPress={clearDates} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="close-circle" size={13} color={Colors.muted} />
+            </TouchableOpacity>
+          </View>
+        )}
+
         {isLoading ? (
-          <ActivityIndicator color={Colors.cyan} style={{ marginTop: 40 }} />
+          <ActivityIndicator color={ACCENT_DARK} style={{ marginTop: 40 }} />
         ) : filtered.length === 0 ? (
-          <View style={[pageStyles.emptyBox, { borderWidth: 0, backgroundColor: 'transparent', marginTop: 40 }]}>
-            <Ionicons name="cash-outline" size={40} color={Colors.borderMid} />
-            <Text style={pageStyles.emptyText}>no loans found</Text>
+          <View style={s.emptyWrap}>
+            <Ionicons name="cash-outline" size={32} color={Colors.faint} />
+            <Text style={s.emptyText}>no loans found</Text>
           </View>
         ) : (
-          <ScrollView contentContainerStyle={{ paddingHorizontal: Spacing.page, paddingBottom: 120, gap: 10 }} showsVerticalScrollIndicator={false}>
-            {filtered.map(item => (
-              <TouchableOpacity
-                key={item.id}
-                style={[s.recordingCard, { backgroundColor: statusBg(item.status) }]}
-                activeOpacity={0.85}
-                onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: item.id } } as any)}
-              >
-                <Ionicons name={item.categories?.icon ?? 'cash-outline'} size={22} color={statusColor(item.status)} style={{ flexShrink: 0 }} />
-                <View style={s.recordingMiddle}>
-                  <Text style={s.recordingName} numberOfLines={1}>{item.name}</Text>
-                  <Text style={[s.recordingMeta, { fontFamily: Fonts.monoBold, color: statusColor(item.status) }]}>
-                    {item.status === 'paid' ? 'paid' : item.status === 'partial' ? 'partial' : 'unpaid'}
-                  </Text>
-                  <Text style={s.recordingMeta}>{new Date(item.transaction_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</Text>
+          <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+            {grouped.map(group => (
+              <View key={group.label}>
+                <View style={s.dateHeaderRow}>
+                  <Text style={s.dateHeaderText}>{group.label}</Text>
                 </View>
-                <View style={{ alignItems: 'flex-end', gap: 3 }}>
-                  <Text style={[s.recordingAmount, { color: statusColor(item.status) }]}>
-                    {Number(item.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                  </Text>
-                  {item.paid_amount > 0 && item.status !== 'paid' && (
-                    <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: Colors.faint }}>
-                      {Number(item.paid_amount).toLocaleString('en-US', { minimumFractionDigits: 2 })} paid
-                    </Text>
-                  )}
-                </View>
-              </TouchableOpacity>
+                {group.items.map(item => {
+                  const isPaid    = item.status === 'paid';
+                  const isPartial = item.status === 'partial';
+                  const remaining = Number(item.amount) - Number(item.paid_amount ?? 0);
+                  return (
+                    <TouchableOpacity
+                      key={item.id}
+                      style={s.row}
+                      activeOpacity={0.85}
+                      onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: item.id } } as any)}
+                    >
+                      <View style={s.rowIconWrap}>
+                        <Ionicons name={(item.categories?.icon ?? 'cash-outline') as any} size={18} color={isPaid ? ACCENT_DARK : PEACH} />
+                      </View>
+                      <View style={s.rowMid}>
+                        <Text style={s.rowType}>
+                          {isPaid ? 'paid' : isPartial ? 'partial' : 'unpaid'}
+                          {item.account ? ` · ${item.account.bank ?? item.account.account_name}` : ''}
+                        </Text>
+                        <Text style={s.rowName} numberOfLines={1}>{item.name}</Text>
+                        {isPartial && (
+                          <Text style={s.rowSub}>{fmt(Number(item.paid_amount ?? 0))} paid · {fmt(remaining)} left</Text>
+                        )}
+                      </View>
+                      <Text style={[s.rowAmount, { color: isPaid ? ACCENT_DARK : PEACH }]}>
+                        {fmt(Number(item.amount))}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
             ))}
+            <Text style={s.footer}>managed by LEDGR</Text>
           </ScrollView>
         )}
       </SafeAreaView>
 
-      {/* Date range picker */}
-      <ConfirmModal
-        visible={showPicker}
-        onClose={() => { setShowPicker(false); setPickingDate('from'); }}
-        title={pickingDate === 'from' ? 'select start date' : 'select end date'}
-        actions={[
-          { label: 'clear', onPress: () => { clearDates(); setShowPicker(false); }, muted: true },
-          { label: 'done', onPress: () => { setShowPicker(false); setPickingDate('from'); } },
-        ]}
-      >
-        <View style={s.pickerYearRow}>
+      {/* Date picker */}
+      <BottomSheet visible={showPicker} onClose={() => { setShowPicker(false); setPickingDate('from'); }} title={pickingDate === 'from' ? 'start date' : 'end date'} height="55%">
+        <View style={s.pickerNav}>
           <TouchableOpacity onPress={() => { if (pickerMonth === 0) { setPickerMonth(11); setPickerYear(y => y - 1); } else setPickerMonth(m => m - 1); }}>
-            <Ionicons name="chevron-back" size={20} color={Colors.text} />
+            <Ionicons name="chevron-back" size={18} color={Colors.text} />
           </TouchableOpacity>
-          <Text style={s.pickerYearText}>{MONTHS[pickerMonth].toLowerCase()} {pickerYear}</Text>
+          <Text style={s.pickerMonthText}>{MONTHS[pickerMonth].toLowerCase()} {pickerYear}</Text>
           <TouchableOpacity onPress={() => { if (pickerMonth === 11) { setPickerMonth(0); setPickerYear(y => y + 1); } else setPickerMonth(m => m + 1); }}>
-            <Ionicons name="chevron-forward" size={20} color={Colors.text} />
+            <Ionicons name="chevron-forward" size={18} color={Colors.text} />
           </TouchableOpacity>
         </View>
-        <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: Colors.cyan, marginBottom: 8 }}>
-          {pickingDate === 'from' ? 'tap to set start date' : 'tap to set end date'}
+        <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: ACCENT_DARK, marginBottom: 8 }}>
+          {pickingDate === 'from' ? 'tap start date' : 'tap end date'}
         </Text>
-        <View style={{ flexDirection: 'row', marginBottom: 4 }}>
+        <View style={{ flexDirection: 'row', marginBottom: 6 }}>
           {['su','mo','tu','we','th','fr','sa'].map(d => (
-            <Text key={d} style={{ flex: 1, textAlign: 'center', fontFamily: Fonts.sans, fontSize: 11, color: Colors.faint }}>{d}</Text>
+            <Text key={d} style={s.calDay}>{d}</Text>
           ))}
         </View>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', width: '100%' }}>
           {cells.map((day, i) => {
             if (!day) return <View key={`e${i}`} style={s.calCell} />;
             const inRange = isInRange(day);
-            const isEdge = isRangeEdge(day);
-            const isToday = isSameDay(new Date(pickerYear, pickerMonth, day), new Date());
+            const edge    = isRangeEdge(day);
+            const today   = isSameDay(new Date(pickerYear, pickerMonth, day), new Date());
             return (
               <TouchableOpacity
                 key={day}
-                style={[s.calCell, inRange && s.calCellRange, isEdge && s.calCellEdge, !inRange && !isEdge && isToday && s.calCellToday]}
+                style={[s.calCell, inRange && s.calCellRange, edge && s.calCellEdge, !inRange && !edge && today && s.calCellToday]}
                 onPress={() => handleDayPress(day)}
               >
-                <Text style={[s.calCellText, (isEdge || isToday) && s.calCellTextActive]}>{day}</Text>
+                <Text style={[s.calCellText, (edge || today) && s.calCellTextActive]}>{day}</Text>
               </TouchableOpacity>
             );
           })}
         </View>
-      </ConfirmModal>
+        <TouchableOpacity style={s.clearBtn} onPress={() => { clearDates(); setShowPicker(false); }}>
+          <Text style={s.clearBtnText}>clear dates</Text>
+        </TouchableOpacity>
+      </BottomSheet>
     </Animated.View>
   );
 }
 
 const s = StyleSheet.create({
-  pageTitle: { fontFamily: Fonts.calSans, fontSize: 32, color: '#425252', letterSpacing: -0.5 },
-  pageSubtitle: { fontFamily: 'ChillaxRegular', fontSize: 13, color: Colors.muted, marginTop: 2 },
-  statCard: { flex: 1, backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: 10, borderWidth: 1, borderColor: Colors.border, alignItems: 'center' },
-  statValue: { fontFamily: 'ChillaxMedium', fontSize: 13, marginBottom: 2 },
-  statLabel: { fontFamily: 'ChillaxLight', fontSize: 9, color: Colors.muted, textAlign: 'center' },
-  filterChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: Radius.pill, borderWidth: 1, borderColor: Colors.borderMid, backgroundColor: Colors.surface },
-  filterChipActive: { backgroundColor: Colors.text, borderColor: Colors.text },
-  filterChipText: { fontFamily: 'ChillaxMedium', fontSize: 12, color: Colors.muted },
-  filterChipTextActive: { color: Colors.white },
-  dateRangeBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, paddingHorizontal: 14, borderRadius: Radius.pill, borderWidth: 1, borderColor: Colors.borderMid, backgroundColor: Colors.surface },
-  dateRangeBtnText: { fontFamily: Fonts.mono, fontSize: 11, color: Colors.muted, flex: 1 },
-  recordingCard: { flexDirection: 'row', alignItems: 'center', borderRadius: Radius.pill, paddingVertical: 12, paddingHorizontal: 16, gap: 12 },
-  recordingMiddle: { flex: 1, gap: 2, overflow: 'hidden' },
-  recordingName: { fontFamily: 'ChillaxMedium', fontSize: 13, color: '#292929' },
-  recordingMeta: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted },
-  recordingAmount: { fontFamily: Fonts.monoBold, fontSize: 14 },
-  pickerYearRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', paddingHorizontal: 4, marginBottom: 12 },
-  pickerYearText: { fontFamily: Fonts.calSans, fontSize: 16, color: Colors.text },
-  calCell: { width: '14.28%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center', borderRadius: Radius.pill },
-  calCellRange: { backgroundColor: Colors.cyan + '22', borderRadius: 0 },
-  calCellEdge: { backgroundColor: Colors.cyan, borderRadius: Radius.pill },
-  calCellToday: { backgroundColor: Colors.border },
-  calCellText: { fontFamily: Fonts.sans, fontSize: 13, color: Colors.text },
-  calCellTextActive: { fontFamily: Fonts.sansSemiBold, color: Colors.white },
+  // Header
+  header:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 25, paddingTop: 16, paddingBottom: 16, gap: 10, backgroundColor: '#1A1A1A', borderBottomWidth: 1, borderBottomColor: '#333' },
+  backBtn:   { width: 36, height: 36, borderRadius: 18, backgroundColor: '#B6E1DE22', alignItems: 'center', justifyContent: 'center' },
+  title:     { flex: 1, fontFamily: Brand.font.display, fontSize: 20, color: '#B6E1DE', letterSpacing: -0.3, textAlign: 'center' },
+  headerBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#B6E1DE22', alignItems: 'center', justifyContent: 'center' },
+
+  // Stats
+  statsRow:    { flexDirection: 'row', gap: 8, paddingHorizontal: Spacing.page, paddingVertical: 14 },
+  statCard:    { flex: 1, backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: 10, borderWidth: 1, borderColor: Colors.border, alignItems: 'center' },
+  statCardActive: { backgroundColor: ACCENT + '44', borderColor: ACCENT },
+  statValue:   { fontFamily: Fonts.monoBold, fontSize: 13, color: Colors.text, marginBottom: 2 },
+  statLabel:   { fontFamily: Fonts.mono, fontSize: 9, color: Colors.muted, textAlign: 'center', letterSpacing: 0.3 },
+
+  // Date row
+  dateRow:     { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: Spacing.page, paddingBottom: 10 },
+  dateRowText: { fontFamily: Fonts.mono, fontSize: 11, color: ACCENT_DARK, flex: 1 },
+
+  // List
+  scroll:        { paddingHorizontal: Spacing.page, paddingBottom: 80 },
+  emptyWrap:     { alignItems: 'center', gap: 12, paddingVertical: 48 },
+  emptyText:     { fontFamily: Fonts.mono, fontSize: 13, color: Colors.muted },
+  dateHeaderRow: { marginTop: 12, marginBottom: 6, paddingTop: 12 },
+  dateHeaderText:{ fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted, letterSpacing: 1.4, textTransform: 'uppercase' },
+
+  row:         { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  rowIconWrap: { width: 34, height: 34, borderRadius: 17, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.surface },
+  rowMid:      { flex: 1, gap: 2 },
+  rowType:     { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted, letterSpacing: 0.4, textTransform: 'uppercase' },
+  rowName:     { ...Brand.type.cardTitle },
+  rowSub:      { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted },
+  rowAmount:   { fontFamily: Fonts.monoBold, fontSize: 14, letterSpacing: -0.3 },
+
+  footer: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.faint, textAlign: 'center', marginTop: 32 },
+
+  // Calendar
+  pickerNav:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', paddingHorizontal: 4, marginBottom: 10 },
+  pickerMonthText: { fontFamily: Fonts.monoBold, fontSize: 15, color: Colors.text },
+  calDay:          { flex: 1, textAlign: 'center', fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted },
+  calCell:         { width: '14.28%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center', borderRadius: Radius.pill },
+  calCellRange:    { backgroundColor: ACCENT + '55', borderRadius: 0 },
+  calCellEdge:     { backgroundColor: ACCENT_DARK },
+  calCellToday:    { backgroundColor: Colors.surface },
+  calCellText:     { fontFamily: Fonts.mono, fontSize: 13, color: Colors.text },
+  calCellTextActive: { fontFamily: Fonts.monoBold, color: Colors.white },
+  clearBtn:        { alignSelf: 'center', marginTop: 16, paddingHorizontal: 20, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: Colors.surface },
+  clearBtnText:    { fontFamily: Fonts.mono, fontSize: 12, color: Colors.muted },
 });

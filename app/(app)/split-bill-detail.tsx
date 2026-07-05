@@ -59,7 +59,7 @@ export default function SplitBillDetailScreen() {
       supabase.from('split_bills').delete().eq('id', splitBillId),
     ]);
     setDeleteSplitModal(false);
-    queryClient.invalidateQueries({ queryKey: ['split-bills'] });
+    queryClient.invalidateQueries({ queryKey: ['split-bills', userId] });
     router.back();
   };
 
@@ -242,7 +242,7 @@ export default function SplitBillDetailScreen() {
   }, [userId]);
 
   const savePerson = async (name: string) => {
-    if (!name.trim() || filledPeople.includes(name.trim())) return;
+    if (!name.trim() || filledPeople.some(p => p.toLowerCase() === name.trim().toLowerCase())) return;
     await supabase.from('bill_splits').insert({ split_bill_id: splitBillId, user_id: userId, person_name: name.trim() });
     // save to contacts too
     const exists = contacts.includes(name.trim());
@@ -765,7 +765,7 @@ export default function SplitBillDetailScreen() {
       }
       await supabase.from('split_bills').update({ status: 'ongoing' }).eq('id', splitBillId);
       setBillStatus('ongoing');
-      queryClient.invalidateQueries({ queryKey: ['split-bill-recordings', splitBillId] });
+      queryClient.invalidateQueries({ queryKey: ['split-bills', userId] });
       return;
     }
     // Closing — check for incomplete recordings
@@ -800,6 +800,7 @@ export default function SplitBillDetailScreen() {
     } else {
       await supabase.from('split_bills').update({ status: 'closed' }).eq('id', splitBillId);
       setBillStatus('closed');
+      queryClient.invalidateQueries({ queryKey: ['split-bills', userId] });
     }
   };
 
@@ -857,6 +858,7 @@ export default function SplitBillDetailScreen() {
     setBillStatus('closed');
     setCloseWithIncompleteModal(false);
     setClosingLoading(false);
+    queryClient.invalidateQueries({ queryKey: ['split-bills', userId] });
     queryClient.invalidateQueries({ queryKey: ['split-bill-recordings', splitBillId] });
   };
 
@@ -1371,12 +1373,12 @@ export default function SplitBillDetailScreen() {
         {/* Header */}
         <View style={s.header}>
           <TouchableOpacity onPress={handleBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={s.backBtn}>
-            <Ionicons name="arrow-back" size={20} color={Colors.text} />
+            <Ionicons name="arrow-back" size={20} color="#B6E1DE" />
           </TouchableOpacity>
           <Text style={s.title} numberOfLines={1}>{name}</Text>
           {billStatus === 'ongoing' && (
             <TouchableOpacity onPress={openEditName} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={s.headerBtn}>
-              <Ionicons name="create-outline" size={16} color={Colors.muted} />
+              <Ionicons name="create-outline" size={16} color="#B6E1DE" />
             </TouchableOpacity>
           )}
           <View style={s.totalBadge}>
@@ -2053,7 +2055,7 @@ export default function SplitBillDetailScreen() {
             return (
               <>
                 {visible.map((c, i) => {
-                  const added = filledPeople.includes(c);
+                  const added = filledPeople.some(p => p.toLowerCase() === c.toLowerCase());
                   return (
                     <TouchableOpacity
                       key={i}
@@ -2757,9 +2759,9 @@ export default function SplitBillDetailScreen() {
 }
 
 const s = StyleSheet.create({
-  header:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: PAGE, paddingTop: 16, paddingBottom: 8, gap: 10, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  backBtn:    { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center' },
-  title:      { flex: 1, fontFamily: Brand.font.display, fontSize: 20, color: Colors.text, letterSpacing: -0.3 },
+  header:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: PAGE, paddingTop: 16, paddingBottom: 16, gap: 10, backgroundColor: '#1A1A1A', borderBottomWidth: 1, borderBottomColor: '#333' },
+  backBtn:    { width: 36, height: 36, borderRadius: 18, backgroundColor: '#B6E1DE22', alignItems: 'center', justifyContent: 'center' },
+  title:      { flex: 1, fontFamily: Brand.font.display, fontSize: 20, color: '#B6E1DE', letterSpacing: -0.3 },
   totalBadge: { backgroundColor: ACCENT + '44', borderRadius: Radius.pill, paddingHorizontal: 12, paddingVertical: 5 },
   totalBadgeText: { fontFamily: Brand.font.monoBold, fontSize: 12, color: ACCENT_DARK },
 

@@ -1,5 +1,5 @@
 import {
-  View, Text, StyleSheet, TouchableOpacity,
+  View, Text, StyleSheet, TouchableOpacity, TextInput,
   SafeAreaView, Animated, Dimensions, ScrollView, ActivityIndicator, Platform,
 } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
@@ -282,7 +282,7 @@ export default function SpaceDetailScreen() {
     queryFn: async () => {
       const { data } = await supabase
         .from('spaces')
-        .select('budget, space_type')
+        .select('budget, space_type, sort_by')
         .eq('id', spaceId)
         .single();
       return data;
@@ -321,6 +321,20 @@ export default function SpaceDetailScreen() {
   const isExpSpace   = (spaceData?.space_type ?? 'expense') === 'expense';
   const isAllCats    = selectedCategories.has('all');
 
+  const [sortBy, setSortBy] = useState<'date' | 'category'>('date');
+
+  useEffect(() => {
+    if (spaceData?.sort_by) setSortBy(spaceData.sort_by as 'date' | 'category');
+  }, [spaceData]);
+
+  const handleSortToggle = async () => {
+    const next = sortBy === 'date' ? 'category' : 'date';
+    setSortBy(next);
+    if (spaceId && spaceId !== 'all') {
+      await supabase.from('spaces').update({ sort_by: next }).eq('id', spaceId);
+    }
+  };
+
   // ── Computed values ────────────────────────────────────────────────────────
   const range = activePreset === 'custom'
     ? { from: customFrom, to: customTo }
@@ -344,22 +358,28 @@ export default function SpaceDetailScreen() {
     return date <= to;
   });
 
-  // Group filtered by date
+  // Group filtered by date or category
   const grouped: { key: string; label: string; date: Date; items: any[] }[] = [];
-  filtered.forEach(r => {
-    const [y, m, d] = r.transaction_date.split('-').map(Number);
-    const date = new Date(y, m - 1, d);
-    const k = dateKey(date);
-    const existing = grouped.find(g => g.key === k);
-    if (existing) existing.items.push(r);
-    else grouped.push({
-      key:   k,
-      label: smartDateLabel(r.transaction_date),
-      date,
-      items: [r],
+  if (sortBy === 'date') {
+    filtered.forEach(r => {
+      const [y, m, d] = r.transaction_date.split('-').map(Number);
+      const date = new Date(y, m - 1, d);
+      const k = dateKey(date);
+      const existing = grouped.find(g => g.key === k);
+      if (existing) existing.items.push(r);
+      else grouped.push({ key: k, label: smartDateLabel(r.transaction_date), date, items: [r] });
     });
-  });
-  grouped.sort((a, b) => b.date.getTime() - a.date.getTime());
+    grouped.sort((a, b) => b.date.getTime() - a.date.getTime());
+  } else {
+    filtered.forEach(r => {
+      const catName = r.categories?.name ?? 'uncategorized';
+      const existing = grouped.find(g => g.key === catName);
+      if (existing) existing.items.push(r);
+      else grouped.push({ key: catName, label: catName, date: new Date(0), items: [r] });
+    });
+    grouped.sort((a, b) => a.label.localeCompare(b.label));
+    grouped.forEach(g => g.items.sort((a, b) => b.transaction_date.localeCompare(a.transaction_date)));
+  }
 
   // Paginate groups
   const paginatedGroups = grouped.slice(0, displayCount);
@@ -854,6 +874,12 @@ export default function SpaceDetailScreen() {
 
           {/* Filter controls row */}
           <View style={s.filterControlsRow}>
+            {spaceId !== 'all' && (
+              <TouchableOpacity onPress={handleSortToggle} activeOpacity={0.75} style={s.filterBtn}>
+                <Ionicons name={sortBy === 'date' ? 'calendar-outline' : 'pricetag-outline'} size={13} color={Colors.cyan} />
+                <Text style={[s.filterBtnText, { color: Colors.cyan }]}>{sortBy}</Text>
+              </TouchableOpacity>
+            )}
             <View style={s.dateNavRow}>
               <TouchableOpacity style={s.dateNavArrow} onPress={() => navigateRange(-1)} activeOpacity={0.7}>
                 <Ionicons name="chevron-back" size={14} color={Colors.cyan} />
@@ -907,6 +933,9 @@ export default function SpaceDetailScreen() {
                       <View style={s.rowMid}>
                         <Text style={s.rowType}>{tl.label}</Text>
                         <Text style={s.rowName} numberOfLines={1}>{item.name}</Text>
+                        {sortBy === 'category' && (
+                          <Text style={s.rowDate}>{smartDateLabel(item.transaction_date)}</Text>
+                        )}
                       </View>
                       <Text style={[s.rowAmount, { color: tl.color }]}>
                         {item.is_due
@@ -1134,7 +1163,6 @@ const s = StyleSheet.create({
   // Section row (recordings only)
   sectionRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 16, paddingBottom: 8 },
   sectionHeader: { ...Brand.type.sectionHeader },
-
   // Filter controls row
   filterControlsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingTop: 16, paddingBottom: 4 },
   filterRow:    { flexDirection: 'row', alignItems: 'center', gap: 4 },
@@ -1150,7 +1178,7 @@ const s = StyleSheet.create({
   emptyText: { ...Brand.type.emptyText },
 
   // Date groups
-  dateHeaderRow:  { marginTop: 12, marginBottom: 6, borderTopWidth: 1, borderTopColor: Colors.border, paddingTop: 12 },
+  dateHeaderRow:  { marginTop: 12, marginBottom: 6, paddingTop: 12 },
   dateHeaderText: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted, letterSpacing: 1.4, textTransform: 'uppercase' },
 
   // Recording row
@@ -1159,6 +1187,7 @@ const s = StyleSheet.create({
   rowMid:      { flex: 1, gap: 2 },
   rowType:     { fontFamily: Fonts.mono,     fontSize: 10, color: Colors.muted, letterSpacing: 0.4, textTransform: 'uppercase' },
   rowName:     { ...Brand.type.cardTitle },
+  rowDate:     { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted },
   rowAmount:   { fontFamily: Fonts.monoBold, fontSize: 14, letterSpacing: -0.3 },
 
   // Modal chips

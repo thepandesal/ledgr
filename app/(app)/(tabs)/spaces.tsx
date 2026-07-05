@@ -279,7 +279,7 @@ export default function SpacesScreen() {
         const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
         return `${months[from.getMonth()]} ${from.getDate()} – ${months[to.getMonth()]} ${to.getDate()}`;
       }
-      return `${fullMonths[from.getMonth()]} ${from.getFullYear()}`;
+      return `${months[from.getMonth()]} ${from.getFullYear()}`;
     }
     if (mode === 'yearly')  return `${from.getFullYear()}`;
     if (mode === 'daily') {
@@ -288,12 +288,10 @@ export default function SpacesScreen() {
       if (isToday) return 'Today';
       return `${months[from.getMonth()]} ${from.getDate()}, ${from.getFullYear()}`;
     }
-    // weekly — get ISO week number
-    const jan1 = new Date(from.getFullYear(), 0, 1);
-    const weekNum = Math.ceil(((from.getTime() - jan1.getTime()) / 86400000 + jan1.getDay() + 1) / 7);
+    // weekly
     const fromStr = `${months[from.getMonth()]} ${from.getDate()}`;
     const toStr   = `${months[to.getMonth()]} ${to.getDate()}`;
-    return `Wk ${weekNum} · ${fromStr} – ${toStr}`;
+    return `${fromStr} – ${toStr}`;
   };
 
   const openCreate = () => {
@@ -428,6 +426,10 @@ export default function SpacesScreen() {
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
         {/* Date filter row */}
         <View style={s.dateFilterRow}>
+          <TouchableOpacity style={s.modeSelectorBtn} onPress={openDateModal} activeOpacity={0.8}>
+            <Ionicons name="options-outline" size={13} color={ACCENT_DARK} />
+            <Text style={s.modeSelectorText}>filter</Text>
+          </TouchableOpacity>
           <View style={s.dateNav}>
             <TouchableOpacity style={s.dateNavArrow} onPress={() => { const next = dateOffset - 1; setDateOffset(next); saveSetting({ spaces_date_offset: next }); }} activeOpacity={0.7}>
               <Ionicons name="chevron-back" size={14} color={ACCENT_DARK} />
@@ -440,16 +442,10 @@ export default function SpacesScreen() {
               <Ionicons name="chevron-forward" size={14} color={ACCENT_DARK} />
             </TouchableOpacity>
           </View>
-          <View style={{ gap: 6, alignItems: 'flex-end' }}>
-            <TouchableOpacity style={s.modeSelectorBtn} onPress={openCreate} activeOpacity={0.8}>
-              <Ionicons name="add" size={13} color={ACCENT_DARK} />
-              <Text style={s.modeSelectorText}>new space</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={s.modeSelectorBtn} onPress={openDateModal} activeOpacity={0.8}>
-              <Ionicons name="options-outline" size={13} color={ACCENT_DARK} />
-              <Text style={s.modeSelectorText}>filter</Text>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity style={s.modeSelectorBtn} onPress={openCreate} activeOpacity={0.8}>
+            <Ionicons name="add" size={13} color={ACCENT_DARK} />
+            <Text style={s.modeSelectorText}>new space</Text>
+          </TouchableOpacity>
         </View>
 
         {/* ── Empty ── */}
