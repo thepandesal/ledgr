@@ -1761,6 +1761,26 @@ export default function SplitBillDetailScreen() {
                       )}
                     </View>
                     <Text style={[s.itemCost, { color: deduct ? ACCENT_DARK : Colors.text }]}>{deduct ? '-' : ''}{fmt(Number(item.cost))}</Text>
+                    {billStatus === 'ongoing' && item.recording_id && (
+                      <TouchableOpacity
+                        onPress={async () => {
+                          const lr = linkedRecordings.find((l: any) => l.recording?.id === item.recording_id);
+                          if (!lr) return;
+                          setItemRows([{ name: '', cost: '' }]);
+                          setParsedItems([]);
+                          setParsedTotal(null);
+                          setParseReceiptPhotos([]);
+                          setParseError('');
+                          setSelectedRecording(lr);
+                          setItemStep('add-items');
+                          setAddItemModal(true);
+                        }}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        style={{ padding: 4 }}
+                      >
+                        <Ionicons name="create-outline" size={15} color={ACCENT_DARK} />
+                      </TouchableOpacity>
+                    )}
                     {billStatus === 'ongoing' && (
                       <TouchableOpacity onPress={() => deleteItem(item.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                         <Ionicons name="close" size={14} color={Colors.faint} />
@@ -1969,9 +1989,7 @@ export default function SplitBillDetailScreen() {
                     const update = field === 'cost'
                       ? { cost: parseFloat(value) || 0 }
                       : { name: value.trim() };
-                    await supabase.from('split_items').update(update).eq('id', item.id);
-                    refetchItems();
-                    setEditingExistingItem(null);
+                    if (field === 'cost') { const recTotal = Number(selectedRecording?.amount_contributed ?? 0); if (recTotal > 0) { const otherCost = items.filter((i: any) => i.recording_id === selectedRecording?.recording?.id && i.id !== item.id).reduce((s: number, i: any) => s + Number(i.cost), 0); const newRowsCost = itemRows.reduce((s, r) => s + (parseFloat(r.cost || '0') || 0), 0); if (otherCost + (parseFloat(value) || 0) + newRowsCost > recTotal + 0.01) { setParseOverBudgetModal(true); return; } } } await supabase.from('split_items').update(update).eq('id', item.id); refetchItems(); setEditingExistingItem(null);
                   }
                 }}
               >
