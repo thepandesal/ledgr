@@ -120,6 +120,7 @@ export default function SplitBillDetailScreen() {
   // ── People state ─────────────────────────────────────────────────────────
   const [addPersonModal, setAddPersonModal] = useState(false);
   const [tagInputVal, setTagInputVal] = useState('');
+  const suppressSubmitRef = useRef(false);
   const [contacts, setContacts] = useState<string[]>([]);
   const [contactsVisible, setContactsVisible] = useState(5);
   const [peopleVisible, setPeopleVisible] = useState(10);
@@ -394,6 +395,7 @@ export default function SplitBillDetailScreen() {
   };
 
   const handleAddPersonSubmit = async () => {
+    if (suppressSubmitRef.current) { suppressSubmitRef.current = false; return; }
     const personName = tagInputVal.trim();
     if (!personName) return;
     await savePerson(personName);
@@ -2672,7 +2674,7 @@ export default function SplitBillDetailScreen() {
               <>
                 <Text style={[s.contactsLabel, { marginBottom: 6 }]}>friends</Text>
                 {filteredFriends.map(f => (
-                  <TouchableOpacity key={f.id} style={s.contactRow} onPress={() => savePerson(f.name)}>
+                  <TouchableOpacity key={f.id} style={s.contactRow} onPress={() => { suppressSubmitRef.current = true; savePerson(f.name); setTagInputVal(''); }}>
                     <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: ACCENT + '44', justifyContent: 'center', alignItems: 'center' }}>
                       <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 11, color: ACCENT_DARK }}>{f.name.charAt(0).toUpperCase()}</Text>
                     </View>
@@ -2700,7 +2702,7 @@ export default function SplitBillDetailScreen() {
                     <TouchableOpacity
                       key={i}
                       style={[s.contactRow, added && { opacity: 0.35 }]}
-                      onPress={() => { if (!added) { savePerson(c); } }}
+                      onPress={() => { if (!added) { suppressSubmitRef.current = true; savePerson(c); setTagInputVal(''); } }}
                       disabled={added}
                     >
                       <Text style={s.contactName}>{c}</Text>

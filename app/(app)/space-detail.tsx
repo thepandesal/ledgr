@@ -38,6 +38,65 @@ const PRESETS: { key: Preset; label: string; icon: string }[] = [
   { key: 'custom',     label: 'Custom',     icon: 'options-outline'  },
 ];
 
+type LocalDateMode = 'monthly' | 'weekly' | 'daily' | 'yearly' | 'custom';
+type WeekStart = 'monday' | 'sunday' | 'saturday';
+
+function getLocalDateRange(
+  mode: LocalDateMode, offset: number, weekStart: WeekStart,
+  useCutoff: boolean, cutoffDay: number,
+  customFrom?: Date, customTo?: Date
+): { from: Date; to: Date } {
+  if (mode === 'custom' && customFrom && customTo) return { from: customFrom, to: customTo };
+  const now = new Date();
+  if (mode === 'monthly') {
+    if (useCutoff) {
+      let csm = now.getMonth(), csy = now.getFullYear();
+      if (now.getDate() < cutoffDay) { csm -= 1; if (csm < 0) { csm = 11; csy -= 1; } }
+      const base = new Date(csy, csm + offset, 1);
+      return { from: new Date(base.getFullYear(), base.getMonth(), cutoffDay), to: new Date(base.getFullYear(), base.getMonth() + 1, cutoffDay - 1) };
+    }
+    return { from: new Date(now.getFullYear(), now.getMonth() + offset, 1), to: new Date(now.getFullYear(), now.getMonth() + offset + 1, 0) };
+  }
+  if (mode === 'yearly') {
+    const y = now.getFullYear() + offset;
+    return { from: new Date(y, 0, 1), to: new Date(y, 11, 31) };
+  }
+  if (mode === 'daily') {
+    const d = new Date(now); d.setDate(d.getDate() + offset);
+    return { from: d, to: d };
+  }
+  // weekly
+  const startDay = weekStart === 'monday' ? 1 : weekStart === 'sunday' ? 0 : 6;
+  const day = now.getDay();
+  const diff = (day - startDay + 7) % 7;
+  const wf = new Date(now); wf.setDate(now.getDate() - diff + offset * 7);
+  const wt = new Date(wf); wt.setDate(wf.getDate() + 6);
+  return { from: wf, to: wt };
+}
+
+function getLocalDateLabel(
+  mode: LocalDateMode, offset: number, weekStart: WeekStart,
+  useCutoff: boolean, cutoffDay: number,
+  customFrom?: Date, customTo?: Date
+): string {
+  if (mode === 'custom' && customFrom && customTo) {
+    const M = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return `${M[customFrom.getMonth()]} ${customFrom.getDate()} – ${M[customTo.getMonth()]} ${customTo.getDate()}, ${customTo.getFullYear()}`;
+  }
+  const { from, to } = getLocalDateRange(mode, offset, weekStart, useCutoff, cutoffDay);
+  const M = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  if (mode === 'monthly') {
+    if (useCutoff) return `${M[from.getMonth()]} ${from.getDate()} – ${M[to.getMonth()]} ${to.getDate()}`;
+    return `${M[from.getMonth()]} ${from.getFullYear()}`;
+  }
+  if (mode === 'yearly') return `${from.getFullYear()}`;
+  if (mode === 'daily') {
+    const isToday = from.toDateString() === new Date().toDateString();
+    return isToday ? 'Today' : `${M[from.getMonth()]} ${from.getDate()}, ${from.getFullYear()}`;
+  }
+  return `${M[from.getMonth()]} ${from.getDate()} – ${M[to.getMonth()]} ${to.getDate()}`;
+}
+
 // ── Helper functions ─────────────────────────────────────────────────────────
 function isSameDay(a: Date, b: Date) {
   return a.getFullYear() === b.getFullYear()
@@ -144,6 +203,18 @@ export default function SpaceDetailScreen() {
   const [cutoffInput,  setCutoffInput]  = useState('25');
   const [customFrom,   setCustomFrom]   = useState<Date>(new Date());
   const [customTo,     setCustomTo]     = useState<Date>(new Date());
+
+  // Local filter state (temporary — never saved, spaces settings always takes over on load)
+  const [localMode,      setLocalMode]      = useState<LocalDateMode>('monthly');
+  const [localOffset,    setLocalOffset]    = useState(0);
+  const [localWeekStart, setLocalWeekStart] = useState<WeekStart>('monday');
+  const [localUseCutoff, setLocalUseCutoff] = useState(false);
+  const [localCutoffDay, setLocalCutoffDay] = useState(25);
+  const [localCustomFrom, setLocalCustomFrom] = useState('');
+  const [localCustomTo,   setLocalCustomTo]   = useState('');
+  const [showLocalFilter, setShowLocalFilter] = useState(false);
+  // true once spacesSettings has been applied — prevents local changes being overwritten
+  const settingsAppliedRef = useRef(false);
 
   // Calendar picker state
   const [pickingDate, setPickingDate] = useState<'from' | 'to'>('from');
@@ -339,9 +410,10 @@ export default function SpaceDetailScreen() {
   };
 
   // ── Computed values ────────────────────────────────────────────────────────
-  const range = activePreset === 'custom'
-    ? { from: customFrom, to: customTo }
-    : getRangeForPreset(activePreset, cutoffDay, rangeOffset);
+  const range = getLocalDateRange(localMode, localOffset, localWeekStart, localUseCutoff, localCutoffDay,
+    localCustomFrom ? new Date(localCustomFrom) : undefined,
+    localCustomTo   ? new Date(localCustomTo)   : undefined
+  );
 
   const isAll = selectedTabs.has('all');
   const currentTypes = isAll
@@ -435,9 +507,10 @@ export default function SpaceDetailScreen() {
   // Range label
   const fmtShort = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   const fmtFull  = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  const rangeLabel = isSameDay(range.from, range.to)
-    ? fmtFull(range.from)
-    : `${fmtShort(range.from)} – ${fmtFull(range.to)}`;
+  const rangeLabel = getLocalDateLabel(localMode, localOffset, localWeekStart, localUseCutoff, localCutoffDay,
+    localCustomFrom ? new Date(localCustomFrom) : undefined,
+    localCustomTo   ? new Date(localCustomTo)   : undefined
+  );
 
   // Calendar helpers
   const firstDay    = new Date(pickerYear, pickerMonth, 1).getDay();
@@ -455,11 +528,12 @@ export default function SpaceDetailScreen() {
     const offset = Number(spacesSettings.spaces_date_offset ?? 0);
     const useCutoff = Boolean(spacesSettings.spaces_use_cutoff);
     const cutoff = Number(spacesSettings.spaces_cutoff_day ?? 25);
-    
+    const ws = (spacesSettings.spaces_week_start ?? 'monday') as WeekStart;
+
     // Always apply cutoff day if set
     setCutoffDay(cutoff);
     setCutoffInput(String(cutoff));
-    
+
     // Map spaces filters to space-detail presets
     if (dateMode === 'monthly') {
       if (useCutoff) {
@@ -469,9 +543,18 @@ export default function SpaceDetailScreen() {
       }
       setRangeOffset(offset);
     } else {
-      // For non-monthly modes, just use this-month with offset 0
       setActivePreset('this-month');
       setRangeOffset(0);
+    }
+
+    // Initialize local filter to match spaces settings (only on first load)
+    if (!settingsAppliedRef.current) {
+      setLocalMode(dateMode as LocalDateMode);
+      setLocalOffset(offset);
+      setLocalWeekStart(ws);
+      setLocalUseCutoff(useCutoff);
+      setLocalCutoffDay(cutoff);
+      settingsAppliedRef.current = true;
     }
   }, [spacesSettings]);
 
@@ -527,14 +610,7 @@ export default function SpaceDetailScreen() {
 
   const navigateRange = (dir: 1 | -1) => {
     setDisplayCount(10);
-    if (activePreset === 'custom') {
-      const days = Math.round((customTo.getTime() - customFrom.getTime()) / 86400000) + 1;
-      const newFrom = new Date(customFrom); newFrom.setDate(newFrom.getDate() + dir * days);
-      const newTo   = new Date(customTo);   newTo.setDate(newTo.getDate()   + dir * days);
-      setCustomFrom(newFrom); setCustomTo(newTo);
-    } else {
-      setRangeOffset(o => o + dir);
-    }
+    setLocalOffset(o => o + dir);
   };
 
   const applyPreset = (key: Preset) => {
@@ -628,27 +704,52 @@ export default function SpaceDetailScreen() {
     const generatedOn = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 
     // ── Category breakdown ──────────────────────────────────────────────────
-    const ICON_EMOJI: Record<string, string> = {
-      'fitness-outline':'🏋️','barbell-outline':'🏋️','bicycle-outline':'🚴','walk-outline':'🚶',
-      'restaurant-outline':'🍽️','fast-food-outline':'🍔','cafe-outline':'☕','pizza-outline':'🍕',
-      'cart-outline':'🛒','bag-outline':'🛍️','shirt-outline':'👕','storefront-outline':'🏪',
-      'car-outline':'🚗','bus-outline':'🚌','airplane-outline':'✈️','train-outline':'🚆',
-      'home-outline':'🏠','bed-outline':'🛏️','business-outline':'🏢','construct-outline':'🔧',
-      'medkit-outline':'💊','heart-outline':'❤️','bandage-outline':'🩹','pulse-outline':'💓',
-      'school-outline':'🎓','book-outline':'📚','library-outline':'📖','pencil-outline':'✏️',
-      'game-controller-outline':'🎮','film-outline':'🎬','musical-notes-outline':'🎵','tv-outline':'📺',
-      'phone-portrait-outline':'📱','laptop-outline':'💻','desktop-outline':'🖥️','wifi-outline':'📶',
-      'cash-outline':'💵','card-outline':'💳','wallet-outline':'👛','trending-up-outline':'📈',
-      'gift-outline':'🎁','balloon-outline':'🎈','sparkles-outline':'✨','star-outline':'⭐',
-      'paw-outline':'🐾','leaf-outline':'🌿','flower-outline':'🌸','water-outline':'💧',
-      'flash-outline':'⚡','flame-outline':'🔥','snow-outline':'❄️','sunny-outline':'☀️',
-      'people-outline':'👥','person-outline':'👤','happy-outline':'😊','sad-outline':'😢',
+    // SVG paths for common Ionicons (outline variants)
+    const ICON_SVG: Record<string, string> = {
+      'fitness-outline':       'M20.57 14.86L22 13.43 20.57 12 17 15.57 8.43 7 12 3.43 10.57 2 9.14 3.43 7.71 2 5.57 4.14 4.14 2.71 2 4.86l1.43 1.43L2 7.71l1.43 1.43L2 10.57 3.43 12 7 8.43 15.57 17 12 20.57 13.43 22l1.43-1.43L16.29 22l2.14-2.14L19.86 21.43 22 19.29l-1.43-1.43L22 16.43z',
+      'barbell-outline':       'M20.57 14.86L22 13.43 20.57 12 17 15.57 8.43 7 12 3.43 10.57 2 9.14 3.43 7.71 2 5.57 4.14 4.14 2.71 2 4.86l1.43 1.43L2 7.71l1.43 1.43L2 10.57 3.43 12 7 8.43 15.57 17 12 20.57 13.43 22l1.43-1.43L16.29 22l2.14-2.14L19.86 21.43 22 19.29l-1.43-1.43L22 16.43z',
+      'restaurant-outline':    'M18 2v8c0 1.1-.9 2-2 2h-2v10h-2V12H10c-1.1 0-2-.9-2-2V2h2v7h2V2h2v7h2V2h2zM6 2C4.34 2 3 3.34 3 5v6h2.5v11h2V11H10V5c0-1.66-1.34-3-4-3z',
+      'fast-food-outline':     'M18.06 22.99h1.66c.84 0 1.53-.64 1.63-1.46L23 5.05h-5V1h-1.97v4.05h-4.97l.3 2.34c1.71.47 3.31 1.32 4.27 2.26 1.44 1.42 2.43 2.89 2.43 5.29v8.05zM1 21.99V21h15.03v.99c0 .55-.45 1-1.01 1H2.01c-.56 0-1.01-.45-1.01-1zm15.03-7H1v-2h15.03v2zm0-4H1v-2h15.03v2z',
+      'cafe-outline':          'M20 3H4v10c0 2.21 1.79 4 4 4h6c2.21 0 4-1.79 4-4v-3h2c1.11 0 2-.89 2-2V5c0-1.11-.89-2-2-2zm0 5h-2V5h2v3zM4 19h16v2H4z',
+      'cart-outline':          'M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96C5 16.1 6.1 17 7 17h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63H19c.75 0 1.41-.41 1.75-1.03l3.58-6.49A1 1 0 0023.46 4H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z',
+      'bag-outline':           'M18 6h-2c0-2.21-1.79-4-4-4S8 3.79 8 6H6c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-8 4c0 .55-.45 1-1 1s-1-.45-1-1V8h2v2zm2-4c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm4 4c0 .55-.45 1-1 1s-1-.45-1-1V8h2v2z',
+      'car-outline':           'M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z',
+      'airplane-outline':      'M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z',
+      'home-outline':          'M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z',
+      'business-outline':      'M12 7V3H2v18h20V7H12zM6 19H4v-2h2v2zm0-4H4v-2h2v2zm0-4H4V9h2v2zm0-4H4V5h2v2zm4 12H8v-2h2v2zm0-4H8v-2h2v2zm0-4H8V9h2v2zm0-4H8V5h2v2zm10 12h-8v-2h2v-2h-2v-2h2v-2h-2V9h8v10zm-2-8h-2v2h2v-2zm0 4h-2v2h2v-2z',
+      'medkit-outline':        'M20 6h-2.18c.07-.44.18-.88.18-1.36C18 2.53 15.47 0 12.36 0c-1.5 0-2.84.59-3.82 1.55L7 3H4c-1.1 0-2 .9-2 2v15c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-8.55-4.26c.51-.51 1.21-.74 1.91-.74 1.49 0 2.64 1.15 2.64 2.64 0 .48-.14.94-.32 1.36H9.5l2.95-3.26zM13 14h-2v3H9v-3H6v-2h3v-3h2v3h3v2z',
+      'heart-outline':         'M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z',
+      'school-outline':        'M5 13.18v4L12 21l7-3.82v-4L12 17l-7-3.82zM12 3L1 9l11 6 9-4.91V17h2V9L12 3z',
+      'book-outline':          'M18 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 4h5v8l-2.5-1.5L6 12V4z',
+      'game-controller-outline':'M15 7.5V2H9v5.5l3 3 3-3zM7.5 9H2v6h5.5l3-3-3-3zM9 16.5V22h6v-5.5l-3-3-3 3zM16.5 9l-3 3 3 3H22V9h-5.5z',
+      'musical-notes-outline': 'M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z',
+      'phone-portrait-outline':'M17 1.01L7 1c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-1.99-2-1.99zM17 19H7V5h10v14z',
+      'laptop-outline':        'M20 18c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z',
+      'cash-outline':          'M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z',
+      'card-outline':          'M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z',
+      'wallet-outline':        'M21 18v1c0 1.1-.9 2-2 2H5c-1.11 0-2-.9-2-2V5c0-1.1.89-2 2-2h14c1.1 0 2 .9 2 2v1h-9c-1.11 0-2 .9-2 2v8c0 1.1.89 2 2 2h9zm-9-2h10V8H12v8zm4-2.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z',
+      'gift-outline':          'M20 6h-2.18c.07-.44.18-.88.18-1.36C18 2.53 15.47 0 12.36 0c-1.5 0-2.84.59-3.82 1.55L7 3H4c-1.1 0-2 .9-2 2v15c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-7.64-4.26c.51-.51 1.21-.74 1.91-.74 1.49 0 2.64 1.15 2.64 2.64 0 .48-.14.94-.32 1.36H9.5l2.86-3.26zM11 11H4V8h7v3zm2 9H4v-7h9v7zm7 0h-5v-7h5v7zm0-9h-5V8h5v3z',
+      'paw-outline':           'M4.5 9.5a2.5 2.5 0 0 1 0-5 2.5 2.5 0 0 1 0 5zm7-8a2.5 2.5 0 0 1 0 5 2.5 2.5 0 0 1 0-5zm5 0a2.5 2.5 0 0 1 0 5 2.5 2.5 0 0 1 0-5zm3.5 9.5a2.5 2.5 0 0 1 0-5 2.5 2.5 0 0 1 0 5zm-3.5 6.5c-1.5 0-2.5-1-4-1s-2.5 1-4 1c-2 0-4-2-4-5 0-2.5 2-4.5 4-4.5 1 0 2 .5 4 .5s3-.5 4-.5c2 0 4 2 4 4.5 0 3-2 5-4 5z',
+      'leaf-outline':          'M17 8C8 10 5.9 16.17 3.82 21.34L5.71 22l1-2.3A4.49 4.49 0 0 0 8 20C19 20 22 3 22 3c-1 2-8 2-5 8z',
+      'water-outline':         'M12 2c-5.33 4.55-8 8.48-8 11.8 0 4.98 3.8 8.2 8 8.2s8-3.22 8-8.2c0-3.32-2.67-7.25-8-11.8z',
+      'flash-outline':         'M7 2v11h3v9l7-12h-4l4-8z',
+      'flame-outline':         'M13.5.67s.74 2.65.74 4.8c0 2.06-1.35 3.73-3.41 3.73-2.07 0-3.63-1.67-3.63-3.73l.03-.36C5.21 7.51 4 10.62 4 14c0 4.42 3.58 8 8 8s8-3.58 8-8C20 8.61 17.41 3.8 13.5.67zM11.71 19c-1.78 0-3.22-1.4-3.22-3.14 0-1.62 1.05-2.76 2.81-3.12 1.77-.36 3.6-1.21 4.62-2.58.39 1.29.59 2.65.59 4.04 0 2.65-2.15 4.8-4.8 4.8z',
+      'sunny-outline':         'M6.76 4.84l-1.8-1.79-1.41 1.41 1.79 1.79 1.42-1.41zM4 10.5H1v2h3v-2zm9-9.95h-2V3.5h2V.55zm7.45 3.91l-1.41-1.41-1.79 1.79 1.41 1.41 1.79-1.79zm-3.21 13.7l1.79 1.8 1.41-1.41-1.8-1.79-1.4 1.4zM20 10.5v2h3v-2h-3zm-8-5c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6zm-1 16.95h2V19.5h-2v2.95zm-7.45-3.91l1.41 1.41 1.79-1.8-1.41-1.41-1.79 1.8z',
+      'people-outline':        'M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z',
+      'person-outline':        'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z',
+      'trending-up-outline':   'M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z',
+      'star-outline':          'M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z',
+      'ellipse-outline':       'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z',
     };
-    const iconEmoji = (iconName: string, catName: string): string => {
-      if (ICON_EMOJI[iconName]) return `<div style="font-size:28px;line-height:1;margin-bottom:10px">${ICON_EMOJI[iconName]}</div>`;
-      // fallback: bordered initial
+
+    const iconSvg = (iconName: string, catName: string): string => {
+      const path = ICON_SVG[iconName];
+      if (path) {
+        return `<div style="width:36px;height:36px;margin-bottom:10px;background:${BORDER};border-radius:8px;display:flex;align-items:center;justify-content:center;padding:6px;box-sizing:border-box">`+
+          `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="${MUTED}"><path d="${path}"/></svg></div>`;
+      }
       const initial = (catName || '?').charAt(0).toUpperCase();
-      return `<div style="width:40px;height:40px;border:1.5px solid ${BORDER};display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:${MUTED};margin-bottom:10px;flex-shrink:0">${initial}</div>`;
+      return `<div style="width:36px;height:36px;border:1.5px solid ${BORDER};border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:${MUTED};margin-bottom:6px">${initial}</div><div style="font-size:8px;color:${FAINT};margin-bottom:4px;word-break:break-all">${iconName}</div>`;
     };
     const catMap: Record<string, { name: string; icon: string; in: number; out: number; count: number }> = {};
     dateFiltered.forEach((r: any) => {
@@ -664,7 +765,7 @@ export default function SpaceDetailScreen() {
       .sort((a, b) => (b.out + b.in) - (a.out + a.in))
       .map(c => `
         <div style="width:160px;border:1px solid ${BORDER};padding:16px;display:inline-block;vertical-align:top;margin:0 12px 12px 0">
-          ${iconEmoji(c.icon, c.name)}
+          ${iconSvg(c.icon, c.name)}
           <div style="font-size:12px;font-weight:700;color:${TEXT};margin-bottom:12px;text-transform:capitalize">${c.name}</div>
           ${c.in > 0 ? `<div style="margin-bottom:6px"><div style="font-size:9px;font-weight:600;color:${FAINT};letter-spacing:0.6px;text-transform:uppercase;margin-bottom:2px">money in</div><div style="font-size:13px;font-weight:700;color:${TEXT}">${fmtAmt(c.in)}</div></div>` : ''}
           ${c.out > 0 ? `<div><div style="font-size:9px;font-weight:600;color:${FAINT};letter-spacing:0.6px;text-transform:uppercase;margin-bottom:2px">money out</div><div style="font-size:13px;font-weight:700;color:${TEXT}">${fmtAmt(c.out)}</div></div>` : ''}
@@ -1035,16 +1136,20 @@ export default function SpaceDetailScreen() {
               </TouchableOpacity>
             )}
             <View style={s.dateNavRow}>
-              <TouchableOpacity style={s.dateNavArrow} onPress={() => navigateRange(-1)} activeOpacity={0.7}>
-                <Ionicons name="chevron-back" size={14} color={Colors.cyan} />
-              </TouchableOpacity>
-              <TouchableOpacity style={s.filterBtn} onPress={() => setShowDateModal(true)} activeOpacity={0.75}>
+              {localMode !== 'custom' && (
+                <TouchableOpacity style={s.dateNavArrow} onPress={() => navigateRange(-1)} activeOpacity={0.7}>
+                  <Ionicons name="chevron-back" size={14} color={Colors.cyan} />
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity style={s.filterBtn} onPress={() => setShowLocalFilter(true)} activeOpacity={0.75}>
                 <Ionicons name="calendar-outline" size={13} color={Colors.cyan} />
                 <Text style={s.filterBtnText}>{rangeLabel}</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={s.dateNavArrow} onPress={() => navigateRange(1)} activeOpacity={0.7}>
-                <Ionicons name="chevron-forward" size={14} color={Colors.cyan} />
-              </TouchableOpacity>
+              {localMode !== 'custom' && (
+                <TouchableOpacity style={s.dateNavArrow} onPress={() => navigateRange(1)} activeOpacity={0.7}>
+                  <Ionicons name="chevron-forward" size={14} color={Colors.cyan} />
+                </TouchableOpacity>
+              )}
             </View>
             <TouchableOpacity style={s.filterBtn} onPress={handleCategoryFilter} activeOpacity={0.75}>
               <Ionicons name="options-outline" size={13} color={!isAllCats ? Colors.cyan : Colors.muted} />
@@ -1155,67 +1260,93 @@ export default function SpaceDetailScreen() {
         <AddRecordingScreen inlineProps={{ spaceId: spaceId as string, spaceName: name as string, defaultDate: new Date().toISOString().split('T')[0], onClose: () => { setShowAddModal(false); queryClient.refetchQueries({ queryKey: ['recordings', spaceId] }); } }} />
       )}
 
-      {/* Date modal */}
-      <BottomSheet visible={showDateModal} onClose={() => setShowDateModal(false)} title="date range" height={MODAL_HEIGHT}>
+      {/* Local filter modal — temporary, never saved */}
+      <BottomSheet visible={showLocalFilter} onClose={() => setShowLocalFilter(false)} title="date filter" height="55%">
+        <Text style={s.modalLabel}>view by</Text>
         <View style={s.chipRow}>
-          {PRESETS.map(p => {
-            const active = p.key === activePreset;
-            return (
-              <TouchableOpacity key={p.key} style={[s.chip, active && s.chipActive]} onPress={() => applyPreset(p.key)} activeOpacity={0.75}>
-                <Ionicons name={p.icon as any} size={13} color={active ? Colors.white : Colors.muted} />
-                <Text style={[s.chipText, active && s.chipTextActive]}>{p.label}</Text>
-              </TouchableOpacity>
-            );
-          })}
+          {(['monthly','weekly','daily','yearly','custom'] as LocalDateMode[]).map(m => (
+            <TouchableOpacity key={m} style={[s.chip, localMode === m && s.chipActive]} onPress={() => { setLocalMode(m); setLocalOffset(0); setDisplayCount(10); }} activeOpacity={0.75}>
+              <Text style={[s.chipText, localMode === m && s.chipTextActive]}>{m}</Text>
+            </TouchableOpacity>
+          ))}
         </View>
 
-        {activePreset === 'cutoff' && (
-          <View style={{ marginBottom: 16 }}>
-            <Text style={s.modalLabel}>billing cycle starts on day</Text>
+        {localMode === 'custom' && (
+          <>
+            <Text style={s.modalLabel}>from</Text>
+            <TextInput
+              style={[s.chip, { borderColor: Colors.borderMid, paddingHorizontal: 12, fontFamily: Fonts.mono, fontSize: 13, color: Colors.text }]}
+              placeholder="YYYY-MM-DD"
+              placeholderTextColor={Colors.faint}
+              value={localCustomFrom}
+              onChangeText={setLocalCustomFrom}
+              keyboardType="numbers-and-punctuation"
+              maxLength={10}
+            />
+            <Text style={s.modalLabel}>to</Text>
+            <TextInput
+              style={[s.chip, { borderColor: Colors.borderMid, paddingHorizontal: 12, fontFamily: Fonts.mono, fontSize: 13, color: Colors.text }]}
+              placeholder="YYYY-MM-DD"
+              placeholderTextColor={Colors.faint}
+              value={localCustomTo}
+              onChangeText={setLocalCustomTo}
+              keyboardType="numbers-and-punctuation"
+              maxLength={10}
+            />
+          </>
+        )}
+
+        {localMode === 'monthly' && (
+          <>
+            <Text style={s.modalLabel}>use cutoff?</Text>
             <View style={s.chipRow}>
-              {[1,5,10,15,20,25,28].map(d => (
-                <TouchableOpacity key={d} style={[s.chip, parseInt(cutoffInput) === d && s.chipActive]} onPress={() => { setCutoffInput(String(d)); setCutoffDay(d); }}>
-                  <Text style={[s.chipText, parseInt(cutoffInput) === d && s.chipTextActive]}>{d}</Text>
+              <TouchableOpacity style={[s.chip, localUseCutoff && s.chipActive]} onPress={() => setLocalUseCutoff(true)} activeOpacity={0.75}>
+                <Text style={[s.chipText, localUseCutoff && s.chipTextActive]}>yes</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[s.chip, !localUseCutoff && s.chipActive]} onPress={() => setLocalUseCutoff(false)} activeOpacity={0.75}>
+                <Text style={[s.chipText, !localUseCutoff && s.chipTextActive]}>no</Text>
+              </TouchableOpacity>
+            </View>
+            {localUseCutoff && (
+              <>
+                <Text style={s.modalLabel}>cutoff day</Text>
+                <View style={s.chipRow}>
+                  {[1,5,10,15,20,25,28].map(d => (
+                    <TouchableOpacity key={d} style={[s.chip, localCutoffDay === d && s.chipActive]} onPress={() => setLocalCutoffDay(d)} activeOpacity={0.75}>
+                      <Text style={[s.chipText, localCutoffDay === d && s.chipTextActive]}>{d}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </>
+            )}
+          </>
+        )}
+
+        {localMode === 'weekly' && (
+          <>
+            <Text style={s.modalLabel}>week starts on</Text>
+            <View style={s.chipRow}>
+              {(['monday','sunday','saturday'] as WeekStart[]).map(ws => (
+                <TouchableOpacity key={ws} style={[s.chip, localWeekStart === ws && s.chipActive]} onPress={() => { setLocalWeekStart(ws); setLocalOffset(0); }} activeOpacity={0.75}>
+                  <Text style={[s.chipText, localWeekStart === ws && s.chipTextActive]}>{ws}</Text>
                 </TouchableOpacity>
               ))}
             </View>
-          </View>
+          </>
         )}
 
-        {activePreset === 'custom' && (
-          <View style={s.calWrap}>
-            <Text style={s.calHint}>{pickingDate === 'from' ? 'tap start date' : 'tap end date'}</Text>
-            <View style={s.pickerNav}>
-              <TouchableOpacity onPress={() => { if (pickerMonth === 0) { setPickerMonth(11); setPickerYear(y => y - 1); } else setPickerMonth(m => m - 1); }}>
-                <Ionicons name="chevron-back" size={18} color={Colors.text} />
-              </TouchableOpacity>
-              <Text style={s.pickerMonthText}>{MONTHS[pickerMonth].toLowerCase()} {pickerYear}</Text>
-              <TouchableOpacity onPress={() => { if (pickerMonth === 11) { setPickerMonth(0); setPickerYear(y => y + 1); } else setPickerMonth(m => m + 1); }}>
-                <Ionicons name="chevron-forward" size={18} color={Colors.text} />
-              </TouchableOpacity>
-            </View>
-            <View style={{ flexDirection: 'row', marginBottom: 6 }}>
-              {['su','mo','tu','we','th','fr','sa'].map(d => <Text key={d} style={s.calDay}>{d}</Text>)}
-            </View>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', width: '100%' }}>
-              {cells.map((day, i) => {
-                if (!day) return <View key={`e${i}`} style={s.calCell} />;
-                const inRange = isInRange(day);
-                const edge    = isEdge(day);
-                const today   = isSameDay(new Date(pickerYear, pickerMonth, day), new Date());
-                return (
-                  <TouchableOpacity
-                    key={day}
-                    style={[s.calCell, inRange && s.calCellRange, edge && s.calCellEdge, !inRange && !edge && today && s.calCellToday]}
-                    onPress={() => handleDayPress(day)}
-                  >
-                    <Text style={[s.calCellText, (edge || today) && s.calCellTextActive]}>{day}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </View>
-        )}
+        <Text style={[s.modalLabel, { marginTop: 8 }]}>quick jump</Text>
+        <View style={s.chipRow}>
+          {[{label:'Today',mode:'daily'},{label:'This Week',mode:'weekly'},{label:'This Month',mode:'monthly'},{label:'This Year',mode:'yearly'}].map(p => (
+            <TouchableOpacity key={p.label} style={s.chip} onPress={() => { setLocalMode(p.mode as LocalDateMode); setLocalOffset(0); setDisplayCount(10); setShowLocalFilter(false); }} activeOpacity={0.75}>
+              <Text style={s.chipText}>{p.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: Colors.faint, marginTop: 12 }}>
+          temporary — spaces filter always resets this on open
+        </Text>
       </BottomSheet>
 
       {/* Filter modal */}
