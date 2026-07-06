@@ -2660,8 +2660,32 @@ export default function SplitBillDetailScreen() {
             autoFocus
           />
         </View>
-        <Text style={s.contactsLabel}>your contacts</Text>
-        <ScrollView style={{ maxHeight: 200 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+        <ScrollView style={{ maxHeight: 260 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          {/* Friends section */}
+          {friends.length > 0 && (() => {
+            const filteredFriends = friends.filter(f =>
+              (!tagInputVal.trim() || f.name.toLowerCase().includes(tagInputVal.toLowerCase())) &&
+              !filledPeople.some(p => p.toLowerCase() === f.name.toLowerCase())
+            );
+            if (filteredFriends.length === 0) return null;
+            return (
+              <>
+                <Text style={[s.contactsLabel, { marginBottom: 6 }]}>friends</Text>
+                {filteredFriends.map(f => (
+                  <TouchableOpacity key={f.id} style={s.contactRow} onPress={() => savePerson(f.name)}>
+                    <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: ACCENT + '44', justifyContent: 'center', alignItems: 'center' }}>
+                      <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 11, color: ACCENT_DARK }}>{f.name.charAt(0).toUpperCase()}</Text>
+                    </View>
+                    <Text style={[s.contactName, { flex: 1 }]}>{f.name}</Text>
+                    <Ionicons name="add" size={14} color={ACCENT_DARK} />
+                  </TouchableOpacity>
+                ))}
+                <View style={{ height: 1, backgroundColor: Colors.border, marginVertical: 8 }} />
+              </>
+            );
+          })()}
+          {/* Contacts section */}
+          <Text style={[s.contactsLabel, { marginBottom: 6 }]}>contacts</Text>
           {contacts.length === 0 && <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: Colors.faint }}>no contacts saved yet</Text>}
           {(() => {
             const filtered = contacts.filter(c =>
