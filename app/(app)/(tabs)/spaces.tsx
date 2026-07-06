@@ -460,8 +460,7 @@ export default function SpacesScreen() {
     setRespondingInvite(null);
   };
   const { data: sharedSpaces = [] } = useQuery<(SpaceData & { role: string; ownerName: string })[]>({
-    queryKey: ['shared-spaces', userId],
-    staleTime: 0,
+    queryKey: ['shared-spaces', userId, dateMode, dateOffset, weekStart, useCutoff, cutoffDay],
     queryFn: async () => {
       const { data: members } = await supabase
         .from('space_members')
@@ -481,10 +480,31 @@ export default function SpacesScreen() {
           supabase.rpc('get_user_display_name', { user_id: id }).then(({ data }) => ({ id, name: data ?? 'unknown' }))
         )
       );
+      // Fetch recording stats for each shared space
+      const { from, to } = getDateRange(dateMode, dateOffset, weekStart, useCutoff, cutoffDay);
+      const fromStr = `${from.getFullYear()}-${String(from.getMonth()+1).padStart(2,'0')}-${String(from.getDate()).padStart(2,'0')}`;
+      const toStr   = `${to.getFullYear()}-${String(to.getMonth()+1).padStart(2,'0')}-${String(to.getDate()).padStart(2,'0')}`;
+      const { data: allRecs } = await supabase.from('recordings')
+        .select('space_id, amount, type')
+        .in('space_id', spaceIds)
+        .gte('transaction_date', fromStr).lte('transaction_date', toStr);
+      const { data: allTimeRecs } = await supabase.from('recordings')
+        .select('space_id, amount, type').in('space_id', spaceIds).in('type', ['income', 'expense']);
+      const spentMap: Record<string, number> = {};
+      const savedMap: Record<string, number> = {};
+      const savedAllTimeMap: Record<string, number> = {};
+      (allTimeRecs ?? []).forEach((r: any) => {
+        if (r.type === 'income') savedAllTimeMap[r.space_id] = (savedAllTimeMap[r.space_id] ?? 0) + Number(r.amount);
+        else if (r.type === 'expense') savedAllTimeMap[r.space_id] = (savedAllTimeMap[r.space_id] ?? 0) - Number(r.amount);
+      });
+      (allRecs ?? []).forEach((r: any) => {
+        if (r.type === 'income' || r.type === 'due') savedMap[r.space_id] = (savedMap[r.space_id] ?? 0) + Number(r.amount);
+        else if (r.type === 'expense' || r.type === 'debt') spentMap[r.space_id] = (spentMap[r.space_id] ?? 0) + Number(r.amount);
+      });
       return spaceRows.map((sp: any) => {
         const member = members.find((m: any) => m.space_id === sp.id);
         const owner = ownerNames.find((o: any) => o.id === sp.user_id);
-        return { ...sp, spent: 0, saved: 0, savedAllTime: 0, count: 0, role: member?.role ?? 'viewer', ownerName: owner?.name ?? 'unknown' };
+        return { ...sp, spent: spentMap[sp.id] ?? 0, saved: savedMap[sp.id] ?? 0, savedAllTime: savedAllTimeMap[sp.id] ?? 0, count: 0, role: member?.role ?? 'viewer', ownerName: owner?.name ?? 'unknown' };
       });
     },
     enabled: !!userId,
@@ -612,6 +632,15 @@ export default function SpacesScreen() {
             <View style={s.list}>
               {sharedSpaces.map((space: any) => {
                 const isExpense = (space.space_type ?? 'expense') === 'expense';
+                const value   = space.spent ?? 0;
+                const saved   = space.saved ?? 0;
+                const allTime = space.savedAllTime ?? 0;
+                const budget  = space.budget ?? 0;
+                const over    = isExpense && budget > 0 && value > budget;
+                const remaining = isExpense ? budget - value : Math.max(budget - allTime, 0);
+                const statusColor = over ? Colors.expense : budget > 0 && isExpense && remaining / budget < 0.2 ? '#F97316' : ACCENT_DARK;
+                const savingsPct  = budget > 0 ? Math.min(allTime / budget, 1) : 0;
+                const savingsColor = savingsPct >= 1 ? ACCENT_DARK : '#F97316';
                 return (
                   <TouchableOpacity
                     key={space.id}
@@ -622,10 +651,27 @@ export default function SpacesScreen() {
                     <View style={s.cardLeft}>
                       <Text style={s.cardName}>{String(space.name).toLowerCase()}</Text>
                       <Text style={s.cardMeta}>{isExpense ? 'expense tracker' : 'savings tracker'}</Text>
-                      <Text style={[s.cardMeta, { color: ACCENT_DARK }]}>{space.role}</Text>
+                      <Text style={[s.cardMeta, { color: ACCENT_DARK }]}>{space.role} · {space.ownerName}</Text>
                     </View>
                     <View style={s.cardRight}>
-                      <Text style={[s.cardMeta, { color: Colors.muted }]}>by {space.ownerName}</Text>
+                      {isExpense ? (
+                        <>
+                          <View style={s.cardRow}><Text style={s.cardRowLabel}>money in</Text><Text style={s.cardRowValue}>{fmtCompact(saved)}</Text></View>
+                          <View style={s.cardRow}><Text style={s.cardRowLabel}>money out</Text><Text style={[s.cardRowValue, over && { color: Colors.expense }]}>{fmtCompact(value)}</Text></View>
+                          {budget > 0 && <View style={s.cardRow}><Text style={s.cardRowLabel}>budget</Text><Text style={[s.cardRowValue, { color: statusColor }]}>{fmtCompact(budget)}</Text></View>}
+                        </>
+                      ) : (
+                        <>
+                          <View style={s.cardRow}><Text style={s.cardRowLabel}>saved</Text><Text style={[s.cardRowValue, { color: ACCENT_DARK }]}>{fmtCompact(saved)}</Text></View>
+                          <View style={s.cardRow}><Text style={s.cardRowLabel}>all time</Text><Text style={[s.cardRowValue, { color: ACCENT_DARK }]}>{fmtCompact(allTime)}</Text></View>
+                          {budget > 0 && (
+                            <>
+                              <View style={s.cardRow}><Text style={s.cardRowLabel}>goal</Text><Text style={s.cardRowValue}>{fmtCompact(budget)}</Text></View>
+                              <View style={s.cardRow}><Text style={s.cardRowLabel}>remaining</Text><Text style={[s.cardRowValue, { color: savingsColor }]}>{fmtCompact(remaining)}</Text></View>
+                            </>
+                          )}
+                        </>
+                      )}
                     </View>
                     <Ionicons name="people-outline" size={14} color={Colors.muted} />
                   </TouchableOpacity>
