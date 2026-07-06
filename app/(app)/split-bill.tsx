@@ -23,6 +23,7 @@ export default function SplitBillScreen() {
   const [newPerson, setNewPerson] = useState('');
   const [personSuggestions, setPersonSuggestions] = useState<string[]>([]);
   const [allContacts, setAllContacts] = useState<string[]>([]);
+  const [friends, setFriends] = useState<{ id: string; name: string }[]>([]);
   const [newItemName, setNewItemName] = useState('');
   const [newItemAmount, setNewItemAmount] = useState('');
   const [loading, setLoading] = useState(true);
@@ -39,11 +40,27 @@ export default function SplitBillScreen() {
   const init = async () => {
     setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      setUserId(user.id);
+    const uid = user?.id ?? (await supabase.auth.getSession()).data.session?.user.id;
+    if (uid) {
+      setUserId(uid);
       // Load contacts
-      const { data: contacts } = await supabase.from('contacts').select('name').eq('user_id', user.id).order('name');
+      const { data: contacts } = await supabase.from('contacts').select('name').eq('user_id', uid).order('name');
       if (contacts) setAllContacts(contacts.map((c: any) => c.name));
+      // Load friends — mirror contacts.tsx pattern exactly
+      const { data: friendships } = await supabase
+        .from('friendships')
+        .select('id, requester_id, receiver_id')
+        .eq('status', 'accepted')
+        .or(`requester_id.eq.${uid},receiver_id.eq.${uid}`);
+      if (friendships && friendships.length > 0) {
+        const friendIds = friendships.map((f: any) => f.requester_id === uid ? f.receiver_id : f.requester_id);
+        const names = await Promise.all(
+          friendIds.map((fid: string) =>
+            supabase.rpc('get_user_display_name', { user_id: fid }).then(({ data: n }) => ({ id: fid, name: n ?? 'unknown' }))
+          )
+        );
+        setFriends(names.sort((a, b) => a.name.localeCompare(b.name)));
+      }
     }
     // Load existing split
     const { data: split } = await supabase.from('bill_splits').select('id').eq('recording_id', recordingId).single();
@@ -230,6 +247,23 @@ export default function SplitBillScreen() {
                 ))}
               </View>
             )}
+            {friends.filter(f => !people.some(p => p.name.toLowerCase() === f.name.toLowerCase())).length > 0 && (
+              <>
+                <Text style={styles.friendsLabel}>friends</Text>
+                <View style={styles.friendsRow}>
+                  {friends
+                    .filter(f => !people.some(p => p.name.toLowerCase() === f.name.toLowerCase()))
+                    .map(f => (
+                      <TouchableOpacity key={f.id} style={styles.friendChip} onPress={() => addPerson(f.name)}>
+                        <View style={styles.friendAvatar}>
+                          <Text style={styles.friendAvatarText}>{f.name.charAt(0).toUpperCase()}</Text>
+                        </View>
+                        <Text style={styles.friendChipText}>{f.name}</Text>
+                      </TouchableOpacity>
+                    ))}
+                </View>
+              </>
+            )}
 
             {/* Items */}
             <View style={styles.sectionHeader}>
@@ -362,6 +396,12 @@ const styles = StyleSheet.create({
   suggestions: { backgroundColor: '#ffffff', borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: '#e8e8e8' },
   suggestion: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#f5f5f5' },
   suggestionText: { fontFamily: 'DMSans_400Regular', fontSize: 14, color: '#1c1d1d' },
+  friendsLabel: { fontFamily: 'DMSans_700Bold', fontSize: 11, color: '#b0b0b0', textTransform: 'uppercase', letterSpacing: 0.6, marginTop: 10, marginBottom: 6 },
+  friendsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 4 },
+  friendChip: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#ffffff', borderRadius: 999, paddingVertical: 7, paddingHorizontal: 12, borderWidth: 1, borderColor: '#e8e8e8' },
+  friendAvatar: { width: 22, height: 22, borderRadius: 11, backgroundColor: '#00bf6322', justifyContent: 'center', alignItems: 'center' },
+  friendAvatarText: { fontFamily: 'DMSans_700Bold', fontSize: 11, color: '#00bf63' },
+  friendChipText: { fontFamily: 'DMSans_600SemiBold', fontSize: 13, color: '#1c1d1d' },
   itemCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ffffff', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: '#e8e8e8' },
   itemLeft: { flex: 1 },
   itemName: { fontFamily: 'DMSans_600SemiBold', fontSize: 14, color: '#1c1d1d' },

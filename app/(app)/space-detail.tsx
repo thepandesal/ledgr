@@ -595,13 +595,10 @@ export default function SpaceDetailScreen() {
     const fmtAmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2 });
     const fmtD = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 
-    const TEAL   = '#2A7A6F';
-    const PEACH_C = '#FFAB91';
-    const MINT    = '#B6E1DE';
-    const TEXT    = '#425252';
-    const MUTED   = '#929090';
-    const FAINT   = '#c0c0c0';
-    const BORDER  = '#f0f0f0';
+    const TEXT   = '#111111';
+    const MUTED  = '#666666';
+    const FAINT  = '#999999';
+    const BORDER = '#e0e0e0';
 
     // Build groups from all date-filtered recordings (ignores tab filter) for accurate totals
     // Exclude linked recordings — they'll be appended after their parent
@@ -615,22 +612,63 @@ export default function SpaceDetailScreen() {
       if (existing) existing.items.push(r);
       else allGrouped.push({ key: k, date, items: [r] });
     });
+    // Sort earliest → oldest
     const sortedGroups = allGrouped.sort((a, b) => a.date.getTime() - b.date.getTime());
 
     let totalIn = 0, totalOut = 0;
     sortedGroups.flatMap(g => g.items).forEach((r: any) => {
-      if (r.type === 'income') totalIn += Number(r.amount);
-      else if (r.type === 'expense' || r.type === 'debt' || r.type === 'payment') {
-        totalOut += Number(r.amount);
-      }
+      if (r.type === 'income' || r.type === 'return') totalIn += Number(r.amount);
+      else if (r.type === 'expense' || r.type === 'debt' || r.type === 'payment') totalOut += Number(r.amount);
     });
     const netBalance = totalIn - totalOut;
-    const netColor = netBalance >= 0 ? TEAL : PEACH_C;
 
     const rangeStr = isSameDay(range.from, range.to)
       ? fmtDate(fmtD(range.from))
       : `${fmtDate(fmtD(range.from))} &ndash; ${fmtDate(fmtD(range.to))}`;
     const generatedOn = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+
+    // ── Category breakdown ──────────────────────────────────────────────────
+    const ICON_EMOJI: Record<string, string> = {
+      'fitness-outline':'🏋️','barbell-outline':'🏋️','bicycle-outline':'🚴','walk-outline':'🚶',
+      'restaurant-outline':'🍽️','fast-food-outline':'🍔','cafe-outline':'☕','pizza-outline':'🍕',
+      'cart-outline':'🛒','bag-outline':'🛍️','shirt-outline':'👕','storefront-outline':'🏪',
+      'car-outline':'🚗','bus-outline':'🚌','airplane-outline':'✈️','train-outline':'🚆',
+      'home-outline':'🏠','bed-outline':'🛏️','business-outline':'🏢','construct-outline':'🔧',
+      'medkit-outline':'💊','heart-outline':'❤️','bandage-outline':'🩹','pulse-outline':'💓',
+      'school-outline':'🎓','book-outline':'📚','library-outline':'📖','pencil-outline':'✏️',
+      'game-controller-outline':'🎮','film-outline':'🎬','musical-notes-outline':'🎵','tv-outline':'📺',
+      'phone-portrait-outline':'📱','laptop-outline':'💻','desktop-outline':'🖥️','wifi-outline':'📶',
+      'cash-outline':'💵','card-outline':'💳','wallet-outline':'👛','trending-up-outline':'📈',
+      'gift-outline':'🎁','balloon-outline':'🎈','sparkles-outline':'✨','star-outline':'⭐',
+      'paw-outline':'🐾','leaf-outline':'🌿','flower-outline':'🌸','water-outline':'💧',
+      'flash-outline':'⚡','flame-outline':'🔥','snow-outline':'❄️','sunny-outline':'☀️',
+      'people-outline':'👥','person-outline':'👤','happy-outline':'😊','sad-outline':'😢',
+    };
+    const iconEmoji = (iconName: string, catName: string): string => {
+      if (ICON_EMOJI[iconName]) return `<div style="font-size:28px;line-height:1;margin-bottom:10px">${ICON_EMOJI[iconName]}</div>`;
+      // fallback: bordered initial
+      const initial = (catName || '?').charAt(0).toUpperCase();
+      return `<div style="width:40px;height:40px;border:1.5px solid ${BORDER};display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:${MUTED};margin-bottom:10px;flex-shrink:0">${initial}</div>`;
+    };
+    const catMap: Record<string, { name: string; icon: string; in: number; out: number; count: number }> = {};
+    dateFiltered.forEach((r: any) => {
+      const key = r.categories?.name ?? 'uncategorized';
+      if (!catMap[key]) catMap[key] = { name: key, icon: r.categories?.icon ?? '', in: 0, out: 0, count: 0 };
+      const isCredit = r.type === 'income' || r.type === 'return';
+      const isDebit  = r.type === 'expense' || r.type === 'debt' || r.type === 'payment';
+      if (isCredit) catMap[key].in  += Number(r.amount);
+      if (isDebit)  catMap[key].out += Number(r.amount);
+      catMap[key].count++;
+    });
+    const catCards = Object.values(catMap)
+      .sort((a, b) => (b.out + b.in) - (a.out + a.in))
+      .map(c => `
+        <div style="width:160px;border:1px solid ${BORDER};padding:16px;display:inline-block;vertical-align:top;margin:0 12px 12px 0">
+          ${iconEmoji(c.icon, c.name)}
+          <div style="font-size:12px;font-weight:700;color:${TEXT};margin-bottom:12px;text-transform:capitalize">${c.name}</div>
+          ${c.in > 0 ? `<div style="margin-bottom:6px"><div style="font-size:9px;font-weight:600;color:${FAINT};letter-spacing:0.6px;text-transform:uppercase;margin-bottom:2px">money in</div><div style="font-size:13px;font-weight:700;color:${TEXT}">${fmtAmt(c.in)}</div></div>` : ''}
+          ${c.out > 0 ? `<div><div style="font-size:9px;font-weight:600;color:${FAINT};letter-spacing:0.6px;text-transform:uppercase;margin-bottom:2px">money out</div><div style="font-size:13px;font-weight:700;color:${TEXT}">${fmtAmt(c.out)}</div></div>` : ''}
+        </div>`).join('');
 
     // Flatten all items across groups into a single sorted list, appending linked activities after their parent
     const allItems: any[] = [];
@@ -649,80 +687,81 @@ export default function SpaceDetailScreen() {
         const isDebit  = r.type === 'expense' || r.type === 'debt' || r.type === 'payment';
         if (isCredit) runningBalance += displayAmt;
         else if (isDebit) runningBalance -= displayAmt;
-        const balColor = runningBalance >= 0 ? TEAL : PEACH_C;
 
-        return `<tr style="border-bottom:1px solid ${BORDER}">
-          <td style="padding:10px 8px;font-family:monospace;font-size:10px;color:${MUTED};white-space:nowrap">${fmtDate(r.transaction_date)}</td>
-          <td style="padding:10px 8px">
-            <div style="font-family:monospace;font-size:12px;font-weight:700;color:${TEXT}">${r.name}</div>
-            ${r.categories?.name ? `<div style="font-family:monospace;font-size:10px;color:${FAINT};margin-top:2px">${r.categories.name}</div>` : ''}
+        return `<tr>
+          <td style="padding:9px 8px;font-size:11px;color:${MUTED};white-space:nowrap">${fmtDate(r.transaction_date)}</td>
+          <td style="padding:9px 8px">
+            <div style="font-size:12px;font-weight:600;color:${TEXT}">${r.name}</div>
+            ${r.categories?.name ? `<div style="font-size:10px;color:${FAINT};margin-top:1px">${r.categories.name}</div>` : ''}
           </td>
-          <td style="padding:10px 8px;text-align:center">
-            <span style="font-family:monospace;font-size:9px;font-weight:700;padding:3px 8px;border-radius:999px;background:${isCredit ? MINT + '55' : PEACH_C + '44'};color:${isCredit ? TEAL : PEACH_C};white-space:nowrap;letter-spacing:0.3px">${tl.label.toUpperCase()}</span>
-          </td>
-          <td style="padding:10px 8px;text-align:right;font-family:monospace;font-size:12px;font-weight:700;color:${PEACH_C}">${isDebit ? fmtAmt(displayAmt) : ''}</td>
-          <td style="padding:10px 8px;text-align:right;font-family:monospace;font-size:12px;font-weight:700;color:${TEAL}">${isCredit ? fmtAmt(displayAmt) : ''}</td>
-          <td style="padding:10px 8px;text-align:right;font-family:monospace;font-size:12px;font-weight:700;color:${balColor}">${fmtAmt(runningBalance)}</td>
+          <td style="padding:9px 8px;font-size:10px;color:${MUTED};text-transform:uppercase;letter-spacing:0.4px">${tl.label}</td>
+          <td style="padding:9px 8px;text-align:right;font-size:12px;color:${TEXT}">${isDebit ? fmtAmt(displayAmt) : ''}</td>
+          <td style="padding:9px 8px;text-align:right;font-size:12px;color:${TEXT}">${isCredit ? fmtAmt(displayAmt) : ''}</td>
+          <td style="padding:9px 8px;text-align:right;font-size:12px;font-weight:600;color:${TEXT}">${fmtAmt(runningBalance)}</td>
         </tr>`;
       }).join('');
 
     return `<!DOCTYPE html><html><head><meta charset="utf-8">
 <style>
   * { box-sizing:border-box; margin:0; padding:0; }
-  body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; background:#fff; width:794px; padding:32px; }
+  body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif; background:#fff; width:794px; padding:40px; color:${TEXT}; }
   table { width:100%; border-collapse:collapse; }
-  th { padding:9px 8px; font-family:monospace; font-size:10px; font-weight:700; color:${MUTED}; text-transform:uppercase; letter-spacing:0.6px; border-bottom:1px solid ${BORDER}; }
+  tr { border-bottom:1px solid ${BORDER}; }
+  th { padding:8px 8px; font-size:10px; font-weight:600; color:${MUTED}; text-transform:uppercase; letter-spacing:0.6px; border-bottom:2px solid ${TEXT}; text-align:left; }
   th:nth-child(4), th:nth-child(5), th:nth-child(6) { text-align:right; }
 </style>
 </head><body>
 
-<div style="font-family:monospace;font-size:13px;font-weight:700;color:${TEAL};letter-spacing:1px;margin-bottom:16px">LEDGR</div>
-<div style="font-size:26px;font-weight:600;color:${TEXT};letter-spacing:-0.5px;margin-bottom:6px">${String(name)}</div>
-<div style="font-family:monospace;font-size:11px;color:${MUTED};margin-bottom:2px">${rangeStr}</div>
-<div style="font-family:monospace;font-size:10px;color:${FAINT};margin-bottom:24px">${dateFiltered.length} transaction${dateFiltered.length !== 1 ? 's' : ''} &middot; generated ${generatedOn}</div>
+<div style="font-size:11px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:${MUTED};margin-bottom:32px">LEDGR</div>
 
-<div style="height:1px;background:${BORDER};margin-bottom:20px"></div>
+<div style="font-size:22px;font-weight:700;color:${TEXT};margin-bottom:4px">${String(name)}</div>
+<div style="font-size:12px;color:${MUTED};margin-bottom:2px">${rangeStr}</div>
+<div style="font-size:11px;color:${FAINT};margin-bottom:32px">${dateFiltered.length} transaction${dateFiltered.length !== 1 ? 's' : ''} &middot; generated ${generatedOn}</div>
 
-<div style="display:flex;gap:12px;margin-bottom:24px">
-  <div style="flex:1;border:1px solid ${BORDER};border-radius:12px;padding:14px 16px">
-    <div style="font-family:monospace;font-size:10px;color:${MUTED};letter-spacing:0.6px;text-transform:uppercase;margin-bottom:6px">money in</div>
-    <div style="font-family:monospace;font-size:18px;font-weight:700;color:${TEAL}">${fmtAmt(totalIn)}</div>
+<div style="height:1px;background:${TEXT};margin-bottom:24px"></div>
+
+<div style="display:flex;gap:0;margin-bottom:32px;border:1px solid ${BORDER}">
+  <div style="flex:1;padding:16px 20px;border-right:1px solid ${BORDER}">
+    <div style="font-size:10px;font-weight:600;color:${MUTED};letter-spacing:0.6px;text-transform:uppercase;margin-bottom:6px">Money In</div>
+    <div style="font-size:18px;font-weight:700;color:${TEXT}">${fmtAmt(totalIn)}</div>
   </div>
-  <div style="flex:1;border:1px solid ${BORDER};border-radius:12px;padding:14px 16px">
-    <div style="font-family:monospace;font-size:10px;color:${MUTED};letter-spacing:0.6px;text-transform:uppercase;margin-bottom:6px">money out</div>
-    <div style="font-family:monospace;font-size:18px;font-weight:700;color:${PEACH_C}">${fmtAmt(totalOut)}</div>
+  <div style="flex:1;padding:16px 20px;border-right:1px solid ${BORDER}">
+    <div style="font-size:10px;font-weight:600;color:${MUTED};letter-spacing:0.6px;text-transform:uppercase;margin-bottom:6px">Money Out</div>
+    <div style="font-size:18px;font-weight:700;color:${TEXT}">${fmtAmt(totalOut)}</div>
   </div>
-  <div style="flex:1;border:1px solid ${BORDER};border-radius:12px;padding:14px 16px;background:${netBalance >= 0 ? MINT + '44' : PEACH_C + '33'}">
-    <div style="font-family:monospace;font-size:10px;color:${MUTED};letter-spacing:0.6px;text-transform:uppercase;margin-bottom:6px">net</div>
-    <div style="font-family:monospace;font-size:18px;font-weight:700;color:${netColor}">${fmtAmt(netBalance)}</div>
+  <div style="flex:1;padding:16px 20px">
+    <div style="font-size:10px;font-weight:600;color:${MUTED};letter-spacing:0.6px;text-transform:uppercase;margin-bottom:6px">Net</div>
+    <div style="font-size:18px;font-weight:700;color:${TEXT}">${fmtAmt(netBalance)}</div>
   </div>
 </div>
 
-<div style="border:1px solid ${BORDER};border-radius:12px;overflow:hidden;margin-bottom:24px">
-  <table>
-    <thead>
-      <tr style="background:#fafafa">
-        <th style="width:100px;text-align:left">Date</th>
-        <th style="text-align:left">Description</th>
-        <th style="width:130px;text-align:center">Type</th>
-        <th style="width:110px">Out</th>
-        <th style="width:110px">In</th>
-        <th style="width:110px">Balance</th>
-      </tr>
-    </thead>
-    <tbody>${tableRows}</tbody>
-    <tfoot>
-      <tr style="background:#fafafa;border-top:1px solid ${BORDER}">
-        <td colspan="3" style="padding:10px 8px;font-family:monospace;font-size:10px;font-weight:700;color:${MUTED};letter-spacing:0.6px;text-transform:uppercase">closing balance</td>
-        <td style="padding:10px 8px;text-align:right;font-family:monospace;font-size:12px;font-weight:700;color:${PEACH_C}">${fmtAmt(totalOut)}</td>
-        <td style="padding:10px 8px;text-align:right;font-family:monospace;font-size:12px;font-weight:700;color:${TEAL}">${fmtAmt(totalIn)}</td>
-        <td style="padding:10px 8px;text-align:right;font-family:monospace;font-size:13px;font-weight:700;color:${netColor}">${fmtAmt(netBalance)}</td>
-      </tr>
-    </tfoot>
-  </table>
-</div>
+<div style="font-size:10px;font-weight:600;color:${MUTED};letter-spacing:0.6px;text-transform:uppercase;margin-bottom:12px;margin-top:32px">By Category</div>
+<div style="margin-bottom:32px">${catCards}</div>
 
-<div style="font-family:monospace;font-size:10px;color:${FAINT};text-align:center">generated by LEDGR</div>
+<div style="font-size:10px;font-weight:600;color:${MUTED};letter-spacing:0.6px;text-transform:uppercase;margin-bottom:10px">Transactions</div>
+<table>
+  <thead>
+    <tr>
+      <th style="width:110px">Date</th>
+      <th>Description</th>
+      <th style="width:130px">Type</th>
+      <th style="width:110px">Out</th>
+      <th style="width:110px">In</th>
+      <th style="width:110px">Balance</th>
+    </tr>
+  </thead>
+  <tbody>${tableRows}</tbody>
+  <tfoot>
+    <tr style="border-top:2px solid ${TEXT};border-bottom:none">
+      <td colspan="3" style="padding:10px 8px;font-size:10px;font-weight:600;color:${MUTED};letter-spacing:0.6px;text-transform:uppercase">Closing Balance</td>
+      <td style="padding:10px 8px;text-align:right;font-size:12px;font-weight:700;color:${TEXT}">${fmtAmt(totalOut)}</td>
+      <td style="padding:10px 8px;text-align:right;font-size:12px;font-weight:700;color:${TEXT}">${fmtAmt(totalIn)}</td>
+      <td style="padding:10px 8px;text-align:right;font-size:13px;font-weight:700;color:${TEXT}">${fmtAmt(netBalance)}</td>
+    </tr>
+  </tfoot>
+</table>
+
+<div style="font-size:10px;color:${FAINT};text-align:center;margin-top:32px;letter-spacing:1px;text-transform:uppercase">LEDGR</div>
 
 </body></html>`;
   };
