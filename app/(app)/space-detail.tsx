@@ -23,6 +23,7 @@ export function setPendingFocusDate(date: string | null) { pendingFocusDate = da
 // ── Constants ────────────────────────────────────────────────────────────────
 const { width } = Dimensions.get('window');
 
+const today = new Date();
 const PEACH = '#FFAB91';
 const PAGE_HEIGHT = 1200; // px per image slice (at scale 2 = 2400px actual)
 
@@ -172,6 +173,8 @@ function getTypeLabel(type: string, status: string, is_due?: boolean, paid_amoun
 
 import { smartDateLabel } from '../../src/lib/smartDateLabel';
 import { computeGhosts, getDueDateForCycle, isLoanComplete, type GhostRow } from '../../src/lib/recurringUtils';
+import { isReminderDueToday } from '../../src/lib/reminderUtils';
+import type { RecordingReminder } from '../../src/types';
 
 export default function SpaceDetailScreen() {
   const { spaceId, name } = useLocalSearchParams<{ spaceId: string; name: string }>();
@@ -237,12 +240,133 @@ export default function SpaceDetailScreen() {
   const [pendingDeleteName, setPendingDeleteName] = useState('');
 
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showAddChoice, setShowAddChoice] = useState(false);
+  const [showReminderModal, setShowReminderModal] = useState(false);
+  const [reminderTab, setReminderTab] = useState<'active' | 'completed' | 'paused'>('active');
+
+  // ── Reminder add modal state (quick-add from space) ────────────────────────────────────────────────────────────
+  const [rName, setRName]               = useState('');
+  const [rFrequency, setRFrequency]     = useState<'daily'|'weekly'|'monthly'>('monthly');
+  const [rDayOfWeek, setRDayOfWeek]     = useState(1);
+  const [rDayOfMonth, setRDayOfMonth]   = useState(1);
+  const [rStartMonth, setRStartMonth]   = useState(today.getMonth());
+  const [rStartDay, setRStartDay]       = useState(today.getDate());
+  const [rStartYear, setRStartYear]     = useState(today.getFullYear());
+  const [rSaving, setRSaving]           = useState(false);
+  const [editReminderId, setEditReminderId] = useState<string | null>(null);
+  const [rRecordingType, setRRecordingType] = useState<'expense'|'income'|'debt'|'due'>('expense');
+  const [rCategoryId, setRCategoryId]       = useState('');
+
+  const SD_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const SD_DAYS   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const SD_YEARS  = Array.from({ length: 6 }, (_, i) => today.getFullYear() + i);
+
+  const handleSaveReminder = async () => {
+    if (!rName.trim()) return;
+    setRSaving(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const startDate = `${rStartYear}-${String(rStartMonth + 1).padStart(2, '0')}-${String(rFrequency === 'monthly' ? rDayOfMonth : rStartDay).padStart(2, '0')}`;
+      const payload = {
+        user_id:      user.id,
+        workspace_id: spaceId,
+        name:         rName.trim(),
+        frequency:    rFrequency,
+        day_of_week:  rFrequency === 'weekly'  ? rDayOfWeek  : null,
+        day_of_month: rFrequency === 'monthly' ? rDayOfMonth : null,
+        start_date:   startDate,
+        recording_type: rRecordingType,
+        category_id:  rCategoryId || null,
+        status:       'active',
+      };
+      if (editReminderId) {
+        await supabase.from('recording_reminders').update(payload).eq('id', editReminderId);
+      } else {
+        await supabase.from('recording_reminders').insert(payload);
+      }
+      queryClient.invalidateQueries({ queryKey: ['space-reminders', spaceId, userId] });
+      setShowReminderModal(false);
+      setRName('');
+      setRCategoryId('');
+      setEditReminderId(null);
+    } finally {
+      setRSaving(false);
+    }
+  };
 
   // ── Ghost payment modal ────────────────────────────────────────────────────────────
   const [ghostModal, setGhostModal]       = useState(false);
   const [ghostTarget, setGhostTarget]     = useState<GhostRow | null>(null);
   const [ghostAmount, setGhostAmount]     = useState('');
   const [ghostSaving, setGhostSaving]     = useState(false);
+
+  // ── Reminder fill modal ────────────────────────────────────────────────────────────
+  const [reminderModal, setReminderModal]   = useState(false);
+  const [reminderTarget, setReminderTarget] = useState<RecordingReminder | null>(null);
+  const [reminderAmount, setReminderAmount] = useState('');
+  const [reminderSaving, setReminderSaving] = useState(false);
+  const [reminderLinked, setReminderLinked] = useState<any[]>([]);
+  const [reminderIsPartial, setReminderIsPartial] = useState(false);
+  const [reminderDate, setReminderDate] = useState('');
+
+
+  const deleteReminderLinked = async (id: string) => {
+    await supabase.from('recordings').delete().eq('id', id);
+    setReminderLinked(prev => prev.filter(r => r.id !== id));
+    queryClient.invalidateQueries({ queryKey: ['recordings', spaceId] });
+  };
+  const [reminderChoiceModal, setReminderChoiceModal]   = useState(false);
+  const [reminderChoiceTarget, setReminderChoiceTarget] = useState<RecordingReminder | null>(null);
+
+  const openReminderChoice = (r: RecordingReminder) => {
+    setReminderChoiceTarget(r);
+    setReminderChoiceModal(true);
+  };
+
+  const openReminderModal = async (r: RecordingReminder) => {
+    setReminderTarget(r);
+    setReminderAmount('');
+    setReminderIsPartial(false);
+    setReminderDate(new Date().toISOString().split('T')[0]);
+    const { data } = await supabase
+      .from('recordings')
+      .select('id, amount, transaction_date, type, status')
+      .eq('reminder_id', r.id)
+      .order('transaction_date', { ascending: false });
+    setReminderLinked(data ?? []);
+    setReminderModal(true);
+  };
+
+  const confirmReminderFill = async () => {
+    if (!reminderTarget || !reminderAmount) return;
+    setReminderSaving(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const recType = reminderTarget.recording_type ?? 'expense';
+      const recStatus = reminderIsPartial ? 'partial' : recType === 'income' ? 'received' : 'paid';
+
+
+
+      await supabase.from('recordings').insert({
+        user_id:          user.id,
+        space_id:         spaceId,
+        name:             reminderTarget.name,
+        type:             recType as any,
+        amount:           parseFloat(reminderAmount),
+        transaction_date: reminderDate || new Date().toISOString().split('T')[0],
+        status:           recStatus,
+        category_id:      reminderTarget.category_id ?? null,
+        account_id:       reminderTarget.account_id  ?? null,
+        reminder_id:      reminderTarget.id,
+      });
+      setReminderModal(false);
+      queryClient.invalidateQueries({ queryKey: ['recordings', spaceId] });
+    } finally {
+      setReminderSaving(false);
+    }
+  };
 
   const openGhostModal = (g: GhostRow) => {
     setGhostTarget(g);
@@ -321,26 +445,32 @@ export default function SpaceDetailScreen() {
   const { data: splitBillPaymentsData = [] } = useQuery({
     queryKey: ['split-bill-payments', spaceId],
     queryFn: async () => {
+      // Step 1: get split_bill_ids linked to recordings in this space
       const { data: sbrRows } = await supabase
         .from('split_bill_recordings')
-        .select('split_bill_id, recording_id, recordings!inner(space_id, transaction_date)')
-        .eq('recordings.space_id', spaceId);
+        .select('split_bill_id, recording_id')
+        .in('recording_id',
+          (await supabase.from('recordings').select('id').eq('space_id', spaceId)).data?.map((r: any) => r.id) ?? []
+        );
       const billIds = [...new Set((sbrRows ?? []).map((r: any) => r.split_bill_id))];
       if (billIds.length === 0) return [];
-      // Build map: split_bill_id → transaction_date (from first linked recording)
+      // Step 2: build map split_bill_id → transaction_date from recordings
+      const recIds = [...new Set((sbrRows ?? []).map((r: any) => r.recording_id))];
+      const { data: recRows } = await supabase.from('recordings').select('id, transaction_date').in('id', recIds);
+      const recDateMap: Record<string, string> = {};
+      (recRows ?? []).forEach((r: any) => { recDateMap[r.id] = r.transaction_date; });
       const billDateMap: Record<string, string> = {};
       (sbrRows ?? []).forEach((r: any) => {
-        if (!billDateMap[r.split_bill_id]) {
-          const rec = Array.isArray(r.recordings) ? r.recordings[0] : r.recordings;
-          if (rec?.transaction_date) billDateMap[r.split_bill_id] = rec.transaction_date;
+        if (!billDateMap[r.split_bill_id] && recDateMap[r.recording_id]) {
+          billDateMap[r.split_bill_id] = recDateMap[r.recording_id];
         }
       });
+      // Step 3: fetch payments for those bills
       const { data: payments } = await supabase
         .from('split_bill_payments')
         .select('id, amount, split_bill_id')
         .eq('status', 'active')
         .in('split_bill_id', billIds);
-      // Attach parent transaction_date to each payment, deduplicate by id
       const seen = new Set<string>();
       return (payments ?? []).filter((p: any) => {
         if (seen.has(p.id)) return false;
@@ -389,6 +519,24 @@ export default function SpaceDetailScreen() {
       return data ?? [];
     },
     enabled: !!spaceId && spaceId !== 'all',
+  });
+
+  const { data: spaceReminders = [] } = useQuery<RecordingReminder[]>({
+    queryKey: ['space-reminders', spaceId, userId],
+    queryFn: async () => {
+      if (!spaceId || spaceId === 'all' || !userId) return [];
+      const { data } = await supabase
+        .from('recording_reminders')
+        .select('*, categories:category_id(name,color,icon), account:account_id(account_name,bank)')
+        .eq('user_id', userId)
+        .or(`workspace_id.eq.${spaceId},workspace_id.is.null`);
+      return (data ?? []).map((r: any) => ({
+        ...r,
+        categories: Array.isArray(r.categories) ? r.categories[0] : r.categories,
+        account:    Array.isArray(r.account)    ? r.account[0]    : r.account,
+      }));
+    },
+    enabled: !!spaceId && spaceId !== 'all' && !!userId,
   });
 
   const budget       = spaceData?.budget ?? null;
@@ -467,7 +615,36 @@ export default function SpaceDetailScreen() {
     new Date()
   );
 
-  // Stats — date-filtered but not tab-filtered
+  const fromStr = `${range.from.getFullYear()}-${String(range.from.getMonth()+1).padStart(2,'0')}-${String(range.from.getDate()).padStart(2,'0')}`;
+  const toStr   = `${range.to.getFullYear()}-${String(range.to.getMonth()+1).padStart(2,'0')}-${String(range.to.getDate()).padStart(2,'0')}`;
+
+  const reminderCompletedInRange = new Set(
+    recordings
+      .filter(r => r.reminder_id && r.transaction_date >= fromStr && r.transaction_date <= toStr)
+      .map(r => r.reminder_id)
+  );
+
+  // ── Due reminders for this space ──────────────────────────────────────────
+  const rangeSpanDays = (range.to.getTime() - range.from.getTime()) / 86400000;
+  const isWideRange = rangeSpanDays > 35;
+  const visibleReminders = spaceReminders.filter(r => {
+    if (r.status === 'paused') return reminderTab === 'paused';
+    const start = new Date(r.start_date + 'T00:00:00');
+    if (start > range.to) return false;
+    const doneThisPeriod = reminderCompletedInRange.has(r.id);
+    if (reminderTab === 'completed') return doneThisPeriod;
+    if (reminderTab === 'active') return isWideRange ? true : !doneThisPeriod;
+    return false;
+  }).sort((a, b) => a.name.localeCompare(b.name));
+  const getReminderMeta = (r: RecordingReminder) => {
+    const filledCount = recordings.filter(rec =>
+      rec.reminder_id === r.id &&
+      rec.transaction_date >= fromStr &&
+      rec.transaction_date <= toStr
+    ).length;
+    return { filledCount, isDone: reminderCompletedInRange.has(r.id) };
+  };
+
   const dateFiltered = recordings.filter(r => {
     const [y, m, d] = r.transaction_date.split('-').map(Number);
     const date = new Date(y, m - 1, d);
@@ -475,8 +652,6 @@ export default function SpaceDetailScreen() {
     const to = new Date(range.to); to.setHours(23, 59, 59);
     return date <= to;
   });
-  const fromStr = `${range.from.getFullYear()}-${String(range.from.getMonth()+1).padStart(2,'0')}-${String(range.from.getDate()).padStart(2,'0')}`;
-  const toStr   = `${range.to.getFullYear()}-${String(range.to.getMonth()+1).padStart(2,'0')}-${String(range.to.getDate()).padStart(2,'0')}`;
 
   const splitBillMoneyIn = (splitBillPaymentsData as any[]).filter(p => {
     if (!p.transaction_date) return false;
@@ -1100,7 +1275,7 @@ export default function SpaceDetailScreen() {
           {spaceId !== 'all' && canAddRecordings && (
             <TouchableOpacity
               style={s.addBtn}
-              onPress={() => setShowAddModal(true)}
+              onPress={() => setShowAddChoice(true)}
               activeOpacity={0.8}
             >
               <Ionicons name="add" size={18} color="#B6E1DE" />
@@ -1208,6 +1383,61 @@ export default function SpaceDetailScreen() {
             ))
           )}
 
+          {/* Reminders section — always visible */}
+          <View style={{ marginTop: 8 }}>
+            <View style={s.sectionRow}>
+              <Text style={s.sectionHeader}>reminders ({visibleReminders.length})</Text>
+            </View>
+            <View style={{ flexDirection: 'row', gap: 6, marginBottom: 8 }}>
+              {(['active', 'completed', 'paused'] as const).map(tab => (
+                <TouchableOpacity
+                  key={tab}
+                  style={[s.chip, reminderTab === tab && s.chipActive]}
+                  onPress={() => setReminderTab(tab)}
+                  activeOpacity={0.75}
+                >
+                  <Text style={[s.chipText, reminderTab === tab && s.chipTextActive]}>{tab}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            {visibleReminders.length === 0 ? (
+              <View style={s.emptyWrap}>
+                <Text style={s.emptyText}>no {reminderTab} reminders for this space</Text>
+              </View>
+            ) : (
+              visibleReminders.map(r => {
+                const isDue = isReminderDueToday(r, today);
+                const { filledCount, isDone } = getReminderMeta(r);
+                return (
+                  <TouchableOpacity
+                    key={`reminder-${r.id}`}
+                    style={[s.row, isDue && !isDone && s.ghostRow, isDue && !isDone && { borderColor: Colors.cyan + '88', backgroundColor: Colors.cyan + '0A' }]}
+                    activeOpacity={0.8}
+                    onPress={() => openReminderChoice(r)}
+                  >
+                    <View style={[s.rowIconWrap, isDone && { backgroundColor: Colors.cyan + '22' }, isDue && !isDone && { backgroundColor: Colors.cyan + '22' }]}>
+                      <Ionicons name={isDone ? 'checkmark-circle-outline' : 'alarm-outline'} size={18} color={isDone ? Colors.cyan : isDue ? Colors.cyan : Colors.muted} />
+                    </View>
+                    <View style={s.rowMid}>
+                      <Text style={[s.rowType, { color: isDone ? Colors.cyan : isDue ? Colors.cyan : Colors.muted }]}>
+                        {isDone
+                          ? `filled ${filledCount}x this period`
+                          : isDue ? 'due today · tap to fill'
+                          : r.status === 'paused' ? 'paused'
+                          : 'reminder'}
+                      </Text>
+                      <Text style={s.rowName} numberOfLines={1}>{r.name}</Text>
+                      {r.categories && (
+                        <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted }}>{r.categories.name}</Text>
+                      )}
+                    </View>
+                    <Ionicons name="chevron-forward" size={14} color={isDone ? Colors.cyan : isDue ? Colors.cyan : Colors.faint} />
+                  </TouchableOpacity>
+                );
+              })
+            )}
+          </View>
+
           {/* Ghost rows from recurring records */}
           {ghosts.length > 0 && (
             <View style={{ marginTop: 8 }}>
@@ -1259,6 +1489,157 @@ export default function SpaceDetailScreen() {
       {showAddModal && (
         <AddRecordingScreen inlineProps={{ spaceId: spaceId as string, spaceName: name as string, defaultDate: new Date().toISOString().split('T')[0], onClose: () => { setShowAddModal(false); queryClient.refetchQueries({ queryKey: ['recordings', spaceId] }); } }} />
       )}
+
+      {/* Add choice sheet */}
+      <BottomSheet visible={showAddChoice} onClose={() => setShowAddChoice(false)} title="add new">
+        <TouchableOpacity
+          style={s.choiceRow}
+          activeOpacity={0.8}
+          onPress={() => { setShowAddChoice(false); setShowAddModal(true); }}
+        >
+          <View style={[s.choiceIcon, { backgroundColor: Colors.cyan + '22' }]}>
+            <Ionicons name="receipt-outline" size={20} color={Colors.cyan} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={s.choiceTitle}>recording</Text>
+            <Text style={s.choiceSub}>log an expense, income, or loan</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={14} color={Colors.faint} />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={s.choiceRow}
+          activeOpacity={0.8}
+          onPress={() => { setShowAddChoice(false); setEditReminderId(null); setRRecordingType('expense'); setRCategoryId(''); setRName(''); setRFrequency('monthly'); setRDayOfWeek(1); setRDayOfMonth(1); setRStartMonth(today.getMonth()); setRStartDay(today.getDate()); setRStartYear(today.getFullYear()); setShowReminderModal(true); }}
+        >
+          <View style={[s.choiceIcon, { backgroundColor: '#F9731622' }]}>
+            <Ionicons name="alarm-outline" size={20} color="#F97316" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={s.choiceTitle}>reminder</Text>
+            <Text style={s.choiceSub}>schedule a recurring recording</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={14} color={Colors.faint} />
+        </TouchableOpacity>
+      </BottomSheet>
+
+      {/* Quick-add reminder modal */}
+      <BottomSheet visible={showReminderModal} onClose={() => setShowReminderModal(false)} title={editReminderId ? 'edit reminder' : 'new reminder'}>
+        <Text style={s.modalLabel}>name</Text>
+        <TextInput
+          style={[s.chip, { borderColor: Colors.borderMid, paddingHorizontal: 12, fontFamily: Fonts.mono, fontSize: 13, color: Colors.text }]}
+          placeholder="e.g. electricity bill"
+          placeholderTextColor={Colors.faint}
+          value={rName}
+          onChangeText={setRName}
+          autoFocus
+        />
+        <Text style={s.modalLabel}>recording type</Text>
+        <View style={s.chipRow}>
+          {(['expense','income','debt','due'] as const).map(t => (
+            <TouchableOpacity key={t} style={[s.chip, rRecordingType === t && s.chipActive]} onPress={() => setRRecordingType(t)} activeOpacity={0.75}>
+              <Text style={[s.chipText, rRecordingType === t && s.chipTextActive]}>{t}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <Text style={s.modalLabel}>category <Text style={{ fontFamily: Fonts.mono, fontSize: 10 }}>(optional)</Text></Text>
+        <View style={s.chipRow}>
+          <TouchableOpacity style={[s.chip, !rCategoryId && s.chipActive]} onPress={() => setRCategoryId('')} activeOpacity={0.75}>
+            <Text style={[s.chipText, !rCategoryId && s.chipTextActive]}>none</Text>
+          </TouchableOpacity>
+          {(categories as any[]).map((c: any) => (
+            <TouchableOpacity key={c.id} style={[s.chip, rCategoryId === c.id && s.chipActive]} onPress={() => setRCategoryId(c.id)} activeOpacity={0.75}>
+              <Text style={[s.chipText, rCategoryId === c.id && s.chipTextActive]}>{c.name}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <Text style={s.modalLabel}>frequency</Text>
+        <View style={s.chipRow}>
+          {(['daily','weekly','monthly'] as const).map(f => (
+            <TouchableOpacity key={f} style={[s.chip, rFrequency === f && s.chipActive]} onPress={() => setRFrequency(f)} activeOpacity={0.75}>
+              <Text style={[s.chipText, rFrequency === f && s.chipTextActive]}>{f}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* weekly: day of week */}
+        {rFrequency === 'weekly' && (
+          <>
+            <Text style={s.modalLabel}>repeats on</Text>
+            <View style={s.chipRow}>
+              {SD_DAYS.map((d, i) => (
+                <TouchableOpacity key={d} style={[s.chip, rDayOfWeek === i && s.chipActive]} onPress={() => setRDayOfWeek(i)} activeOpacity={0.75}>
+                  <Text style={[s.chipText, rDayOfWeek === i && s.chipTextActive]}>{d}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </>
+        )}
+
+        {/* monthly: day of month chips + custom */}
+        {rFrequency === 'monthly' && (
+          <>
+            <Text style={s.modalLabel}>day of month</Text>
+            <View style={s.chipRow}>
+              {[1,5,10,15,20,25,28].map(d => (
+                <TouchableOpacity key={d} style={[s.chip, rDayOfMonth === d && s.chipActive]} onPress={() => setRDayOfMonth(d)} activeOpacity={0.75}>
+                  <Text style={[s.chipText, rDayOfMonth === d && s.chipTextActive]}>{d}</Text>
+                </TouchableOpacity>
+              ))}
+              <TouchableOpacity style={[s.chip, ![1,5,10,15,20,25,28].includes(rDayOfMonth) && s.chipActive]} onPress={() => setRDayOfMonth(0)} activeOpacity={0.75}>
+                <Text style={[s.chipText, ![1,5,10,15,20,25,28].includes(rDayOfMonth) && s.chipTextActive]}>custom</Text>
+              </TouchableOpacity>
+            </View>
+            {![1,5,10,15,20,25,28].includes(rDayOfMonth) && (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingVertical: 4 }}>
+                {Array.from({ length: 31 }, (_, i) => i + 1).map(d => (
+                  <TouchableOpacity key={d} style={[s.chip, rDayOfMonth === d && s.chipActive]} onPress={() => setRDayOfMonth(d)} activeOpacity={0.75}>
+                    <Text style={[s.chipText, rDayOfMonth === d && s.chipTextActive]}>{d}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            )}
+          </>
+        )}
+
+        {/* start date dropdowns */}
+        <Text style={s.modalLabel}>{rFrequency === 'monthly' ? 'starts from' : 'start date'}</Text>
+        <View style={{ flexDirection: 'row', gap: 8, height: 130 }}>
+          <ScrollView style={s.dropCol} showsVerticalScrollIndicator={false} nestedScrollEnabled>
+            {SD_MONTHS.map((m, i) => (
+              <TouchableOpacity key={m} style={[s.dropItem, rStartMonth === i && s.dropItemActive]} onPress={() => setRStartMonth(i)} activeOpacity={0.75}>
+                <Text style={[s.dropText, rStartMonth === i && s.dropTextActive]}>{m}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+          {(rFrequency === 'daily' || rFrequency === 'weekly') && (
+            <ScrollView style={s.dropCol} showsVerticalScrollIndicator={false} nestedScrollEnabled>
+              {Array.from({ length: 31 }, (_, i) => i + 1).map(d => (
+                <TouchableOpacity key={d} style={[s.dropItem, rStartDay === d && s.dropItemActive]} onPress={() => setRStartDay(d)} activeOpacity={0.75}>
+                  <Text style={[s.dropText, rStartDay === d && s.dropTextActive]}>{d}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          )}
+          <ScrollView style={s.dropCol} showsVerticalScrollIndicator={false} nestedScrollEnabled>
+            {SD_YEARS.map(y => (
+              <TouchableOpacity key={y} style={[s.dropItem, rStartYear === y && s.dropItemActive]} onPress={() => setRStartYear(y)} activeOpacity={0.75}>
+                <Text style={[s.dropText, rStartYear === y && s.dropTextActive]}>{y}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+
+        <TouchableOpacity
+          style={[{ backgroundColor: Colors.cyan, borderRadius: Radius.pill, paddingVertical: 14, alignItems: 'center' as const, marginTop: 20 }, (!rName.trim() || rSaving) && { opacity: 0.4 }]}
+          onPress={handleSaveReminder}
+          disabled={rSaving || !rName.trim()}
+          activeOpacity={0.8}
+        >
+          <Text style={{ fontFamily: Fonts.monoBold, fontSize: 14, color: Colors.text }}>
+            {rSaving ? 'saving...' : editReminderId ? 'save changes' : 'create reminder'}
+          </Text>
+        </TouchableOpacity>
+      </BottomSheet>
 
       {/* Local filter modal — temporary, never saved */}
       <BottomSheet visible={showLocalFilter} onClose={() => setShowLocalFilter(false)} title="date filter" height="55%">
@@ -1391,6 +1772,147 @@ export default function SpaceDetailScreen() {
           />
         );
       })()}
+
+      {/* Reminder choice modal */}
+      <BottomSheet visible={reminderChoiceModal} onClose={() => setReminderChoiceModal(false)} title={reminderChoiceTarget?.name ?? 'reminder'} height="45%">
+        <TouchableOpacity
+          style={s.choiceRow}
+          activeOpacity={0.8}
+          onPress={() => { setReminderChoiceModal(false); if (reminderChoiceTarget) openReminderModal(reminderChoiceTarget); }}
+        >
+          <View style={[s.choiceIcon, { backgroundColor: Colors.cyan + '22' }]}>
+            <Ionicons name="add-circle-outline" size={20} color={Colors.cyan} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={s.choiceTitle}>record amount</Text>
+            <Text style={s.choiceSub}>log a transaction for this reminder</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={14} color={Colors.faint} />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={s.choiceRow}
+          activeOpacity={0.8}
+          onPress={() => {
+            setReminderChoiceModal(false);
+            if (reminderChoiceTarget) {
+              setEditReminderId(reminderChoiceTarget.id);
+              setRRecordingType((reminderChoiceTarget.recording_type ?? 'expense') as any);
+              setRName(reminderChoiceTarget.name);
+              setRFrequency(reminderChoiceTarget.frequency);
+              setRDayOfWeek(reminderChoiceTarget.day_of_week ?? 1);
+              setRDayOfMonth(reminderChoiceTarget.day_of_month ?? 1);
+              const sd = new Date(reminderChoiceTarget.start_date + 'T00:00:00');
+              setRStartMonth(sd.getMonth());
+              setRStartDay(sd.getDate());
+              setRStartYear(sd.getFullYear());
+              setRCategoryId(reminderChoiceTarget.category_id ?? '');
+              setShowReminderModal(true);
+            }
+          }}
+        >
+          <View style={[s.choiceIcon, { backgroundColor: Colors.surface }]}>
+            <Ionicons name="create-outline" size={20} color={Colors.muted} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={s.choiceTitle}>edit reminder</Text>
+            <Text style={s.choiceSub}>change name, frequency, or category</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={14} color={Colors.faint} />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={s.choiceRow}
+          activeOpacity={0.8}
+          onPress={async () => {
+            setReminderChoiceModal(false);
+            if (!reminderChoiceTarget) return;
+            const next = reminderChoiceTarget.status === 'paused' ? 'active' : 'paused';
+            await supabase.from('recording_reminders').update({ status: next }).eq('id', reminderChoiceTarget.id);
+            queryClient.invalidateQueries({ queryKey: ['space-reminders', spaceId, userId] });
+          }}
+        >
+          <View style={[s.choiceIcon, { backgroundColor: Colors.surface }]}>
+            <Ionicons
+              name={reminderChoiceTarget?.status === 'active' ? 'pause-circle-outline' : 'play-circle-outline'}
+              size={20} color={Colors.muted}
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={s.choiceTitle}>{reminderChoiceTarget?.status === 'active' ? 'pause reminder' : 'resume reminder'}</Text>
+            <Text style={s.choiceSub}>temporarily stop this reminder</Text>
+          </View>
+        </TouchableOpacity>
+      </BottomSheet>
+
+      {/* Reminder fill modal */}
+      <BottomSheet visible={reminderModal} onClose={() => setReminderModal(false)} title="fill reminder">
+        {reminderTarget && (
+          <>
+            <Text style={{ fontFamily: Brand.font.mono, fontSize: 13, color: Colors.text, marginBottom: 2 }}>
+              {reminderTarget.name}
+            </Text>
+            <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: Colors.muted, marginBottom: 12 }}>
+              {reminderTarget.recording_type ?? 'expense'}
+            </Text>
+
+            {/* Previous payments */}
+            {reminderLinked.length > 0 && (
+              <>
+                <Text style={{ fontFamily: Fonts.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 6 }}>previous payments</Text>
+                {reminderLinked.map(r => (
+                  <View key={r.id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 10 }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontFamily: Fonts.monoBold, fontSize: 12, color: Colors.text }}>{Number(r.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+                      <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted }}>{r.transaction_date} · {r.type} · {r.status}</Text>
+                    </View>
+                    <TouchableOpacity onPress={() => deleteReminderLinked(r.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                      <Ionicons name="close-circle-outline" size={18} color={Colors.muted} />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </>
+            )}
+
+            {/* Partial/complete toggle */}
+            <Text style={{ fontFamily: Fonts.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.6, textTransform: 'uppercase', marginTop: 12, marginBottom: 6 }}>payment type</Text>
+            <View style={s.chipRow}>
+              <TouchableOpacity style={[s.chip, !reminderIsPartial && s.chipActive]} onPress={() => setReminderIsPartial(false)} activeOpacity={0.75}>
+                <Text style={[s.chipText, !reminderIsPartial && s.chipTextActive]}>complete</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[s.chip, reminderIsPartial && s.chipActive]} onPress={() => setReminderIsPartial(true)} activeOpacity={0.75}>
+                <Text style={[s.chipText, reminderIsPartial && s.chipTextActive]}>partial</Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginTop: 12, marginBottom: 6 }}>date</Text>
+            <TextInput
+              style={{ fontFamily: Brand.font.mono, fontSize: 14, color: Colors.text, backgroundColor: Colors.surface, borderRadius: Radius.md, paddingHorizontal: 14, paddingVertical: 11, borderWidth: 1, borderColor: Colors.borderMid, marginBottom: 16 }}
+              value={reminderDate}
+              onChangeText={setReminderDate}
+              placeholder="YYYY-MM-DD"
+              placeholderTextColor={Colors.faint}
+              keyboardType="numbers-and-punctuation"
+              maxLength={10}
+            />
+            <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginTop: 12, marginBottom: 6 }}>amount</Text>
+            <TextInput
+              style={{ fontFamily: Brand.font.mono, fontSize: 16, color: Colors.text, backgroundColor: Colors.surface, borderRadius: Radius.md, paddingHorizontal: 14, paddingVertical: 11, borderWidth: 1, borderColor: Colors.borderMid, marginBottom: 16 }}
+              value={reminderAmount}
+              onChangeText={setReminderAmount}
+              keyboardType="decimal-pad"
+              autoFocus
+            />
+            <TouchableOpacity
+              style={{ backgroundColor: Colors.cyan, borderRadius: Radius.pill, paddingVertical: 14, alignItems: 'center', opacity: reminderSaving || !reminderAmount ? 0.5 : 1 }}
+              onPress={confirmReminderFill}
+              disabled={reminderSaving || !reminderAmount}
+            >
+              <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 14, color: Colors.text }}>
+                {reminderSaving ? 'saving...' : reminderIsPartial ? 'record partial' : `record ${reminderTarget.recording_type ?? 'expense'}`}
+              </Text>
+            </TouchableOpacity>
+          </>
+        )}
+      </BottomSheet>
 
       {/* Ghost payment modal */}
       <BottomSheet visible={ghostModal} onClose={() => setGhostModal(false)} title="record payment">
@@ -1565,7 +2087,7 @@ const s = StyleSheet.create({
   chipActive:     { backgroundColor: Colors.cyan },
   chipText:       { fontFamily: Fonts.mono,     fontSize: 12, color: Colors.muted },
   chipTextActive: { fontFamily: Fonts.monoBold, fontSize: 12, color: Colors.white },
-  modalLabel:     { fontFamily: Fonts.mono, fontSize: 12, color: Colors.muted, marginBottom: 10 },
+  modalLabel:     { fontFamily: Fonts.mono, fontSize: 12, color: '#1A1A1A', marginBottom: 10 },
   sectionLabel:   { fontFamily: Fonts.monoBold, fontSize: 11, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8, marginTop: 4 },
   clearBtn:       { alignSelf: 'flex-end', marginBottom: 12, paddingHorizontal: 14, paddingVertical: 7, borderRadius: Radius.pill, backgroundColor: Colors.surface },
   clearBtnText:   { fontFamily: Fonts.monoBold, fontSize: 12, color: Colors.cyan },
@@ -1589,4 +2111,15 @@ const s = StyleSheet.create({
   // Ghost rows
   ghostRow:        { borderStyle: 'dashed', borderWidth: 1, borderColor: Colors.borderMid, borderRadius: Radius.md, marginBottom: 4, backgroundColor: Colors.surface },
   ghostRowOverdue: { borderColor: '#F97316', backgroundColor: '#F9731608' },
+  // Choice sheet
+  choiceRow:  { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  choiceIcon: { width: 40, height: 40, borderRadius: Radius.md, justifyContent: 'center', alignItems: 'center' },
+  choiceTitle:{ fontFamily: Fonts.monoBold, fontSize: 14, color: Colors.text },
+  choiceSub:  { fontFamily: Fonts.mono, fontSize: 11, color: Colors.muted, marginTop: 2 },
+  // Dropdown column pickers (reminder modal)
+  dropCol:       { flex: 1, borderWidth: 1, borderColor: Colors.borderMid, borderRadius: Radius.lg, backgroundColor: Colors.surface },
+  dropItem:      { paddingVertical: 9, paddingHorizontal: 10, alignItems: 'center' },
+  dropItemActive:{ backgroundColor: Colors.cyan, borderRadius: Radius.md },
+  dropText:      { fontFamily: Fonts.mono,     fontSize: 13, color: Colors.muted },
+  dropTextActive:{ fontFamily: Fonts.monoBold, fontSize: 13, color: Colors.white },
 });

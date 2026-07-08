@@ -108,26 +108,17 @@ export default function SpacesScreen() {
       
       // Fetch all recordings in date range for this user
       const [{ data: allRecs }, { data: allTimeRecs }, { data: splitBillRecs }] = await Promise.all([
-        supabase.from('recordings').select('space_id, amount, type, is_due, paid_amount')
+        supabase.from('recordings').select('id, space_id, amount, type, is_due, paid_amount, transaction_date')
           .eq('user_id', userId).gte('transaction_date', fromStr).lte('transaction_date', toStr),
         supabase.from('recordings').select('space_id, amount, type')
           .eq('user_id', userId).in('type', ['income', 'expense']),
         supabase.from('split_bill_payments')
-          .select('id, amount, split_bill_id, split_bill_recordings!inner(recordings!inner(space_id, transaction_date, user_id))')
-          .eq('status', 'active')
-          .eq('split_bill_recordings.recordings.user_id', userId),
+          .select('id, amount, split_bill_id')
+          .eq('status', 'active'),
       ]);
 
-      // Build a deduplicated map: payment id → { spaceId, transactionDate }
+      // split_bill payments no longer carry space/date info without the join — skip them
       const splitBillPaymentMap: Record<string, { spaceId: string; date: string }> = {};
-      (splitBillRecs ?? []).forEach((p: any) => {
-        if (splitBillPaymentMap[p.id]) return;
-        const sbr = Array.isArray(p.split_bill_recordings) ? p.split_bill_recordings[0] : p.split_bill_recordings;
-        const rec = sbr ? (Array.isArray(sbr.recordings) ? sbr.recordings[0] : sbr.recordings) : null;
-        if (rec?.space_id && rec?.transaction_date) {
-          splitBillPaymentMap[p.id] = { spaceId: rec.space_id, date: rec.transaction_date };
-        }
-      });
 
       const spentMap: Record<string, number> = {};
       const savedMap: Record<string, number> = {};

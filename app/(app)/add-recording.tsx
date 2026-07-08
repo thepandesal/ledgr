@@ -7,7 +7,7 @@
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
   TextInput, ActivityIndicator, Switch, FlatList, Image, Alert,
-  Modal, Animated,
+  Modal,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -67,9 +67,6 @@ const TYPE_GROUPS = [
 
 const TYPES = TYPE_GROUPS.flatMap(g => g.types);
 
-const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const FREQUENCIES = ['daily', 'weekly', 'monthly', 'yearly'];
-
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function AddRecordingScreen({ inlineProps }: {
@@ -96,42 +93,6 @@ export default function AddRecordingScreen({ inlineProps }: {
   const [error, setError]       = useState('');
   const [spaceBudget, setSpaceBudget] = useState<number | null>(null);
   const [spaceSpent, setSpaceSpent] = useState<number>(0);
-
-  // ── Recurring ────────────────────────────────────────────────────────────
-  const [isRecurring, setIsRecurring]     = useState(false);
-  const [frequency, setFrequency]         = useState('monthly');
-  const [recurringDays, setRecurringDays] = useState<number[]>([]);
-  const [recurringDate, setRecurringDate] = useState('1');
-
-  // ── Loan calculator (for due/debt recurring) ─────────────────────────────
-  const [loanMode, setLoanMode]           = useState<'months' | 'installment'>('months');
-  const [loanMonths, setLoanMonths]       = useState('');
-  const [loanInstallment, setLoanInstallment] = useState('');
-  const [loanStartDate, setLoanStartDate] = useState(defaultDate ?? new Date().toISOString().split('T')[0]);
-  const [loanDayOfMonth, setLoanDayOfMonth] = useState(1);
-  const [loanEndDateOverride, setLoanEndDateOverride] = useState('');
-
-  // Derived loan values
-  const loanTotal = parseFloat(amount || '0') || 0;
-  const computedInstallment = loanMode === 'months' && loanMonths
-    ? loanTotal / parseInt(loanMonths)
-    : parseFloat(loanInstallment || '0') || 0;
-  const computedMonths = loanMode === 'installment' && computedInstallment > 0
-    ? Math.ceil(loanTotal / computedInstallment)
-    : parseInt(loanMonths || '0') || 0;
-  const finalInstallment = computedMonths > 0 && loanTotal > 0
-    ? loanTotal - Math.floor(loanTotal / computedInstallment) * computedInstallment > 0.01
-      ? loanTotal - (computedMonths - 1) * computedInstallment
-      : computedInstallment
-    : 0;
-  const autoEndDate = (() => {
-    if (!loanStartDate || computedMonths <= 0) return '';
-    const d = new Date(loanStartDate + 'T00:00:00');
-    d.setMonth(d.getMonth() + computedMonths - 1);
-    d.setDate(loanDayOfMonth);
-    return d.toISOString().split('T')[0];
-  })();
-  const isLoanCalc = isRecurring && (effectiveType === 'due' || effectiveType === 'debt' || effectiveType === 'payable' || effectiveType === 'receivable');
 
   // ── Picker data ──────────────────────────────────────────────────────────
   const [categories, setCategories]           = useState<any[]>([]);
@@ -167,10 +128,9 @@ export default function AddRecordingScreen({ inlineProps }: {
   const effectiveType = type === 'expense' && expenseIsReceivable ? 'expense_receivable'
                       : type === 'income'  && incomeIsLoan        ? 'payable'
                       : type;
-  const isLoanType   = effectiveType === 'receivable' || effectiveType === 'payable';
-  const isComboType  = effectiveType === 'expense_receivable';
-  const selectedType = TYPES.find(t => t.key === type)!;
-  const showRecurringToggle = isLoanType || effectiveType === 'due' || effectiveType === 'debt' || effectiveType === 'expense';
+  const isLoanType  = effectiveType === 'receivable' || effectiveType === 'payable';
+  const isComboType = effectiveType === 'expense_receivable';
+  const selectedType = TYPES.find(t => t.key === type)!
 
   // ─── Lifecycle ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -228,12 +188,6 @@ export default function AddRecordingScreen({ inlineProps }: {
         setPersonName(rec.person_name ?? '');
         if (rec.categories) setSelectedCategory(Array.isArray(rec.categories) ? rec.categories[0] : rec.categories);
         if (rec.account) setSelectedAccount(Array.isArray(rec.account) ? rec.account[0] : rec.account);
-        if (rec.is_recurring) {
-          setIsRecurring(true);
-          setFrequency(rec.recurring_frequency ?? 'monthly');
-          setRecurringDays(rec.recurring_days ?? []);
-          setRecurringDate(String(rec.recurring_date ?? 1));
-        }
       }
     }
   };
@@ -296,30 +250,6 @@ export default function AddRecordingScreen({ inlineProps }: {
     try {
       const { data: { user } } = await supabase.auth.getUser();
 
-      // ── Recurring loan/due/debt → insert into recurring_records ──
-      if (isRecurring && isLoanCalc && !editId) {
-        if (!loanStartDate || computedMonths <= 0 || computedInstallment <= 0) {
-          setError('please complete the loan calculator fields.'); setLoading(false); return;
-        }
-        const { error: err } = await supabase.from('recurring_records').insert({
-          user_id: user!.id,
-          space_id: spaceId || null,
-          name: recName.trim(),
-          type: effectiveType,
-          total_amount: loanTotal,
-          installment_amount: Math.round(computedInstallment * 100) / 100,
-          months: computedMonths,
-          start_date: loanStartDate,
-          end_date: loanEndDateOverride || autoEndDate || null,
-          day_of_month: loanDayOfMonth,
-          category_id: selectedCategory?.id || null,
-        });
-        if (err) throw err;
-        setPendingFocusDate(loanStartDate);
-        handleClose();
-        return;
-      }
-
       if (editId) {
         const { error: err } = await supabase.from('recordings').update({
           name: recName.trim(), type, amount: parseFloat(amount),
@@ -379,11 +309,6 @@ export default function AddRecordingScreen({ inlineProps }: {
             : selectedAccount?.id || null,
           status: statusMap[effectiveType] ?? 'paid',
           person_name: isLoanType ? personName.trim() || null : null,
-          is_recurring: isLoanType ? isRecurring : false,
-          recurring_frequency: isLoanType && isRecurring ? frequency : null,
-          recurring_days: isLoanType && isRecurring && frequency === 'weekly' ? recurringDays : null,
-          recurring_date: isLoanType && isRecurring && ['monthly', 'yearly'].includes(frequency)
-            ? parseInt(recurringDate) : null,
           linked_recording_id: effectiveType === 'receivable' && linkedExpense ? linkedExpense.id : null,
           decreased_from_account_id: effectiveType === 'receivable' ? decreasedFromAccount?.id || null : null,
           receive_to_account_id: effectiveType === 'receivable' ? receiveToAccount?.id || null : null,
@@ -442,9 +367,6 @@ export default function AddRecordingScreen({ inlineProps }: {
     setExpenseList(data ?? []);
     setShowExpenseModal(true);
   };
-
-  const toggleDay = (day: number) =>
-    setRecurringDays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]);
 
   // ─── Render ─────────────────────────────────────────────────────────────
 
@@ -666,122 +588,6 @@ export default function AddRecordingScreen({ inlineProps }: {
             </TouchableOpacity>
           </FormRow>
         </FormBlock>
-      )}
-
-      {/* ── Recurring ── */}
-      {showRecurringToggle && (
-        <>
-          <View style={s.switchRow}>
-            <View>
-              <Text style={s.switchLabel}>recurring</Text>
-              <Text style={s.switchSub}>repeats on a schedule</Text>
-            </View>
-            <Switch value={isRecurring} onValueChange={v => { setIsRecurring(v); }} trackColor={{ true: Colors.cyan }} thumbColor={Colors.white} />
-          </View>
-          {isRecurring && isLoanCalc && (
-            <FormBlock>
-              {/* Mode toggle */}
-              <FormRow label="mode" stacked>
-                <View style={s.chipRow}>
-                  {(['months', 'installment'] as const).map(m => (
-                    <TouchableOpacity key={m} style={[s.chip, loanMode === m && s.chipActive]} onPress={() => setLoanMode(m)}>
-                      <Text style={[s.chipText, loanMode === m && s.chipTextActive]}>
-                        {m === 'months' ? 'I know the months' : 'I know the installment'}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </FormRow>
-              {/* Months or installment input */}
-              {loanMode === 'months' ? (
-                <FormRow label="months">
-                  <TextInput style={s.inlineInput} placeholder="e.g. 12" placeholderTextColor={Colors.faint} value={loanMonths} onChangeText={setLoanMonths} keyboardType="number-pad" />
-                </FormRow>
-              ) : (
-                <FormRow label="monthly amount">
-                  <TextInput style={s.inlineInput} placeholder="e.g. 5000" placeholderTextColor={Colors.faint} value={loanInstallment} onChangeText={setLoanInstallment} keyboardType="decimal-pad" />
-                </FormRow>
-              )}
-              {/* Start date */}
-              <FormRow label="start date" stacked>
-                <MonthPicker date={loanStartDate} onChange={setLoanStartDate} />
-              </FormRow>
-              {/* Day of month chips */}
-              <FormRow label="day of month" stacked>
-                <View style={s.chipRow}>
-                  {[1,5,10,15,20,25,28].map(d => (
-                    <TouchableOpacity key={d} style={[s.chip, loanDayOfMonth === d && s.chipActive]} onPress={() => setLoanDayOfMonth(d)}>
-                      <Text style={[s.chipText, loanDayOfMonth === d && s.chipTextActive]}>{d}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </FormRow>
-              {/* Summary card */}
-              {computedMonths > 0 && computedInstallment > 0 && (
-                <View style={s.loanSummary}>
-                  <View style={s.loanSummaryRow}>
-                    <Text style={s.loanSummaryLabel}>monthly installment</Text>
-                    <Text style={s.loanSummaryValue}>{computedInstallment.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
-                  </View>
-                  <View style={s.loanSummaryRow}>
-                    <Text style={s.loanSummaryLabel}>total months</Text>
-                    <Text style={s.loanSummaryValue}>{computedMonths}</Text>
-                  </View>
-                  {Math.abs(finalInstallment - computedInstallment) > 0.01 && (
-                    <View style={s.loanSummaryRow}>
-                      <Text style={s.loanSummaryLabel}>final installment</Text>
-                      <Text style={[s.loanSummaryValue, { color: Colors.pending }]}>{finalInstallment.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
-                    </View>
-                  )}
-                  <View style={s.loanSummaryRow}>
-                    <Text style={s.loanSummaryLabel}>estimated end date</Text>
-                    <Text style={s.loanSummaryValue}>{loanEndDateOverride || autoEndDate || '—'}</Text>
-                  </View>
-                </View>
-              )}
-              {/* End date override */}
-              <FormRow label="end date (override)" stacked>
-                <MonthPicker date={loanEndDateOverride || autoEndDate} onChange={setLoanEndDateOverride} />
-              </FormRow>
-            </FormBlock>
-          )}
-          {isRecurring && !isLoanCalc && (
-            <FormBlock>
-              <FormRow label="frequency" stacked>
-                <View style={s.chipRow}>
-                  {FREQUENCIES.map(f => (
-                    <TouchableOpacity key={f} style={[s.chip, frequency === f && s.chipActive]} onPress={() => setFrequency(f)}>
-                      <Text style={[s.chipText, frequency === f && s.chipTextActive]}>{f}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </FormRow>
-              {frequency === 'weekly' && (
-                <FormRow label="days" stacked>
-                  <View style={s.chipRow}>
-                    {WEEKDAYS.map((day, i) => (
-                      <TouchableOpacity key={day} style={[s.chip, recurringDays.includes(i) && s.chipActive]} onPress={() => toggleDay(i)}>
-                        <Text style={[s.chipText, recurringDays.includes(i) && s.chipTextActive]}>{day}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </FormRow>
-              )}
-              {['monthly', 'yearly'].includes(frequency) && (
-                <FormRow label={frequency === 'monthly' ? 'day' : 'day #'}>
-                  <TextInput
-                    style={s.inlineInput}
-                    placeholder={frequency === 'monthly' ? '1–31' : '1–365'}
-                    placeholderTextColor={Colors.faint}
-                    value={recurringDate}
-                    onChangeText={setRecurringDate}
-                    keyboardType="number-pad"
-                  />
-                </FormRow>
-              )}
-            </FormBlock>
-          )}
-        </>
       )}
 
       {/* ── Notes ── */}
@@ -1009,13 +815,6 @@ const s = StyleSheet.create({
   amountRow:       { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 },
   amountSign:      { fontFamily: Fonts.monoBold, fontSize: 16 },
   catDot:          { width: 22, height: 22, borderRadius: 11, justifyContent: 'center', alignItems: 'center' },
-  switchRow: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: 14, marginTop: 10,
-    borderWidth: 1, borderColor: Colors.border,
-  },
-  switchLabel:     { fontFamily: Fonts.monoBold, fontSize: 12, color: Colors.text },
-  switchSub:       { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted, marginTop: 2 },
   chipRow:         { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   chip:            { paddingHorizontal: 12, paddingVertical: 7, borderRadius: Radius.pill, borderWidth: 1, borderColor: Colors.borderMid, backgroundColor: Colors.surface },
   chipActive:      { backgroundColor: Colors.cyan, borderColor: Colors.cyan },
@@ -1035,10 +834,6 @@ const s = StyleSheet.create({
   budgetTrack:     { height: 6, backgroundColor: Colors.border, borderRadius: Radius.pill, overflow: 'hidden' },
   budgetFill:      { height: '100%', borderRadius: Radius.pill },
   budgetOver:      { fontFamily: Fonts.mono, fontSize: 10, color: Colors.expense, letterSpacing: 0.2 },
-  loanSummary:     { backgroundColor: Colors.surface, borderRadius: Radius.md, padding: 12, gap: 8, marginTop: 8, borderWidth: 1, borderColor: Colors.borderMid },
-  loanSummaryRow:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  loanSummaryLabel:{ fontFamily: Fonts.mono, fontSize: 11, color: Colors.muted },
-  loanSummaryValue:{ fontFamily: Fonts.monoBold, fontSize: 12, color: Colors.text },
   suggestionChip:     { paddingHorizontal: 12, paddingVertical: 6, borderRadius: Radius.pill, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.borderMid },
   suggestionChipText: { fontFamily: Fonts.mono, fontSize: 12, color: Colors.text },
 });

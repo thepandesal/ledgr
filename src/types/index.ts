@@ -166,6 +166,31 @@ export interface RecordingBreakdown {
   account_id: string | null;
 }
 
+export type ReminderFrequency = 'daily' | 'weekly' | 'monthly';
+export type ReminderStatus = 'active' | 'paused' | 'completed';
+
+export interface RecordingReminder {
+  id: string;
+  user_id: string;
+  workspace_id?: string | null;
+  name: string;
+  category_id?: string | null;
+  account_id?: string | null;
+  frequency: ReminderFrequency;
+  day_of_week?: number | null;   // 0=Sun…6=Sat
+  day_of_month?: number | null;  // 1–31
+  interval_days?: number | null;
+  start_date: string;            // YYYY-MM-DD
+  end_date?: string | null;
+  recording_type: 'expense' | 'income' | 'debt' | 'due';
+  status: ReminderStatus;
+  created_at: string;
+  // joined
+  categories?: Pick<Category, 'name' | 'color' | 'icon'> | null;
+  account?: Pick<Account, 'account_name' | 'bank'> | null;
+  space?: Pick<Space, 'name' | 'color'> | null;
+}
+
 // ─── UI helpers ───────────────────────────────────────────────────────────────
 
 export interface PersonPayStatus {

@@ -10,6 +10,7 @@ import ContactsScreen from './contacts';
 import CategoriesScreen from './categories';
 import DashboardScreen from './dashboard';
 import NotificationsScreen from '../notifications';
+import RemindersScreen from './reminders';
 import { Colors, Fonts, Radius, Spacing } from '@/components/ui/theme';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../../src/lib/supabase';
@@ -49,6 +50,7 @@ const TAB_META: Record<string, { title: string; subtitle: string }> = {
   categories:    { title: 'categories', subtitle: 'organize your recordings'        },
   loans:         { title: 'loans',      subtitle: 'payables & borrowings'           },
   receivables:   { title: 'receivables', subtitle: 'money owed to you'             },
+  reminders:     { title: 'reminders',  subtitle: 'your scheduled recordings'      },
 };
 
 const OTHERS_ITEMS = [
@@ -56,12 +58,13 @@ const OTHERS_ITEMS = [
   { key: 'bill-split',         label: 'Split Bill',     icon: 'people-outline',        route: null },
   { key: 'contacts',           label: 'Contacts',       icon: 'people-circle-outline', route: null },
   { key: 'categories',         label: 'Categories',     icon: 'pricetag-outline',      route: null },
+  { key: 'reminders',          label: 'Reminders',      icon: 'alarm-outline',         route: null },
   { key: 'loans',              label: 'Loans',          icon: 'cash-outline',          route: '/(app)/loans' },
   { key: 'receivables',        label: 'Receivables',    icon: 'arrow-undo-outline',    route: '/(app)/receivables' },
   { key: 'notifications-page', label: 'Notifications',  icon: 'notifications-outline', route: null },
 ];
 
-const SLIDE_KEYS = ['spaces', 'accounts', 'dashboard', 'categories', 'receipts', 'bill-split', 'contacts', 'notifications-page'];
+const SLIDE_KEYS = ['spaces', 'accounts', 'dashboard', 'categories', 'receipts', 'bill-split', 'contacts', 'notifications-page', 'reminders'];
 
 const PROFILE_BG       = '#F7F8FA';
 const PROFILE_TITLE    = '#1A1A2E';
@@ -77,6 +80,7 @@ const MemoCategories = memo(CategoriesScreen);
 const MemoDashboard  = memo(DashboardScreen);
 const MemoContacts       = memo(ContactsScreen);
 const MemoNotifications  = memo(NotificationsScreen);
+const MemoReminders      = memo(RemindersScreen);
 
 const SCREENS: Record<string, React.ReactNode> = {
   spaces:               <MemoSpaces />,
@@ -87,6 +91,7 @@ const SCREENS: Record<string, React.ReactNode> = {
   receipts:             <MemoReceipts />,
   contacts:             <MemoContacts />,
   'notifications-page': <MemoNotifications />,
+  reminders:            <MemoReminders />,
 };
 
 function ProfileScreen() {
