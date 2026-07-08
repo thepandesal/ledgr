@@ -13,8 +13,17 @@ export interface ParsedItem {
 
 export interface ParsedReceipt {
   items: ParsedItem[];
-  detectedTotal: number | null; // the receipt's own total line, for validation
+  detectedTotal: number | null;
   rawText: string;
+}
+
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }
 
 // ── Keywords that indicate a non-item line ────────────────────────────────────
@@ -141,7 +150,7 @@ export function parseReceiptText(rawText: string): ParsedReceipt {
     const name  = extractItemName(line, price);
 
     if (name.length >= 2) {
-      items.push({ name, price });
+      items.push({ name: escapeHtml(name), price });
     }
   }
 

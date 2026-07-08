@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { Platform } from 'react-native';
+import * as Notifications from 'expo-notifications';
 import { supabase } from '../lib/supabase';
 import type { User } from '@supabase/supabase-js';
 
@@ -15,6 +17,17 @@ function generateProfileCode(): string {
   let code = 'LDGR-';
   for (let i = 0; i < 4; i++) code += chars[Math.floor(Math.random() * chars.length)];
   return code;
+}
+
+async function registerPushToken(userId: string) {
+  if (Platform.OS === 'web') return;
+  const { status } = await Notifications.requestPermissionsAsync();
+  if (status !== 'granted') return;
+  const token = (await Notifications.getExpoPushTokenAsync()).data;
+  await supabase.from('push_tokens').upsert(
+    { user_id: userId, token, platform: Platform.OS },
+    { onConflict: 'user_id,token' }
+  );
 }
 
 /**
@@ -34,6 +47,7 @@ export function useUser(): UseUserResult {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       setLoading(false);
+      if (session?.user?.id) registerPushToken(session.user.id);
     });
 
     // Listen for auth state changes

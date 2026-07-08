@@ -327,11 +327,44 @@ export default function AddRecordingScreen({ inlineProps }: {
 
         // Handle receipt linkage after saving
         if (newRec?.id) {
-          if (receiptId) {
+          // Budget warning notifications
+        if (effectiveType === 'expense' && spaceId && spaceBudget && newRec?.id) {
+          const newSpent = spaceSpent + parseFloat(amount);
+          const pct = newSpent / spaceBudget;
+          const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
+          if (pct >= 1.0) {
+            const { data: existing } = await supabase.from('notifications').select('id')
+              .eq('user_id', user!.id).eq('type', 'budget_limit_reached')
+              .contains('data', { spaceId }).gte('created_at', monthStart.toISOString()).maybeSingle();
+            if (!existing) {
+              await supabase.from('notifications').insert({
+                user_id: user!.id, type: 'budget_limit_reached',
+                title: `you've hit your budget limit`,
+                body: `${spaceName} has exceeded its budget`,
+                message: `${spaceName} has exceeded its budget`,
+                data: { spaceId, spaceName }, is_read: false, status: 'new',
+              });
+            }
+          } else if (pct >= 0.8) {
+            const { data: existing } = await supabase.from('notifications').select('id')
+              .eq('user_id', user!.id).eq('type', 'budget_warning_80')
+              .contains('data', { spaceId }).gte('created_at', monthStart.toISOString()).maybeSingle();
+            if (!existing) {
+              await supabase.from('notifications').insert({
+                user_id: user!.id, type: 'budget_warning_80',
+                title: `you've used 80% of your budget`,
+                body: `${spaceName} is almost at its limit`,
+                message: `${spaceName} is almost at its limit`,
+                data: { spaceId, spaceName }, is_read: false, status: 'new',
+              });
+            }
+          }
+        }
+
+        if (receiptId) {
             // Launched from an existing receipt — link that entry to this new recording
             await supabase.from('receipt_entries').update({ recording_id: newRec.id }).eq('id', receiptId);
           } else if (receiptPhotos.length > 0) {
-            // New receipt photos were added inline — create a new entry and upload them
             const { data: { user: u } } = await supabase.auth.getUser();
             const note = recName.trim();
             const { data: entry } = await supabase.from('receipt_entries')
@@ -685,7 +718,7 @@ export default function AddRecordingScreen({ inlineProps }: {
                       ? { backgroundColor: t.color + '22', borderColor: t.color }
                       : { backgroundColor: Colors.surface, borderColor: Colors.border },
                   ]}
-                  onPress={() => { setType(t.key); setIsRecurring(false); setExpenseIsReceivable(false); setIncomeIsLoan(false); setShowTypeModal(false); }}
+                  onPress={() => { setType(t.key); setExpenseIsReceivable(false); setIncomeIsLoan(false); setShowTypeModal(false); }}
                 >
                   <View style={[s.catDot, { backgroundColor: t.color + '33' }]}>
                     <Ionicons name={t.icon as any} size={13} color={t.color} />

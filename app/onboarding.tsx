@@ -17,6 +17,26 @@ export default function OnboardingScreen() {
     try {
       const { error: updateError } = await supabase.auth.updateUser({ data: { full_name: name.trim() } });
       if (updateError) throw updateError;
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const DEFAULT_CATEGORIES = [
+          { name: 'Food',          icon: 'restaurant-outline',   color: '#FFAB91' },
+          { name: 'Transport',     icon: 'car-outline',           color: '#80CBC4' },
+          { name: 'Utilities',     icon: 'flash-outline',         color: '#FFE082' },
+          { name: 'Rent',          icon: 'home-outline',          color: '#B39DDB' },
+          { name: 'Entertainment', icon: 'musical-notes-outline', color: '#F48FB1' },
+          { name: 'Health',        icon: 'medkit-outline',        color: '#A5D6A7' },
+          { name: 'Shopping',      icon: 'bag-outline',           color: '#90CAF9' },
+          { name: 'Subscriptions', icon: 'card-outline',          color: '#FFCC80' },
+          { name: 'Fitness',       icon: 'fitness-outline',       color: '#80DEEA' },
+          { name: 'Others',        icon: 'ellipse-outline',       color: '#CFD8DC' },
+        ];
+        await supabase.from('categories').insert(
+          DEFAULT_CATEGORIES.map(c => ({ ...c, user_id: user.id, is_default: true }))
+        );
+      }
+
       router.replace('/(app)/(tabs)');
     } catch (e: any) {
       setError(e.message ?? 'Something went wrong.');

@@ -31,8 +31,7 @@ const fmtCompact = (n: number) => {
   return fmt(n);
 };
 
-type DateMode = 'monthly' | 'weekly' | 'daily' | 'yearly';
-type WeekStart = 'monday' | 'sunday' | 'saturday';
+import { getDateRange, getDateLabel, type DateMode, type WeekStart } from '../../../src/lib/dateUtils';
 
 const MOTIVATIONS = [
   'Every peso saved is a step forward.',
@@ -134,9 +133,6 @@ export default function SpacesScreen() {
       });
       
       // Debug: log what we're processing
-      console.log('[Spaces Query] Date range:', fromStr, 'to', toStr);
-      console.log('[Spaces Query] useCutoff:', useCutoff, 'cutoffDay:', cutoffDay, 'dateMode:', dateMode);
-      console.log('[Spaces Query] Total recordings fetched:', (allRecs ?? []).length);
       
       (allRecs ?? []).forEach((r: any) => {
         // Skip voided recordings entirely
@@ -206,84 +202,9 @@ export default function SpacesScreen() {
     );
   };
 
-  // ── Date range calculator ────────────────────────────────────────────
-  const getDateRange = (mode: DateMode, offset: number, ws: WeekStart, useCutoffParam: boolean, cutoffDayParam: number): { from: Date; to: Date } => {
-    const now = new Date();
-    if (mode === 'monthly') {
-      if (useCutoffParam && cutoffDayParam >= 1 && cutoffDayParam <= 31) {
-        // Determine current cutoff cycle based on today's date
-        // If today >= cutoffDay, cycle is cutoffDay this month → cutoffDay-1 next month
-        // If today < cutoffDay, cycle is cutoffDay last month → cutoffDay-1 this month
-        const now2 = new Date();
-        let cycleStartMonth = now2.getMonth();
-        let cycleStartYear  = now2.getFullYear();
-        if (now2.getDate() < cutoffDay) {
-          // We're before the cutoff, so current cycle started last month
-          cycleStartMonth -= 1;
-          if (cycleStartMonth < 0) { cycleStartMonth = 11; cycleStartYear -= 1; }
-        }
-        // Apply offset (each offset moves one full cycle = 1 month)
-        cycleStartMonth += offset;
-        // Normalise overflow/underflow
-        const baseDate = new Date(cycleStartYear, cycleStartMonth, 1);
-        const y = baseDate.getFullYear();
-        const m = baseDate.getMonth();
-        const from = new Date(y, m, cutoffDay);
-        const to   = new Date(y, m + 1, cutoffDay - 1);
-        return { from, to };
-      }
-      const y = now.getFullYear();
-      const m = now.getMonth() + offset;
-      return { from: new Date(y, m, 1), to: new Date(y, m + 1, 0) };
-    }
-    if (mode === 'yearly') {
-      const y = now.getFullYear() + offset;
-      return {
-        from: new Date(y, 0, 1),
-        to:   new Date(y, 11, 31),
-      };
-    }
-    if (mode === 'daily') {
-      const d = new Date(now);
-      d.setDate(d.getDate() + offset);
-      return { from: d, to: d };
-    }
-    // weekly
-    const startDay = ws === 'monday' ? 1 : ws === 'sunday' ? 0 : 6;
-    const today = new Date(now);
-    const day = today.getDay();
-    const diff = (day - startDay + 7) % 7;
-    const weekFrom = new Date(today);
-    weekFrom.setDate(today.getDate() - diff + offset * 7);
-    const weekTo = new Date(weekFrom);
-    weekTo.setDate(weekFrom.getDate() + 6);
-    return { from: weekFrom, to: weekTo };
-  };
-
   // ── Date label formatter ─────────────────────────────────────────────
-  const getDateLabel = (mode: DateMode, offset: number, ws: WeekStart): string => {
-    const { from, to } = getDateRange(mode, offset, ws, useCutoff, cutoffDay);
-    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    const fullMonths = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-    if (mode === 'monthly') {
-      if (useCutoff && cutoffDay >= 1 && cutoffDay <= 31) {
-        const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-        return `${months[from.getMonth()]} ${from.getDate()} – ${months[to.getMonth()]} ${to.getDate()}`;
-      }
-      return `${months[from.getMonth()]} ${from.getFullYear()}`;
-    }
-    if (mode === 'yearly')  return `${from.getFullYear()}`;
-    if (mode === 'daily') {
-      const now = new Date();
-      const isToday = from.toDateString() === now.toDateString();
-      if (isToday) return 'Today';
-      return `${months[from.getMonth()]} ${from.getDate()}, ${from.getFullYear()}`;
-    }
-    // weekly
-    const fromStr = `${months[from.getMonth()]} ${from.getDate()}`;
-    const toStr   = `${months[to.getMonth()]} ${to.getDate()}`;
-    return `${fromStr} – ${toStr}`;
-  };
+  const getLabel = (mode: DateMode, offset: number, ws: WeekStart): string =>
+    getDateLabel(mode, offset, ws, useCutoff, cutoffDay);
 
   const openCreate = () => {
     setSpaceName(''); setError(''); setSpaceBudget('');
@@ -402,7 +323,7 @@ export default function SpacesScreen() {
   const firstName = userName?.split(' ')[0] || 'there';
   
   // Memoize date calculations to prevent infinite loops
-  const dateLabel = useMemo(() => getDateLabel(dateMode, dateOffset, weekStart), [dateMode, dateOffset, weekStart, useCutoff, cutoffDay]);
+  const dateLabel = useMemo(() => getLabel(dateMode, dateOffset, weekStart), [dateMode, dateOffset, weekStart, useCutoff, cutoffDay]);
   const dateRange = useMemo(() => getDateRange(dateMode, dateOffset, weekStart, useCutoff, cutoffDay), [dateMode, dateOffset, weekStart, useCutoff, cutoffDay]);
   const expenseActive   = spaces.filter(sp => (sp.space_type ?? 'expense') === 'expense' && sp.is_active !== false).sort((a, b) => a.name.localeCompare(b.name));
   const savingsActive   = spaces.filter(sp => sp.space_type === 'savings'  && sp.is_active !== false).sort((a, b) => a.name.localeCompare(b.name));

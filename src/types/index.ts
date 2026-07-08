@@ -167,7 +167,7 @@ export interface RecordingBreakdown {
 }
 
 export type ReminderFrequency = 'daily' | 'weekly' | 'monthly';
-export type ReminderStatus = 'active' | 'paused' | 'completed';
+export type ReminderStatus = 'active' | 'paused' | 'completed' | 'archived';
 
 export interface RecordingReminder {
   id: string;

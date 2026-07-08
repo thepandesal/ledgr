@@ -381,11 +381,11 @@ export default function TabsLayout() {
           }]}>
             {Platform.OS === 'ios' ? (
               <BlurView intensity={60} tint="light" style={s.bubbleInner}>
-                <BubbleContent items={OTHERS_ITEMS} activeTab={activeTab} onPress={handleOthersItem} />
+                <BubbleContent items={OTHERS_ITEMS} activeTab={activeTab} onPress={handleOthersItem} unreadCount={unreadCount} />
               </BlurView>
             ) : (
               <View style={[s.bubbleInner, s.bubbleInnerAndroid]}>
-                <BubbleContent items={OTHERS_ITEMS} activeTab={activeTab} onPress={handleOthersItem} />
+                <BubbleContent items={OTHERS_ITEMS} activeTab={activeTab} onPress={handleOthersItem} unreadCount={unreadCount} />
               </View>
             )}
           </Animated.View>
@@ -425,15 +425,17 @@ export default function TabsLayout() {
   );
 }
 
-function BubbleContent({ items, activeTab, onPress }: {
+function BubbleContent({ items, activeTab, onPress, unreadCount }: {
   items: typeof OTHERS_ITEMS;
   activeTab: string;
   onPress: (item: typeof OTHERS_ITEMS[0]) => void;
+  unreadCount: number;
 }) {
   return (
     <>
       {items.map((item, i) => {
         const isActive = activeTab === item.key;
+        const showBadge = item.key === 'notifications-page' && unreadCount > 0;
         return (
           <TouchableOpacity
             key={item.key}
@@ -443,9 +445,19 @@ function BubbleContent({ items, activeTab, onPress }: {
           >
             <View style={[s.bubbleIconWrap, isActive && s.bubbleIconWrapActive]}>
               <Ionicons name={item.icon as any} size={16} color={isActive ? NAV_ACCENT : Colors.text} />
+              {showBadge && (
+                <View style={s.bubbleBadge}>
+                  <Text style={s.navBadgeText}>{unreadCount > 9 ? '9+' : String(unreadCount)}</Text>
+                </View>
+              )}
             </View>
             <Text style={[s.bubbleItemLabel, isActive && s.bubbleItemLabelActive]}>{item.label}</Text>
-            <Ionicons name="chevron-forward" size={12} color={Colors.faint} style={{ marginLeft: 'auto' }} />
+            {showBadge && (
+              <View style={s.bubbleBadgeLabel}>
+                <Text style={s.bubbleBadgeLabelText}>{unreadCount > 9 ? '9+' : String(unreadCount)}</Text>
+              </View>
+            )}
+            <Ionicons name="chevron-forward" size={12} color={Colors.faint} style={{ marginLeft: showBadge ? 0 : 'auto' }} />
           </TouchableOpacity>
         );
       })}
@@ -500,6 +512,9 @@ const s = StyleSheet.create({
   bubbleIconWrapActive: { backgroundColor: BUBBLE_ACTIVE_BG },
   bubbleItemLabel:       { fontFamily: 'ChillaxRegular', fontSize: 14, color: Colors.text },
   bubbleItemLabelActive: { fontFamily: 'ChillaxMedium',  fontSize: 14, color: NAV_ACCENT },
+  bubbleBadge:           { position: 'absolute', top: -4, right: -4, minWidth: 16, height: 16, borderRadius: 8, backgroundColor: '#ed6a6a', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
+  bubbleBadgeLabel:      { marginLeft: 'auto', minWidth: 20, height: 20, borderRadius: 10, backgroundColor: '#ed6a6a', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },
+  bubbleBadgeLabelText:  { fontFamily: 'ChillaxMedium', fontSize: 10, color: '#fff', lineHeight: 14 },
 });
 
 const p = StyleSheet.create({

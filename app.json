@@ -13,7 +13,11 @@
     },
     "plugins": [
       "expo-router",
-      "expo-font"
+      "expo-font",
+      ["expo-notifications", {
+        "icon": "./assets/icon.png",
+        "color": "#1A1A1A"
+      }]
     ],
     "experiments": {
       "typedRoutes": true

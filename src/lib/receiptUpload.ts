@@ -9,6 +9,18 @@ const R2_SECRET_KEY = process.env.EXPO_PUBLIC_R2_SECRET_KEY!;
 const R2_BUCKET = process.env.EXPO_PUBLIC_R2_BUCKET!;
 const R2_PUBLIC_URL = process.env.EXPO_PUBLIC_R2_PUBLIC_URL!;
 
+const ALLOWED_DOMAINS = ['supabase.co', 'supabase.in', 'ledgr.art', 'amazonaws.com'];
+
+function isSafeUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'https:') return false;
+    return ALLOWED_DOMAINS.some(domain => parsed.hostname.endsWith(domain));
+  } catch {
+    return false;
+  }
+}
+
 export const compressImage = async (uri: string): Promise<string> => {
   // ImageManipulator is unreliable on web — skip compression and return as-is
   if (Platform.OS === 'web') return uri;
@@ -109,6 +121,7 @@ export const uploadReceiptPhoto = async (
   if (Platform.OS === 'web') {
     publicUrl = await uploadToSupabase(fileName, buffer);
   } else {
+    if (!isSafeUrl(`${R2_ENDPOINT}/${R2_BUCKET}/${fileName}`)) throw new Error('blocked: untrusted URL');
     publicUrl = await uploadToR2(fileName, buffer);
   }
 

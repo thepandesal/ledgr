@@ -103,12 +103,29 @@ export default function DashboardScreen() {
     queryFn: async () => {
       const { data } = await supabase
         .from('user_settings')
-        .select('cutoff_day, dashboard_preset, dashboard_custom_from, dashboard_custom_to, dashboard_space_ids, dashboard_tab_ids, dashboard_range_offset, dashboard_amount_sort, dashboard_account_ids, dashboard_category_ids')
+        .select('cutoff_day, dashboard_preset, dashboard_custom_from, dashboard_custom_to, dashboard_space_ids, dashboard_tab_ids, dashboard_range_offset, dashboard_amount_sort, dashboard_account_ids, dashboard_category_ids, spaces_date_mode, spaces_week_start, spaces_date_offset, spaces_cutoff_day, spaces_use_cutoff')
         .eq('user_id', userId)
         .maybeSingle();
       if (!data) return data;
-      if (data.cutoff_day) { setCutoffDay(data.cutoff_day); setCutoffInput(String(data.cutoff_day)); }
-      if (data.dashboard_preset) setActivePreset(data.dashboard_preset as Preset);
+
+      // Apply global spaces filter settings first (as defaults)
+      const globalMode   = data.spaces_date_mode   ?? 'monthly';
+      const globalOffset = Number(data.spaces_date_offset ?? 0);
+      const globalCutoff = Number(data.spaces_cutoff_day  ?? 25);
+      const globalUseCutoff = Boolean(data.spaces_use_cutoff);
+
+      // Map global mode → dashboard preset
+      let derivedPreset: Preset = 'this-month';
+      if (globalMode === 'monthly' && globalUseCutoff) derivedPreset = 'cutoff';
+      else if (globalMode === 'monthly') derivedPreset = 'this-month';
+
+      setCutoffDay(globalCutoff);
+      setCutoffInput(String(globalCutoff));
+
+      // Dashboard-specific overrides (if saved)
+      // Always use global spaces filter (no dashboard-specific override)
+      setActivePreset(derivedPreset);
+
       if (data.dashboard_custom_from) setCustomFrom(new Date(data.dashboard_custom_from));
       if (data.dashboard_custom_to)   setCustomTo(new Date(data.dashboard_custom_to));
       if (data.dashboard_space_ids) {
@@ -119,8 +136,9 @@ export default function DashboardScreen() {
         const tabs = (data.dashboard_tab_ids as string).split(',').filter(Boolean);
         setSelectedTabs(new Set(tabs.length ? tabs as ActivityTab[] : ['all']));
       }
-      if (data.dashboard_range_offset != null) setRangeOffset(Number(data.dashboard_range_offset));
-      if (data.dashboard_amount_sort)  setAmountSort(data.dashboard_amount_sort as any);
+      setRangeOffset(globalOffset);
+      if (data.dashboard_amount_sort) setAmountSort(data.dashboard_amount_sort as any);
+
       if (data.dashboard_account_ids) {
         const ids = (data.dashboard_account_ids as string).split(',').filter(Boolean);
         setSelectedAccounts(new Set(ids.length ? ids : ['all']));

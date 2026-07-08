@@ -24,6 +24,12 @@ const TYPE_ICON: Record<string, string> = {
   friend_request_accepted: 'people-outline',
   split_bill_invite:       'receipt-outline',
   space_invite:            'grid-outline',
+  budget_warning_80:       'warning-outline',
+  budget_limit_reached:    'alert-circle-outline',
+  savings_reminder:        'trending-up-outline',
+  dues_reminder:           'time-outline',
+  dues_end_of_month:       'calendar-outline',
+  dues_month_summary:      'bar-chart-outline',
   default:                 'notifications-outline',
 };
 
@@ -45,7 +51,8 @@ export default function NotificationsScreen() {
 
   useEffect(() => {
     if (!userId) return;
-    (async () => {
+
+    const load = async () => {
       const { data } = await supabase
         .from('notifications')
         .select('*')
@@ -53,7 +60,6 @@ export default function NotificationsScreen() {
         .order('created_at', { ascending: false });
       setNotifications(data ?? []);
       setLoading(false);
-      // Mark all 'new' → 'saw' when page is opened
       if (data && data.some((n: any) => n.status === 'new')) {
         await supabase
           .from('notifications')
@@ -62,7 +68,28 @@ export default function NotificationsScreen() {
           .eq('status', 'new');
         setNotifications(prev => prev.map(n => n.status === 'new' ? { ...n, status: 'saw' } : n));
       }
-    })();
+    };
+
+    load();
+
+    // Realtime — new notifications appear instantly without refresh
+    const channel = supabase
+      .channel('notifications-live')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'notifications',
+        filter: `user_id=eq.${userId}`,
+      }, async (payload) => {
+        const n = payload.new as any;
+        setNotifications(prev => [n, ...prev]);
+        // Auto-mark as saw since the page is open
+        await supabase.from('notifications').update({ status: 'saw', is_read: true, read: true }).eq('id', n.id);
+        setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, status: 'saw' } : x));
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, [userId]);
 
   const handleTap = async (n: any) => {
@@ -80,6 +107,18 @@ export default function NotificationsScreen() {
     }
     if (n.type === 'space_invite') {
       router.push('/(app)/(tabs)/spaces' as any); return;
+    }
+    if (n.type === 'budget_warning_80' || n.type === 'budget_limit_reached') {
+      if (data.spaceId) router.push({ pathname: '/(app)/space-detail', params: { spaceId: data.spaceId, name: data.spaceName ?? 'space' } } as any);
+      return;
+    }
+    if (n.type === 'savings_reminder') {
+      if (data.spaceId) router.push({ pathname: '/(app)/space-detail', params: { spaceId: data.spaceId, name: data.spaceName ?? 'space' } } as any);
+      return;
+    }
+    if (n.type === 'dues_reminder' || n.type === 'dues_month_summary' || n.type === 'dues_end_of_month') {
+      router.push('/(app)/(tabs)/dashboard' as any);
+      return;
     }
     if (data.recordingId) {
       router.push({ pathname: '/(app)/recording-detail', params: { recordingId: data.recordingId } } as any);

@@ -1,4 +1,5 @@
 import { Stack, useRouter } from 'expo-router';
+import * as Notifications from 'expo-notifications';
 import { useFonts, DMSans_400Regular, DMSans_500Medium, DMSans_600SemiBold, DMSans_700Bold } from '@expo-google-fonts/dm-sans';
 import { RobotoMono_400Regular, RobotoMono_700Bold } from '@expo-google-fonts/roboto-mono';
 import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
@@ -9,6 +10,14 @@ import { View, ActivityIndicator } from 'react-native';
 import { useEffect, useState } from 'react';
 import { supabase } from '../src/lib/supabase';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+  }),
+});
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -74,7 +83,7 @@ export default function RootLayout() {
   useEffect(() => {
     if (!fontsLoaded) return;
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('[auth] event:', event, 'session:', !!session);
+      if (__DEV__) console.log('[auth] event:', event);
       const path = typeof window !== 'undefined' ? window.location.pathname : '';
       // Don't redirect if on split share page
       if (path.startsWith('/split/')) { setReady(true); return; }

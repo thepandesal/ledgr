@@ -63,6 +63,11 @@ export default function RecordingDetailScreen() {
   const [editDate, setEditDate] = useState('');
   const [editAccountId, setEditAccountId] = useState('');
   const [editAccounts, setEditAccounts] = useState<any[]>([]);
+  const [editName, setEditName] = useState('');
+  const [editNotes, setEditNotes] = useState('');
+  const [editCategoryId, setEditCategoryId] = useState<string | null>(null);
+  const [editCategories, setEditCategories] = useState<any[]>([]);
+  const [showEditCategoryModal, setShowEditCategoryModal] = useState(false);
   const webviewRef = useRef<any>(null);
   const [copiedToast, setCopiedToast] = useState(false);
   const [tooltip, setTooltip] = useState<{ name: string } | null>(null);
@@ -161,7 +166,7 @@ export default function RecordingDetailScreen() {
       setWriteOffModal(false);
       setWriteOffReason('');
       loadPaymentData();
-    } catch (e) { console.log(e); }
+    } catch (e) { /* write-off failed silently */ }
     finally { setWriteOffLoading(false); }
   };
 
@@ -269,7 +274,7 @@ export default function RecordingDetailScreen() {
       }
       if (recordingDate) setPendingFocusDate(recordingDate);
       handleBack();
-    } catch (e) { console.log(e); }
+    } catch (e) { /* delete failed silently */ }
     finally { setDeleteLoading(false); }
   };
 
@@ -441,7 +446,7 @@ export default function RecordingDetailScreen() {
       }
       setMarkCompleteModal(false);
       loadPaymentData();
-    } catch (e) { console.log(e); }
+    } catch (e) { /* mark complete failed silently */ }
     finally { setMarkCompleteLoading(false); }
   };
 
@@ -474,7 +479,7 @@ export default function RecordingDetailScreen() {
         setOverpaymentAmount(Math.round(excess * 100) / 100);
         setOverpaymentModal(true);
       }
-    } catch (e) { console.log(e); }
+    } catch (e) { /* collect due failed silently */ }
     finally { setCollectDueLoading(false); }
   };
 
@@ -484,7 +489,7 @@ export default function RecordingDetailScreen() {
       await supabase.from('recordings').update({ is_due: false, paid_amount: 0, status: 'unpaid' }).eq('id', recordingId);
       setRecording((prev: any) => ({ ...prev, is_due: false, paid_amount: 0, status: 'unpaid' }));
       setCancelDueConfirm(false);
-    } catch (e) { console.log(e); }
+    } catch (e) { /* cancel due failed silently */ }
     finally { setCancelDueLoading(false); }
   };
 
@@ -590,7 +595,7 @@ export default function RecordingDetailScreen() {
         setOverpaymentAmount(Math.round(excess * 100) / 100);
         setOverpaymentModal(true);
       }
-    } catch (e) { console.log(e); }
+    } catch (e) { /* collect failed silently */ }
     finally { setCollectLoading(false); }
   };
 
@@ -694,7 +699,7 @@ export default function RecordingDetailScreen() {
         setOverpaymentAmount(Math.round(excess * 100) / 100);
         setOverpaymentModal(true);
       }
-    } catch (e) { console.log(e); }
+    } catch (e) { /* payment failed silently */ }
     finally { setPayLoading(false); }
   };
 
@@ -727,7 +732,7 @@ export default function RecordingDetailScreen() {
       setReceivableMode('full');
       setReceivableManualAmount('');
       setReceivableSelectedPeople([]);
-    } catch (e) { console.log(e); }
+    } catch (e) { /* receivable failed silently */ }
     finally { setReceivableLoading(false); }
   };
 
@@ -1045,7 +1050,7 @@ export default function RecordingDetailScreen() {
         await Sharing.shareAsync(fileUri, { mimeType: 'image/png', dialogTitle: 'Save split image' });
         setSaveImageModal(false);
       }
-    } catch (e) { console.log(e); }
+    } catch (e) { /* webview capture failed silently */ }
     finally { setShareLoading(false); }
   };
 
@@ -1053,18 +1058,28 @@ export default function RecordingDetailScreen() {
   const openEditModal = async () => {
     setEditDate(recording?.transaction_date ?? '');
     setEditAccountId(recording?.account_id ?? '');
+    setEditName(recording?.name ?? '');
+    setEditNotes(recording?.notes ?? '');
+    setEditCategoryId(recording?.category_id ?? null);
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
-    const { data: accs } = await supabase.from('accounts').select().eq('user_id', user.id).order('account_name');
+    const [{ data: accs }, { data: cats }] = await Promise.all([
+      supabase.from('accounts').select().eq('user_id', user.id).order('account_name'),
+      supabase.from('categories').select().eq('user_id', user.id).order('name'),
+    ]);
     if (accs) setEditAccounts(accs);
+    if (cats) setEditCategories(cats);
     setEditModal(true);
   };
 
   const saveEdit = async () => {
     if (!editDate) return;
     await supabase.from('recordings').update({
+      name: editName.trim() || recording?.name,
       transaction_date: editDate,
       account_id: editAccountId || null,
+      category_id: editCategoryId || null,
+      notes: editNotes.trim() || null,
     }).eq('id', recordingId);
     setEditModal(false);
     loadRecording();
@@ -1906,8 +1921,26 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
       <BottomSheet visible={editModal} onClose={() => setEditModal(false)} sub="recording" title="edit recording">
         <View style={formStyles.block}>
           <View style={formStyles.blockRow}>
+            <Text style={formStyles.blockLabel}>name</Text>
+            <TextInput style={formStyles.inlineInput} placeholder="recording name" placeholderTextColor={Colors.faint} value={editName} onChangeText={setEditName} />
+          </View>
+          <View style={formStyles.blockDivider} />
+          <View style={formStyles.blockRow}>
             <Text style={formStyles.blockLabel}>date</Text>
             <TextInput style={formStyles.inlineInput} placeholder="YYYY-MM-DD" placeholderTextColor={Colors.faint} value={editDate} onChangeText={setEditDate} />
+          </View>
+          <View style={formStyles.blockDivider} />
+          <TouchableOpacity style={formStyles.blockRow} onPress={() => setShowEditCategoryModal(true)}>
+            <Text style={formStyles.blockLabel}>category</Text>
+            <Text style={[formStyles.inlineInput, { color: editCategoryId ? Colors.text : Colors.faint }]}>
+              {editCategoryId ? (editCategories.find(c => c.id === editCategoryId)?.name ?? 'select') : 'optional'}
+            </Text>
+            <Ionicons name="chevron-down" size={13} color={Colors.faint} />
+          </TouchableOpacity>
+          <View style={formStyles.blockDivider} />
+          <View style={formStyles.blockRow}>
+            <Text style={formStyles.blockLabel}>notes</Text>
+            <TextInput style={[formStyles.inlineInput, { flex: 1 }]} placeholder="optional" placeholderTextColor={Colors.faint} value={editNotes} onChangeText={setEditNotes} multiline />
           </View>
           <View style={formStyles.blockDivider} />
           <View style={[formStyles.blockRow, { flexDirection: 'column', alignItems: 'flex-start', gap: 8 }]}>
@@ -1937,6 +1970,32 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
             <Text style={formStyles.primaryBtnText}>save</Text>
           </TouchableOpacity>
         </View>
+      </BottomSheet>
+
+      {/* Edit category picker */}
+      <BottomSheet visible={showEditCategoryModal} onClose={() => setShowEditCategoryModal(false)} sub="recording" title="category">
+        <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 320 }}>
+          <TouchableOpacity
+            style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 10 }}
+            onPress={() => { setEditCategoryId(null); setShowEditCategoryModal(false); }}
+          >
+            <Ionicons name={!editCategoryId ? 'checkmark-circle' : 'ellipse-outline'} size={18} color={!editCategoryId ? ACCENT_DARK : Colors.faint} />
+            <Text style={{ fontFamily: Brand.font.mono, fontSize: 13, color: Colors.muted }}>none</Text>
+          </TouchableOpacity>
+          {editCategories.map(cat => (
+            <TouchableOpacity
+              key={cat.id}
+              style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 10 }}
+              onPress={() => { setEditCategoryId(cat.id); setShowEditCategoryModal(false); }}
+            >
+              <Ionicons name={editCategoryId === cat.id ? 'checkmark-circle' : 'ellipse-outline'} size={18} color={editCategoryId === cat.id ? ACCENT_DARK : Colors.faint} />
+              <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: cat.color, justifyContent: 'center', alignItems: 'center' }}>
+                <Ionicons name={cat.icon} size={11} color={Colors.text} />
+              </View>
+              <Text style={{ fontFamily: Brand.font.mono, fontSize: 13, color: Colors.text }}>{cat.name}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
       </BottomSheet>
 
       {/* Photo carousel modal */}

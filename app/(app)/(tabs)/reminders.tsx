@@ -81,7 +81,8 @@ export default function RemindersScreen() {
         .from('recording_reminders')
         .select('*, categories:category_id(name,color,icon), account:account_id(account_name,bank), space:workspace_id(name,color)')
         .eq('user_id', userId)
-        .order('created_at', { ascending: false });
+        .in('status', ['active', 'paused'])
+        .order('name', { ascending: true });
       return (data ?? []).map((r: any) => ({
         ...r,
         categories: Array.isArray(r.categories) ? r.categories[0] : r.categories,
@@ -124,10 +125,10 @@ export default function RemindersScreen() {
   }, [userId]));
 
   // ── Derived lists ────────────────────────────────────────────────────────
-  const now        = new Date();
-  const dueToday   = reminders.filter(r => isReminderDueToday(r, now));
-  const upcoming   = reminders.filter(r => r.status === 'active' && !isReminderDueToday(r, now));
-  const completed  = reminders.filter(r => r.status !== 'active');
+  const now      = new Date();
+  const dueToday = reminders.filter(r => r.status === 'active' && isReminderDueToday(r, now));
+  const upcoming = reminders.filter(r => r.status === 'active' && !isReminderDueToday(r, now));
+  const paused   = reminders.filter(r => r.status === 'paused');
 
   // ── Handlers ─────────────────────────────────────────────────────────────
   const openAdd = () => {
@@ -311,11 +312,11 @@ export default function RemindersScreen() {
           </>
         )}
 
-        {/* Completed / paused */}
-        {completed.length > 0 && (
+        {/* Paused */}
+        {paused.length > 0 && (
           <>
-            <Text style={s.sectionHeader}>paused / completed</Text>
-            {completed.map(r => renderReminder(r, false))}
+            <Text style={s.sectionHeader}>paused</Text>
+            {paused.map(r => renderReminder(r, false))}
           </>
         )}
 

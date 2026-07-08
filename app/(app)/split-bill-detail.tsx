@@ -140,8 +140,9 @@ export default function SplitBillDetailScreen() {
     await supabase.from('notifications').insert({
       user_id: friendId,
       type: 'split_bill_invite',
-      title: 'you\'ve been added to a split bill',
-      body: `${String(name)} — your share is ${amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
+      title: `${userName} has tagged you on a split bill`,
+      body: `${String(name)} — your share is ${amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}. tap to see`,
+      message: `${String(name)} — your share is ${amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}. tap to see`,
       data: { splitBillId, splitBillName: String(name) },
       is_read: false,
       status: 'new',

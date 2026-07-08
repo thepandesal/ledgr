@@ -39,65 +39,6 @@ const PRESETS: { key: Preset; label: string; icon: string }[] = [
   { key: 'custom',     label: 'Custom',     icon: 'options-outline'  },
 ];
 
-type LocalDateMode = 'monthly' | 'weekly' | 'daily' | 'yearly' | 'custom';
-type WeekStart = 'monday' | 'sunday' | 'saturday';
-
-function getLocalDateRange(
-  mode: LocalDateMode, offset: number, weekStart: WeekStart,
-  useCutoff: boolean, cutoffDay: number,
-  customFrom?: Date, customTo?: Date
-): { from: Date; to: Date } {
-  if (mode === 'custom' && customFrom && customTo) return { from: customFrom, to: customTo };
-  const now = new Date();
-  if (mode === 'monthly') {
-    if (useCutoff) {
-      let csm = now.getMonth(), csy = now.getFullYear();
-      if (now.getDate() < cutoffDay) { csm -= 1; if (csm < 0) { csm = 11; csy -= 1; } }
-      const base = new Date(csy, csm + offset, 1);
-      return { from: new Date(base.getFullYear(), base.getMonth(), cutoffDay), to: new Date(base.getFullYear(), base.getMonth() + 1, cutoffDay - 1) };
-    }
-    return { from: new Date(now.getFullYear(), now.getMonth() + offset, 1), to: new Date(now.getFullYear(), now.getMonth() + offset + 1, 0) };
-  }
-  if (mode === 'yearly') {
-    const y = now.getFullYear() + offset;
-    return { from: new Date(y, 0, 1), to: new Date(y, 11, 31) };
-  }
-  if (mode === 'daily') {
-    const d = new Date(now); d.setDate(d.getDate() + offset);
-    return { from: d, to: d };
-  }
-  // weekly
-  const startDay = weekStart === 'monday' ? 1 : weekStart === 'sunday' ? 0 : 6;
-  const day = now.getDay();
-  const diff = (day - startDay + 7) % 7;
-  const wf = new Date(now); wf.setDate(now.getDate() - diff + offset * 7);
-  const wt = new Date(wf); wt.setDate(wf.getDate() + 6);
-  return { from: wf, to: wt };
-}
-
-function getLocalDateLabel(
-  mode: LocalDateMode, offset: number, weekStart: WeekStart,
-  useCutoff: boolean, cutoffDay: number,
-  customFrom?: Date, customTo?: Date
-): string {
-  if (mode === 'custom' && customFrom && customTo) {
-    const M = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    return `${M[customFrom.getMonth()]} ${customFrom.getDate()} – ${M[customTo.getMonth()]} ${customTo.getDate()}, ${customTo.getFullYear()}`;
-  }
-  const { from, to } = getLocalDateRange(mode, offset, weekStart, useCutoff, cutoffDay);
-  const M = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  if (mode === 'monthly') {
-    if (useCutoff) return `${M[from.getMonth()]} ${from.getDate()} – ${M[to.getMonth()]} ${to.getDate()}`;
-    return `${M[from.getMonth()]} ${from.getFullYear()}`;
-  }
-  if (mode === 'yearly') return `${from.getFullYear()}`;
-  if (mode === 'daily') {
-    const isToday = from.toDateString() === new Date().toDateString();
-    return isToday ? 'Today' : `${M[from.getMonth()]} ${from.getDate()}, ${from.getFullYear()}`;
-  }
-  return `${M[from.getMonth()]} ${from.getDate()} – ${M[to.getMonth()]} ${to.getDate()}`;
-}
-
 // ── Helper functions ─────────────────────────────────────────────────────────
 function isSameDay(a: Date, b: Date) {
   return a.getFullYear() === b.getFullYear()
@@ -172,6 +113,7 @@ function getTypeLabel(type: string, status: string, is_due?: boolean, paid_amoun
 }
 
 import { smartDateLabel } from '../../src/lib/smartDateLabel';
+import { getDateRange, getDateLabel, type DateMode as LocalDateMode, type WeekStart } from '../../src/lib/dateUtils';
 import { computeGhosts, getDueDateForCycle, isLoanComplete, type GhostRow } from '../../src/lib/recurringUtils';
 import { isReminderDueToday } from '../../src/lib/reminderUtils';
 import type { RecordingReminder } from '../../src/types';
@@ -243,6 +185,7 @@ export default function SpaceDetailScreen() {
   const [showAddChoice, setShowAddChoice] = useState(false);
   const [showReminderModal, setShowReminderModal] = useState(false);
   const [reminderTab, setReminderTab] = useState<'active' | 'completed' | 'paused'>('active');
+  const [recordingSearch, setRecordingSearch] = useState('');
 
   // ── Reminder add modal state (quick-add from space) ────────────────────────────────────────────────────────────
   const [rName, setRName]               = useState('');
@@ -558,7 +501,7 @@ export default function SpaceDetailScreen() {
   };
 
   // ── Computed values ────────────────────────────────────────────────────────
-  const range = getLocalDateRange(localMode, localOffset, localWeekStart, localUseCutoff, localCutoffDay,
+  const range = getDateRange(localMode, localOffset, localWeekStart, localUseCutoff, localCutoffDay,
     localCustomFrom ? new Date(localCustomFrom) : undefined,
     localCustomTo   ? new Date(localCustomTo)   : undefined
   );
@@ -571,9 +514,9 @@ export default function SpaceDetailScreen() {
   const filtered = recordings.filter(r => {
     if (!currentTypes.includes(r.type)) return false;
     if (r.status === 'voided') return false;
-    // When Due tab is selected, only show is_due expenses
     if (!isAll && selectedTabs.has('receivables') && r.type === 'expense' && !r.is_due) return false;
     if (!isAllCats && !selectedCategories.has(r.category_id)) return false;
+    if (recordingSearch.trim() && !r.name.toLowerCase().includes(recordingSearch.toLowerCase())) return false;
     const [y, m, d] = r.transaction_date.split('-').map(Number);
     const date = new Date(y, m - 1, d);
     if (date < range.from) return false;
@@ -628,9 +571,9 @@ export default function SpaceDetailScreen() {
   const rangeSpanDays = (range.to.getTime() - range.from.getTime()) / 86400000;
   const isWideRange = rangeSpanDays > 35;
   const visibleReminders = spaceReminders.filter(r => {
-    if (r.status === 'paused') return reminderTab === 'paused';
-    const start = new Date(r.start_date + 'T00:00:00');
-    if (start > range.to) return false;
+    if (r.status === 'archived') return false;
+
+    if (r.status === 'paused') return (reminderTab as string) === 'paused';
     const doneThisPeriod = reminderCompletedInRange.has(r.id);
     if (reminderTab === 'completed') return doneThisPeriod;
     if (reminderTab === 'active') return isWideRange ? true : !doneThisPeriod;
@@ -682,7 +625,7 @@ export default function SpaceDetailScreen() {
   // Range label
   const fmtShort = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   const fmtFull  = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  const rangeLabel = getLocalDateLabel(localMode, localOffset, localWeekStart, localUseCutoff, localCutoffDay,
+  const rangeLabel = getDateLabel(localMode, localOffset, localWeekStart, localUseCutoff, localCutoffDay,
     localCustomFrom ? new Date(localCustomFrom) : undefined,
     localCustomTo   ? new Date(localCustomTo)   : undefined
   );
@@ -1225,8 +1168,9 @@ export default function SpaceDetailScreen() {
     await supabase.from('notifications').insert({
       user_id: inviteFriendId,
       type: 'space_invite',
-      title: 'you\'ve been invited to a shared space',
+      title: `${userName} is inviting you to join a space`,
       body: `${String(name)} — role: ${inviteRole}`,
+      message: `${String(name)} — role: ${inviteRole}`,
       data: { spaceId, spaceName: String(name) },
       is_read: false,
       status: 'new',
@@ -1337,6 +1281,23 @@ export default function SpaceDetailScreen() {
           {/* Recordings section */}
           <View style={s.sectionRow}>
             <Text style={s.sectionHeader}>recordings ({filtered.length})</Text>
+          </View>
+
+          {/* Search */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: Colors.borderMid, borderRadius: Radius.pill, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 8, backgroundColor: Colors.surface }}>
+            <Ionicons name="search-outline" size={13} color={Colors.faint} />
+            <TextInput
+              style={{ flex: 1, fontFamily: Fonts.mono, fontSize: 13, color: Colors.text, padding: 0 }}
+              placeholder="search recordings..."
+              placeholderTextColor={Colors.faint}
+              value={recordingSearch}
+              onChangeText={v => { setRecordingSearch(v); setDisplayCount(10); }}
+            />
+            {recordingSearch.length > 0 && (
+              <TouchableOpacity onPress={() => setRecordingSearch('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Ionicons name="close" size={13} color={Colors.faint} />
+              </TouchableOpacity>
+            )}
           </View>
 
           {isLoading ? (
@@ -1839,6 +1800,29 @@ export default function SpaceDetailScreen() {
           <View style={{ flex: 1 }}>
             <Text style={s.choiceTitle}>{reminderChoiceTarget?.status === 'active' ? 'pause reminder' : 'resume reminder'}</Text>
             <Text style={s.choiceSub}>temporarily stop this reminder</Text>
+          </View>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={s.choiceRow}
+          activeOpacity={0.8}
+          onPress={async () => {
+            setReminderChoiceModal(false);
+            if (!reminderChoiceTarget) return;
+            const hasLinked = recordings.some(r => r.reminder_id === reminderChoiceTarget.id);
+            if (hasLinked) {
+              await supabase.from('recording_reminders').update({ status: 'archived' }).eq('id', reminderChoiceTarget.id);
+            } else {
+              await supabase.from('recording_reminders').delete().eq('id', reminderChoiceTarget.id);
+            }
+            queryClient.invalidateQueries({ queryKey: ['space-reminders', spaceId, userId] });
+          }}
+        >
+          <View style={[s.choiceIcon, { backgroundColor: Colors.surface }]}>
+            <Ionicons name={recordings.some(r => r.reminder_id === reminderChoiceTarget?.id) ? 'archive-outline' : 'trash-outline'} size={20} color={Colors.muted} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={s.choiceTitle}>{recordings.some(r => r.reminder_id === reminderChoiceTarget?.id) ? 'archive reminder' : 'delete reminder'}</Text>
+            <Text style={s.choiceSub}>{recordings.some(r => r.reminder_id === reminderChoiceTarget?.id) ? 'has linked recordings - will be archived' : 'permanently remove this reminder'}</Text>
           </View>
         </TouchableOpacity>
       </BottomSheet>
