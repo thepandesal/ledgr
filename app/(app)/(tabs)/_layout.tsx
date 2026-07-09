@@ -15,6 +15,11 @@ import { Colors, Fonts, Radius, Spacing } from '@/components/ui/theme';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../../src/lib/supabase';
 import { useUser } from '../../../src/hooks/useUser';
+import TourTarget from '@/components/TourTarget';
+import AppTourOverlay from '@/components/AppTourOverlay';
+import { TourContext, APP_TOUR_STEPS } from '../../../src/lib/TourContext';
+import type { RefObject } from 'react';
+import type { View as RNView } from 'react-native';
 
 export { BlurContext } from '../../../src/lib/BlurContext';
 import { BlurContext } from '../../../src/lib/BlurContext';
@@ -211,9 +216,17 @@ function ProfileScreen() {
 }
 const MemoProfile = ProfileScreen;
 
+const NAV_TOUR_IDS: Record<string, string> = {
+  spaces: 'tour-nav-spaces',
+  accounts: 'tour-nav-accounts',
+  dashboard: 'tour-nav-dashboard',
+  others: 'tour-nav-others',
+};
+
 export default function TabsLayout() {
   const router = useRouter();
   const { width: W } = useWindowDimensions();
+  const { user } = useUser();
   const [activeTab, setActiveTab] = useState('spaces');
   const [othersOpen, setOthersOpen] = useState(false);
   const activeTabRef = useRef('spaces');
@@ -222,6 +235,18 @@ export default function TabsLayout() {
   const [blurActive, setBlurActive] = useState(false);
   const addHandlers = useRef<Record<string, () => void>>({});
   const [, forceUpdate] = useState(0);
+
+  const tourTargets = useRef(new Map<string, RefObject<RNView | null>>());
+  const registerTourTarget = useCallback((id: string, ref: RefObject<RNView | null>) => {
+    tourTargets.current.set(id, ref);
+  }, []);
+  const unregisterTourTarget = useCallback((id: string) => {
+    tourTargets.current.delete(id);
+  }, []);
+
+  const [tourVisible, setTourVisible] = useState(false);
+  const [tourStep, setTourStep] = useState(0);
+  const [tourLoading, setTourLoading] = useState(false);
 
   const setBlur = (v: boolean) => {
     setBlurActive(v);
@@ -332,7 +357,50 @@ export default function TabsLayout() {
 
   const isOthersActive = OTHERS_ITEMS.some(i => i.key === activeTab) || othersOpen;
 
+  useEffect(() => {
+    const checkTour = (pending?: boolean) => {
+      if (pending === true) {
+        setTourVisible(true);
+        setTourStep(0);
+      }
+    };
+    checkTour(user?.user_metadata?.onboarding_pending === true);
+    supabase.auth.getUser().then(({ data: { user: u } }) => {
+      checkTour(u?.user_metadata?.onboarding_pending === true);
+    });
+  }, [user?.user_metadata?.onboarding_pending]);
+
+  useEffect(() => {
+    if (!tourVisible) return;
+    const step = APP_TOUR_STEPS[tourStep];
+    if (step?.tab && step.tab !== activeTabRef.current) {
+      if (othersOpen) closeOthers();
+      switchTab(step.tab);
+    }
+  }, [tourStep, tourVisible]);
+
+  const finishTour = async () => {
+    setTourLoading(true);
+    try {
+      const { error } = await supabase.auth.updateUser({
+        data: { onboarding_pending: false, onboarding_completed: true },
+      });
+      if (error) throw error;
+      setTourVisible(false);
+    } catch (e) {
+      console.warn('[tour] finish failed:', e);
+    } finally {
+      setTourLoading(false);
+    }
+  };
+
+  const handleTourNext = () => {
+    if (tourStep >= APP_TOUR_STEPS.length - 1) finishTour();
+    else setTourStep(i => i + 1);
+  };
+
   return (
+    <TourContext.Provider value={{ register: registerTourTarget, unregister: unregisterTourTarget }}>
     <BlurContext.Provider value={{ setBlur, registerAdd, unregisterAdd, activeTab, __hasProvider: true }}>
     <View style={s.container}>
 
@@ -397,8 +465,9 @@ export default function TabsLayout() {
         {MAIN_TABS.map(tab => {
           const isActive = tab.key === 'others' ? isOthersActive : activeTab === tab.key;
           const showBadge = tab.key === 'others' && unreadCount > 0;
-          return (
-            <TouchableOpacity key={tab.key} style={s.navItem} onPress={() => handleNavPress(tab.key)} activeOpacity={0.7}>
+          const tourId = NAV_TOUR_IDS[tab.key];
+          const navContent = (
+            <TouchableOpacity style={s.navItem} onPress={() => handleNavPress(tab.key)} activeOpacity={0.7}>
               <View style={[s.navIconWrap, isActive && s.navIconWrapActive]}>
                 <Ionicons name={tab.icon as any} size={22} color={isActive ? NAV_ACCENT : NAV_INACTIVE} />
                 {showBadge && (
@@ -410,8 +479,25 @@ export default function TabsLayout() {
               <Text style={[s.navLabel, isActive && s.navLabelActive]}>{tab.label}</Text>
             </TouchableOpacity>
           );
+          return tourId ? (
+            <TourTarget key={tab.key} id={tourId} style={{ flex: 1 }}>
+              {navContent}
+            </TourTarget>
+          ) : (
+            <View key={tab.key} style={{ flex: 1 }}>{navContent}</View>
+          );
         })}
       </View>
+
+      <AppTourOverlay
+        visible={tourVisible}
+        steps={APP_TOUR_STEPS}
+        stepIndex={tourStep}
+        targets={tourTargets.current}
+        onNext={handleTourNext}
+        onSkip={finishTour}
+        loading={tourLoading}
+      />
 
       {/* ── Global blur overlay (covers header + content) ── */}
       {blurActive && (
@@ -422,6 +508,7 @@ export default function TabsLayout() {
 
     </View>
     </BlurContext.Provider>
+    </TourContext.Provider>
   );
 }
 

@@ -127,6 +127,7 @@ export default function RootLayout() {
       <Stack.Screen name="onboarding" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="(app)" options={{ animation: 'none' }} />
       <Stack.Screen name="split" options={{ animation: 'fade', headerShown: false }} />
+      <Stack.Screen name="legal" options={{ animation: 'slide_from_bottom', headerShown: false }} />
     </Stack>
     </QueryClientProvider>
   );

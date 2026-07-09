@@ -84,8 +84,14 @@ export default function ReceiptsScreen() {
     if (status !== 'granted') { Alert.alert('Permission needed', 'Camera access required.'); return; }
     const result = await ImagePicker.launchCameraAsync({ quality: 1 });
     if (!result.canceled && result.assets[0] && activeEntryId) {
-      const compressed = await compressImage(result.assets[0].uri);
-      await uploadReceiptPhoto(compressed, activeEntryId);
+      try {
+        const compressed = await compressImage(result.assets[0].uri);
+        await uploadReceiptPhoto(compressed, activeEntryId);
+      } catch (e: any) {
+        if (e?.message === 'RECEIPT_LIMIT_REACHED') {
+          Alert.alert('monthly limit reached', 'you\'ve used all 10 free receipt photo uploads this month. resets on the 1st.');
+        }
+      }
     }
   };
 
@@ -94,9 +100,15 @@ export default function ReceiptsScreen() {
     if (status !== 'granted') { Alert.alert('Permission needed', 'Photo library access required.'); return; }
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsMultipleSelection: true, quality: 1 });
     if (!result.canceled && activeEntryId) {
-      for (const asset of result.assets) {
-        const compressed = await compressImage(asset.uri);
-        await uploadReceiptPhoto(compressed, activeEntryId);
+      try {
+        for (const asset of result.assets) {
+          const compressed = await compressImage(asset.uri);
+          await uploadReceiptPhoto(compressed, activeEntryId);
+        }
+      } catch (e: any) {
+        if (e?.message === 'RECEIPT_LIMIT_REACHED') {
+          Alert.alert('monthly limit reached', 'you\'ve used all 10 free receipt photo uploads this month. resets on the 1st.');
+        }
       }
     }
   };

@@ -117,10 +117,16 @@ export default function ReceiptDetailScreen() {
     if (status !== 'granted') { Alert.alert('Permission needed', 'Photo library access required.'); return; }
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsMultipleSelection: true, quality: 1 });
     if (!result.canceled) {
-      for (const asset of result.assets) {
-        const compressed = await compressImage(asset.uri);
-        const uploaded = await uploadReceiptPhoto(compressed, receiptId);
-        if (uploaded) setPhotos(prev => [...prev, uploaded]);
+      try {
+        for (const asset of result.assets) {
+          const compressed = await compressImage(asset.uri);
+          const uploaded = await uploadReceiptPhoto(compressed, receiptId);
+          if (uploaded) setPhotos(prev => [...prev, uploaded]);
+        }
+      } catch (e: any) {
+        if (e?.message === 'RECEIPT_LIMIT_REACHED') {
+          Alert.alert('monthly limit reached', 'you\'ve used all 10 free receipt photo uploads this month. resets on the 1st.');
+        }
       }
     }
   };
@@ -130,9 +136,15 @@ export default function ReceiptDetailScreen() {
     if (status !== 'granted') { Alert.alert('Permission needed', 'Camera access required.'); return; }
     const result = await ImagePicker.launchCameraAsync({ quality: 1 });
     if (!result.canceled && result.assets[0]) {
-      const compressed = await compressImage(result.assets[0].uri);
-      const uploaded = await uploadReceiptPhoto(compressed, receiptId);
-      if (uploaded) setPhotos(prev => [...prev, uploaded]);
+      try {
+        const compressed = await compressImage(result.assets[0].uri);
+        const uploaded = await uploadReceiptPhoto(compressed, receiptId);
+        if (uploaded) setPhotos(prev => [...prev, uploaded]);
+      } catch (e: any) {
+        if (e?.message === 'RECEIPT_LIMIT_REACHED') {
+          Alert.alert('monthly limit reached', 'you\'ve used all 10 free receipt photo uploads this month. resets on the 1st.');
+        }
+      }
     }
   };
 

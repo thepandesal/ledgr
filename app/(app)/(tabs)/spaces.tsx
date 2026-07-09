@@ -13,6 +13,7 @@ import ConfirmModal from '@/components/ui/ConfirmModal';
 import { Colors, Fonts, Radius, Spacing } from '@/components/ui/theme';
 import { Brand } from '../../../src/lib/brand';
 import { BlurContext } from '../../../src/lib/BlurContext';
+import TourTarget from '@/components/TourTarget';
 
 interface SpaceData {
   id: string; name: string; color: string; icon: string;
@@ -478,10 +479,12 @@ export default function SpacesScreen() {
               <Ionicons name="chevron-forward" size={14} color={ACCENT_DARK} />
             </TouchableOpacity>
           </View>
-          <TouchableOpacity style={s.modeSelectorBtn} onPress={openCreate} activeOpacity={0.8}>
-            <Ionicons name="add" size={13} color={ACCENT_DARK} />
-            <Text style={s.modeSelectorText}>new space</Text>
-          </TouchableOpacity>
+          <TourTarget id="tour-new-space">
+            <TouchableOpacity style={s.modeSelectorBtn} onPress={openCreate} activeOpacity={0.8}>
+              <Ionicons name="add" size={13} color={ACCENT_DARK} />
+              <Text style={s.modeSelectorText}>new space</Text>
+            </TouchableOpacity>
+          </TourTarget>
         </View>
 
         {/* ── Empty ── */}

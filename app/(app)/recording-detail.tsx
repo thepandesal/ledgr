@@ -67,8 +67,10 @@ export default function RecordingDetailScreen() {
   const [editNotes, setEditNotes] = useState('');
   const [editCategoryId, setEditCategoryId] = useState<string | null>(null);
   const [editCategories, setEditCategories] = useState<any[]>([]);
+  const [editAmount, setEditAmount] = useState('');
+  const [editAmountLocked, setEditAmountLocked] = useState(false);
+  const [editError, setEditError] = useState('');
   const [showEditCategoryModal, setShowEditCategoryModal] = useState(false);
-  const webviewRef = useRef<any>(null);
   const [copiedToast, setCopiedToast] = useState(false);
   const [tooltip, setTooltip] = useState<{ name: string } | null>(null);
   const [contacts, setContacts] = useState<string[]>([]);
@@ -761,7 +763,11 @@ export default function RecordingDetailScreen() {
       setAddReceiptModal(false);
       loadLinkedReceipt();
     }
-  };
+  } catch (e: any) {
+    if (e?.message === 'RECEIPT_LIMIT_REACHED') {
+      Alert.alert('monthly limit reached', 'you\'ve used all 10 free receipt photo uploads this month. resets on the 1st.');
+    }
+  }
 
   const addReceiptFromGallery = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -786,7 +792,11 @@ export default function RecordingDetailScreen() {
       setAddReceiptModal(false);
       loadLinkedReceipt();
     }
-  };
+  } catch (e: any) {
+    if (e?.message === 'RECEIPT_LIMIT_REACHED') {
+      Alert.alert('monthly limit reached', 'you\'ve used all 10 free receipt photo uploads this month. resets on the 1st.');
+    }
+  }
 
   const loadLinkedReceipt = async () => {
     if (!recordingId) return;
@@ -957,16 +967,17 @@ export default function RecordingDetailScreen() {
         }).join('')}
       </div>
     `).join('');
-    const paymentHtml = data.payment ? `
+    const paymentHtml = data.payment.length > 0 ? `
       <h3 style="font-size:14px;color:#7fd8cd;margin:24px 0 10px">payment information</h3>
-      <div style="background:#fafafa;border-radius:12px;padding:14px;border:1px solid #f0f0f0;display:flex;justify-content:space-between;align-items:center">
+      ${data.payment.map(acc => `
+      <div style="background:#fafafa;border-radius:12px;padding:14px;border:1px solid #f0f0f0;display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
         <div>
-          <div style="font-size:15px;font-weight:600;color:#425252">${data.payment.accountName}</div>
-          <div style="font-family:monospace;font-size:11px;color:#929090">${data.payment.bank}</div>
-          <div style="font-family:monospace;font-weight:bold;font-size:13px;color:#425252">${data.payment.accountNumber}</div>
+          <div style="font-size:15px;font-weight:600;color:#425252">${acc.accountName}</div>
+          <div style="font-family:monospace;font-size:11px;color:#929090">${acc.bank}</div>
+          <div style="font-family:monospace;font-weight:bold;font-size:13px;color:#425252">${acc.accountNumber}</div>
         </div>
-        ${data.payment.qrCode ? `<img src="${data.payment.qrCode}" width="80" height="80" style="border-radius:8px"/>` : ''}
-      </div>
+        ${acc.qrCode ? `<img src="${acc.qrCode}" width="80" height="80" style="border-radius:8px"/>` : ''}
+      </div>`).join('')}
     ` : '';
     return `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;padding:24px;background:#fff;font-family:sans-serif}*{box-sizing:border-box}</style></head><body>
       <div style="font-size:18px;color:#7fd8cd;margin-bottom:8px;font-weight:900;letter-spacing:-0.5px">LEDGR</div>
@@ -1061,26 +1072,36 @@ export default function RecordingDetailScreen() {
     setEditName(recording?.name ?? '');
     setEditNotes(recording?.notes ?? '');
     setEditCategoryId(recording?.category_id ?? null);
+    setEditAmount(String(recording?.amount ?? ''));
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
-    const [{ data: accs }, { data: cats }] = await Promise.all([
+    const [{ data: accs }, { data: cats }, { data: linked }] = await Promise.all([
       supabase.from('accounts').select().eq('user_id', user.id).order('account_name'),
       supabase.from('categories').select().eq('user_id', user.id).order('name'),
+      supabase.from('recordings').select('id').eq('linked_recording_id', recordingId).limit(1),
     ]);
     if (accs) setEditAccounts(accs);
     if (cats) setEditCategories(cats);
+    // Lock amount if any linked recordings exist (payments, returns, etc.)
+    setEditAmountLocked((linked ?? []).length > 0);
     setEditModal(true);
   };
 
   const saveEdit = async () => {
     if (!editDate) return;
-    await supabase.from('recordings').update({
+    setEditError('');
+    const updates: any = {
       name: editName.trim() || recording?.name,
       transaction_date: editDate,
       account_id: editAccountId || null,
       category_id: editCategoryId || null,
       notes: editNotes.trim() || null,
-    }).eq('id', recordingId);
+    };
+    if (!editAmountLocked && editAmount && parseFloat(editAmount) > 0) {
+      updates.amount = parseFloat(editAmount);
+    }
+    const { error } = await supabase.from('recordings').update(updates).eq('id', recordingId);
+    if (error) { setEditError(error.message); return; }
     setEditModal(false);
     loadRecording();
   };
@@ -1918,11 +1939,19 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
       </BottomSheet>
 
       {/* Edit recording modal */}
-      <BottomSheet visible={editModal} onClose={() => setEditModal(false)} sub="recording" title="edit recording">
+      <BottomSheet visible={editModal} onClose={() => { setEditModal(false); setEditError(''); }} sub="recording" title="edit recording">
         <View style={formStyles.block}>
+          {editError ? <Text style={{ fontFamily: Brand.font.mono, fontSize: 12, color: Colors.expense, marginBottom: 8 }}>{editError}</Text> : null}
           <View style={formStyles.blockRow}>
             <Text style={formStyles.blockLabel}>name</Text>
             <TextInput style={formStyles.inlineInput} placeholder="recording name" placeholderTextColor={Colors.faint} value={editName} onChangeText={setEditName} />
+          </View>
+          <View style={formStyles.blockDivider} />
+          <View style={formStyles.blockRow}>
+            <Text style={formStyles.blockLabel}>amount</Text>
+            {editAmountLocked
+              ? <Text style={[formStyles.inlineInput, { color: Colors.muted }]}>{editAmount} · locked (has linked records)</Text>
+              : <TextInput style={formStyles.inlineInput} placeholder="0.00" placeholderTextColor={Colors.faint} value={editAmount} onChangeText={setEditAmount} keyboardType="decimal-pad" />}
           </View>
           <View style={formStyles.blockDivider} />
           <View style={formStyles.blockRow}>

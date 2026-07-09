@@ -373,7 +373,14 @@ export default function AddRecordingScreen({ inlineProps }: {
             if (entry?.id) {
               for (const uri of receiptPhotos) {
                 const compressed = await compressImage(uri);
-                await uploadReceiptPhoto(compressed, entry.id);
+                try {
+                  await uploadReceiptPhoto(compressed, entry.id);
+                } catch (uploadErr: any) {
+                  if (uploadErr?.message === 'RECEIPT_LIMIT_REACHED') {
+                    setError('monthly receipt limit reached — photos were not saved, but your recording was.');
+                  }
+                  break;
+                }
               }
             }
           }

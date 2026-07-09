@@ -22,12 +22,27 @@ function isSafeUrl(url: string): boolean {
 }
 
 export const compressImage = async (uri: string): Promise<string> => {
-  // ImageManipulator is unreliable on web — skip compression and return as-is
-  if (Platform.OS === 'web') return uri;
+  if (Platform.OS === 'web') {
+    // Web compression via canvas
+    return new Promise((resolve) => {
+      const img = new window.Image();
+      img.onload = () => {
+        const MAX = 900;
+        const scale = img.width > MAX ? MAX / img.width : 1;
+        const canvas = document.createElement('canvas');
+        canvas.width  = Math.round(img.width  * scale);
+        canvas.height = Math.round(img.height * scale);
+        canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', 0.65));
+      };
+      img.onerror = () => resolve(uri);
+      img.src = uri;
+    });
+  }
   const r = await ImageManipulator.manipulateAsync(
     uri,
-    [{ resize: { width: 1200 } }],
-    { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
+    [{ resize: { width: 900 } }],
+    { compress: 0.65, format: ImageManipulator.SaveFormat.JPEG }
   );
   return r.uri;
 };
@@ -94,6 +109,20 @@ const uploadToSupabase = async (fileName: string, buffer: ArrayBuffer): Promise<
   return data?.signedUrl ?? '';
 };
 
+export const FREE_RECEIPT_LIMIT = 10;
+
+/** Returns how many receipt photos the user has uploaded this calendar month */
+export const getMonthlyReceiptCount = async (userId: string): Promise<number> => {
+  const start = new Date();
+  start.setDate(1); start.setHours(0, 0, 0, 0);
+  const { count } = await supabase
+    .from('receipt_photos')
+    .select('id, receipt_entries!inner(user_id)', { count: 'exact', head: true })
+    .eq('receipt_entries.user_id', userId)
+    .gte('receipt_photos.created_at', start.toISOString());
+  return count ?? 0;
+};
+
 /** Uploads a photo URI — uses Supabase on web (CORS safe), R2 on native */
 export const uploadReceiptPhoto = async (
   uri: string,
@@ -101,6 +130,12 @@ export const uploadReceiptPhoto = async (
 ): Promise<{ id: string; url: string; path: string } | null> => {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
+
+  // Enforce monthly free limit
+  const monthlyCount = await getMonthlyReceiptCount(user.id);
+  if (monthlyCount >= FREE_RECEIPT_LIMIT) {
+    throw new Error('RECEIPT_LIMIT_REACHED');
+  }
 
   const fileName = `${user.id}/${entryId}/${Date.now()}_${Math.random().toString(36).slice(2)}.jpg`;
 

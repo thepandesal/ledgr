@@ -350,7 +350,7 @@ export default function SpaceDetailScreen() {
       setGhostModal(false);
       queryClient.invalidateQueries({ queryKey: ['recordings', spaceId] });
       queryClient.invalidateQueries({ queryKey: ['recurring-records', spaceId] });
-    } catch (e) { console.log(e); }
+    } catch (e) { /* ghost payment failed silently */ }
     finally { setGhostSaving(false); }
   };
 
@@ -379,7 +379,7 @@ export default function SpaceDetailScreen() {
         const { data } = await query.eq('user_id', userId).order('transaction_date', { ascending: false }).order('created_at', { ascending: false });
         return normalize(data ?? []);
       }
-      const { data } = await query.eq('space_id', spaceId).order('transaction_date', { ascending: false }).order('created_at', { ascending: false });
+      const { data } = await query.select('*, categories:category_id(name,color,icon), user_id').eq('space_id', spaceId).order('transaction_date', { ascending: false }).order('created_at', { ascending: false });
       return normalize(data ?? []);
     },
     enabled: !!spaceId && (spaceId !== 'all' || !!userId),
@@ -1009,7 +1009,7 @@ export default function SpaceDetailScreen() {
           await Sharing.shareAsync(fileUri, { mimeType: 'image/png', dialogTitle: 'Save statement' });
         }
       }
-    } catch (e) { console.error('handleStatementWebViewMessage error:', e); }
+    } catch (e) { /* statement webview capture failed silently */ }
     finally { setStatementLoading(false); }
   };
 
@@ -1087,7 +1087,6 @@ export default function SpaceDetailScreen() {
         setCaptureHtml(captureScript);
       }
     } catch (e) {
-      console.error('generateStatement error:', e);
       setStatementLoading(false);
     }
   };
@@ -1126,6 +1125,14 @@ export default function SpaceDetailScreen() {
   const myRole = isOwner ? 'owner' : (myMembership?.status === 'accepted' ? myMembership.role : null);
   const canAddRecordings = myRole === 'owner' || myRole === 'co-owner';
   const canViewOnly = myRole === 'viewer';
+
+  // Delete permission: owner can delete any recording.
+  // co-owner can delete their own recordings or other co-owners', but NOT the owner's recordings.
+  const canDeleteRecording = (recordingUserId: string) => {
+    if (myRole === 'owner') return true;
+    if (myRole === 'co-owner') return recordingUserId !== spaceOwner;
+    return false;
+  };
 
   const [membersModal, setMembersModal] = useState(false);
   const [inviteModal, setInviteModal] = useState(false);
@@ -1320,7 +1327,7 @@ export default function SpaceDetailScreen() {
                       style={s.row}
                       activeOpacity={0.85}
                       onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: item.id } } as any)}
-                      onLongPress={() => { if (!canAddRecordings) return; setPendingDeleteId(item.id); setPendingDeleteName(item.name); setConfirmModal(true); }}
+                      onLongPress={() => { if (!canDeleteRecording(item.user_id)) return; setPendingDeleteId(item.id); setPendingDeleteName(item.name); setConfirmModal(true); }}
                     >
                       <View style={s.rowIconWrap}>
                         <Ionicons name={(item.categories?.icon ?? 'ellipse-outline') as any} size={18} color={Colors.cyan} />

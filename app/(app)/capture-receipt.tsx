@@ -8,6 +8,7 @@ import { useSlideScreen } from '../../src/hooks/useSlideScreen';
 import pageStyles from '@/components/ui/pageStyles';
 import { Colors, Fonts, Radius } from '@/components/ui/theme';
 import { compressImage, uploadReceiptPhoto } from '../../src/lib/receiptUpload';
+import { ocrReceiptImage } from '../../src/lib/receiptParser';
 
 const { width } = Dimensions.get('window');
 
@@ -16,8 +17,9 @@ export default function CaptureReceiptScreen() {
   const { receiptId, galleryOnly, recordingId, recordingName, recordingDate } = useLocalSearchParams<{ receiptId?: string; galleryOnly?: string; recordingId?: string; recordingName?: string; recordingDate?: string }>();
   const slideAnim = useRef(new Animated.Value(width)).current;
 
-  const [photos, setPhotos] = useState<string[]>([]); // local URIs
+  const [photos, setPhotos] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+  const [parsing, setParsing] = useState(false);
 
   useEffect(() => {
     Animated.timing(slideAnim, { toValue: 0, duration: 280, useNativeDriver: false }).start();
@@ -52,6 +54,24 @@ export default function CaptureReceiptScreen() {
     setPhotos(prev => prev.filter((_, i) => i !== idx));
   };
 
+  const parseOnly = async () => {
+    if (photos.length === 0) return;
+    setParsing(true);
+    try {
+      const results = await Promise.all(photos.map(uri => ocrReceiptImage(uri)));
+      const allItems = results.flatMap(r => r.items);
+      Alert.alert(
+        'parsed items',
+        allItems.length > 0
+          ? allItems.map(i => `${i.name} — ${i.price.toLocaleString('en-US', { minimumFractionDigits: 2 })}`).join('\n')
+          : 'no items detected',
+        [{ text: 'ok' }]
+      );
+    } finally {
+      setParsing(false);
+    }
+  };
+
   const save = async () => {
     if (photos.length === 0) return;
     setSaving(true);
@@ -81,7 +101,18 @@ export default function CaptureReceiptScreen() {
 
       router.replace({ pathname: '/(app)/(tabs)/receipts' } as any);
     } catch (e: any) {
-      Alert.alert('Error', e?.message ?? 'Something went wrong');
+      if (e?.message === 'RECEIPT_LIMIT_REACHED') {
+        Alert.alert(
+          'monthly limit reached',
+          'you\'ve used all 10 free receipt photo uploads this month. you can still parse the receipt without saving it.',
+          [
+            { text: 'cancel', style: 'cancel' },
+            { text: 'parse only', onPress: parseOnly },
+          ]
+        );
+      } else {
+        Alert.alert('Error', e?.message ?? 'Something went wrong');
+      }
       setSaving(false);
     }
   };
@@ -131,9 +162,14 @@ export default function CaptureReceiptScreen() {
         {photos.length > 0 && (
           <View style={s.footer}>
             <Text style={s.footerCount}>{photos.length} photo{photos.length > 1 ? 's' : ''}</Text>
-            <TouchableOpacity style={[s.saveBtn, saving && { opacity: 0.6 }]} onPress={save} disabled={saving}>
-              <Text style={s.saveBtnText}>{saving ? 'saving...' : 'save receipt'}</Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <TouchableOpacity style={[s.parseBtn, parsing && { opacity: 0.6 }]} onPress={parseOnly} disabled={parsing || saving}>
+                <Text style={s.parseBtnText}>{parsing ? 'parsing...' : 'parse only'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[s.saveBtn, saving && { opacity: 0.6 }]} onPress={save} disabled={saving || parsing}>
+                <Text style={s.saveBtnText}>{saving ? 'saving...' : 'save receipt'}</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         )}
       </SafeAreaView>
@@ -154,8 +190,10 @@ const s = StyleSheet.create({
   addPhotoBtnText: { fontFamily: Fonts.mono, fontSize: 11, color: Colors.cyan },
   footer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 28, paddingVertical: 16, borderTopWidth: 1, borderTopColor: Colors.border },
   footerCount: { fontFamily: Fonts.mono, fontSize: 12, color: Colors.muted },
-  saveBtn: { backgroundColor: Colors.text, borderRadius: Radius.pill, paddingVertical: 12, paddingHorizontal: 24 },
-  saveBtnText: { fontFamily: Fonts.monoBold, fontSize: 13, color: Colors.white },
+  saveBtn:      { backgroundColor: Colors.text, borderRadius: Radius.pill, paddingVertical: 12, paddingHorizontal: 24 },
+  saveBtnText:  { fontFamily: Fonts.monoBold, fontSize: 13, color: Colors.white },
+  parseBtn:     { borderRadius: Radius.pill, paddingVertical: 12, paddingHorizontal: 16, borderWidth: 1, borderColor: Colors.borderMid, backgroundColor: Colors.surface },
+  parseBtnText: { fontFamily: Fonts.monoBold, fontSize: 13, color: Colors.text },
 });
 
 
