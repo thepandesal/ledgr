@@ -7,6 +7,7 @@
 export const Colors = {
   // Brand
   cyan: '#7fd8cd',
+  headerBg: '#1A1A1A', // dark screen header background
 
   // Text
   text: '#425252',

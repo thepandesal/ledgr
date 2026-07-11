@@ -38,11 +38,11 @@ export default function LoansScreen() {
   const slideAnim = useRef(new Animated.Value(Dimensions.get('window').width)).current;
 
   useEffect(() => {
-    Animated.timing(slideAnim, { toValue: 0, duration: 280, useNativeDriver: false }).start();
+    Animated.timing(slideAnim, { toValue: 0, duration: 280, useNativeDriver: true }).start();
   }, []);
 
   const handleBack = () => {
-    Animated.timing(slideAnim, { toValue: Dimensions.get('window').width, duration: 250, useNativeDriver: false }).start(() => router.back());
+    Animated.timing(slideAnim, { toValue: Dimensions.get('window').width, duration: 250, useNativeDriver: true }).start(() => router.back());
   };
 
   const [statusFilter, setStatusFilter] = useState<'all' | 'unpaid' | 'partial' | 'paid'>('all');
@@ -306,7 +306,7 @@ const s = StyleSheet.create({
   calDay:          { flex: 1, textAlign: 'center', fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted },
   calCell:         { width: '14.28%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center', borderRadius: Radius.pill },
   calCellRange:    { backgroundColor: ACCENT + '55', borderRadius: 0 },
-  calCellEdge:     { backgroundColor: ACCENT_DARK },
+  calCellEdge:     { backgroundColor: ACCENT },
   calCellToday:    { backgroundColor: Colors.surface },
   calCellText:     { fontFamily: Fonts.mono, fontSize: 13, color: Colors.text },
   calCellTextActive: { fontFamily: Fonts.monoBold, color: Colors.white },

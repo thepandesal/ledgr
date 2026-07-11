@@ -35,6 +35,9 @@ export const BrandColors = {
   income:         '#B6E1DE', // money in
   expense:        '#FFAB91', // money out (peach)
 
+  // Dark header
+  headerDark:     '#1A1A1A', // dark screen header background
+
   // Neutrals (from theme.ts Colors)
   white:          '#FFFFFF',
   surface:        '#F9FAFB',

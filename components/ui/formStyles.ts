@@ -124,8 +124,8 @@ const formStyles = StyleSheet.create({
     backgroundColor: '#ffffff',
   },
   chipActive: {
-    backgroundColor: '#0ccfcf',
-    borderColor: '#0ccfcf',
+    backgroundColor: '#B6E1DE',
+    borderColor: '#B6E1DE',
   },
   chipText: {
     fontFamily: 'RobotoMono_400Regular',
@@ -267,7 +267,7 @@ const formStyles = StyleSheet.create({
   hint: {
     fontFamily: 'RobotoMono_400Regular',
     fontSize: 10,
-    color: '#0ccfcf',
+    color: '#2A7A6F',
     marginTop: 4,
   },
   hintMuted: {

@@ -9,8 +9,8 @@ import { useQuery } from '@tanstack/react-query';
 import { useUser } from '../../src/hooks/useUser';
 import { supabase } from '../../src/lib/supabase';
 import ConfirmModal from '@/components/ui/ConfirmModal';
-import pageStyles from '@/components/ui/pageStyles';
 import { Colors, Fonts, Radius, Spacing } from '@/components/ui/theme';
+import { Brand } from '../../src/lib/brand';
 
 const { width } = Dimensions.get('window');
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -33,7 +33,7 @@ export default function ReceivablesScreen() {
   const [pickingDate, setPickingDate] = useState<'from' | 'to'>('from');
 
   useEffect(() => {
-    Animated.timing(slideAnim, { toValue: 0, duration: 280, useNativeDriver: false }).start();
+    Animated.timing(slideAnim, { toValue: 0, duration: 280, useNativeDriver: true }).start();
   }, []);
 
   const { data: receivables = [], isLoading } = useQuery({
@@ -132,23 +132,25 @@ export default function ReceivablesScreen() {
   const daysInMonth = new Date(pickerYear, pickerMonth + 1, 0).getDate();
   const cells = Array(firstDay).fill(null).concat(Array.from({ length: daysInMonth }, (_, i) => i + 1));
 
-  return (
-    <Animated.View style={[pageStyles.container, { transform: [{ translateX: slideAnim }] }]}>
-      <SafeAreaView style={pageStyles.inner}>
-        <TouchableOpacity onPress={() => {
-          Animated.timing(slideAnim, { toValue: width, duration: 250, useNativeDriver: false }).start(() => router.back());
-        }} style={pageStyles.backBtn}>
-          <Ionicons name="arrow-back" size={22} color={Colors.muted} />
-        </TouchableOpacity>
+  const handleBack = () => {
+    Animated.timing(slideAnim, { toValue: width, duration: 250, useNativeDriver: true }).start(() => router.back());
+  };
 
-        {/* Header */}
-        <View style={{ paddingHorizontal: Spacing.page, marginBottom: 16 }}>
-          <Text style={s.pageTitle}>receivables</Text>
-          <Text style={s.pageSubtitle}>money owed to you, tracked.</Text>
+  return (
+    <Animated.View style={[{ flex: 1, backgroundColor: Colors.white }, { transform: [{ translateX: slideAnim }] }]}>
+      <SafeAreaView style={{ flex: 1 }}>
+
+        {/* Dark header */}
+        <View style={s.header}>
+          <TouchableOpacity onPress={handleBack} style={s.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name="arrow-back" size={20} color={Brand.color.accent} />
+          </TouchableOpacity>
+          <Text style={s.headerTitle}>receivables</Text>
+          <View style={{ width: 36 }} />
         </View>
 
         {/* Stats as filter toggles */}
-        <View style={{ flexDirection: 'row', gap: 8, marginHorizontal: Spacing.page, marginBottom: 16 }}>
+        <View style={{ flexDirection: 'row', gap: 8, marginHorizontal: Spacing.page, marginTop: 14, marginBottom: 16 }}>
           {[
             { key: 'pending',    label: 'pending',       value: countPending, color: Colors.pending },
             { key: 'unreceived', label: 'pending total', value: totalPending.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }), color: Colors.expense },
@@ -158,12 +160,12 @@ export default function ReceivablesScreen() {
             return (
               <TouchableOpacity
                 key={st.key}
-                style={[s.statCard, isActive && { borderColor: Colors.cyan, backgroundColor: Colors.cyan + '18' }]}
+                style={[s.statCard, isActive && { borderColor: Brand.color.accent, backgroundColor: Brand.color.accent + '18' }]}
                 onPress={() => setActiveFilters(prev => isActive ? prev.filter(k => k !== st.key) : [...prev, st.key])}
                 activeOpacity={0.7}
               >
-                <Text style={[s.statValue, { color: isActive ? Colors.cyan : st.color }]}>{st.value}</Text>
-                <Text style={[s.statLabel, isActive && { color: Colors.cyan }]}>{st.label}</Text>
+                <Text style={[s.statValue, { color: isActive ? Brand.color.accentDark : st.color }]}>{st.value}</Text>
+                <Text style={[s.statLabel, isActive && { color: Brand.color.accentDark }]}>{st.label}</Text>
               </TouchableOpacity>
             );
           })}
@@ -172,8 +174,8 @@ export default function ReceivablesScreen() {
         {/* Date range */}
         <View style={{ paddingHorizontal: Spacing.page, marginBottom: 12 }}>
           <TouchableOpacity style={s.dateRangeBtn} onPress={() => { setPickingDate('from'); setShowPicker(true); }}>
-            <Ionicons name="calendar-outline" size={14} color={dateFrom ? Colors.cyan : Colors.muted} />
-            <Text style={[s.dateRangeBtnText, dateFrom && { color: Colors.cyan }]}>{dateLabel()}</Text>
+            <Ionicons name="calendar-outline" size={14} color={dateFrom ? Brand.color.accentDark : Colors.muted} />
+            <Text style={[s.dateRangeBtnText, dateFrom && { color: Brand.color.accentDark }]}>{dateLabel()}</Text>
             {(dateFrom || dateTo) && (
               <TouchableOpacity onPress={clearDates} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                 <Ionicons name="close-circle" size={14} color={Colors.muted} />
@@ -184,11 +186,11 @@ export default function ReceivablesScreen() {
 
         {/* List */}
         {isLoading ? (
-          <ActivityIndicator color={Colors.cyan} style={{ marginTop: 40 }} />
+          <ActivityIndicator color={Brand.color.accentDark} style={{ marginTop: 40 }} />
         ) : filtered.length === 0 ? (
-          <View style={[pageStyles.emptyBox, { borderWidth: 0, backgroundColor: 'transparent', marginTop: 40 }]}>
+          <View style={{ alignItems: 'center', gap: 12, paddingVertical: 48 }}>
             <Ionicons name="arrow-undo-outline" size={40} color={Colors.borderMid} />
-            <Text style={pageStyles.emptyText}>no receivables found</Text>
+            <Text style={{ fontFamily: Fonts.mono, fontSize: 13, color: Colors.muted }}>no receivables found</Text>
           </View>
         ) : (
           <ScrollView contentContainerStyle={{ paddingHorizontal: Spacing.page, paddingBottom: 120, gap: 10 }} showsVerticalScrollIndicator={false}>
@@ -242,12 +244,12 @@ export default function ReceivablesScreen() {
             <Ionicons name="chevron-forward" size={20} color={Colors.text} />
           </TouchableOpacity>
         </View>
-        <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: Colors.cyan, marginBottom: 8 }}>
+        <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: Brand.color.accentDark, marginBottom: 8 }}>
           {pickingDate === 'from' ? 'tap to set start date' : 'tap to set end date'}
         </Text>
         <View style={{ flexDirection: 'row', marginBottom: 4 }}>
           {['su','mo','tu','we','th','fr','sa'].map(d => (
-            <Text key={d} style={{ flex: 1, textAlign: 'center', fontFamily: Fonts.sans, fontSize: 11, color: Colors.faint }}>{d}</Text>
+            <Text key={d} style={{ flex: 1, textAlign: 'center', fontFamily: Fonts.mono, fontSize: 11, color: Colors.faint }}>{d}</Text>
           ))}
         </View>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', width: '100%' }}>
@@ -273,28 +275,29 @@ export default function ReceivablesScreen() {
 }
 
 const s = StyleSheet.create({
-  pageTitle: { fontFamily: Fonts.calSans, fontSize: 32, color: '#425252', letterSpacing: -0.5 },
-  pageSubtitle: { fontFamily: 'ChillaxRegular', fontSize: 13, color: Colors.muted, marginTop: 2 },
+  header:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 25, paddingTop: 16, paddingBottom: 16, gap: 10, backgroundColor: Colors.headerBg, borderBottomWidth: 1, borderBottomColor: '#333' },
+  backBtn:   { width: 36, height: 36, borderRadius: 18, backgroundColor: Brand.color.accent + '22', alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { flex: 1, fontFamily: Brand.font.display, fontSize: 20, color: Brand.color.accent, letterSpacing: -0.3, textAlign: 'center' },
   statCard: { flex: 1, backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: 10, borderWidth: 1, borderColor: Colors.border, alignItems: 'center' },
-  statValue: { fontFamily: 'ChillaxMedium', fontSize: 13, marginBottom: 2 },
-  statLabel: { fontFamily: 'ChillaxLight', fontSize: 9, color: Colors.muted, textAlign: 'center' },
+  statValue: { fontFamily: Fonts.monoBold, fontSize: 13, marginBottom: 2 },
+  statLabel: { fontFamily: Fonts.mono, fontSize: 9, color: Colors.muted, textAlign: 'center' },
   filterChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: Radius.pill, borderWidth: 1, borderColor: Colors.borderMid, backgroundColor: Colors.surface },
   filterChipActive: { backgroundColor: Colors.text, borderColor: Colors.text },
-  filterChipText: { fontFamily: 'ChillaxMedium', fontSize: 12, color: Colors.muted },
+  filterChipText: { fontFamily: Brand.font.heading, fontSize: 12, color: Colors.muted },
   filterChipTextActive: { color: Colors.white },
   dateRangeBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, paddingHorizontal: 14, borderRadius: Radius.pill, borderWidth: 1, borderColor: Colors.borderMid, backgroundColor: Colors.surface },
   dateRangeBtnText: { fontFamily: Fonts.mono, fontSize: 11, color: Colors.muted, flex: 1 },
   recordingCard: { flexDirection: 'row', alignItems: 'center', borderRadius: Radius.pill, paddingVertical: 12, paddingHorizontal: 16, gap: 12 },
   recordingMiddle: { flex: 1, gap: 2, overflow: 'hidden' },
-  recordingName: { fontFamily: 'ChillaxMedium', fontSize: 13, color: '#292929' },
+  recordingName: { fontFamily: Brand.font.heading, fontSize: 13, color: Colors.text },
   recordingMeta: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted },
   recordingAmount: { fontFamily: Fonts.monoBold, fontSize: 14 },
   pickerYearRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', paddingHorizontal: 4, marginBottom: 12 },
-  pickerYearText: { fontFamily: Fonts.calSans, fontSize: 16, color: Colors.text },
+  pickerYearText: { fontFamily: Fonts.display, fontSize: 16, color: Colors.text },
   calCell: { width: '14.28%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center', borderRadius: Radius.pill },
-  calCellRange: { backgroundColor: Colors.cyan + '22', borderRadius: 0 },
-  calCellEdge: { backgroundColor: Colors.cyan, borderRadius: Radius.pill },
+  calCellRange: { backgroundColor: Brand.color.accent + '55', borderRadius: 0 },
+  calCellEdge: { backgroundColor: Brand.color.accent, borderRadius: Radius.pill },
   calCellToday: { backgroundColor: Colors.border },
-  calCellText: { fontFamily: Fonts.sans, fontSize: 13, color: Colors.text },
-  calCellTextActive: { fontFamily: Fonts.sansSemiBold, color: Colors.white },
+  calCellText: { fontFamily: Fonts.mono, fontSize: 13, color: Colors.text },
+  calCellTextActive: { fontFamily: Fonts.monoBold, color: Colors.text },
 });

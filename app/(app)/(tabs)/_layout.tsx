@@ -1,4 +1,4 @@
-import { View, TouchableOpacity, Text, StyleSheet, Animated, Dimensions, Platform, SafeAreaView, ScrollView, useWindowDimensions, Clipboard } from 'react-native';
+import { View, TouchableOpacity, Text, StyleSheet, Animated, Dimensions, Platform, SafeAreaView, ScrollView, useWindowDimensions, Clipboard, TextInput, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useRef, memo, useCallback, useEffect }from 'react';
 import { BlurView } from 'expo-blur';
@@ -25,7 +25,7 @@ export { BlurContext } from '../../../src/lib/BlurContext';
 import { BlurContext } from '../../../src/lib/BlurContext';
 
 // ── Brand tokens ─────────────────────────────────────────────────────────────
-const HEADER_BG        = '#1A1A1A'; // header background
+const HEADER_BG        = Colors.headerBg;
 const HEADER_TEXT      = '#B6E1DE'; // teal text on dark header bg
 const HEADER_TEXT_DIM  = '#B6E1DE99';
 const HEADER_BTN_BG    = '#B6E1DE22';
@@ -71,10 +71,6 @@ const OTHERS_ITEMS = [
 
 const SLIDE_KEYS = ['spaces', 'accounts', 'dashboard', 'categories', 'receipts', 'bill-split', 'contacts', 'notifications-page', 'reminders'];
 
-const PROFILE_BG       = '#F7F8FA';
-const PROFILE_TITLE    = '#1A1A2E';
-const PROFILE_MUTED    = '#9A9DB0';
-const PROFILE_BORDER   = '#ECECEC';
 const PROFILE_DANGER   = '#FFAB91';
 const PROFILE_DANGEBG  = '#FFF5F2';
 const MemoSpaces     = memo(SpacesScreen);
@@ -99,10 +95,38 @@ const SCREENS: Record<string, React.ReactNode> = {
   reminders:            <MemoReminders />,
 };
 
+const CURRENCIES = [
+  { code: 'PHP', symbol: '₱', label: 'Philippine Peso' },
+  { code: 'USD', symbol: '$', label: 'US Dollar' },
+  { code: 'EUR', symbol: '€', label: 'Euro' },
+  { code: 'GBP', symbol: '£', label: 'British Pound' },
+  { code: 'JPY', symbol: '¥', label: 'Japanese Yen' },
+  { code: 'AUD', symbol: 'A$', label: 'Australian Dollar' },
+  { code: 'CAD', symbol: 'C$', label: 'Canadian Dollar' },
+  { code: 'SGD', symbol: 'S$', label: 'Singapore Dollar' },
+  { code: 'MYR', symbol: 'RM', label: 'Malaysian Ringgit' },
+  { code: 'IDR', symbol: 'Rp', label: 'Indonesian Rupiah' },
+  { code: 'THB', symbol: '฿', label: 'Thai Baht' },
+  { code: 'VND', symbol: '₫', label: 'Vietnamese Dong' },
+  { code: 'KRW', symbol: '₩', label: 'South Korean Won' },
+  { code: 'CNY', symbol: '¥', label: 'Chinese Yuan' },
+  { code: 'INR', symbol: '₹', label: 'Indian Rupee' },
+  { code: 'HKD', symbol: 'HK$', label: 'Hong Kong Dollar' },
+  { code: 'NZD', symbol: 'NZ$', label: 'New Zealand Dollar' },
+  { code: 'CHF', symbol: 'Fr', label: 'Swiss Franc' },
+  { code: 'BRL', symbol: 'R$', label: 'Brazilian Real' },
+  { code: 'MXN', symbol: 'MX$', label: 'Mexican Peso' },
+];
+
 function ProfileScreen() {
   const router = useRouter();
-  const { user, userName, profileCode } = useUser();
+  const { user, userName, profileCode, defaultCurrency, setDefaultCurrency } = useUser();
   const [codeCopied, setCodeCopied] = useState(false);
+  const [showCurrencyModal, setShowCurrencyModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
   const email = user?.email ?? '';
 
   const copyCode = () => {
@@ -120,14 +144,9 @@ function ProfileScreen() {
     : '';
 
   const handleLogout = async () => {
-    console.log('[logout] button pressed');
     try {
-      const { error } = await supabase.auth.signOut();
-      console.log('[logout] signOut result:', error ? error.message : 'success');
-    } catch (e) {
-      console.log('[logout] signOut threw:', e);
-    }
-    console.log('[logout] navigating to /');
+      await supabase.auth.signOut();
+    } catch (e) {}
     if (typeof window !== 'undefined') {
       window.location.href = '/';
     } else {
@@ -136,10 +155,29 @@ function ProfileScreen() {
   };
 
   const handleDeleteAccount = async () => {
+    if (deleteConfirmText.toLowerCase() !== 'delete') {
+      setDeleteError('type "delete" to confirm');
+      return;
+    }
+    setDeleting(true);
+    setDeleteError('');
     try {
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (!currentUser) throw new Error('not authenticated');
+      // Call the delete_user_data DB function via RPC
+      // This requires the function to be created with SECURITY DEFINER in Supabase
+      const { error } = await supabase.rpc('delete_user_data', { target_user_id: currentUser.id });
+      if (error) throw error;
       await supabase.auth.signOut();
-    } catch (e) {}
-    router.replace('/' as any);
+      if (typeof window !== 'undefined') {
+        window.location.href = '/';
+      } else {
+        router.replace('/' as any);
+      }
+    } catch (e: any) {
+      setDeleteError(e.message ?? 'something went wrong. please try again.');
+      setDeleting(false);
+    }
   };
 
   return (
@@ -197,6 +235,15 @@ function ProfileScreen() {
             </View>
             <Ionicons name={codeCopied ? 'checkmark-circle' : 'copy-outline'} size={16} color={codeCopied ? HEADER_BG : Colors.faint} />
           </TouchableOpacity>
+          <View style={p.divider} />
+          <TouchableOpacity style={p.row} onPress={() => setShowCurrencyModal(true)} activeOpacity={0.7}>
+            <View style={p.rowIcon}><Ionicons name="cash-outline" size={16} color={Colors.muted} /></View>
+            <View style={p.rowBody}>
+              <Text style={p.rowLabel}>Default Currency</Text>
+              <Text style={p.rowValue}>{defaultCurrency} · {CURRENCIES.find(c => c.code === defaultCurrency)?.symbol ?? ''}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={Colors.faint} />
+          </TouchableOpacity>
         </View>
 
         {/* Actions */}
@@ -205,12 +252,79 @@ function ProfileScreen() {
           <Text style={p.logoutText}>Log Out</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={p.deleteBtn} onPress={handleDeleteAccount} activeOpacity={0.8}>
+        <TouchableOpacity style={p.deleteBtn} onPress={() => { setShowDeleteModal(true); setDeleteConfirmText(''); setDeleteError(''); }} activeOpacity={0.8}>
           <Ionicons name="trash-outline" size={18} color={PROFILE_DANGER} />
           <Text style={p.deleteText}>Delete Account</Text>
         </TouchableOpacity>
 
       </ScrollView>
+
+      {/* ── Currency picker modal ── */}
+      {showCurrencyModal && (
+        <View style={p.modalOverlay}>
+          <View style={p.modalBox}>
+            <Text style={p.modalTitle}>default currency</Text>
+            <ScrollView style={{ maxHeight: 360 }} showsVerticalScrollIndicator={false}>
+              {CURRENCIES.map(c => (
+                <TouchableOpacity
+                  key={c.code}
+                  style={[p.currencyRow, defaultCurrency === c.code && p.currencyRowActive]}
+                  onPress={() => { setDefaultCurrency(c.code); setShowCurrencyModal(false); }}
+                  activeOpacity={0.75}
+                >
+                  <Text style={p.currencySymbol}>{c.symbol}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={p.currencyCode}>{c.code}</Text>
+                    <Text style={p.currencyLabel}>{c.label}</Text>
+                  </View>
+                  {defaultCurrency === c.code && <Ionicons name="checkmark" size={16} color={HEADER_BG} />}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity style={p.modalCancelBtn} onPress={() => setShowCurrencyModal(false)} activeOpacity={0.8}>
+              <Text style={p.modalCancelText}>cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      {/* ── Delete account confirmation modal ── */}
+      {showDeleteModal && (
+        <View style={p.modalOverlay}>
+          <View style={p.modalBox}>
+            <Text style={p.modalTitle}>delete account</Text>
+            <Text style={p.deleteWarning}>
+              this will permanently delete your account and ALL your data — recordings, spaces, receipts, reminders, everything. this cannot be undone.
+            </Text>
+            <Text style={p.deletePrompt}>type "delete" to confirm</Text>
+            <TextInput
+              style={p.deleteInput}
+              value={deleteConfirmText}
+              onChangeText={v => { setDeleteConfirmText(v); setDeleteError(''); }}
+              placeholder="delete"
+              placeholderTextColor={Colors.faint}
+              autoCapitalize="none"
+              autoFocus
+            />
+            {deleteError ? <Text style={p.deleteErrorText}>{deleteError}</Text> : null}
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
+              <TouchableOpacity style={[p.modalCancelBtn, { flex: 1 }]} onPress={() => setShowDeleteModal(false)} disabled={deleting} activeOpacity={0.8}>
+                <Text style={p.modalCancelText}>cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[p.deleteConfirmBtn, (deleting || deleteConfirmText.toLowerCase() !== 'delete') && { opacity: 0.4 }]}
+                onPress={handleDeleteAccount}
+                disabled={deleting || deleteConfirmText.toLowerCase() !== 'delete'}
+                activeOpacity={0.8}
+              >
+                {deleting
+                  ? <ActivityIndicator color="#fff" size="small" />
+                  : <Text style={p.deleteConfirmText}>delete forever</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -649,5 +763,38 @@ const p = StyleSheet.create({
     paddingVertical: 14,
   },
   deleteText: { fontFamily: 'ChillaxMedium', fontSize: 14, color: PROFILE_DANGER },
+
+  // ── Modals
+  modalOverlay: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center', zIndex: 200, padding: 24,
+  },
+  modalBox: {
+    backgroundColor: Colors.white, borderRadius: Radius.xl, padding: 24, width: '100%',
+  },
+  modalTitle: { fontFamily: 'CalSans', fontSize: 18, color: Colors.text, marginBottom: 16, letterSpacing: -0.3 },
+  modalCancelBtn: {
+    backgroundColor: Colors.surface, borderRadius: Radius.pill,
+    paddingVertical: 12, alignItems: 'center', borderWidth: 1, borderColor: Colors.border,
+  },
+  modalCancelText: { fontFamily: Fonts.monoBold, fontSize: 13, color: Colors.muted },
+
+  // Currency picker
+  currencyRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingVertical: 12, paddingHorizontal: 8, borderRadius: Radius.md,
+  },
+  currencyRowActive: { backgroundColor: Colors.surface },
+  currencySymbol: { fontFamily: Fonts.monoBold, fontSize: 18, color: Colors.text, width: 28, textAlign: 'center' },
+  currencyCode:   { fontFamily: Fonts.monoBold, fontSize: 13, color: Colors.text },
+  currencyLabel:  { fontFamily: Fonts.mono, fontSize: 11, color: Colors.muted },
+
+  // Delete confirmation
+  deleteWarning:     { fontFamily: Fonts.mono, fontSize: 13, color: Colors.muted, lineHeight: 20, marginBottom: 16 },
+  deletePrompt:      { fontFamily: Fonts.monoBold, fontSize: 11, color: Colors.text, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
+  deleteInput:       { fontFamily: Fonts.mono, fontSize: 15, color: Colors.text, backgroundColor: Colors.surface, borderRadius: Radius.lg, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1, borderColor: Colors.borderMid },
+  deleteErrorText:   { fontFamily: Fonts.mono, fontSize: 12, color: PROFILE_DANGER, marginTop: 6 },
+  deleteConfirmBtn:  { flex: 1, backgroundColor: PROFILE_DANGER, borderRadius: Radius.pill, paddingVertical: 12, alignItems: 'center' },
+  deleteConfirmText: { fontFamily: Fonts.monoBold, fontSize: 13, color: '#fff' },
 });
 
