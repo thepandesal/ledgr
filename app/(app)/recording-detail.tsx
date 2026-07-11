@@ -1,7 +1,7 @@
 import AddItemModal from './AddItemModal';
 import { setPendingFocusDate } from './space-detail';
 import { useScreenAnim } from '@/components/ui/ScreenWrapper';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Animated, Dimensions, ScrollView, TextInput, Modal, Platform, Image, Share } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Animated, Dimensions, ScrollView, TextInput, Modal, Platform, Image, Share, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -20,6 +20,8 @@ import { Colors, Radius } from '@/components/ui/theme';
 import { Brand } from '../../src/lib/brand';
 import { writeOff } from '../../src/lib/writeOff';
 
+import { useUser } from '../../src/hooks/useUser';
+
 const ACCENT      = Brand.color.accent;
 const ACCENT_DARK = Brand.color.accentDark;
 const PEACH       = '#FFAB91';
@@ -36,6 +38,8 @@ export default function RecordingDetailScreen() {
   const { recordingId } = useLocalSearchParams<{ recordingId: string }>();
   const router = useRouter();
   const { slideAnim, handleBack } = useScreenAnim();
+  const webviewRef = useRef<any>(null);
+  const { defaultCurrency } = useUser();
 
   const [recording, setRecording] = useState<any>(null);
   const [people, setPeople] = useState<string[]>([]);
@@ -281,16 +285,16 @@ export default function RecordingDetailScreen() {
   };
 
   useEffect(() => {
-    loadRecording();
-    loadContacts();
-    loadPeople();
-    loadItems();
-    loadLinkedReceipt();
-    loadPaymentData();
-    loadLinkedSplitBill();
-    // Pre-fetch share row ID so share button is instant
-    supabase.from('split_shares').select('id').eq('recording_id', recordingId).maybeSingle()
-      .then(({ data }) => { if (data) setShareRowId(data.id); });
+    Promise.all([
+      loadRecording(),
+      loadContacts(),
+      loadPeople(),
+      loadItems(),
+      loadLinkedReceipt(),
+      loadLinkedSplitBill(),
+      supabase.from('split_shares').select('id').eq('recording_id', recordingId).maybeSingle()
+        .then(({ data }) => { if (data) setShareRowId(data.id); }),
+    ]).then(() => loadPaymentData());
   }, []);
 
   useFocusEffect(useCallback(() => {
@@ -743,60 +747,64 @@ export default function RecordingDetailScreen() {
   };
 
   const addReceiptFromCamera = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') return;
-    const result = await ImagePicker.launchCameraAsync({ quality: 1 });
-    if (!result.canceled && result.assets[0]) {
-      let entryId = linkedReceipt?.id;
-      if (!entryId) {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-        const note = recording?.transaction_date && recording?.name
-          ? `${new Date(recording.transaction_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}: ${recording.name}`
-          : recording?.name ?? '';
-        const { data: entry } = await supabase.from('receipt_entries').insert({ user_id: user.id, note, recording_id: recordingId }).select().maybeSingle();
-        entryId = entry?.id;
+    try {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') return;
+      const result = await ImagePicker.launchCameraAsync({ quality: 1 });
+      if (!result.canceled && result.assets[0]) {
+        let entryId = linkedReceipt?.id;
+        if (!entryId) {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) return;
+          const note = recording?.transaction_date && recording?.name
+            ? `${new Date(recording.transaction_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}: ${recording.name}`
+            : recording?.name ?? '';
+          const { data: entry } = await supabase.from('receipt_entries').insert({ user_id: user.id, note, recording_id: recordingId }).select().maybeSingle();
+          entryId = entry?.id;
+        }
+        if (!entryId) return;
+        const compressed = await compressImage(result.assets[0].uri);
+        await uploadReceiptPhoto(compressed, entryId);
+        setAddReceiptModal(false);
+        loadLinkedReceipt();
       }
-      if (!entryId) return;
-      const compressed = await compressImage(result.assets[0].uri);
-      await uploadReceiptPhoto(compressed, entryId);
-      setAddReceiptModal(false);
-      loadLinkedReceipt();
+    } catch (e: any) {
+      if (e?.message === 'RECEIPT_LIMIT_REACHED') {
+        Alert.alert('monthly limit reached', 'you\'ve used all 10 free receipt photo uploads this month. resets on the 1st.');
+      }
     }
-  } catch (e: any) {
-    if (e?.message === 'RECEIPT_LIMIT_REACHED') {
-      Alert.alert('monthly limit reached', 'you\'ve used all 10 free receipt photo uploads this month. resets on the 1st.');
-    }
-  }
+  };
 
   const addReceiptFromGallery = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') return;
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsMultipleSelection: true, quality: 1 });
-    if (!result.canceled) {
-      let entryId = linkedReceipt?.id;
-      if (!entryId) {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-        const note = recording?.transaction_date && recording?.name
-          ? `${new Date(recording.transaction_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}: ${recording.name}`
-          : recording?.name ?? '';
-        const { data: entry } = await supabase.from('receipt_entries').insert({ user_id: user.id, note, recording_id: recordingId }).select().maybeSingle();
-        entryId = entry?.id;
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') return;
+      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsMultipleSelection: true, quality: 1 });
+      if (!result.canceled) {
+        let entryId = linkedReceipt?.id;
+        if (!entryId) {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) return;
+          const note = recording?.transaction_date && recording?.name
+            ? `${new Date(recording.transaction_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}: ${recording.name}`
+            : recording?.name ?? '';
+          const { data: entry } = await supabase.from('receipt_entries').insert({ user_id: user.id, note, recording_id: recordingId }).select().maybeSingle();
+          entryId = entry?.id;
+        }
+        if (!entryId) return;
+        for (const asset of result.assets) {
+          const compressed = await compressImage(asset.uri);
+          await uploadReceiptPhoto(compressed, entryId);
+        }
+        setAddReceiptModal(false);
+        loadLinkedReceipt();
       }
-      if (!entryId) return;
-      for (const asset of result.assets) {
-        const compressed = await compressImage(asset.uri);
-        await uploadReceiptPhoto(compressed, entryId);
+    } catch (e: any) {
+      if (e?.message === 'RECEIPT_LIMIT_REACHED') {
+        Alert.alert('monthly limit reached', 'you\'ve used all 10 free receipt photo uploads this month. resets on the 1st.');
       }
-      setAddReceiptModal(false);
-      loadLinkedReceipt();
     }
-  } catch (e: any) {
-    if (e?.message === 'RECEIPT_LIMIT_REACHED') {
-      Alert.alert('monthly limit reached', 'you\'ve used all 10 free receipt photo uploads this month. resets on the 1st.');
-    }
-  }
+  };
 
   const loadLinkedReceipt = async () => {
     if (!recordingId) return;
@@ -805,15 +813,7 @@ export default function RecordingDetailScreen() {
     setLinkedReceipt(entry);
     const { data: photos } = await supabase.from('receipt_photos').select('id, storage_path, url').eq('entry_id', entry.id).order('created_at').limit(5);
     if (photos) {
-      const urls = await Promise.all(photos.map(async (p: any) => {
-        let url = p.url ?? '';
-        if (!url && p.storage_path) {
-          const { data } = await supabase.storage.from('receipts').createSignedUrl(p.storage_path, 3600);
-          url = data?.signedUrl ?? '';
-        }
-        return { id: p.id, url };
-      }));
-      setReceiptPhotos(urls);
+      setReceiptPhotos(photos.map((p: any) => ({ id: p.id, url: p.url ?? '' })));
     }
   };
 
@@ -1317,10 +1317,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
     return Number(recording.amount).toLocaleString('en-US', { minimumFractionDigits: 2 });
   };
 
-  const formatDate = (d: string) => {
-    if (!d) return '—';
-    return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  };
+  const formatDate = (d: string) => { if (!d) return '—'; const [y, m, day] = d.split('-').map(Number); return new Date(y, m - 1, day).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); };
 
   const typeLabel = (type: string, status: string) => {
     if (recording?.is_write_off) return 'Write-off';
@@ -1379,7 +1376,10 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
           <View style={rd.summaryGrid}>
             <View style={rd.summaryCell}>
               <Text style={rd.summaryLabel}>amount</Text>
-              <Text style={[rd.summaryValue, { color: amountColor() }]}>{Number(recording?.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+              <Text style={[rd.summaryValue, { color: amountColor() }]}>
+                {Number(recording?.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: Colors.muted }}> {defaultCurrency}</Text>
+              </Text>
             </View>
             <View style={rd.summaryCell}>
               <Text style={rd.summaryLabel}>type</Text>
