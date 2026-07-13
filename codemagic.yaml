@@ -6,9 +6,6 @@ workflows:
     integrations:
       app_store_connect: codemagic
     environment:
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: art.ledgr.app
       vars:
         BUNDLE_ID: art.ledgr.app
         XCODE_WORKSPACE: ios/ledgr.xcworkspace
@@ -26,7 +23,7 @@ workflows:
           keychain initialize
           app-store-connect fetch-signing-files \
             --type IOS_APP_STORE \
-            --bundle-id art.ledgr.app \
+            --bundle-id "$BUNDLE_ID" \
             --create
           keychain add-certificates
           xcode-project use-profiles
