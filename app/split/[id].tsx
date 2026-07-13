@@ -379,7 +379,7 @@ export default function SplitSharePage() {
           {zoomPhoto && (
             <Image
               source={{ uri: zoomPhoto }}
-              style={{ width: '90%' as any, height: '85%' as any, borderRadius: 12, maxWidth: screenW - 32 }}
+              style={{ width: screenW * 0.92, height: screenW * 0.92 * 1.5, maxHeight: '85vh' as any, borderRadius: 12, cursor: 'zoom-in' } as any}
               resizeMode="contain"
             />
           )}

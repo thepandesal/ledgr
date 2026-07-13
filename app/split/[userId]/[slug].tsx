@@ -477,7 +477,7 @@ export default function SplitShareSlugPage() {
           ) : (
             <ScrollView style={{ width: '100%' }} contentContainerStyle={{ padding: 24, paddingTop: 80, gap: 16 }} showsVerticalScrollIndicator={false}>
               {receiptModalPhotos.map((url, i) => (
-                <Image key={i} source={{ uri: url }} style={{ width: '100%', height: undefined, aspectRatio: 3 / 4, maxHeight: '80vh' as any, borderRadius: 12 }} resizeMode="contain" />
+                <Image key={i} source={{ uri: url }} style={{ width: screenW - 48, height: (screenW - 48) * 1.4, borderRadius: 12, cursor: 'zoom-in' } as any} resizeMode="contain" />
               ))}
             </ScrollView>
           )}
@@ -487,7 +487,7 @@ export default function SplitShareSlugPage() {
       <Modal visible={qrModal} transparent animationType="fade" onRequestClose={() => setQrModal(false)}>
         <BlurView intensity={60} tint="dark" style={s.overlay}>
           <TouchableOpacity style={s.overlay} activeOpacity={1} onPress={() => { setQrModal(false); setQrModalAcc(null); }}>
-            <Image source={{ uri: qrModalAcc?.qr_code ?? '' }} style={[s.qrLarge, { width: '90%' as any, height: '90%' as any, maxWidth: qrSize, maxHeight: qrSize }]} resizeMode="contain" />
+            <Image source={{ uri: qrModalAcc?.qr_code ?? '' }} style={[s.qrLarge, { width: qrSize, height: qrSize, cursor: 'zoom-in' } as any]} resizeMode="contain" />
             <Text style={s.qrTap}>tap anywhere to close</Text>
           </TouchableOpacity>
         </BlurView>
