@@ -225,6 +225,13 @@ export default function RecordingDetailScreen() {
     if (data?.split_bills) {
       const sb = Array.isArray(data.split_bills) ? data.split_bills[0] : data.split_bills;
       if (sb) setLinkedSplitBill(sb);
+      return;
+    }
+    // Also check if this recording was charged from a split bill payment
+    const { data: rec } = await supabase.from('recordings').select('split_bill_id, type').eq('id', recordingId).single();
+    if (rec?.split_bill_id && rec?.type === 'expense') {
+      const { data: sb } = await supabase.from('split_bills').select('id, name').eq('id', rec.split_bill_id).single();
+      if (sb) setLinkedSplitBill(sb);
     }
   };
 
@@ -1713,7 +1720,11 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                 <View style={rd.recIconWrap}><Ionicons name="people-outline" size={14} color={ACCENT_DARK} /></View>
                 <View style={rd.recMid}>
                   <Text style={rd.recName}>{linkedSplitBill.name}</Text>
-                  <Text style={rd.recDate}>contributed {Number(recording?.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+                  <Text style={rd.recDate}>
+                    {recording?.type === 'expense' && recording?.split_bill_id && !recording?.linked_recording_id
+                      ? 'charged from this split bill'
+                      : `contributed ${Number(recording?.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+                  </Text>
                 </View>
                 <Ionicons name="chevron-forward" size={13} color={Colors.muted} />
               </TouchableOpacity>
