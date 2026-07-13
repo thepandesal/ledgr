@@ -307,7 +307,7 @@ export default function SplitSharePage() {
           ) : (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingVertical: 4 }}>
               {receiptPhotos.map((url, i) => (
-                <TouchableOpacity key={i} onPress={() => setZoomPhoto(url)} activeOpacity={0.85}>
+                <TouchableOpacity key={i} onPress={() => setZoomPhoto(url)} activeOpacity={0.85} style={{ cursor: 'zoom-in' } as any}>
                   <Image
                     source={{ uri: url }}
                     style={{ width: 120, height: 160, borderRadius: Radius.md, backgroundColor: Colors.surface }}
@@ -340,7 +340,7 @@ export default function SplitSharePage() {
                   </TouchableOpacity>
                 </View>
                 {acc.qr_code && (
-                  <TouchableOpacity onPress={() => { setZoomPhoto(acc.qr_code); }}>
+                  <TouchableOpacity onPress={() => { setZoomPhoto(acc.qr_code); }} style={{ cursor: 'zoom-in' } as any}>
                     <Image source={{ uri: acc.qr_code }} style={s.qr} resizeMode="contain" />
                     <Text style={s.qrHint}>tap to enlarge</Text>
                   </TouchableOpacity>
@@ -379,7 +379,7 @@ export default function SplitSharePage() {
           {zoomPhoto && (
             <Image
               source={{ uri: zoomPhoto }}
-              style={{ width: screenW - 32, height: (screenW - 32) * 1.4, borderRadius: 12, maxHeight: '85%' as any }}
+              style={{ width: '90%' as any, height: '85%' as any, borderRadius: 12, maxWidth: screenW - 32 }}
               resizeMode="contain"
             />
           )}

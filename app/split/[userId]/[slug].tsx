@@ -393,7 +393,7 @@ export default function SplitShareSlugPage() {
           <Text style={s.sectionHeader}>receipts</Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 4 }}>
             {splitReceiptPhotos.map((url, i) => (
-              <TouchableOpacity key={i} onPress={() => { setReceiptModalPhotos(splitReceiptPhotos); setReceiptModal(true); }} activeOpacity={0.85}>
+              <TouchableOpacity key={i} onPress={() => { setReceiptModalPhotos(splitReceiptPhotos); setReceiptModal(true); }} activeOpacity={0.85} style={{ cursor: 'zoom-in' } as any}>
                 <Image source={{ uri: url }} style={{ width: 90, height: 90, borderRadius: Radius.md, backgroundColor: Colors.surface }} resizeMode="cover" />
               </TouchableOpacity>
             ))}
@@ -437,7 +437,7 @@ export default function SplitShareSlugPage() {
                   </TouchableOpacity>
                 </View>
                 {acc.qr_code && (
-                  <TouchableOpacity onPress={() => { setQrModalAcc(acc); setQrModal(true); }}>
+                  <TouchableOpacity onPress={() => { setQrModalAcc(acc); setQrModal(true); }} style={{ cursor: 'zoom-in' } as any}>
                     <Image source={{ uri: acc.qr_code }} style={s.qr} resizeMode="contain" />
                     <Text style={s.qrHint}>tap to enlarge</Text>
                   </TouchableOpacity>
@@ -477,7 +477,7 @@ export default function SplitShareSlugPage() {
           ) : (
             <ScrollView style={{ width: '100%' }} contentContainerStyle={{ padding: 24, paddingTop: 80, gap: 16 }} showsVerticalScrollIndicator={false}>
               {receiptModalPhotos.map((url, i) => (
-                <Image key={i} source={{ uri: url }} style={{ width: '100%', aspectRatio: 3 / 4, borderRadius: 12 }} resizeMode="contain" />
+                <Image key={i} source={{ uri: url }} style={{ width: '100%', height: undefined, aspectRatio: 3 / 4, maxHeight: '80vh' as any, borderRadius: 12 }} resizeMode="contain" />
               ))}
             </ScrollView>
           )}
@@ -487,7 +487,7 @@ export default function SplitShareSlugPage() {
       <Modal visible={qrModal} transparent animationType="fade" onRequestClose={() => setQrModal(false)}>
         <BlurView intensity={60} tint="dark" style={s.overlay}>
           <TouchableOpacity style={s.overlay} activeOpacity={1} onPress={() => { setQrModal(false); setQrModalAcc(null); }}>
-            <Image source={{ uri: qrModalAcc?.qr_code ?? '' }} style={[s.qrLarge, { width: qrSize, height: qrSize }]} resizeMode="contain" />
+            <Image source={{ uri: qrModalAcc?.qr_code ?? '' }} style={[s.qrLarge, { width: '90%' as any, height: '90%' as any, maxWidth: qrSize, maxHeight: qrSize }]} resizeMode="contain" />
             <Text style={s.qrTap}>tap anywhere to close</Text>
           </TouchableOpacity>
         </BlurView>
