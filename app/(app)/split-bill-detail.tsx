@@ -840,18 +840,18 @@ export default function SplitBillDetailScreen() {
       // Per-person rows — matching share page style
       const personRowsHtml = filledPeople.map((p: string) => {
         const total = totals[p] ?? 0;
-        const color = total < 0 ? '#FFAB91' : '#2A7A6F';
-        return `<div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid #f0f0f0">`+
-          `<div style="width:32px;height:32px;border-radius:50%;background:#B6E1DE44;display:flex;align-items:center;justify-content:center;flex-shrink:0">`+
-          `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2A7A6F" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg></div>`+
-          `<span style="font-family:-apple-system,sans-serif;font-size:13px;color:#425252;flex:1">${p}</span>`+
-          `<span style="font-family:monospace;font-size:14px;font-weight:700;color:${color}">${total < 0 ? '-' : ''}${fmt2(total)}</span>`+
+        const color = total < 0 ? '#d97060' : '#2A7A6F';
+        return `<div style="display:flex;align-items:center;gap:12px;padding:13px 16px;border-bottom:1px solid #eef0f0">`+
+          `<div style="width:30px;height:30px;border-radius:50%;background:#e8f5f4;display:flex;align-items:center;justify-content:center;flex-shrink:0">`+
+          `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2A7A6F" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg></div>`+
+          `<span style="font-family:system-ui,-apple-system,sans-serif;font-size:13px;color:#2e3d3d;flex:1">${p}</span>`+
+          `<span style="font-family:ui-monospace,monospace;font-size:13px;font-weight:600;color:${color}">${total < 0 ? '-' : ''}${fmt2(total)}</span>`+
           `</div>`;
       }).join('');
-      const totalRowHtml = `<div style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:#B6E1DE44">`+
-        `<div style="width:32px;height:32px;border-radius:50%;background:#B6E1DE;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:monospace;font-size:13px;color:#2A7A6F;font-weight:700">Σ</div>`+
-        `<span style="font-family:-apple-system,sans-serif;font-size:13px;font-weight:700;color:#2A7A6F;flex:1">total</span>`+
-        `<span style="font-family:monospace;font-size:14px;font-weight:700;color:#2A7A6F">${grandTotal < 0 ? '-' : ''}${fmt2(grandTotal)}</span>`+
+      const totalRowHtml = `<div style="display:flex;align-items:center;gap:12px;padding:13px 16px;background:#e8f5f4">`+
+        `<div style="width:30px;height:30px;border-radius:50%;background:#b6e1de;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:ui-monospace,monospace;font-size:12px;color:#2A7A6F;font-weight:600">Σ</div>`+
+        `<span style="font-family:system-ui,-apple-system,sans-serif;font-size:13px;font-weight:600;color:#2A7A6F;flex:1">total</span>`+
+        `<span style="font-family:ui-monospace,monospace;font-size:13px;font-weight:600;color:#2A7A6F">${grandTotal < 0 ? '-' : ''}${fmt2(grandTotal)}</span>`+
         `</div>`;
 
       // Item rows — matching share page style
@@ -868,7 +868,7 @@ export default function SplitBillDetailScreen() {
       });
       const itemRowsHtml = recGroups.map((group) => {
         const groupHeader = recGroups.length > 1
-          ? `<div style="padding:8px 14px;background:#B6E1DE22;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:10px;font-weight:600;color:#2A7A6F;text-transform:uppercase;letter-spacing:0.5px">${group.recName}</div>`
+          ? `<div style="padding:8px 16px;background:#f0f8f7;font-family:ui-monospace,monospace;font-size:10px;font-weight:500;color:#2A7A6F;text-transform:uppercase;letter-spacing:0.8px">${group.recName}</div>`
           : '';
         const rows = group.items.map((item: any, ii: number) => {
           const d = isDeductType(item.recording_type);
@@ -923,18 +923,19 @@ export default function SplitBillDetailScreen() {
       }).join('');
 
       const sectionLabel = (text: string) =>
-        `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:11px;font-weight:600;color:#929090;letter-spacing:0.5px;text-transform:uppercase;margin:24px 0 8px">${text}</div>`;
+        `<div style="font-family:ui-monospace,monospace;font-size:10px;font-weight:500;color:#929090;letter-spacing:0.8px;text-transform:uppercase;margin:24px 0 10px">${text}</div>`;
       const block = (inner: string) =>
-        `<div style="border:1px solid #f0f0f0;border-radius:12px;overflow:hidden">${inner}</div>`;
+        `<div style="border:1px solid #eef0f0;border-radius:14px;overflow:hidden">${inner}</div>`;
 
       const html = `<!DOCTYPE html><html><head><meta charset="utf-8">`+
-        `<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#fff;padding:32px;width:480px;margin:0 auto}</style>`+
+        `<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:system-ui,-apple-system,sans-serif;background:#fff;padding:36px 32px;width:480px;margin:0 auto;-webkit-font-smoothing:antialiased}</style>`+
         `</head><body>`+
-        `<div style="font-size:30px;font-weight:600;color:#425252;letter-spacing:-0.5px;margin-bottom:4px">${String(name).toLowerCase()}</div>`+
-        `<div style="font-family:monospace;font-size:12px;color:#929090;margin-bottom:20px">${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>`+
+        `<div style="font-size:28px;font-weight:600;color:#1a2e2e;letter-spacing:-0.5px;margin-bottom:6px">${String(name).toLowerCase()}</div>`+
+        `<div style="font-family:ui-monospace,monospace;font-size:11px;color:#929090;margin-bottom:28px;letter-spacing:0.2px">${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>`+
         sectionLabel('per person pay') + block(personRowsHtml + totalRowHtml) +
         (items.length > 0 ? sectionLabel('item breakdown') + block(itemRowsHtml) : '') +
         (payRowsHtml ? sectionLabel('payment information') + block(payRowsHtml) : '') +
+        `<div style="font-family:ui-monospace,monospace;font-size:10px;color:#c8d0d0;text-align:center;margin-top:32px">generated by LEDGR</div>`+
         `</body></html>`;
 
       if (Platform.OS !== 'web') {
