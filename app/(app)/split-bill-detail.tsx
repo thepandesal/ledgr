@@ -1337,7 +1337,7 @@ export default function SplitBillDetailScreen() {
     queryFn: async () => {
       const { data } = await supabase
         .from('split_bill_payments')
-        .select('id, person_name, amount, created_at, status, cancelled_reason, cancelled_at')
+        .select('id, person_name, amount, created_at, status, cancelled_reason, cancelled_at, charged_recording_id')
         .eq('split_bill_id', splitBillId)
         .order('created_at');
       return data ?? [];
@@ -1478,7 +1478,26 @@ export default function SplitBillDetailScreen() {
       }
     }
 
-    // 2. Mark payment as cancelled (never delete)
+    // 2. Reduce or delete the consolidated charged expense if this payment was charged to a space
+    if (pay.charged_recording_id) {
+      const { data: chargedExp } = await supabase
+        .from('recordings')
+        .select('id, amount, space_id')
+        .eq('id', pay.charged_recording_id)
+        .maybeSingle();
+      if (chargedExp) {
+        const newAmount = Number(chargedExp.amount) - Number(pay.amount);
+        if (newAmount <= 0.001) {
+          await supabase.from('recordings').delete().eq('id', chargedExp.id);
+        } else {
+          await supabase.from('recordings').update({ amount: newAmount }).eq('id', chargedExp.id);
+        }
+        queryClient.invalidateQueries({ queryKey: ['recordings', chargedExp.space_id] });
+        queryClient.invalidateQueries({ queryKey: ['dashboard-activities', userId] });
+      }
+    }
+
+    // 3. Mark payment as cancelled (never delete)
     await supabase.from('split_bill_payments').update({
       status: 'cancelled',
       cancelled_reason: cancelReason.trim() || null,
@@ -1611,25 +1630,6 @@ export default function SplitBillDetailScreen() {
     // FIX 2: keep the id so we can tag every return recording with it
     const paymentRowId = paymentRow?.id ?? null;
 
-    // Charge to space — create an expense recording on the selected space
-    if (chargeToSpace && chargeSpaceId) {
-      await supabase.from('recordings').insert({
-        user_id: userId,
-        space_id: chargeSpaceId,
-        name: `${String(name)} · ${paymentPerson}`,
-        type: 'expense',
-        amount,
-        transaction_date: new Date().toISOString().split('T')[0],
-        status: 'paid',
-        account_id: chargeAccountId || null,
-        category_id: chargeCategoryId || null,
-        split_bill_id: splitBillId,
-        split_bill_payment_id: paymentRowId,
-      });
-      queryClient.invalidateQueries({ queryKey: ['recordings', chargeSpaceId] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-activities', userId] });
-    }
-
     // 2. Compute per-recording and manual breakdown for this person
     // Build: { recordingId -> amount_owed_by_person } and manual total
     const recordingOwed: Record<string, { amount: number; rec: any }> = {};
@@ -1704,8 +1704,6 @@ export default function SplitBillDetailScreen() {
     const manualExtra = parseFloat(paymentAmount || '0') || 0;
     if (remaining > 0 && manualOwed > 0) {
       const manualCredit = Math.min(remaining, manualOwed, manualExtra);
-      // FIX 1: check by split_bill_id instead of name so renames don't
-      // break the dedup and a new prompt isn't shown after every payment.
       const { data: existingManual } = await supabase
         .from('recordings')
         .select('id')
@@ -1715,27 +1713,52 @@ export default function SplitBillDetailScreen() {
         .limit(1);
 
       if (!existingManual || existingManual.length === 0) {
-        // No existing manual recording — prompt user
         setManualReturnAmount(manualCredit);
         setManualReturnType('return');
         setManualReturnModal(true);
       }
-      // If it already exists, silently skip (already tracked)
     }
 
-    // 5. Charge to space — create an expense on the selected space
+    // 5. Charge to space — upsert a single consolidated expense per split bill per space
     if (chargeToSpace && chargeSpaceId) {
-      await supabase.from('recordings').insert({
-        user_id: userId,
-        space_id: chargeSpaceId,
-        name: `${String(name)} · ${paymentPerson}`,
-        type: 'expense',
-        amount,
-        transaction_date: today,
-        status: 'paid',
-        account_id: chargeAccountId || null,
-        split_bill_id: splitBillId,
-      });
+      const { data: existing } = await supabase
+        .from('recordings')
+        .select('id, amount')
+        .eq('split_bill_id', splitBillId)
+        .eq('space_id', chargeSpaceId)
+        .eq('type', 'expense')
+        .is('linked_recording_id', null)
+        .maybeSingle();
+      if (existing) {
+        await supabase.from('recordings').update({
+          amount: Number(existing.amount) + amount,
+          transaction_date: today,
+          account_id: chargeAccountId || null,
+          category_id: chargeCategoryId || null,
+        }).eq('id', existing.id);
+        // tag this payment row with the consolidated expense id so cancel can find it
+        if (paymentRowId) {
+          await supabase.from('split_bill_payments').update({ charged_recording_id: existing.id }).eq('id', paymentRowId);
+        }
+      } else {
+        const { data: newExp } = await supabase.from('recordings').insert({
+          user_id: userId,
+          space_id: chargeSpaceId,
+          name: String(name),
+          type: 'expense',
+          amount,
+          transaction_date: today,
+          status: 'paid',
+          account_id: chargeAccountId || null,
+          category_id: chargeCategoryId || null,
+          split_bill_id: splitBillId,
+        }).select('id').single();
+        if (paymentRowId && newExp?.id) {
+          await supabase.from('split_bill_payments').update({ charged_recording_id: newExp.id }).eq('id', paymentRowId);
+        }
+      }
+      queryClient.invalidateQueries({ queryKey: ['recordings', chargeSpaceId] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-activities', userId] });
     }
 
     setPaymentSaving(false);
@@ -2192,6 +2215,10 @@ export default function SplitBillDetailScreen() {
                         new Date(pay.created_at) > new Date(latest.created_at) ? pay : latest
                       )
                     : null;
+                  // Build relationship summary for this person
+                  const personRecRows = getPersonRecordingRows(p);
+                  const personManualOwed = getPersonManualOwed(p);
+
                   return (
                     <View key={p} style={{ paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 8 }}>
                       {/* Name row */}
@@ -2231,6 +2258,34 @@ export default function SplitBillDetailScreen() {
                             )}
                           </View>
                         </>
+                      )}
+                      {/* Relationship: linked recordings + manual items */}
+                      {(personRecRows.length > 0 || personManualOwed > 0) && (
+                        <View style={{ gap: 3 }}>
+                          {personRecRows.map((row) => (
+                            <TouchableOpacity
+                              key={row.recordingId}
+                              style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
+                              onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: row.recordingId } } as any)}
+                            >
+                              <Ionicons name="receipt-outline" size={10} color={Colors.muted} />
+                              <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: Colors.muted, flex: 1 }} numberOfLines={1}>
+                                {row.recording?.name ?? '—'}
+                              </Text>
+                              <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: ACCENT_DARK }}>
+                                {fmt(row.owed)}
+                              </Text>
+                              <Ionicons name="chevron-forward" size={10} color={Colors.faint} />
+                            </TouchableOpacity>
+                          ))}
+                          {personManualOwed > 0 && (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                              <Ionicons name="create-outline" size={10} color={Colors.muted} />
+                              <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: Colors.muted, flex: 1 }}>manual items</Text>
+                              <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: ACCENT_DARK }}>{fmt(personManualOwed)}</Text>
+                            </View>
+                          )}
+                        </View>
                       )}
                       {/* Payment history rows */}
                       {personPayments.map((pay: any) => (
