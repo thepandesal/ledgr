@@ -27,11 +27,13 @@ workflows:
             --create
           keychain add-certificates
           xcode-project use-profiles
+      - name: List iOS folder
+        script: ls -la ios/
       - name: Build iOS
         script: |
           xcode-project build-ipa \
-            --workspace "$XCODE_WORKSPACE" \
-            --scheme "$XCODE_SCHEME"
+            --workspace "ios/ledgr.xcworkspace" \
+            --scheme "Ledgr"
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
