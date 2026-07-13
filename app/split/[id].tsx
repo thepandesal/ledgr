@@ -2,7 +2,6 @@ import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Image, Touchable
 import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../src/lib/supabase';
-import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Radius } from '@/components/ui/theme';
 import { Brand } from '../../src/lib/brand';
@@ -25,8 +24,6 @@ export default function SplitSharePage() {
   const [receiptPhotos, setReceiptPhotos]   = useState<string[]>([]);
   const [receiptLoading, setReceiptLoading] = useState(false);
   const [zoomPhoto, setZoomPhoto]           = useState<string | null>(null);
-  const [qrModal, setQrModal]               = useState(false);
-  const [qrModalAcc, setQrModalAcc]         = useState<any>(null);
   const [showUrlBar, setShowUrlBar]         = useState(false);
   const [copiedAccIdx, setCopiedAccIdx]     = useState<number | null>(null);
 
@@ -190,7 +187,6 @@ export default function SplitSharePage() {
 
   const grandTotal = perPerson.reduce((sum, p) => sum + p.total, 0);
   const { width: screenW } = useWindowDimensions();
-  const qrSize = screenW * 0.9;
 
   return (
     <>
@@ -344,7 +340,7 @@ export default function SplitSharePage() {
                   </TouchableOpacity>
                 </View>
                 {acc.qr_code && (
-                  <TouchableOpacity onPress={() => { setQrModalAcc(acc); setQrModal(true); }}>
+                  <TouchableOpacity onPress={() => { setZoomPhoto(acc.qr_code); }}>
                     <Image source={{ uri: acc.qr_code }} style={s.qr} resizeMode="contain" />
                     <Text style={s.qrHint}>tap to enlarge</Text>
                   </TouchableOpacity>
@@ -391,15 +387,6 @@ export default function SplitSharePage() {
         </TouchableOpacity>
       </Modal>
 
-      {/* QR Modal */}
-      <Modal visible={qrModal} transparent animationType="fade" onRequestClose={() => setQrModal(false)}>
-        <BlurView intensity={60} tint="dark" style={s.overlay}>
-          <TouchableOpacity style={s.overlay} activeOpacity={1} onPress={() => { setQrModal(false); setQrModalAcc(null); }}>
-            <Image source={{ uri: qrModalAcc?.qr_code ?? '' }} style={[s.qrLarge, { width: qrSize, height: qrSize }]} resizeMode="contain" />
-            <Text style={s.qrTap}>tap anywhere to close</Text>
-          </TouchableOpacity>
-        </BlurView>
-      </Modal>
     </>
   );
 }
@@ -450,6 +437,4 @@ const s = StyleSheet.create({
   footer: { fontFamily: Brand.font.mono, fontSize: 10, color: Colors.faint, textAlign: 'center', marginTop: 8 },
 
   overlay: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  qrLarge: { borderRadius: Radius.lg },
-  qrTap:   { fontFamily: Brand.font.mono, fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 16 },
 });
