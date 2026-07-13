@@ -32,9 +32,13 @@ interface Props {
   loading: boolean;
   getAmount: () => number;
   onConfirm: () => void;
+  spaces: { id: string; name: string }[];
+  spaceId: string | null;
+  setSpaceId: (id: string | null) => void;
+  defaultSpaceId: string | null;
 }
 
-export default function CollectModal({ visible, onClose, recording, items, filledPeople, step, setStep, mode, setMode, manualAmount, setManualAmount, selectedPeople, setSelectedPeople, accounts, account, setAccount, date, setDate, complete, setComplete, loading, getAmount, onConfirm }: Props) {
+export default function CollectModal({ visible, onClose, recording, items, filledPeople, step, setStep, mode, setMode, manualAmount, setManualAmount, selectedPeople, setSelectedPeople, accounts, account, setAccount, date, setDate, complete, setComplete, loading, getAmount, onConfirm, spaces, spaceId, setSpaceId, defaultSpaceId }: Props) {
   const perPersonMap: Record<string, number> = {};
   items.forEach(item => {
     const calc = (people: string[], cost: number) => {
@@ -104,6 +108,37 @@ export default function CollectModal({ visible, onClose, recording, items, fille
           <View style={{ gap: 4 }}>
             <Text style={formStyles.hintMuted}>collection date</Text>
             <TextInput style={[formStyles.input, { width: '100%' }]} placeholder="YYYY-MM-DD" placeholderTextColor={Colors.faint} value={date} onChangeText={setDate} />
+          </View>
+          {/* Space picker */}
+          <View style={{ gap: 8 }}>
+            <Text style={formStyles.hintMuted}>record collection in</Text>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <TouchableOpacity
+                style={{ flex: 1, paddingVertical: 10, borderRadius: 999, borderWidth: 1, alignItems: 'center' as const, borderColor: spaceId === defaultSpaceId ? Colors.cyan : Colors.borderMid, backgroundColor: spaceId === defaultSpaceId ? Colors.cyan + '22' : Colors.white }}
+                onPress={() => setSpaceId(defaultSpaceId)}
+              >
+                <Text style={{ fontFamily: Fonts.monoBold, fontSize: 11, color: spaceId === defaultSpaceId ? Colors.cyan : Colors.muted }}>same space</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{ flex: 1, paddingVertical: 10, borderRadius: 999, borderWidth: 1, alignItems: 'center' as const, borderColor: spaceId !== defaultSpaceId ? Colors.cyan : Colors.borderMid, backgroundColor: spaceId !== defaultSpaceId ? Colors.cyan + '22' : Colors.white }}
+                onPress={() => { if (spaceId === defaultSpaceId) setSpaceId(spaces.find(s => s.id !== defaultSpaceId)?.id ?? defaultSpaceId); }}
+              >
+                <Text style={{ fontFamily: Fonts.monoBold, fontSize: 11, color: spaceId !== defaultSpaceId ? Colors.cyan : Colors.muted }}>different space</Text>
+              </TouchableOpacity>
+            </View>
+            {spaceId !== defaultSpaceId && (
+              <ScrollView style={{ maxHeight: 140 }} showsVerticalScrollIndicator={false}>
+                {spaces.filter(s => s.id !== defaultSpaceId).map(s => (
+                  <TouchableOpacity
+                    key={s.id}
+                    style={{ paddingVertical: 11, paddingHorizontal: 14, borderRadius: 8, marginBottom: 4, borderWidth: 1, borderColor: spaceId === s.id ? Colors.cyan : Colors.borderMid, backgroundColor: spaceId === s.id ? Colors.cyan + '22' : Colors.white }}
+                    onPress={() => setSpaceId(s.id)}
+                  >
+                    <Text style={{ fontFamily: Fonts.monoBold, fontSize: 13, color: spaceId === s.id ? Colors.cyan : Colors.text }}>{s.name}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            )}
           </View>
           <View style={{ gap: 4 }}>
             <Text style={formStyles.hintMuted}>complete collection?</Text>

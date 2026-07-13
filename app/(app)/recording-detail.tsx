@@ -118,6 +118,14 @@ export default function RecordingDetailScreen() {
   const [collectDueDate, setCollectDueDate] = useState(new Date().toISOString().split('T')[0]);
   const [collectDueComplete, setCollectDueComplete] = useState<boolean | null>(null);
   const [collectDueLoading, setCollectDueLoading] = useState(false);
+  const [collectDueSpaceId, setCollectDueSpaceId] = useState<string | null>(null);
+
+  // Shared spaces for space picker
+  const [availableSpaces, setAvailableSpaces] = useState<{ id: string; name: string }[]>([]);
+
+  // Space overrides for pay/collect modals
+  const [collectSpaceId, setCollectSpaceId] = useState<string | null>(null);
+  const [paySpaceId, setPaySpaceId] = useState<string | null>(null);
 
   // Mark as complete state
   const [markCompleteModal, setMarkCompleteModal] = useState(false);
@@ -292,6 +300,7 @@ export default function RecordingDetailScreen() {
       loadItems(),
       loadLinkedReceipt(),
       loadLinkedSplitBill(),
+      loadAvailableSpaces(),
       supabase.from('split_shares').select('id').eq('recording_id', recordingId).maybeSingle()
         .then(({ data }) => { if (data) setShareRowId(data.id); }),
     ]).then(() => loadPaymentData());
@@ -460,6 +469,7 @@ export default function RecordingDetailScreen() {
     setCollectDueAmount('');
     setCollectDueDate(new Date().toISOString().split('T')[0]);
     setCollectDueComplete(null);
+    setCollectDueSpaceId(recording?.space_id ?? null);
     setCollectDueModal(true);
   };
 
@@ -469,18 +479,30 @@ export default function RecordingDetailScreen() {
     if (amount <= 0) return;
     setCollectDueLoading(true);
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
       const prevPaid = Number(recording.paid_amount ?? 0);
       const total = Number(recording.amount ?? 0);
       const newPaid = prevPaid + amount;
       const cappedPaid = Math.min(newPaid, total);
       const excess = newPaid - total;
       const newStatus = collectDueComplete ? 'paid' : 'partial';
-      await supabase.from('recordings').update({
-        paid_amount: cappedPaid,
-        status: newStatus,
-      }).eq('id', recordingId);
+      // Create a return recording for the collection
+      await supabase.from('recordings').insert({
+        user_id: user.id,
+        space_id: collectDueSpaceId ?? recording.space_id,
+        name: recording.name,
+        type: 'return',
+        amount,
+        transaction_date: collectDueDate,
+        status: 'received',
+        linked_recording_id: recordingId,
+        category_id: recording.category_id ?? null,
+      });
+      await supabase.from('recordings').update({ paid_amount: cappedPaid, status: newStatus }).eq('id', recordingId);
       setRecording((prev: any) => ({ ...prev, paid_amount: cappedPaid, status: newStatus }));
       setCollectDueModal(false);
+      loadPaymentData();
       if (excess > 0.01) {
         setOverpaymentAmount(Math.round(excess * 100) / 100);
         setOverpaymentModal(true);
@@ -512,6 +534,7 @@ export default function RecordingDetailScreen() {
     setCollectSelectedPeople([]);
     setCollectDate(new Date().toISOString().split('T')[0]);
     setCollectComplete(null);
+    setCollectSpaceId(recording?.space_id ?? null);
     setCollectModal(true);
   };
 
@@ -559,7 +582,7 @@ export default function RecordingDetailScreen() {
       }
 
       const { data: newRec } = await supabase.from('recordings').insert({
-        space_id: recording.space_id,
+        space_id: collectSpaceId ?? recording.space_id,
         user_id: user.id,
         name: recording.name,
         type: 'return',
@@ -618,6 +641,7 @@ export default function RecordingDetailScreen() {
     setPaySelectedPeople([]);
     setPayDate(new Date().toISOString().split('T')[0]);
     setPayComplete(null);
+    setPaySpaceId(recording?.space_id ?? null);
     setPayModal(true);
   };
 
@@ -664,7 +688,7 @@ export default function RecordingDetailScreen() {
       }
 
       const { data: newRec } = await supabase.from('recordings').insert({
-        space_id: recording.space_id,
+        space_id: paySpaceId ?? recording.space_id,
         user_id: user.id,
         name: recording.name,
         type: 'expense',
@@ -847,6 +871,24 @@ export default function RecordingDetailScreen() {
       categories: Array.isArray(data.categories) ? data.categories[0] : data.categories,
       account: Array.isArray(data.account) ? data.account[0] : data.account,
     });
+  };
+
+  const loadAvailableSpaces = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const [{ data: ownSpaces }, { data: members }] = await Promise.all([
+      supabase.from('spaces').select('id, name').eq('user_id', user.id).order('name'),
+      supabase.from('space_members').select('space_id, role').eq('user_id', user.id).eq('status', 'accepted').in('role', ['owner', 'co-owner']),
+    ]);
+    const sharedIds = (members ?? []).map((m: any) => m.space_id);
+    let sharedSpaces: any[] = [];
+    if (sharedIds.length > 0) {
+      const { data } = await supabase.from('spaces').select('id, name').in('id', sharedIds).order('name');
+      sharedSpaces = data ?? [];
+    }
+    const all = [...(ownSpaces ?? []), ...sharedSpaces];
+    const seen = new Set<string>();
+    setAvailableSpaces(all.filter(s => { if (seen.has(s.id)) return false; seen.add(s.id); return true; }));
   };
 
   const loadPeople = async () => {
@@ -1772,6 +1814,10 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
         loading={payLoading}
         getAmount={getPayAmount}
         onConfirm={confirmPayment}
+        spaces={availableSpaces}
+        spaceId={paySpaceId}
+        setSpaceId={setPaySpaceId}
+        defaultSpaceId={recording?.space_id ?? null}
       />
 
       {/* Delete confirm modal */}
@@ -1817,6 +1863,10 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
         loading={collectLoading}
         getAmount={getCollectAmount}
         onConfirm={confirmCollect}
+        spaces={availableSpaces}
+        spaceId={collectSpaceId}
+        setSpaceId={setCollectSpaceId}
+        defaultSpaceId={recording?.space_id ?? null}
       />
 
       <ReceivableModal
@@ -1849,6 +1899,10 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
         setComplete={setCollectDueComplete}
         loading={collectDueLoading}
         onConfirm={confirmCollectDue}
+        spaces={availableSpaces}
+        spaceId={collectDueSpaceId}
+        setSpaceId={setCollectDueSpaceId}
+        defaultSpaceId={recording?.space_id ?? null}
       />
 
       <ConfirmModal
