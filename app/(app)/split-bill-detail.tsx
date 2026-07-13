@@ -1352,6 +1352,13 @@ export default function SplitBillDetailScreen() {
   const [paymentManualAmounts, setPaymentManualAmounts] = useState<Record<string, string>>({});
   const [paymentRecord, setPaymentRecord]   = useState(true);
   const [paymentSaving, setPaymentSaving]   = useState(false);
+  const [chargeToSpace, setChargeToSpace]   = useState(false);
+  const [chargeSpaceId, setChargeSpaceId]   = useState<string | null>(null);
+  const [chargeAccountId, setChargeAccountId] = useState<string | null>(null);
+  const [chargeCategoryId, setChargeCategoryId] = useState<string | null>(null);
+  const [chargeSpaces, setChargeSpaces]     = useState<any[]>([]);
+  const [chargeAccounts, setChargeAccounts] = useState<any[]>([]);
+  const [chargeCategories, setChargeCategories] = useState<any[]>([]);
 
   // ── Cancel payment state ───────────────────────────────────────────────
   const [cancelPaymentModal, setCancelPaymentModal] = useState(false);
@@ -1484,12 +1491,24 @@ export default function SplitBillDetailScreen() {
   // Only active payments count toward paid totals
   const activePayments = payments.filter((p: any) => p.status !== 'cancelled');
 
-  const openPaymentModal = (person: string) => {
+  const openPaymentModal = async (person: string) => {
     setPaymentPerson(person);
     setPaymentMode('full');
     setPaymentAmount('');
     setPaymentManualAmounts({});
     setPaymentRecord(true);
+    setChargeToSpace(false);
+    setChargeSpaceId(null);
+    setChargeAccountId(null);
+    setChargeCategoryId(null);
+    const [{ data: sp }, { data: ac }, { data: cats }] = await Promise.all([
+      supabase.from('spaces').select('id, name').eq('user_id', userId).eq('is_active', true).order('name'),
+      supabase.from('accounts').select('id, account_name, bank').eq('user_id', userId).order('account_name'),
+      supabase.from('categories').select('id, name').eq('user_id', userId).order('name'),
+    ]);
+    setChargeSpaces(sp ?? []);
+    setChargeAccounts(ac ?? []);
+    setChargeCategories(cats ?? []);
     setPaymentModal(true);
   };
 
@@ -1573,6 +1592,22 @@ export default function SplitBillDetailScreen() {
     }).select('id').single();
     // FIX 2: keep the id so we can tag every return recording with it
     const paymentRowId = paymentRow?.id ?? null;
+
+    // Charge to space — create an expense recording on the selected space
+    if (chargeToSpace && chargeSpaceId) {
+      await supabase.from('recordings').insert({
+        user_id: userId,
+        space_id: chargeSpaceId,
+        name: `${String(name)} · ${paymentPerson}`,
+        type: 'expense',
+        amount,
+        transaction_date: new Date().toISOString().split('T')[0],
+        status: 'paid',
+        account_id: chargeAccountId || null,
+        category_id: chargeCategoryId || null,
+        split_bill_id: splitBillId,
+      });
+    }
 
     // 2. Compute per-recording and manual breakdown for this person
     // Build: { recordingId -> amount_owed_by_person } and manual total
@@ -1665,6 +1700,21 @@ export default function SplitBillDetailScreen() {
         setManualReturnModal(true);
       }
       // If it already exists, silently skip (already tracked)
+    }
+
+    // 5. Charge to space — create an expense on the selected space
+    if (chargeToSpace && chargeSpaceId) {
+      await supabase.from('recordings').insert({
+        user_id: userId,
+        space_id: chargeSpaceId,
+        name: `${String(name)} · ${paymentPerson}`,
+        type: 'expense',
+        amount,
+        transaction_date: today,
+        status: 'paid',
+        account_id: chargeAccountId || null,
+        split_bill_id: splitBillId,
+      });
     }
 
     setPaymentSaving(false);
@@ -3071,10 +3121,56 @@ export default function SplitBillDetailScreen() {
               {paymentMode === 'full' && (
                 <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 15, color: ACCENT_DARK, marginBottom: 8 }}>{fmt(remaining)}</Text>
               )}
+              {/* Charge to space */}
               <TouchableOpacity
-                style={[s.doneBtn, { opacity: paymentSaving ? 0.5 : 1 }]}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, borderTopWidth: 1, borderTopColor: Colors.border, marginTop: 4 }}
+                onPress={() => setChargeToSpace(v => !v)}
+                activeOpacity={0.7}
+              >
+                <Ionicons name={chargeToSpace ? 'checkbox' : 'square-outline'} size={18} color={chargeToSpace ? ACCENT_DARK : Colors.muted} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 13, color: Colors.text }}>charge to a space</Text>
+                  <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: Colors.muted }}>creates an expense on the selected space</Text>
+                </View>
+              </TouchableOpacity>
+              {chargeToSpace && (
+                <View style={{ gap: 10, marginBottom: 8 }}>
+                  <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase' }}>space</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+                    {chargeSpaces.map((sp: any) => (
+                      <TouchableOpacity key={sp.id} style={[s.modeBtn, chargeSpaceId === sp.id && s.modeBtnActive]} onPress={() => setChargeSpaceId(sp.id)}>
+                        <Text style={[s.modeBtnText, chargeSpaceId === sp.id && s.modeBtnTextActive]}>{sp.name}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                  <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase' }}>account <Text style={{ fontFamily: Brand.font.mono, textTransform: 'none' }}>(optional)</Text></Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+                    <TouchableOpacity style={[s.modeBtn, !chargeAccountId && s.modeBtnActive]} onPress={() => setChargeAccountId(null)}>
+                      <Text style={[s.modeBtnText, !chargeAccountId && s.modeBtnTextActive]}>none</Text>
+                    </TouchableOpacity>
+                    {chargeAccounts.map((ac: any) => (
+                      <TouchableOpacity key={ac.id} style={[s.modeBtn, chargeAccountId === ac.id && s.modeBtnActive]} onPress={() => setChargeAccountId(ac.id)}>
+                        <Text style={[s.modeBtnText, chargeAccountId === ac.id && s.modeBtnTextActive]}>{ac.account_name}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                  <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase' }}>category <Text style={{ fontFamily: Brand.font.mono, textTransform: 'none' }}>(optional)</Text></Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+                    <TouchableOpacity style={[s.modeBtn, !chargeCategoryId && s.modeBtnActive]} onPress={() => setChargeCategoryId(null)}>
+                      <Text style={[s.modeBtnText, !chargeCategoryId && s.modeBtnTextActive]}>none</Text>
+                    </TouchableOpacity>
+                    {chargeCategories.map((cat: any) => (
+                      <TouchableOpacity key={cat.id} style={[s.modeBtn, chargeCategoryId === cat.id && s.modeBtnActive]} onPress={() => setChargeCategoryId(cat.id)}>
+                        <Text style={[s.modeBtnText, chargeCategoryId === cat.id && s.modeBtnTextActive]}>{cat.name}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+              <TouchableOpacity
+                style={[s.doneBtn, { opacity: paymentSaving || (chargeToSpace && !chargeSpaceId) ? 0.5 : 1 }]}
                 onPress={savePayment}
-                disabled={paymentSaving}
+                disabled={paymentSaving || (chargeToSpace && !chargeSpaceId)}
               >
                 <Text style={s.doneBtnText}>{paymentSaving ? 'saving...' : actionLabel}</Text>
               </TouchableOpacity>
