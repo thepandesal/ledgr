@@ -446,9 +446,9 @@ export default function DashboardScreen() {
   };
 
   const tabValue = (key: string) => {
-    if (key === 'all')          return `${defaultCurrency} ${fmtAbbr(moneyInTotal + moneyOutTotal)}`;
-    if (key === 'money-in')    return `${defaultCurrency} ${fmtAbbr(moneyInTotal)}`;
-    if (key === 'money-out')   return `${defaultCurrency} ${fmtAbbr(moneyOutTotal)}`;
+    if (key === 'all')          return fmtAbbr(moneyInTotal + moneyOutTotal);
+    if (key === 'money-in')    return fmtAbbr(moneyInTotal);
+    if (key === 'money-out')   return fmtAbbr(moneyOutTotal);
     if (key === 'loans')       return String(loansActive);
     if (key === 'receivables') return String(receivablesPending);
     return '';

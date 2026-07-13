@@ -36,22 +36,22 @@ const BUBBLE_ACTIVE_BG = '#EEF2FB'; // bubble active item bg
 const { width } = Dimensions.get('window');
 
 const MAIN_TABS = [
-  { key: 'spaces',        label: 'Spaces',     icon: 'grid' },
-  { key: 'accounts',      label: 'Accounts',   icon: 'wallet-outline' },
-  { key: 'dashboard',     label: 'Dashboard',  icon: 'pulse-outline' },
-  { key: 'notifications', label: 'Profile',   icon: 'person-outline' },
-  { key: 'others',        label: 'Others',     icon: 'apps-outline' },
+  { key: 'spaces',              label: 'Spaces',        icon: 'grid' },
+  { key: 'accounts',            label: 'Accounts',      icon: 'wallet-outline' },
+  { key: 'dashboard',           label: 'Dashboard',     icon: 'pulse-outline' },
+  { key: 'notifications-tab',   label: 'Notifications', icon: 'notifications-outline' },
+  { key: 'others',              label: 'Others',        icon: 'apps-outline' },
 ];
 
 const TAB_META: Record<string, { title: string; subtitle: string }> = {
   spaces:        { title: 'spaces',     subtitle: 'track your budgets & savings'    },
   accounts:      { title: 'accounts',   subtitle: 'your saved payment methods'      },
   dashboard:     { title: 'activities', subtitle: 'all your recordings in one place' },
-  notifications: { title: 'profile',   subtitle: 'your account details'            },
   receipts:      { title: 'receipts',   subtitle: 'your paper trail, digitized'     },
   'bill-split':  { title: 'split bill',  subtitle: 'split expenses with friends'    },
   contacts:      { title: 'contacts',   subtitle: 'your friends & contacts'         },
   'notifications-page': { title: 'notifications', subtitle: 'your alerts'                      },
+  profile:              { title: 'profile',       subtitle: 'your account details'             },
   categories:    { title: 'categories', subtitle: 'organize your recordings'        },
   loans:         { title: 'loans',      subtitle: 'payables & borrowings'           },
   receivables:   { title: 'receivables', subtitle: 'money owed to you'             },
@@ -59,17 +59,17 @@ const TAB_META: Record<string, { title: string; subtitle: string }> = {
 };
 
 const OTHERS_ITEMS = [
-  { key: 'receipts',           label: 'Receipts',       icon: 'receipt-outline',       route: null },
-  { key: 'bill-split',         label: 'Split Bill',     icon: 'people-outline',        route: null },
-  { key: 'contacts',           label: 'Contacts',       icon: 'people-circle-outline', route: null },
-  { key: 'categories',         label: 'Categories',     icon: 'pricetag-outline',      route: null },
-  { key: 'reminders',          label: 'Reminders',      icon: 'alarm-outline',         route: null },
-  { key: 'loans',              label: 'Loans',          icon: 'cash-outline',          route: '/(app)/loans' },
-  { key: 'receivables',        label: 'Receivables',    icon: 'arrow-undo-outline',    route: '/(app)/receivables' },
-  { key: 'notifications-page', label: 'Notifications',  icon: 'notifications-outline', route: null },
+  { key: 'receipts',    label: 'Receipts',    icon: 'receipt-outline',       route: null },
+  { key: 'bill-split',  label: 'Split Bill',  icon: 'people-outline',        route: null },
+  { key: 'contacts',    label: 'Contacts',    icon: 'people-circle-outline', route: null },
+  { key: 'categories',  label: 'Categories',  icon: 'pricetag-outline',      route: null },
+  { key: 'reminders',   label: 'Reminders',   icon: 'alarm-outline',         route: null },
+  { key: 'loans',       label: 'Loans',       icon: 'cash-outline',          route: '/(app)/loans' },
+  { key: 'receivables', label: 'Receivables', icon: 'arrow-undo-outline',    route: '/(app)/receivables' },
+  { key: 'profile',     label: 'Profile',     icon: 'person-outline',        route: null },
 ];
 
-const SLIDE_KEYS = ['spaces', 'accounts', 'dashboard', 'categories', 'receipts', 'bill-split', 'contacts', 'notifications-page', 'reminders'];
+const SLIDE_KEYS = ['spaces', 'accounts', 'dashboard', 'categories', 'receipts', 'bill-split', 'contacts', 'notifications-page', 'reminders', 'profile'];
 
 const PROFILE_DANGER   = '#FFAB91';
 const PROFILE_DANGEBG  = '#FFF5F2';
@@ -414,19 +414,17 @@ export default function TabsLayout() {
     Object.fromEntries(SLIDE_KEYS.map((k, i) => [k, new Animated.Value(i === 0 ? 0 : width)]))
   ).current;
 
-  // Notification slide anim
-  const notifAnim = useRef(new Animated.Value(width)).current;
+  // Notification slide anim — no longer needed (notifications-page is in SLIDE_KEYS)
 
   const switchTab = useCallback((key: string) => {
     if (key === activeTabRef.current) return;
     const prev = activeTabRef.current;
     activeTabRef.current = key;
 
-    const incoming = key === 'notifications' ? notifAnim : slideAnims[key];
-    const outgoing = prev === 'notifications' ? notifAnim : slideAnims[prev];
+    const incoming = slideAnims[key];
+    const outgoing = slideAnims[prev];
     incoming?.setValue(width);
 
-    // Start animations immediately on native thread
     Animated.parallel([
       Animated.timing(incoming, { toValue: 0, duration: 320, useNativeDriver: true }),
       Animated.timing(outgoing, { toValue: -width, duration: 320, useNativeDriver: true }),
@@ -456,12 +454,12 @@ export default function TabsLayout() {
   const handleNavPress = (key: string) => {
     if (key === 'others') { othersOpen ? closeOthers() : openOthers(); return; }
     if (othersOpen) closeOthers();
+    if (key === 'notifications-tab') { setUnreadCount(0); switchTab('notifications-page'); return; }
     switchTab(key);
   };
 
   const handleOthersItem = (item: typeof OTHERS_ITEMS[0]) => {
     closeOthers();
-    if (item.key === 'notifications-page') setUnreadCount(0);
     if (item.route) {
       router.push(item.route as any);
     } else {
@@ -470,6 +468,7 @@ export default function TabsLayout() {
   };
 
   const isOthersActive = OTHERS_ITEMS.some(i => i.key === activeTab) || othersOpen;
+  const isNotifTabActive = activeTab === 'notifications-page';
 
   useEffect(() => {
     const checkTour = (pending?: boolean) => {
@@ -537,17 +536,9 @@ export default function TabsLayout() {
             style={[s.screen, { transform: [{ translateX: slideAnims[key] }], zIndex: activeTab === key ? 10 : 0 }]}
             pointerEvents={activeTab === key ? 'auto' : 'none'}
           >
-            {SCREENS[key]}
+            {key === 'profile' ? <MemoProfile /> : SCREENS[key]}
           </Animated.View>
         ))}
-
-        {/* Profile screen */}
-        <Animated.View
-          style={[s.screen, { transform: [{ translateX: notifAnim }], zIndex: activeTab === 'notifications' ? 10 : 0 }]}
-          pointerEvents={activeTab === 'notifications' ? 'auto' : 'none'}
-        >
-          <MemoProfile />
-        </Animated.View>
       </View>
 
       {/* Others bubble */}
@@ -577,8 +568,8 @@ export default function TabsLayout() {
       {/* Bottom nav bar */}
       <View style={s.navBar}>
         {MAIN_TABS.map(tab => {
-          const isActive = tab.key === 'others' ? isOthersActive : activeTab === tab.key;
-          const showBadge = tab.key === 'others' && unreadCount > 0;
+          const isActive = tab.key === 'others' ? isOthersActive : tab.key === 'notifications-tab' ? isNotifTabActive : activeTab === tab.key;
+          const showBadge = (tab.key === 'notifications-tab' && unreadCount > 0);
           const tourId = NAV_TOUR_IDS[tab.key];
           const navContent = (
             <TouchableOpacity style={s.navItem} onPress={() => handleNavPress(tab.key)} activeOpacity={0.7}>
@@ -636,7 +627,7 @@ function BubbleContent({ items, activeTab, onPress, unreadCount }: {
     <>
       {items.map((item, i) => {
         const isActive = activeTab === item.key;
-        const showBadge = item.key === 'notifications-page' && unreadCount > 0;
+        const showBadge = false;
         return (
           <TouchableOpacity
             key={item.key}
