@@ -23,8 +23,8 @@ export default function SplitSharePage() {
   const [billPayments, setBillPayments]     = useState<any[]>([]);
   const [receiptId, setReceiptId]           = useState<string | null>(null);
   const [receiptPhotos, setReceiptPhotos]   = useState<string[]>([]);
-  const [receiptModal, setReceiptModal]     = useState(false);
   const [receiptLoading, setReceiptLoading] = useState(false);
+  const [zoomPhoto, setZoomPhoto]           = useState<string | null>(null);
   const [qrModal, setQrModal]               = useState(false);
   const [qrModalAcc, setQrModalAcc]         = useState<any>(null);
   const [showUrlBar, setShowUrlBar]         = useState(false);
@@ -41,11 +41,20 @@ export default function SplitSharePage() {
 
   useEffect(() => { if (!id) return; loadAll(); }, [id]);
 
+  useEffect(() => { if (receiptId) openReceipt(); }, [receiptId]);
+
   const isDeduct = (type: string) => type === 'payable';
 
   const loadAll = async () => {
     const { data: share, error } = await supabase.from('split_shares').select('recording_id, split_bill_id, data').eq('id', id).single();
-    if (error || !share) { setNotFound(true); setLoading(false); return; }
+    if (error || !share) {
+      // PGRST116 = no rows found, anything else is likely an RLS/permissions issue
+      if (error?.code !== 'PGRST116') {
+        // Try anonymous/public fetch as fallback — the table may need a public read policy
+        console.warn('[split] share load error:', error?.message);
+      }
+      setNotFound(true); setLoading(false); return;
+    }
     const accountIds: string[] = share.data?.account_ids ?? [];
     const splitBillId = share.split_bill_id;
     const rid = share.recording_id;
@@ -291,11 +300,30 @@ export default function SplitSharePage() {
         {/* Receipt */}
         {receiptId && <>
           <Text style={s.sectionHeader}>receipt</Text>
-          <TouchableOpacity style={s.actionBtn} onPress={openReceipt} activeOpacity={0.8}>
-            <Ionicons name="receipt-outline" size={15} color={ACCENT_DARK} />
-            <Text style={s.actionBtnText}>view receipt photos</Text>
-            <Ionicons name="chevron-forward" size={13} color={ACCENT_DARK} />
-          </TouchableOpacity>
+          {receiptPhotos.length === 0 && !receiptLoading ? (
+            <TouchableOpacity style={s.actionBtn} onPress={openReceipt} activeOpacity={0.8}>
+              <Ionicons name="receipt-outline" size={15} color={ACCENT_DARK} />
+              <Text style={s.actionBtnText}>view receipt photos</Text>
+              <Ionicons name="chevron-forward" size={13} color={ACCENT_DARK} />
+            </TouchableOpacity>
+          ) : receiptLoading ? (
+            <ActivityIndicator color={ACCENT_DARK} style={{ marginVertical: 12 }} />
+          ) : (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingVertical: 4 }}>
+              {receiptPhotos.map((url, i) => (
+                <TouchableOpacity key={i} onPress={() => setZoomPhoto(url)} activeOpacity={0.85}>
+                  <Image
+                    source={{ uri: url }}
+                    style={{ width: 120, height: 160, borderRadius: Radius.md, backgroundColor: Colors.surface }}
+                    resizeMode="cover"
+                  />
+                  <View style={{ position: 'absolute', bottom: 6, right: 6, backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 99, padding: 4 }}>
+                    <Ionicons name="expand-outline" size={12} color="#fff" />
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          )}
         </>}
 
         {/* Payment info */}
@@ -346,24 +374,21 @@ export default function SplitSharePage() {
         </TouchableOpacity>
       </ScrollView>
 
-      {/* Receipt Modal */}
-      <Modal visible={receiptModal} transparent animationType="slide" onRequestClose={() => setReceiptModal(false)}>
-        <BlurView intensity={60} tint="dark" style={s.overlay}>
-          <TouchableOpacity style={{ position: 'absolute', top: 56, right: 24, zIndex: 10 }} onPress={() => setReceiptModal(false)}>
-            <Ionicons name="close" size={26} color="#fff" />
+      {/* Zoom lightbox */}
+      <Modal visible={!!zoomPhoto} transparent animationType="fade" onRequestClose={() => setZoomPhoto(null)}>
+        <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', justifyContent: 'center', alignItems: 'center' }} activeOpacity={1} onPress={() => setZoomPhoto(null)}>
+          <TouchableOpacity style={{ position: 'absolute', top: 52, right: 24, zIndex: 10, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 99, padding: 8 }} onPress={() => setZoomPhoto(null)}>
+            <Ionicons name="close" size={22} color="#fff" />
           </TouchableOpacity>
-          {receiptLoading ? (
-            <ActivityIndicator color="#fff" />
-          ) : receiptPhotos.length === 0 ? (
-            <Text style={{ fontFamily: Brand.font.mono, fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>no photos found</Text>
-          ) : (
-            <ScrollView style={{ width: '100%' }} contentContainerStyle={{ padding: 24, paddingTop: 80, gap: 16 }} showsVerticalScrollIndicator={false}>
-              {receiptPhotos.map((url, i) => (
-                <Image key={i} source={{ uri: url }} style={{ width: '100%', aspectRatio: 3 / 4, borderRadius: 12 }} resizeMode="contain" />
-              ))}
-            </ScrollView>
+          {zoomPhoto && (
+            <Image
+              source={{ uri: zoomPhoto }}
+              style={{ width: screenW - 32, height: (screenW - 32) * 1.4, borderRadius: 12, maxHeight: '85%' as any }}
+              resizeMode="contain"
+            />
           )}
-        </BlurView>
+          <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 16 }}>tap anywhere to close</Text>
+        </TouchableOpacity>
       </Modal>
 
       {/* QR Modal */}
