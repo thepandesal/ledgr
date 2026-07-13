@@ -44,20 +44,22 @@ export default function ReceiptsScreen() {
     queryKey: ['receipts', userId],
     queryFn: async () => {
       if (!userId) return [];
-      const { data } = await supabase.from('receipt_entries').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+      const { data } = await supabase
+        .from('receipt_entries')
+        .select('*, receipt_photos(storage_path, url), recordings(name, type)')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
       if (!data) return [];
-      const full: Entry[] = await Promise.all(data.map(async (e: any) => {
-        const { data: photos, count } = await supabase.from('receipt_photos').select('storage_path, url', { count: 'exact' }).eq('entry_id', e.id).order('created_at').limit(1);
-        let firstPhoto = '';
-        if (photos && photos.length > 0) firstPhoto = photos[0].url ?? '';
-        let recording = null;
-        if (e.recording_id) {
-          const { data: rec } = await supabase.from('recordings').select('name, type').eq('id', e.recording_id).single();
-          recording = rec;
-        }
-        return { ...e, firstPhoto, photoCount: count ?? 0, recording };
-      }));
-      return full;
+      return data.map((e: any) => {
+        const photos: any[] = Array.isArray(e.receipt_photos) ? e.receipt_photos : [];
+        const rec = Array.isArray(e.recordings) ? e.recordings[0] : e.recordings;
+        return {
+          ...e,
+          firstPhoto: photos[0]?.url ?? '',
+          photoCount: photos.length,
+          recording: rec ?? null,
+        };
+      }) as Entry[];
     },
     enabled: !!userId,
   });
@@ -101,9 +103,12 @@ export default function ReceiptsScreen() {
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsMultipleSelection: true, quality: 1 });
     if (!result.canceled && activeEntryId) {
       try {
-        for (const asset of result.assets) {
-          const compressed = await compressImage(asset.uri);
-          await uploadReceiptPhoto(compressed, activeEntryId);
+        const CONCURRENCY = 3;
+        for (let i = 0; i < result.assets.length; i += CONCURRENCY) {
+          await Promise.all(result.assets.slice(i, i + CONCURRENCY).map(async (asset) => {
+            const compressed = await compressImage(asset.uri);
+            await uploadReceiptPhoto(compressed, activeEntryId!);
+          }));
         }
       } catch (e: any) {
         if (e?.message === 'RECEIPT_LIMIT_REACHED') {
@@ -113,7 +118,7 @@ export default function ReceiptsScreen() {
     }
   };
 
-  const formatDate = (d: string) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const formatDate = (d: string) => { const [y, m, day] = d.split('-').map(Number); return new Date(y, m - 1, day).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); };
   const typeColor = (type: string) => type === 'expense' ? Colors.expense : type === 'income' ? Colors.income : Colors.text;
 
   const paginatedEntries = entries.slice(0, displayCount);

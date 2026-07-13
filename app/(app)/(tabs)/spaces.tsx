@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, useRef, useContext, useEffect, useMemo } from 'react';
 import { useUser } from '../../../src/hooks/useUser';
+import { useExchangeRates } from '../../../src/lib/useExchangeRates';
 import BottomSheet from '@/components/ui/BottomSheet';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import { Colors, Fonts, Radius, Spacing } from '@/components/ui/theme';
@@ -17,7 +18,7 @@ import TourTarget from '@/components/TourTarget';
 
 interface SpaceData {
   id: string; name: string; color: string; icon: string;
-  budget?: number | null; spent?: number; saved?: number; savedAllTime?: number; count?: number;
+  budget?: number | null; budget_currency?: string; spent?: number; saved?: number; savedAllTime?: number; count?: number;
   space_type?: string; savings_target_date?: string | null; is_active?: boolean;
 }
 
@@ -32,7 +33,7 @@ const fmtCompact = (n: number) => {
   return fmt(n);
 };
 
-import { getDateRange, getDateLabel, type DateMode, type WeekStart } from '../../../src/lib/dateUtils';
+import { getDateRange, getDateLabel, parseLocalDate, type DateMode, type WeekStart } from '../../../src/lib/dateUtils';
 
 const MOTIVATIONS = [
   'Every peso saved is a step forward.',
@@ -45,10 +46,14 @@ const MOTIVATIONS = [
 export default function SpacesScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { userId, userName } = useUser();
+  const { userId, userName, defaultCurrency } = useUser();
+  const { convert, rateMap } = useExchangeRates();
   const [createModal, setCreateModal] = useState(false);
   const [spaceName, setSpaceName] = useState('');
   const [spaceBudget, setSpaceBudget] = useState('');
+  const [spaceBudgetCurrency, setSpaceBudgetCurrency] = useState('PHP');
+  const [showBudgetCurrencyModal, setShowBudgetCurrencyModal] = useState(false);
+  const BUDGET_CURRENCIES = ['PHP','USD','EUR','GBP','JPY','AUD','CAD','SGD','MYR','IDR','THB','VND','KRW','CNY','INR','HKD','NZD','CHF','BRL','MXN'];
   const [spaceType, setSpaceType] = useState<'expense' | 'savings'>('expense');
   const [spaceTargetDate, setSpaceTargetDate] = useState('');
   const [loading, setLoading] = useState(false);
@@ -107,11 +112,10 @@ export default function SpacesScreen() {
       const toStr   = `${to.getFullYear()}-${String(to.getMonth() + 1).padStart(2, '0')}-${String(to.getDate()).padStart(2, '0')}`;
       
       // Fetch all recordings in date range for this user
-      const [{ data: allRecs }, { data: allTimeRecs }, { data: splitBillRecs }] = await Promise.all([
-        supabase.from('recordings').select('id, space_id, amount, type, is_due, paid_amount, transaction_date')
+      const [{ data: allRecs }, { data: allTimeSums }, { data: splitBillRecs }] = await Promise.all([
+        supabase.from('recordings').select('id, space_id, amount, type, is_due, paid_amount, transaction_date, currency')
           .eq('user_id', userId).gte('transaction_date', fromStr).lte('transaction_date', toStr),
-        supabase.from('recordings').select('space_id, amount, type')
-          .eq('user_id', userId).in('type', ['income', 'expense']),
+        supabase.rpc('get_space_all_time_totals', { p_user_id: userId }),
         supabase.from('split_bill_payments')
           .select('id, amount, split_bill_id')
           .eq('status', 'active'),
@@ -125,36 +129,25 @@ export default function SpacesScreen() {
       const savedAllTimeMap: Record<string, number> = {};
       const countMap: Record<string, number> = {};
 
-      (allTimeRecs ?? []).forEach((r: any) => {
-        if (r.type === 'income') {
-          savedAllTimeMap[r.space_id] = (savedAllTimeMap[r.space_id] ?? 0) + Number(r.amount);
-        } else if (r.type === 'expense') {
-          savedAllTimeMap[r.space_id] = (savedAllTimeMap[r.space_id] ?? 0) - Number(r.amount);
-        }
+      (allTimeSums ?? []).forEach((r: any) => {
+        savedAllTimeMap[r.space_id] = Number(r.income_total ?? 0) - Number(r.expense_total ?? 0);
       });
-      
-      // Debug: log what we're processing
-      
+
       (allRecs ?? []).forEach((r: any) => {
-        // Skip voided recordings entirely
         if (r.status === 'voided') return;
-        // Only count primary transaction types (income, expense, debt, due)
-        // Exclude payment and return to match space-detail page
         if (['income', 'expense', 'debt', 'due'].includes(r.type)) {
           countMap[r.space_id] = (countMap[r.space_id] || 0) + 1;
         }
-        
-        // Calculate amounts based on type
+        const amt = convert(Number(r.amount), r.currency ?? defaultCurrency, defaultCurrency);
         if (r.type === 'income' || r.type === 'due') {
-          savedMap[r.space_id] = (savedMap[r.space_id] || 0) + Number(r.amount);
+          savedMap[r.space_id] = (savedMap[r.space_id] || 0) + amt;
         } else if (r.type === 'expense') {
-          spentMap[r.space_id] = (spentMap[r.space_id] || 0) + Number(r.amount);
+          spentMap[r.space_id] = (spentMap[r.space_id] || 0) + amt;
         } else if (r.type === 'debt') {
-          spentMap[r.space_id] = (spentMap[r.space_id] || 0) + Number(r.amount);
+          spentMap[r.space_id] = (spentMap[r.space_id] || 0) + amt;
         } else if (r.type === 'payment') {
-          spentMap[r.space_id] = (spentMap[r.space_id] || 0) + Number(r.amount);
+          spentMap[r.space_id] = (spentMap[r.space_id] || 0) + amt;
         }
-        // 'due' type is income-like, so we don't add it to spent
       });
       
       // Add split bill payments to savedMap — filtered by parent recording's transaction_date
@@ -209,6 +202,7 @@ export default function SpacesScreen() {
 
   const openCreate = () => {
     setSpaceName(''); setError(''); setSpaceBudget('');
+    setSpaceBudgetCurrency(defaultCurrency);
     setSpaceType('expense'); setSpaceTargetDate(''); setEditMode(false);
     setCreateModal(true); setBlur(true);
   };
@@ -225,6 +219,7 @@ export default function SpacesScreen() {
       const { error: err } = await supabase.from('spaces').update({
         name: spaceName.trim(),
         budget: spaceBudget.trim() ? parseFloat(spaceBudget) : null,
+        budget_currency: spaceBudgetCurrency,
         space_type: spaceType,
         savings_target_date: spaceType === 'savings' && spaceTargetDate.trim() ? spaceTargetDate.trim() : null,
       }).eq('id', selectedSpace.id);
@@ -233,6 +228,7 @@ export default function SpacesScreen() {
       const { error: err } = await supabase.from('spaces').insert({
         user_id: userId, name: spaceName.trim(), color: ACCENT, icon: 'grid',
         budget: spaceBudget.trim() ? parseFloat(spaceBudget) : null,
+        budget_currency: spaceBudgetCurrency,
         space_type: spaceType,
         savings_target_date: spaceType === 'savings' && spaceTargetDate.trim() ? spaceTargetDate.trim() : null,
       }).select().single();
@@ -249,8 +245,11 @@ export default function SpacesScreen() {
     setSpaceType((selectedSpace.space_type as any) ?? 'expense');
     setSpaceTargetDate(selectedSpace.savings_target_date ?? '');
     setSpaceBudget('');
-    supabase.from('spaces').select('budget').eq('id', selectedSpace.id).single()
-      .then(({ data }) => { if (data?.budget) setSpaceBudget(String(data.budget)); });
+    supabase.from('spaces').select('budget, budget_currency').eq('id', selectedSpace.id).single()
+      .then(({ data }) => {
+        if (data?.budget) setSpaceBudget(String(data.budget));
+        if (data?.budget_currency) setSpaceBudgetCurrency(data.budget_currency);
+      });
     setError(''); setCreateModal(true);
   };
 
@@ -269,7 +268,7 @@ export default function SpacesScreen() {
 
   const renderExpenseCard = (space: SpaceData) => {
     const value       = space.spent ?? 0;
-    const budget      = space.budget ?? 0;
+    const budget      = space.budget ? convert(space.budget, space.budget_currency ?? 'PHP', defaultCurrency) : 0;
     const over        = budget > 0 && value > budget;
     const remaining   = budget - value;
     const statusColor = over ? Colors.expense : budget > 0 && remaining / budget < 0.2 ? '#F97316' : ACCENT_DARK;
@@ -280,10 +279,10 @@ export default function SpacesScreen() {
           <Text style={s.cardMeta}>{space.count ?? 0} transaction{(space.count ?? 0) !== 1 ? 's' : ''}</Text>
         </View>
         <View style={s.cardRight}>
-          <View style={s.cardRow}><Text style={s.cardRowLabel}>money in</Text><Text style={s.cardRowValue}>{fmtCompact(space.saved ?? 0)}</Text></View>
-          <View style={s.cardRow}><Text style={s.cardRowLabel}>money out</Text><Text style={[s.cardRowValue, over && { color: Colors.expense }]}>{fmtCompact(value)}</Text></View>
+          <View style={s.cardRow}><Text style={s.cardRowLabel}>money in</Text><Text style={s.cardRowValue}>{defaultCurrency} {fmtCompact(space.saved ?? 0)}</Text></View>
+          <View style={s.cardRow}><Text style={s.cardRowLabel}>money out</Text><Text style={[s.cardRowValue, over && { color: Colors.expense }]}>{defaultCurrency} {fmtCompact(value)}</Text></View>
           {budget > 0 && (
-            <View style={s.cardRow}><Text style={s.cardRowLabel}>budget</Text><Text style={[s.cardRowValue, { color: statusColor }]}>{fmtCompact(budget)}</Text></View>
+            <View style={s.cardRow}><Text style={s.cardRowLabel}>budget</Text><Text style={[s.cardRowValue, { color: statusColor }]}>{defaultCurrency} {fmtCompact(budget)}</Text></View>
           )}
         </View>
         <TouchableOpacity onPress={() => { setSelectedSpace(space); setMenuModal(true); setBlur(true); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -296,7 +295,7 @@ export default function SpacesScreen() {
   const renderSavingsCard = (space: SpaceData) => {
     const value       = space.saved ?? 0;
     const allTime     = space.savedAllTime ?? 0;
-    const budget      = space.budget ?? 0;
+    const budget      = space.budget ? convert(space.budget, space.budget_currency ?? 'PHP', defaultCurrency) : 0;
     const remaining   = Math.max(budget - allTime, 0);
     const pct         = budget > 0 ? Math.min(allTime / budget, 1) : 0;
     const statusColor = pct >= 1 ? ACCENT_DARK : '#F97316';
@@ -307,11 +306,11 @@ export default function SpacesScreen() {
           <Text style={s.cardMeta}>{space.count ?? 0} transaction{(space.count ?? 0) !== 1 ? 's' : ''}</Text>
         </View>
         <View style={s.cardRight}>
-          <View style={s.cardRow}><Text style={s.cardRowLabel}>saved</Text><Text style={[s.cardRowValue, { color: ACCENT_DARK }]}>{fmtCompact(value)}</Text></View>
-          <View style={s.cardRow}><Text style={s.cardRowLabel}>all time</Text><Text style={[s.cardRowValue, { color: ACCENT_DARK }]}>{fmtCompact(allTime)}</Text></View>
+          <View style={s.cardRow}><Text style={s.cardRowLabel}>saved</Text><Text style={[s.cardRowValue, { color: ACCENT_DARK }]}>{defaultCurrency} {fmtCompact(value)}</Text></View>
+          <View style={s.cardRow}><Text style={s.cardRowLabel}>all time</Text><Text style={[s.cardRowValue, { color: ACCENT_DARK }]}>{defaultCurrency} {fmtCompact(allTime)}</Text></View>
           {budget > 0 && (<>
-            <View style={s.cardRow}><Text style={s.cardRowLabel}>goal</Text><Text style={s.cardRowValue}>{fmtCompact(budget)}</Text></View>
-            <View style={s.cardRow}><Text style={s.cardRowLabel}>remaining</Text><Text style={[s.cardRowValue, { color: statusColor }]}>{fmtCompact(remaining)}</Text></View>
+            <View style={s.cardRow}><Text style={s.cardRowLabel}>goal</Text><Text style={s.cardRowValue}>{defaultCurrency} {fmtCompact(budget)}</Text></View>
+            <View style={s.cardRow}><Text style={s.cardRowLabel}>remaining</Text><Text style={[s.cardRowValue, { color: statusColor }]}>{defaultCurrency} {fmtCompact(remaining)}</Text></View>
           </>)}
         </View>
         <TouchableOpacity onPress={() => { setSelectedSpace(space); setMenuModal(true); setBlur(true); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -373,7 +372,7 @@ export default function SpacesScreen() {
     setRespondingInvite(null);
   };
   const { data: sharedSpaces = [] } = useQuery<(SpaceData & { role: string; ownerName: string })[]>({
-    queryKey: ['shared-spaces', userId, dateMode, dateOffset, weekStart, useCutoff, cutoffDay],
+    queryKey: ['shared-spaces', userId, dateMode, dateOffset, weekStart, useCutoff, cutoffDay, defaultCurrency],
     queryFn: async () => {
       const { data: members } = await supabase
         .from('space_members')
@@ -401,14 +400,12 @@ export default function SpacesScreen() {
         .select('space_id, amount, type')
         .in('space_id', spaceIds)
         .gte('transaction_date', fromStr).lte('transaction_date', toStr);
-      const { data: allTimeRecs } = await supabase.from('recordings')
-        .select('space_id, amount, type').in('space_id', spaceIds).in('type', ['income', 'expense']);
+      const { data: allTimeSumsShared } = await supabase.rpc('get_space_all_time_totals_by_ids', { p_space_ids: spaceIds });
       const spentMap: Record<string, number> = {};
       const savedMap: Record<string, number> = {};
       const savedAllTimeMap: Record<string, number> = {};
-      (allTimeRecs ?? []).forEach((r: any) => {
-        if (r.type === 'income') savedAllTimeMap[r.space_id] = (savedAllTimeMap[r.space_id] ?? 0) + Number(r.amount);
-        else if (r.type === 'expense') savedAllTimeMap[r.space_id] = (savedAllTimeMap[r.space_id] ?? 0) - Number(r.amount);
+      (allTimeSumsShared ?? []).forEach((r: any) => {
+        savedAllTimeMap[r.space_id] = Number(r.income_total ?? 0) - Number(r.expense_total ?? 0);
       });
       (allRecs ?? []).forEach((r: any) => {
         if (r.type === 'income' || r.type === 'due') savedMap[r.space_id] = (savedMap[r.space_id] ?? 0) + Number(r.amount);
@@ -611,7 +608,15 @@ export default function SpacesScreen() {
         <Text style={s.label}>name</Text>
         <TextInput style={s.input} placeholder="e.g. household" placeholderTextColor={Colors.faint} value={spaceName} onChangeText={v => { setSpaceName(v.slice(0, 20)); setError(''); }} maxLength={20} autoFocus />
         <Text style={s.label}>{spaceType === 'expense' ? 'budget' : 'target goal'} <Text style={{ color: Colors.muted }}>(optional)</Text></Text>
-        <TextInput style={s.input} placeholder="e.g. 10000" placeholderTextColor={Colors.faint} value={spaceBudget} onChangeText={setSpaceBudget} keyboardType="decimal-pad" />
+        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+          <TextInput style={[s.input, { flex: 1 }]} placeholder="e.g. 10000" placeholderTextColor={Colors.faint} value={spaceBudget} onChangeText={setSpaceBudget} keyboardType="decimal-pad" />
+          <TouchableOpacity
+            style={{ paddingHorizontal: 12, paddingVertical: 12, borderRadius: Radius.lg, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.borderMid }}
+            onPress={() => setShowBudgetCurrencyModal(true)}
+          >
+            <Text style={{ fontFamily: Fonts.monoBold, fontSize: 13, color: Colors.text }}>{spaceBudgetCurrency}</Text>
+          </TouchableOpacity>
+        </View>
         {spaceType === 'savings' && (
           <>
             <Text style={s.label}>target date <Text style={{ color: Colors.muted }}>(optional)</Text></Text>
@@ -621,6 +626,21 @@ export default function SpacesScreen() {
         <TouchableOpacity style={[s.saveBtn, (!spaceName.trim() || loading) && { opacity: 0.4 }]} onPress={handleCreate} disabled={loading || !spaceName.trim()} activeOpacity={0.8}>
           {loading ? <ActivityIndicator color={Colors.white} /> : <Text style={s.saveBtnText}>{editMode ? 'save changes' : 'create space'}</Text>}
         </TouchableOpacity>
+      </BottomSheet>
+
+      <BottomSheet visible={showBudgetCurrencyModal} onClose={() => setShowBudgetCurrencyModal(false)} title="budget currency" height="50%">
+        <ScrollView showsVerticalScrollIndicator={false}>
+          {BUDGET_CURRENCIES.map(c => (
+            <TouchableOpacity
+              key={c}
+              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.border }}
+              onPress={() => { setSpaceBudgetCurrency(c); setShowBudgetCurrencyModal(false); }}
+            >
+              <Text style={{ fontFamily: spaceBudgetCurrency === c ? Fonts.monoBold : Fonts.mono, fontSize: 14, color: Colors.text }}>{c}</Text>
+              {spaceBudgetCurrency === c && <Ionicons name="checkmark" size={16} color={ACCENT_DARK} />}
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
       </BottomSheet>
 
       <ConfirmModal

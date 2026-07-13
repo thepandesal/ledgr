@@ -1,3 +1,19 @@
+/**
+ * Parses a YYYY-MM-DD string as a local date (not UTC).
+ * Use this everywhere instead of new Date(dateString) for date-only strings.
+ */
+export function parseLocalDate(dateStr: string): Date {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+/**
+ * Formats a YYYY-MM-DD string for display using local time.
+ */
+export function formatDisplayDate(dateStr: string): string {
+  return parseLocalDate(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
 export type DateMode = 'monthly' | 'weekly' | 'daily' | 'yearly' | 'custom';
 export type WeekStart = 'monday' | 'sunday' | 'saturday';
 

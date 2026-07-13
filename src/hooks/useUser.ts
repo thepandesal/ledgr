@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import type { User } from '@supabase/supabase-js';
 
@@ -9,6 +10,8 @@ interface UseUserResult {
   userId: string;
   userName: string;
   profileCode: string;
+  defaultCurrency: string;
+  setDefaultCurrency: (currency: string) => Promise<void>;
   loading: boolean;
 }
 
@@ -41,52 +44,58 @@ async function registerPushToken(userId: string) {
 export function useUser(): UseUserResult {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
-    // Get current session synchronously if available
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       setLoading(false);
       if (session?.user?.id) registerPushToken(session.user.id);
     });
-
-    // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
       setUser(session?.user ?? null);
     });
-
     return () => subscription.unsubscribe();
   }, []);
 
-  const [profileCode, setProfileCode] = useState('');
-
-  useEffect(() => {
-    if (!user?.id) return;
-    supabase
-      .from('user_settings')
-      .select('profile_code')
-      .eq('user_id', user.id)
-      .maybeSingle()
-      .then(async ({ data, error }) => {
-        if (data?.profile_code) {
-          setProfileCode(data.profile_code);
-          return;
-        }
-        // No code yet — generate and save
+  const { data: settings } = useQuery({
+    queryKey: ['user-settings', user?.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('user_settings')
+        .select('profile_code, default_currency')
+        .eq('user_id', user!.id)
+        .maybeSingle();
+      if (!data?.profile_code) {
         const code = generateProfileCode();
-        const { error: upsertError } = await supabase.from('user_settings').upsert(
-          { user_id: user.id, profile_code: code, updated_at: new Date().toISOString() },
+        await supabase.from('user_settings').upsert(
+          { user_id: user!.id, profile_code: code, updated_at: new Date().toISOString() },
           { onConflict: 'user_id' }
         );
-        if (!upsertError) setProfileCode(code);
-      });
-  }, [user?.id]);
+        return { ...data, profile_code: code };
+      }
+      return data;
+    },
+    enabled: !!user?.id,
+    staleTime: Infinity,
+  });
+
+  const setDefaultCurrency = async (currency: string) => {
+    if (!user?.id) return;
+    queryClient.setQueryData(['user-settings', user.id], (old: any) => ({ ...old, default_currency: currency }));
+    await supabase.from('user_settings').upsert(
+      { user_id: user.id, default_currency: currency, updated_at: new Date().toISOString() },
+      { onConflict: 'user_id' }
+    );
+  };
 
   return {
     user,
     userId: user?.id ?? '',
     userName: user?.user_metadata?.full_name ?? '',
-    profileCode,
+    profileCode: settings?.profile_code ?? '',
+    defaultCurrency: settings?.default_currency ?? 'PHP',
+    setDefaultCurrency,
     loading,
   };
 }

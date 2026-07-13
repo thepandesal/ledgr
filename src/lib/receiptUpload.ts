@@ -140,8 +140,24 @@ export const uploadReceiptPhoto = async (
   const fileName = `${user.id}/${entryId}/${Date.now()}_${Math.random().toString(36).slice(2)}.jpg`;
 
   let buffer: ArrayBuffer;
-  if (typeof window !== 'undefined' && (uri.startsWith('blob:') || uri.startsWith('data:'))) {
-    buffer = await fetch(uri).then(r => r.arrayBuffer());
+  if (typeof window !== 'undefined' && uri.startsWith('blob:')) {
+    buffer = await new Promise<ArrayBuffer>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('GET', uri);
+      xhr.responseType = 'arraybuffer';
+      xhr.onload = () => resolve(xhr.response as ArrayBuffer);
+      xhr.onerror = () => reject(new Error('blob read failed'));
+      xhr.send();
+    });
+  } else if (typeof window !== 'undefined' && uri.startsWith('data:')) {
+    const base64 = uri.split(',')[1];
+    if (!base64) throw new Error('blocked: malformed data URI');
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    buffer = bytes.buffer;
+  } else if (typeof window !== 'undefined') {
+    throw new Error('blocked: unsupported URI scheme');
   } else {
     const b64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
     const binary = atob(b64);
@@ -159,6 +175,8 @@ export const uploadReceiptPhoto = async (
     if (!isSafeUrl(`${R2_ENDPOINT}/${R2_BUCKET}/${fileName}`)) throw new Error('blocked: untrusted URL');
     publicUrl = await uploadToR2(fileName, buffer);
   }
+
+  if (!publicUrl || !isSafeUrl(publicUrl)) throw new Error('blocked: untrusted public URL');
 
   const { data: row } = await supabase
     .from('receipt_photos')

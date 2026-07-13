@@ -154,7 +154,7 @@ export function parseReceiptText(rawText: string): ParsedReceipt {
     }
   }
 
-  return { items, detectedTotal, rawText };
+  return { items, detectedTotal, rawText: escapeHtml(rawText) };
 }
 
 // ── OCR runner (web only via Tesseract.js) ────────────────────────────────────

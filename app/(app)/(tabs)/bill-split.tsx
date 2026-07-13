@@ -62,17 +62,23 @@ export default function BillSplitScreen() {
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
       if (!data) return [];
-      const enriched = await Promise.all(data.map(async (bill: any) => {
-        const [{ count: recCount }, { data: people }, { data: recs }] = await Promise.all([
-          supabase.from('split_bill_recordings').select('id', { count: 'exact', head: true }).eq('split_bill_id', bill.id),
-          supabase.from('bill_splits').select('person_name').eq('split_bill_id', bill.id),
-          supabase.from('split_bill_recordings').select('amount_contributed').eq('split_bill_id', bill.id),
-        ]);
-        const uniquePeople = new Set((people ?? []).map((p: any) => p.person_name)).size;
-        const total = (recs ?? []).reduce((s: number, r: any) => s + Number(r.amount_contributed), 0);
-        return { ...bill, recording_count: recCount ?? 0, people_count: uniquePeople, total_amount: total, status: bill.status ?? 'ongoing' };
-      }));
-      return enriched;
+      const billIds = data.map((b: any) => b.id);
+      if (billIds.length === 0) return [];
+      const [{ data: allRecordings }, { data: allPeople }] = await Promise.all([
+        supabase.from('split_bill_recordings').select('split_bill_id, amount_contributed').in('split_bill_id', billIds),
+        supabase.from('bill_splits').select('split_bill_id, person_name').in('split_bill_id', billIds),
+      ]);
+      return data.map((bill: any) => {
+        const recs = (allRecordings ?? []).filter((r: any) => r.split_bill_id === bill.id);
+        const people = (allPeople ?? []).filter((p: any) => p.split_bill_id === bill.id);
+        return {
+          ...bill,
+          recording_count: recs.length,
+          people_count: new Set(people.map((p: any) => p.person_name)).size,
+          total_amount: recs.reduce((s: number, r: any) => s + Number(r.amount_contributed), 0),
+          status: bill.status ?? 'ongoing',
+        };
+      });
     },
     enabled: !!userId,
   });

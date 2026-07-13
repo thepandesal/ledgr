@@ -33,6 +33,7 @@ import {
   Spacing,
 } from '@/components/ui';
 import formStyles from '@/components/ui/formStyles';
+import { useUser } from '../../src/hooks/useUser';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -81,6 +82,14 @@ export default function AddRecordingScreen({ inlineProps }: {
   const editId    = params.editId;
   const receiptId = params.receiptId;
   const handleClose = inlineProps?.onClose ?? (() => router.back());
+  const { defaultCurrency } = useUser();
+  const [currency, setCurrency] = useState(defaultCurrency);
+  const [showCurrencyModal, setShowCurrencyModal] = useState(false);
+
+  const CURRENCIES = [
+    'PHP','USD','EUR','GBP','JPY','AUD','CAD','SGD','MYR','IDR',
+    'THB','VND','KRW','CNY','INR','HKD','NZD','CHF','BRL','MXN',
+  ];
 
   // ── Form state ──────────────────────────────────────────────────────────
   const [recName, setRecName]   = useState('');
@@ -186,6 +195,7 @@ export default function AddRecordingScreen({ inlineProps }: {
         setDate(rec.transaction_date);
         setNotes(rec.notes ?? '');
         setPersonName(rec.person_name ?? '');
+        if (rec.currency) setCurrency(rec.currency);
         if (rec.categories) setSelectedCategory(Array.isArray(rec.categories) ? rec.categories[0] : rec.categories);
         if (rec.account) setSelectedAccount(Array.isArray(rec.account) ? rec.account[0] : rec.account);
       }
@@ -256,6 +266,7 @@ export default function AddRecordingScreen({ inlineProps }: {
           transaction_date: date, notes: notes.trim() || null,
           category_id: selectedCategory?.id || null,
           account_id: selectedAccount?.id || null,
+          currency,
         }).eq('id', editId);
         if (err) throw err;
       } else {
@@ -273,12 +284,11 @@ export default function AddRecordingScreen({ inlineProps }: {
             notes: notes.trim() || null,
             category_id: selectedCategory?.id || null,
             account_id: selectedAccount?.id || null,
-            status: 'paid',
-            is_due: true,
+            status: 'paid', is_due: true,
             person_name: personName.trim() || null,
+            currency,
           }).select('id').single();
           if (expErr) throw expErr;
-          // Create receivable linked to expense
           const { error: recErr } = await supabase.from('recordings').insert({
             space_id: spaceId, user_id: user!.id,
             name: recName.trim(), type: 'receivable',
@@ -289,6 +299,7 @@ export default function AddRecordingScreen({ inlineProps }: {
             status: 'pending',
             person_name: personName.trim() || null,
             linked_recording_id: expRec!.id,
+            currency,
           });
           if (recErr) throw recErr;
           setPendingFocusDate(date);
@@ -312,6 +323,7 @@ export default function AddRecordingScreen({ inlineProps }: {
           linked_recording_id: effectiveType === 'receivable' && linkedExpense ? linkedExpense.id : null,
           decreased_from_account_id: effectiveType === 'receivable' ? decreasedFromAccount?.id || null : null,
           receive_to_account_id: effectiveType === 'receivable' ? receiveToAccount?.id || null : null,
+          currency,
         }).select('id').single();
         if (err) throw err;
 
@@ -493,6 +505,9 @@ export default function AddRecordingScreen({ inlineProps }: {
               onChangeText={setAmount}
               keyboardType="decimal-pad"
             />
+            <TouchableOpacity onPress={() => setShowCurrencyModal(true)} style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: Radius.pill, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.borderMid }}>
+              <Text style={{ fontFamily: Fonts.monoBold, fontSize: 11, color: Colors.text }}>{currency}</Text>
+            </TouchableOpacity>
           </View>
         </FormRow>
         <FormRow label="date" stacked>
@@ -711,6 +726,21 @@ export default function AddRecordingScreen({ inlineProps }: {
       >
         {loading ? <ActivityIndicator color={Colors.white} /> : <Text style={s.saveBtnText}>save recording</Text>}
       </TouchableOpacity>
+      <BottomSheet visible={showCurrencyModal} onClose={() => setShowCurrencyModal(false)} title="currency" height="50%">
+        <ScrollView showsVerticalScrollIndicator={false}>
+          {CURRENCIES.map(c => (
+            <TouchableOpacity
+              key={c}
+              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.border }}
+              onPress={() => { setCurrency(c); setShowCurrencyModal(false); }}
+            >
+              <Text style={{ fontFamily: currency === c ? Fonts.monoBold : Fonts.mono, fontSize: 14, color: Colors.text }}>{c}</Text>
+              {currency === c && <Ionicons name="checkmark" size={16} color={Colors.cyan} />}
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </BottomSheet>
+
       <BottomSheet visible={showTypeModal} onClose={() => setShowTypeModal(false)} sub="recording" title="select type">
         <ScrollView showsVerticalScrollIndicator={false}>
           {TYPE_GROUPS.map(group => (

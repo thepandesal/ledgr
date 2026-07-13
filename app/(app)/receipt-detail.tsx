@@ -62,11 +62,7 @@ export default function ReceiptDetailScreen() {
     }
     const { data: rows } = await supabase.from('receipt_photos').select('id, storage_path, url').eq('entry_id', receiptId).order('created_at');
     if (rows) {
-      const withUrls = await Promise.all(rows.map(async (p: any) => {
-        let url = p.url ?? ''; if (!url && p.storage_path) { const { data } = await supabase.storage.from('receipts').createSignedUrl(p.storage_path, 3600); url = data?.signedUrl ?? ''; }
-        return { id: p.id, url, path: p.storage_path };
-      }));
-      setPhotos(withUrls);
+      setPhotos(rows.map((p: any) => ({ id: p.id, url: p.url ?? '', path: p.storage_path })));
     }
     setLoading(false);
   };
@@ -188,7 +184,7 @@ export default function ReceiptDetailScreen() {
     ? linkRecordings.filter(r => r.name.toLowerCase().includes(linkSearch.toLowerCase()))
     : linkRecordings;
 
-  const formatDate = (d: string) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const formatDate = (d: string) => { const [y, m, day] = d.split('-').map(Number); return new Date(y, m - 1, day).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); };
   const typeColor = (type: string) => type === 'expense' ? Colors.expense : type === 'income' ? Colors.income : Colors.text;
 
   if (loading) return (

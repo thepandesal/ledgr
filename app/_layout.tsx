@@ -83,7 +83,7 @@ export default function RootLayout() {
   useEffect(() => {
     if (!fontsLoaded) return;
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (__DEV__) console.log('[auth] event:', event);
+      if (__DEV__) console.log('[auth] event:', String(event).replace(/[\r\n]/g, ' '));
       const path = typeof window !== 'undefined' ? window.location.pathname : '';
       // Don't redirect if on split share page
       if (path.startsWith('/split/')) { setReady(true); return; }

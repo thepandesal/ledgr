@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useState, useRef, useContext, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useUser } from '../../../src/hooks/useUser';
+import { useExchangeRates } from '../../../src/lib/useExchangeRates';
 import { supabase } from '../../../src/lib/supabase';
 import BottomSheet from '@/components/ui/BottomSheet';
 import ActivityTabs, { ACTIVITY_TABS, ActivityTab } from '@/components/ui/ActivityTabs';
@@ -70,7 +71,11 @@ import { smartDateLabel } from '../../../src/lib/smartDateLabel';
 
 export default function DashboardScreen() {
   const router    = useRouter();
-  const { userId } = useUser();
+  const { userId, defaultCurrency } = useUser();
+  const { convert, rateMap } = useExchangeRates();
+  const [qaCurrency, setQaCurrency] = useState(defaultCurrency);
+  const [showQaCurrencyModal, setShowQaCurrencyModal] = useState(false);
+  const QA_CURRENCIES = ['PHP','USD','EUR','GBP','JPY','AUD','CAD','SGD','MYR','IDR','THB','VND','KRW','CNY','INR','HKD','NZD','CHF','BRL','MXN'];
   const { registerAdd, unregisterAdd } = useContext(BlurContext);
   const queryClient = useQueryClient();
 
@@ -353,10 +358,11 @@ export default function DashboardScreen() {
     return date <= to;
   });
 
-  const moneyInTotal    = allRecordings(['income']).reduce((s, r) => s + Number(r.amount), 0);
-  const moneyOutTotal   = allRecordings(['expense']).reduce((s, r) => {
+  const moneyInTotal  = allRecordings(['income']).reduce((s, r) =>
+    s + convert(Number(r.amount), r.currency ?? defaultCurrency, defaultCurrency), 0);
+  const moneyOutTotal  = allRecordings(['expense']).reduce((s, r) => {
     const net = r.is_due ? Math.max(0, Number(r.amount) - Number(r.paid_amount ?? 0)) : Number(r.amount);
-    return s + net;
+    return s + convert(net, r.currency ?? defaultCurrency, defaultCurrency);
   }, 0);
   const loansActive     = allRecordings(['debt']).filter(r => r.status !== 'paid').length;
   const loansPaid       = allRecordings(['debt']).filter(r => r.status === 'paid').length;
@@ -440,9 +446,9 @@ export default function DashboardScreen() {
   };
 
   const tabValue = (key: string) => {
-    if (key === 'all')          return fmtAbbr(moneyInTotal + moneyOutTotal);
-    if (key === 'money-in')    return fmtAbbr(moneyInTotal);
-    if (key === 'money-out')   return fmtAbbr(moneyOutTotal);
+    if (key === 'all')          return `${defaultCurrency} ${fmtAbbr(moneyInTotal + moneyOutTotal)}`;
+    if (key === 'money-in')    return `${defaultCurrency} ${fmtAbbr(moneyInTotal)}`;
+    if (key === 'money-out')   return `${defaultCurrency} ${fmtAbbr(moneyOutTotal)}`;
     if (key === 'loans')       return String(loansActive);
     if (key === 'receivables') return String(receivablesPending);
     return '';
@@ -463,23 +469,20 @@ export default function DashboardScreen() {
           user_id: userId, space_id: qaSpaceId || null,
           name: qaName.trim(), type: 'expense',
           amount: parseFloat(qaAmount), transaction_date: txDate,
-          category_id: qaCatId || null, status: 'paid', is_due: true,
+          category_id: qaCatId || null, status: 'paid', is_due: true, currency: qaCurrency,
         });
       } else {
         await supabase.from('recordings').insert({
-          user_id: userId,
-          space_id: qaSpaceId || null,
-          name: qaName.trim(),
-          type: qaType,
-          amount: parseFloat(qaAmount),
-          transaction_date: txDate,
-          category_id: qaCatId || null,
-          status: statusMap[qaType] ?? 'paid',
+          user_id: userId, space_id: qaSpaceId || null,
+          name: qaName.trim(), type: qaType,
+          amount: parseFloat(qaAmount), transaction_date: txDate,
+          category_id: qaCatId || null, status: statusMap[qaType] ?? 'paid', currency: qaCurrency,
         });
       }
       queryClient.invalidateQueries({ queryKey: ['dashboard-activities', userId] });
       setShowAddModal(false);
       setQaName(''); setQaAmount(''); setQaType('expense'); setQaSpaceId(null); setQaCatId(null); setQaError('');
+      setQaCurrency(defaultCurrency);
       setQaDay(String(new Date().getDate())); setQaMonth(String(new Date().getMonth()+1)); setQaYear(String(new Date().getFullYear()));
     } catch (e: any) { setQaError(e.message); }
     setQaLoading(false);
@@ -573,7 +576,7 @@ export default function DashboardScreen() {
                       {item.space?.name ? <Text style={s.rowSpace}>{item.space.name}</Text> : null}
                     </View>
                     <Text style={[s.rowAmount, { color: tl?.color ?? Colors.cyan }]}>
-                      {Number(item.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      {item.currency ?? defaultCurrency} {Number(item.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -614,7 +617,15 @@ export default function DashboardScreen() {
 
         {/* Amount */}
         <Text style={s.qaLabel}>amount</Text>
-        <TextInput style={s.qaInput} placeholder="0.00" placeholderTextColor={Colors.faint} value={qaAmount} onChangeText={setQaAmount} keyboardType="decimal-pad" />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <TextInput style={[s.qaInput, { flex: 1 }]} placeholder="0.00" placeholderTextColor={Colors.faint} value={qaAmount} onChangeText={setQaAmount} keyboardType="decimal-pad" />
+          <TouchableOpacity
+            style={{ paddingHorizontal: 12, paddingVertical: 12, borderRadius: Radius.lg, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.borderMid }}
+            onPress={() => setShowQaCurrencyModal(true)}
+          >
+            <Text style={{ fontFamily: Fonts.monoBold, fontSize: 13, color: Colors.text }}>{qaCurrency}</Text>
+          </TouchableOpacity>
+        </View>
 
         {/* Date */}
         <Text style={s.qaLabel}>date</Text>
@@ -673,6 +684,22 @@ export default function DashboardScreen() {
         >
           {qaLoading ? <ActivityIndicator color={ACCENT_TEXT} /> : <Text style={s.qaSaveBtnText}>save</Text>}
         </TouchableOpacity>
+      </BottomSheet>
+
+      {/* ── Quick-add currency picker ── */}
+      <BottomSheet visible={showQaCurrencyModal} onClose={() => setShowQaCurrencyModal(false)} title="currency" height="50%">
+        <ScrollView showsVerticalScrollIndicator={false}>
+          {QA_CURRENCIES.map(c => (
+            <TouchableOpacity
+              key={c}
+              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.borderMid }}
+              onPress={() => { setQaCurrency(c); setShowQaCurrencyModal(false); }}
+            >
+              <Text style={{ fontFamily: qaCurrency === c ? Fonts.monoBold : Fonts.mono, fontSize: 14, color: Colors.text }}>{c}</Text>
+              {qaCurrency === c && <Ionicons name="checkmark" size={16} color={ACCENT} />}
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
       </BottomSheet>
 
       {/* ── Date modal ── */}
