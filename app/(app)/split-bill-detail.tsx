@@ -1626,6 +1626,8 @@ export default function SplitBillDetailScreen() {
         split_bill_id: splitBillId,
         split_bill_payment_id: paymentRowId,
       });
+      queryClient.invalidateQueries({ queryKey: ['recordings', chargeSpaceId] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-activities', userId] });
     }
 
     // 2. Compute per-recording and manual breakdown for this person
