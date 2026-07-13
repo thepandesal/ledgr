@@ -257,23 +257,25 @@ export default function SplitSharePage() {
                     <View style={[s.rowIconWrap, { backgroundColor: ACCENT + '44' }]}>
                       <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 13, color: ACCENT_DARK }}>{ii + 1}</Text>
                     </View>
-                    <Text style={s.rowName}>{String(item.name ?? '').toLowerCase()}</Text>
-                    <Text style={[s.rowAmount, { color: deduct ? PEACH : ACCENT_DARK }]}>
-                      {deduct ? '-' : '+'}{fmt(Number(item.cost ?? 0))}
-                    </Text>
+                    <Text style={[s.rowName, { alignSelf: 'flex-start', marginTop: 2 }]}>{String(item.name ?? '').toLowerCase()}</Text>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={[s.rowAmount, { color: deduct ? PEACH : ACCENT_DARK }]}>
+                        {deduct ? '-' : '+'}{fmt(Number(item.cost ?? 0))}
+                      </Text>
+                      {subs.length === 0 && itemPeople.length > 0 && (
+                        <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: deduct ? PEACH : ACCENT_DARK, marginTop: 2 }}>
+                          {fmt(Number(item.cost ?? 0) / itemPeople.length)} each
+                        </Text>
+                      )}
+                    </View>
                   </View>
                   {subs.length === 0 && itemPeople.length > 0 && (
-                    <View style={{ paddingLeft: 60, paddingRight: 14, paddingBottom: 12, gap: 4 }}>
-                      <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: deduct ? PEACH : ACCENT_DARK }}>
-                        {fmt(Number(item.cost ?? 0) / itemPeople.length)} each
-                      </Text>
-                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
-                        {itemPeople.map((person: string, pi: number) => (
-                          <View key={pi} style={{ backgroundColor: ACCENT + '44', borderRadius: 99, paddingHorizontal: 8, paddingVertical: 3 }}>
-                            <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: ACCENT_DARK }}>{person}</Text>
-                          </View>
-                        ))}
-                      </View>
+                    <View style={{ paddingLeft: 60, paddingRight: 14, paddingBottom: 12, flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
+                      {itemPeople.map((person: string, pi: number) => (
+                        <View key={pi} style={{ backgroundColor: ACCENT + '44', borderRadius: 99, paddingHorizontal: 8, paddingVertical: 3 }}>
+                          <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: ACCENT_DARK }}>{person}</Text>
+                        </View>
+                      ))}
                     </View>
                   )}
                   {subs.map((sub, si) => {
