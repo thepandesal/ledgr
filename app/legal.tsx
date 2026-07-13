@@ -2,6 +2,8 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-nati
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { Colors, Fonts } from '../components/ui/theme';
+import { Brand } from '../src/lib/brand';
 
 const LAST_UPDATED = 'June 2025';
 
@@ -107,7 +109,7 @@ export default function LegalScreen() {
     <SafeAreaView style={s.container} edges={['top', 'bottom']}>
       <View style={s.header}>
         <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Ionicons name="arrow-back" size={20} color="#545454" />
+          <Ionicons name="arrow-back" size={20} color={Colors.text} />
         </TouchableOpacity>
         <Text style={s.title}>{showPrivacy ? 'privacy policy' : 'terms of service'}</Text>
         <View style={{ width: 20 }} />
@@ -140,15 +142,15 @@ export default function LegalScreen() {
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#ffffff' },
-  header:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
-  title:     { fontFamily: 'ChillaxMedium', fontSize: 16, color: '#545454' },
+  container: { flex: 1, backgroundColor: Colors.white },
+  header:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  title:     { fontFamily: 'ChillaxMedium', fontSize: 16, color: Colors.text },
   tabs:      { flexDirection: 'row', paddingHorizontal: 24, paddingTop: 16, gap: 8 },
-  tab:       { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999, backgroundColor: '#f5f5f5' },
-  tabActive: { backgroundColor: '#7fd8cd' },
-  tabText:   { fontFamily: 'ChillaxRegular', fontSize: 13, color: '#929090' },
-  tabTextActive: { fontFamily: 'ChillaxMedium', fontSize: 13, color: '#1c1d1d' },
+  tab:       { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999, backgroundColor: Colors.input },
+  tabActive: { backgroundColor: Brand.color.accent },
+  tabText:   { fontFamily: 'ChillaxRegular', fontSize: 13, color: Colors.muted },
+  tabTextActive: { fontFamily: 'ChillaxMedium', fontSize: 13, color: Colors.text },
   scroll:    { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 48 },
-  updated:   { fontFamily: 'DMSans_400Regular', fontSize: 11, color: '#929090', marginBottom: 16 },
-  body:      { fontFamily: 'DMSans_400Regular', fontSize: 13, color: '#545454', lineHeight: 22 },
+  updated:   { fontFamily: 'DMSans_400Regular', fontSize: 11, color: Colors.muted, marginBottom: 16 },
+  body:      { fontFamily: 'DMSans_400Regular', fontSize: 13, color: Colors.text, lineHeight: 22 },
 });

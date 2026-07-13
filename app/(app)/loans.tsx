@@ -267,10 +267,10 @@ export default function LoansScreen() {
 
 const s = StyleSheet.create({
   // Header
-  header:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 25, paddingTop: 16, paddingBottom: 16, gap: 10, backgroundColor: '#1A1A1A', borderBottomWidth: 1, borderBottomColor: '#333' },
-  backBtn:   { width: 36, height: 36, borderRadius: 18, backgroundColor: '#B6E1DE22', alignItems: 'center', justifyContent: 'center' },
-  title:     { flex: 1, fontFamily: Brand.font.display, fontSize: 20, color: '#B6E1DE', letterSpacing: -0.3, textAlign: 'center' },
-  headerBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#B6E1DE22', alignItems: 'center', justifyContent: 'center' },
+  header:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 25, paddingTop: 16, paddingBottom: 16, gap: 10, backgroundColor: Colors.headerBg, borderBottomWidth: 1, borderBottomColor: Colors.borderMid },
+  backBtn:   { width: 36, height: 36, borderRadius: 18, backgroundColor: Brand.color.accent + '22', alignItems: 'center', justifyContent: 'center' },
+  title:     { flex: 1, fontFamily: Brand.font.display, fontSize: 20, color: Brand.color.accent, letterSpacing: -0.3, textAlign: 'center' },
+  headerBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: Brand.color.accent + '22', alignItems: 'center', justifyContent: 'center' },
 
   // Stats
   statsRow:    { flexDirection: 'row', gap: 8, paddingHorizontal: Spacing.page, paddingVertical: 14 },

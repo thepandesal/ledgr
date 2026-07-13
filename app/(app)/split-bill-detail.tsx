@@ -115,7 +115,7 @@ export default function SplitBillDetailScreen() {
 
 
   // ── Load linked recordings ────────────────────────────────────────────────
-  const { userId } = useUser();
+  const { userId, defaultCurrency } = useUser();
 
   // ── People state ─────────────────────────────────────────────────────────
   const [addPersonModal, setAddPersonModal] = useState(false);
@@ -3123,7 +3123,7 @@ export default function SplitBillDetailScreen() {
       {/* Manual return prompt */}
       <BottomSheet visible={manualReturnModal} onClose={() => setManualReturnModal(false)} title="manual item settlement">
         <Text style={{ fontFamily: Brand.font.mono, fontSize: 13, color: Colors.text, marginBottom: 16 }}>
-          ₱{fmt(manualReturnAmount)} is from a manual item with no linked recording.
+          {defaultCurrency}{fmt(manualReturnAmount)} is from a manual item with no linked recording.
         </Text>
         <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 10 }}>create a recording for this?</Text>
         <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
@@ -3500,10 +3500,10 @@ export default function SplitBillDetailScreen() {
 }
 
 const s = StyleSheet.create({
-  header:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: PAGE, paddingTop: 16, paddingBottom: 16, gap: 10, backgroundColor: '#1A1A1A', borderBottomWidth: 1, borderBottomColor: '#333' },
-  backBtn:    { width: 36, height: 36, borderRadius: 18, backgroundColor: '#B6E1DE22', alignItems: 'center', justifyContent: 'center' },
-  headerBtn:  { width: 36, height: 36, borderRadius: 18, backgroundColor: '#B6E1DE22', alignItems: 'center', justifyContent: 'center' },
-  title:      { flex: 1, fontFamily: Brand.font.display, fontSize: 20, color: '#B6E1DE', letterSpacing: -0.3 },
+  header:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: PAGE, paddingTop: 16, paddingBottom: 16, gap: 10, backgroundColor: Colors.headerBg, borderBottomWidth: 1, borderBottomColor: Colors.borderMid },
+  backBtn:    { width: 36, height: 36, borderRadius: 18, backgroundColor: Brand.color.accent + '22', alignItems: 'center', justifyContent: 'center' },
+  headerBtn:  { width: 36, height: 36, borderRadius: 18, backgroundColor: Brand.color.accent + '22', alignItems: 'center', justifyContent: 'center' },
+  title:      { flex: 1, fontFamily: Brand.font.display, fontSize: 20, color: Brand.color.accent, letterSpacing: -0.3 },
   totalBadge: { backgroundColor: ACCENT + '44', borderRadius: Radius.pill, paddingHorizontal: 12, paddingVertical: 5 },
   totalBadgeText: { fontFamily: Brand.font.monoBold, fontSize: 12, color: ACCENT_DARK },
 

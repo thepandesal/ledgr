@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { supabase } from '../src/lib/supabase';
 import SlideScreen from '../components/SlideScreen';
 import { Colors, Fonts, Radius } from '../components/ui/theme';
+import { Brand } from '../src/lib/brand';
 
 const DEFAULT_CATEGORIES = [
   { name: 'Food',          icon: 'restaurant-outline',   color: '#FFAB91' },
@@ -21,9 +22,33 @@ const DEFAULT_CATEGORIES = [
   { name: 'Others',        icon: 'ellipse-outline',       color: '#CFD8DC' },
 ];
 
+const CURRENCIES = [
+  { code: 'PHP', label: 'Philippine Peso' },
+  { code: 'USD', label: 'US Dollar' },
+  { code: 'EUR', label: 'Euro' },
+  { code: 'GBP', label: 'British Pound' },
+  { code: 'JPY', label: 'Japanese Yen' },
+  { code: 'AUD', label: 'Australian Dollar' },
+  { code: 'CAD', label: 'Canadian Dollar' },
+  { code: 'SGD', label: 'Singapore Dollar' },
+  { code: 'MYR', label: 'Malaysian Ringgit' },
+  { code: 'IDR', label: 'Indonesian Rupiah' },
+  { code: 'THB', label: 'Thai Baht' },
+  { code: 'VND', label: 'Vietnamese Dong' },
+  { code: 'KRW', label: 'South Korean Won' },
+  { code: 'CNY', label: 'Chinese Yuan' },
+  { code: 'INR', label: 'Indian Rupee' },
+  { code: 'HKD', label: 'Hong Kong Dollar' },
+  { code: 'NZD', label: 'New Zealand Dollar' },
+  { code: 'CHF', label: 'Swiss Franc' },
+  { code: 'BRL', label: 'Brazilian Real' },
+  { code: 'MXN', label: 'Mexican Peso' },
+];
+
 export default function OnboardingScreen() {
   const router = useRouter();
   const [name, setName] = useState('');
+  const [currency, setCurrency] = useState('PHP');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -49,6 +74,12 @@ export default function OnboardingScreen() {
             DEFAULT_CATEGORIES.map(c => ({ ...c, user_id: user.id, is_default: true }))
           );
         }
+
+        // Save default currency
+        await supabase.from('user_settings').upsert(
+          { user_id: user.id, default_currency: currency, updated_at: new Date().toISOString() },
+          { onConflict: 'user_id' }
+        );
       }
 
       router.replace('/(app)/(tabs)');
@@ -69,7 +100,7 @@ export default function OnboardingScreen() {
           <TextInput
             style={[styles.input, error ? styles.inputError : null]}
             placeholder="your name"
-            placeholderTextColor="#b0b0b0"
+            placeholderTextColor={Colors.faint}
             value={name}
             onChangeText={(v) => { setName(v); setError(''); }}
             autoFocus
@@ -77,6 +108,19 @@ export default function OnboardingScreen() {
             onSubmitEditing={handleNameSubmit}
           />
           {error ? <Text style={styles.error}>{error}</Text> : null}
+          <Text style={styles.label}>currency</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 4 }}>
+            {CURRENCIES.map(c => (
+              <TouchableOpacity
+                key={c.code}
+                style={[styles.currencyChip, currency === c.code && styles.currencyChipActive]}
+                onPress={() => setCurrency(c.code)}
+                activeOpacity={0.75}
+              >
+                <Text style={[styles.currencyChipText, currency === c.code && styles.currencyChipTextActive]}>{c.code}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
           <TouchableOpacity
             style={[styles.button, !name.trim() && styles.buttonDisabled]}
             onPress={handleNameSubmit}
@@ -102,8 +146,8 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     marginBottom: 4,
   },
-  title: { fontFamily: Fonts.sansBold, fontSize: 28, color: '#1c1d1d', marginBottom: 4 },
-  subtitle: { fontFamily: Fonts.sans, fontSize: 14, color: '#8a8a8a', marginBottom: 8 },
+  title: { fontFamily: Fonts.sansBold, fontSize: 28, color: Colors.text, marginBottom: 4 },
+  subtitle: { fontFamily: Fonts.sans, fontSize: 14, color: Colors.muted, marginBottom: 8 },
   input: {
     backgroundColor: Colors.input,
     borderRadius: Radius.lg,
@@ -111,14 +155,19 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     fontFamily: Fonts.sans,
     fontSize: 16,
-    color: '#1c1d1d',
+    color: Colors.text,
     borderWidth: 1,
     borderColor: Colors.borderMid,
   },
-  inputError: { borderColor: '#e74c3c' },
-  error: { fontFamily: Fonts.sans, fontSize: 13, color: '#e74c3c' },
+  inputError: { borderColor: Colors.expense },
+  error: { fontFamily: Fonts.sans, fontSize: 13, color: Colors.expense },
+  label: { fontFamily: Fonts.sansSemiBold, fontSize: 12, color: Colors.muted, textTransform: 'uppercase', letterSpacing: 0.6, marginTop: 8 },
+  currencyChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, backgroundColor: Colors.input, borderWidth: 1, borderColor: Colors.borderMid },
+  currencyChipActive: { backgroundColor: Brand.color.accent, borderColor: Brand.color.accent },
+  currencyChipText: { fontFamily: Fonts.sans, fontSize: 13, color: Colors.muted },
+  currencyChipTextActive: { fontFamily: Fonts.sansSemiBold, fontSize: 13, color: Colors.white },
   button: {
-    backgroundColor: '#00bf63',
+    backgroundColor: Brand.color.accent,
     borderRadius: Radius.pill,
     paddingVertical: 15,
     alignItems: 'center',

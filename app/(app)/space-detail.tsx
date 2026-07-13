@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useUser } from '../../src/hooks/useUser';
+import { useExchangeRates } from '../../src/lib/useExchangeRates';
 import { useScreenAnim } from '@/components/ui/ScreenWrapper';
 import { supabase } from '../../src/lib/supabase';
 import ConfirmModal from '@/components/ui/ConfirmModal';
@@ -84,14 +85,14 @@ function fmtAmount(n: number) {
 }
 
 function getTypeLabel(type: string, status: string, is_due?: boolean, paid_amount?: number, amount?: number) {
-  if (type === 'income')  return { label: 'income',  color: Colors.cyan };
+  if (type === 'income')  return { label: 'income',  color: Brand.color.accentDark };
   if (type === 'expense') {
     if (is_due) {
       const paid = Number(paid_amount ?? 0);
       const total = Number(amount ?? 0);
       const collected = total > 0 && paid >= total - 0.01;
       const partial   = paid > 0 && !collected;
-      if (collected) return { label: 'expense · collected',        color: Colors.cyan };
+      if (collected) return { label: 'expense · collected',        color: Brand.color.accentDark };
       if (partial)   return { label: 'expense · due · partial',    color: PEACH };
       return               { label: 'expense · due',               color: PEACH };
     }
@@ -103,12 +104,12 @@ function getTypeLabel(type: string, status: string, is_due?: boolean, paid_amoun
     return                           { label: 'debt',                  color: PEACH };
   }
   if (type === 'due') {
-    if (status === 'paid')    return { label: 'due · collected',        color: Colors.cyan };
-    if (status === 'partial') return { label: 'due · partially paid',   color: Colors.cyan };
-    return                           { label: 'due',                    color: Colors.cyan };
+    if (status === 'paid')    return { label: 'due · collected',        color: Brand.color.accentDark };
+    if (status === 'partial') return { label: 'due · partially paid',   color: Brand.color.accentDark };
+    return                           { label: 'due',                    color: Brand.color.accentDark };
   }
   if (type === 'payment') return { label: 'payment', color: PEACH };
-  if (type === 'return')  return { label: 'return',  color: Colors.cyan };
+  if (type === 'return')  return { label: 'return',  color: Brand.color.accentDark };
   return { label: type, color: Colors.muted };
 }
 
@@ -122,7 +123,8 @@ export default function SpaceDetailScreen() {
   const { spaceId, name } = useLocalSearchParams<{ spaceId: string; name: string }>();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { userId } = useUser();
+  const { userId, defaultCurrency } = useUser();
+  const { convert } = useExchangeRates();
 
   // Slide animation
   const { slideAnim, handleBack } = useScreenAnim();
@@ -429,7 +431,7 @@ export default function SpaceDetailScreen() {
     queryFn: async () => {
       const { data } = await supabase
         .from('spaces')
-        .select('budget, space_type, sort_by')
+        .select('budget, budget_currency, space_type, sort_by')
         .eq('id', spaceId)
         .single();
       return data;
@@ -482,7 +484,7 @@ export default function SpaceDetailScreen() {
     enabled: !!spaceId && spaceId !== 'all' && !!userId,
   });
 
-  const budget       = spaceData?.budget ?? null;
+  const budget       = spaceData?.budget ? convert(spaceData.budget, spaceData.budget_currency ?? 'PHP', defaultCurrency) : null;
   const isExpSpace   = (spaceData?.space_type ?? 'expense') === 'expense';
   const isAllCats    = selectedCategories.has('all');
 
@@ -1257,29 +1259,29 @@ export default function SpaceDetailScreen() {
           <View style={s.filterControlsRow}>
             {spaceId !== 'all' && (
               <TouchableOpacity onPress={handleSortToggle} activeOpacity={0.75} style={s.filterBtn}>
-                <Ionicons name={sortBy === 'date' ? 'calendar-outline' : 'pricetag-outline'} size={13} color={Colors.cyan} />
-                <Text style={[s.filterBtnText, { color: Colors.cyan }]}>{sortBy}</Text>
+                <Ionicons name={sortBy === 'date' ? 'calendar-outline' : 'pricetag-outline'} size={13} color={Brand.color.accentDark} />
+                <Text style={[s.filterBtnText, { color: Brand.color.accentDark }]}>{sortBy}</Text>
               </TouchableOpacity>
             )}
             <View style={s.dateNavRow}>
               {localMode !== 'custom' && (
                 <TouchableOpacity style={s.dateNavArrow} onPress={() => navigateRange(-1)} activeOpacity={0.7}>
-                  <Ionicons name="chevron-back" size={14} color={Colors.cyan} />
+                  <Ionicons name="chevron-back" size={14} color={Brand.color.accentDark} />
                 </TouchableOpacity>
               )}
               <TouchableOpacity style={s.filterBtn} onPress={() => setShowLocalFilter(true)} activeOpacity={0.75}>
-                <Ionicons name="calendar-outline" size={13} color={Colors.cyan} />
+                <Ionicons name="calendar-outline" size={13} color={Brand.color.accentDark} />
                 <Text style={s.filterBtnText}>{rangeLabel}</Text>
               </TouchableOpacity>
               {localMode !== 'custom' && (
                 <TouchableOpacity style={s.dateNavArrow} onPress={() => navigateRange(1)} activeOpacity={0.7}>
-                  <Ionicons name="chevron-forward" size={14} color={Colors.cyan} />
+                  <Ionicons name="chevron-forward" size={14} color={Brand.color.accentDark} />
                 </TouchableOpacity>
               )}
             </View>
             <TouchableOpacity style={s.filterBtn} onPress={handleCategoryFilter} activeOpacity={0.75}>
-              <Ionicons name="options-outline" size={13} color={!isAllCats ? Colors.cyan : Colors.muted} />
-              <Text style={[s.filterBtnText, !isAllCats && { color: Colors.cyan }]}>Filter</Text>
+              <Ionicons name="options-outline" size={13} color={!isAllCats ? Brand.color.accentDark : Colors.muted} />
+              <Text style={[s.filterBtnText, !isAllCats && { color: Brand.color.accentDark }]}>Filter</Text>
             </TouchableOpacity>
           </View>
 
@@ -1308,7 +1310,7 @@ export default function SpaceDetailScreen() {
           </View>
 
           {isLoading ? (
-            <ActivityIndicator color={Colors.cyan} style={{ marginTop: 24 }} />
+            <ActivityIndicator color={Brand.color.accentDark} style={{ marginTop: 24 }} />
           ) : filtered.length === 0 ? (
             <View style={s.emptyWrap}>
               <Text style={s.emptyText}>no recordings found for this period</Text>
@@ -1330,7 +1332,7 @@ export default function SpaceDetailScreen() {
                       onLongPress={() => { if (!canDeleteRecording(item.user_id)) return; setPendingDeleteId(item.id); setPendingDeleteName(item.name); setConfirmModal(true); }}
                     >
                       <View style={s.rowIconWrap}>
-                        <Ionicons name={(item.categories?.icon ?? 'ellipse-outline') as any} size={18} color={Colors.cyan} />
+                        <Ionicons name={(item.categories?.icon ?? 'ellipse-outline') as any} size={18} color={Brand.color.accentDark} />
                       </View>
                       <View style={s.rowMid}>
                         <Text style={s.rowType}>{tl.label}</Text>
@@ -1379,15 +1381,15 @@ export default function SpaceDetailScreen() {
                 return (
                   <TouchableOpacity
                     key={`reminder-${r.id}`}
-                    style={[s.row, isDue && !isDone && s.ghostRow, isDue && !isDone && { borderColor: Colors.cyan + '88', backgroundColor: Colors.cyan + '0A' }]}
+                    style={[s.row, isDue && !isDone && s.ghostRow, isDue && !isDone && { borderColor: Brand.color.accent + '88', backgroundColor: Brand.color.accent + '0A' }]}
                     activeOpacity={0.8}
                     onPress={() => openReminderChoice(r)}
                   >
-                    <View style={[s.rowIconWrap, isDone && { backgroundColor: Colors.cyan + '22' }, isDue && !isDone && { backgroundColor: Colors.cyan + '22' }]}>
-                      <Ionicons name={isDone ? 'checkmark-circle-outline' : 'alarm-outline'} size={18} color={isDone ? Colors.cyan : isDue ? Colors.cyan : Colors.muted} />
+                    <View style={[s.rowIconWrap, isDone && { backgroundColor: Brand.color.accent + '22' }, isDue && !isDone && { backgroundColor: Brand.color.accent + '22' }]}>
+                      <Ionicons name={isDone ? 'checkmark-circle-outline' : 'alarm-outline'} size={18} color={isDone ? Brand.color.accentDark : isDue ? Brand.color.accentDark : Colors.muted} />
                     </View>
                     <View style={s.rowMid}>
-                      <Text style={[s.rowType, { color: isDone ? Colors.cyan : isDue ? Colors.cyan : Colors.muted }]}>
+                      <Text style={[s.rowType, { color: isDone ? Brand.color.accentDark : isDue ? Brand.color.accentDark : Colors.muted }]}>
                         {isDone
                           ? `filled ${filledCount}x this period`
                           : isDue ? 'due today · tap to fill'
@@ -1399,7 +1401,7 @@ export default function SpaceDetailScreen() {
                         <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted }}>{r.categories.name}</Text>
                       )}
                     </View>
-                    <Ionicons name="chevron-forward" size={14} color={isDone ? Colors.cyan : isDue ? Colors.cyan : Colors.faint} />
+                    <Ionicons name="chevron-forward" size={14} color={isDone ? Brand.color.accentDark : isDue ? Brand.color.accentDark : Colors.faint} />
                   </TouchableOpacity>
                 );
               })
@@ -1443,7 +1445,7 @@ export default function SpaceDetailScreen() {
           {hasMore && (
             <View style={s.loadMoreWrap}>
               {isLoadingMore ? (
-                <ActivityIndicator color={Colors.cyan} size="small" />
+                <ActivityIndicator color={Brand.color.accentDark} size="small" />
               ) : (
                 <Text style={s.loadMoreText}>scroll for more</Text>
               )}
@@ -1465,8 +1467,8 @@ export default function SpaceDetailScreen() {
           activeOpacity={0.8}
           onPress={() => { setShowAddChoice(false); setShowAddModal(true); }}
         >
-          <View style={[s.choiceIcon, { backgroundColor: Colors.cyan + '22' }]}>
-            <Ionicons name="receipt-outline" size={20} color={Colors.cyan} />
+          <View style={[s.choiceIcon, { backgroundColor: Brand.color.accent + '22' }]}>
+            <Ionicons name="receipt-outline" size={20} color={Brand.color.accentDark} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={s.choiceTitle}>recording</Text>
@@ -1598,7 +1600,7 @@ export default function SpaceDetailScreen() {
         </View>
 
         <TouchableOpacity
-          style={[{ backgroundColor: Colors.cyan, borderRadius: Radius.pill, paddingVertical: 14, alignItems: 'center' as const, marginTop: 20 }, (!rName.trim() || rSaving) && { opacity: 0.4 }]}
+          style={[{ backgroundColor: Brand.color.accent, borderRadius: Radius.pill, paddingVertical: 14, alignItems: 'center' as const, marginTop: 20 }, (!rName.trim() || rSaving) && { opacity: 0.4 }]}
           onPress={handleSaveReminder}
           disabled={rSaving || !rName.trim()}
           activeOpacity={0.8}
@@ -1748,8 +1750,8 @@ export default function SpaceDetailScreen() {
           activeOpacity={0.8}
           onPress={() => { setReminderChoiceModal(false); if (reminderChoiceTarget) openReminderModal(reminderChoiceTarget); }}
         >
-          <View style={[s.choiceIcon, { backgroundColor: Colors.cyan + '22' }]}>
-            <Ionicons name="add-circle-outline" size={20} color={Colors.cyan} />
+          <View style={[s.choiceIcon, { backgroundColor: Brand.color.accent + '22' }]}>
+            <Ionicons name="add-circle-outline" size={20} color={Brand.color.accentDark} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={s.choiceTitle}>record amount</Text>
@@ -1893,7 +1895,7 @@ export default function SpaceDetailScreen() {
               autoFocus
             />
             <TouchableOpacity
-              style={{ backgroundColor: Colors.cyan, borderRadius: Radius.pill, paddingVertical: 14, alignItems: 'center', opacity: reminderSaving || !reminderAmount ? 0.5 : 1 }}
+              style={{ backgroundColor: Brand.color.accent, borderRadius: Radius.pill, paddingVertical: 14, alignItems: 'center', opacity: reminderSaving || !reminderAmount ? 0.5 : 1 }}
               onPress={confirmReminderFill}
               disabled={reminderSaving || !reminderAmount}
             >
@@ -1924,7 +1926,7 @@ export default function SpaceDetailScreen() {
               autoFocus
             />
             <TouchableOpacity
-              style={{ backgroundColor: Colors.cyan, borderRadius: Radius.pill, paddingVertical: 14, alignItems: 'center', opacity: ghostSaving ? 0.5 : 1 }}
+              style={{ backgroundColor: Brand.color.accent, borderRadius: Radius.pill, paddingVertical: 14, alignItems: 'center', opacity: ghostSaving ? 0.5 : 1 }}
               onPress={confirmGhostPayment}
               disabled={ghostSaving}
             >
@@ -1940,11 +1942,11 @@ export default function SpaceDetailScreen() {
       <BottomSheet visible={membersModal} onClose={() => setMembersModal(false)} title="members" maxHeight="60%">
         {isOwner && (
           <TouchableOpacity
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-end', paddingHorizontal: 12, paddingVertical: 6, borderRadius: Radius.pill, backgroundColor: Colors.cyan + '33', marginBottom: 12 }}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-end', paddingHorizontal: 12, paddingVertical: 6, borderRadius: Radius.pill, backgroundColor: Brand.color.accent + '33', marginBottom: 12 }}
             onPress={() => { setMembersModal(false); openInviteModal(); }}
           >
-            <Ionicons name="person-add-outline" size={13} color={Colors.cyan} />
-            <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 12, color: Colors.cyan }}>invite friend</Text>
+            <Ionicons name="person-add-outline" size={13} color={Brand.color.accentDark} />
+            <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 12, color: Brand.color.accentDark }}>invite friend</Text>
           </TouchableOpacity>
         )}
         {members.length === 0 ? (
@@ -1952,8 +1954,8 @@ export default function SpaceDetailScreen() {
         ) : (
           members.map(m => (
             <View key={m.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border }}>
-              <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: Colors.cyan + '33', justifyContent: 'center', alignItems: 'center' }}>
-                <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 13, color: Colors.cyan }}>{m.name.charAt(0).toUpperCase()}</Text>
+              <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: Brand.color.accent + '33', justifyContent: 'center', alignItems: 'center' }}>
+                <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 13, color: Brand.color.accentDark }}>{m.name.charAt(0).toUpperCase()}</Text>
               </View>
               <View style={{ flex: 1, gap: 2 }}>
                 <Text style={{ fontFamily: Brand.font.heading, fontSize: 13, color: Colors.text }}>{m.name}</Text>
@@ -1985,7 +1987,7 @@ export default function SpaceDetailScreen() {
                   style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 10 }}
                   onPress={() => setInviteFriendId(f.id)}
                 >
-                  <Ionicons name={inviteFriendId === f.id ? 'radio-button-on' : 'radio-button-off'} size={16} color={inviteFriendId === f.id ? Colors.cyan : Colors.faint} />
+                  <Ionicons name={inviteFriendId === f.id ? 'radio-button-on' : 'radio-button-off'} size={16} color={inviteFriendId === f.id ? Brand.color.accentDark : Colors.faint} />
                   <Text style={{ fontFamily: Brand.font.heading, fontSize: 13, color: Colors.text }}>{f.name}</Text>
                 </TouchableOpacity>
               ))}
@@ -1995,10 +1997,10 @@ export default function SpaceDetailScreen() {
               {(['viewer', 'co-owner'] as const).map(r => (
                 <TouchableOpacity
                   key={r}
-                  style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, borderWidth: 1, borderColor: inviteRole === r ? Colors.cyan : Colors.borderMid, backgroundColor: inviteRole === r ? Colors.cyan + '33' : Colors.surface }}
+                  style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, borderWidth: 1, borderColor: inviteRole === r ? Brand.color.accentDark : Colors.borderMid, backgroundColor: inviteRole === r ? Brand.color.accent + '33' : Colors.surface }}
                   onPress={() => setInviteRole(r)}
                 >
-                  <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 12, color: inviteRole === r ? Colors.cyan : Colors.muted }}>{r}</Text>
+                  <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 12, color: inviteRole === r ? Brand.color.accentDark : Colors.muted }}>{r}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -2006,11 +2008,11 @@ export default function SpaceDetailScreen() {
               {inviteRole === 'co-owner' ? 'can add recordings and invite members' : 'can view recordings only'}
             </Text>
             <TouchableOpacity
-              style={{ backgroundColor: Colors.cyan + '44', borderRadius: Radius.pill, paddingVertical: 14, alignItems: 'center', marginTop: 20, opacity: inviteSaving || !inviteFriendId ? 0.5 : 1 }}
+              style={{ backgroundColor: Brand.color.accent + '44', borderRadius: Radius.pill, paddingVertical: 14, alignItems: 'center', marginTop: 20, opacity: inviteSaving || !inviteFriendId ? 0.5 : 1 }}
               onPress={sendSpaceInvite}
               disabled={inviteSaving || !inviteFriendId}
             >
-              <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 14, color: Colors.cyan }}>{inviteSaving ? 'sending...' : 'send invite'}</Text>
+              <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 14, color: Brand.color.accentDark }}>{inviteSaving ? 'sending...' : 'send invite'}</Text>
             </TouchableOpacity>
           </>
         )}
@@ -2033,10 +2035,10 @@ export default function SpaceDetailScreen() {
 
 const s = StyleSheet.create({
   // Header
-  header:  { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 25, paddingTop: 16, paddingBottom: 16, gap: 10, backgroundColor: '#1A1A1A', borderBottomWidth: 1, borderBottomColor: '#333' },
-  backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#B6E1DE22', alignItems: 'center', justifyContent: 'center' },
-  title:   { flex: 1, fontFamily: Brand.font.display, fontSize: 20, color: '#B6E1DE', letterSpacing: -0.3, textAlign: 'center' },
-  addBtn:  { width: 36, height: 36, borderRadius: 18, backgroundColor: '#B6E1DE22', alignItems: 'center', justifyContent: 'center' },
+  header:  { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 25, paddingTop: 16, paddingBottom: 16, gap: 10, backgroundColor: Colors.headerBg, borderBottomWidth: 1, borderBottomColor: Colors.borderMid },
+  backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: Brand.color.accent + '22', alignItems: 'center', justifyContent: 'center' },
+  title:   { flex: 1, fontFamily: Brand.font.display, fontSize: 20, color: Brand.color.accent, letterSpacing: -0.3, textAlign: 'center' },
+  addBtn:  { width: 36, height: 36, borderRadius: 18, backgroundColor: Brand.color.accent + '22', alignItems: 'center', justifyContent: 'center' },
 
   // Scroll
   scroll: { paddingHorizontal: 25, paddingBottom: 80 },
@@ -2075,23 +2077,23 @@ const s = StyleSheet.create({
   // Modal chips
   chipRow:        { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
   chip:           { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: Colors.surface },
-  chipActive:     { backgroundColor: Colors.cyan },
+  chipActive:     { backgroundColor: Brand.color.accent },
   chipText:       { fontFamily: Fonts.mono,     fontSize: 12, color: Colors.muted },
   chipTextActive: { fontFamily: Fonts.monoBold, fontSize: 12, color: Colors.white },
-  modalLabel:     { fontFamily: Fonts.mono, fontSize: 12, color: '#1A1A1A', marginBottom: 10 },
+  modalLabel:     { fontFamily: Fonts.mono, fontSize: 12, color: Colors.text, marginBottom: 10 },
   sectionLabel:   { fontFamily: Fonts.monoBold, fontSize: 11, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8, marginTop: 4 },
   clearBtn:       { alignSelf: 'flex-end', marginBottom: 12, paddingHorizontal: 14, paddingVertical: 7, borderRadius: Radius.pill, backgroundColor: Colors.surface },
-  clearBtnText:   { fontFamily: Fonts.monoBold, fontSize: 12, color: Colors.cyan },
+  clearBtnText:   { fontFamily: Fonts.monoBold, fontSize: 12, color: Brand.color.accentDark },
 
   // Calendar
   calWrap:         { width: '100%' },
-  calHint:         { fontFamily: Fonts.mono, fontSize: 11, color: Colors.cyan, marginBottom: 10 },
+  calHint:         { fontFamily: Fonts.mono, fontSize: 11, color: Brand.color.accentDark, marginBottom: 10 },
   pickerNav:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', paddingHorizontal: 4, marginBottom: 10 },
   pickerMonthText: { fontFamily: Fonts.monoBold, fontSize: 15, color: Colors.text },
   calDay:          { flex: 1, textAlign: 'center', fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted },
   calCell:         { width: '14.28%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center', borderRadius: Radius.pill },
-  calCellRange:    { backgroundColor: Colors.cyan + '55', borderRadius: 0 },
-  calCellEdge:     { backgroundColor: Colors.cyan },
+  calCellRange:    { backgroundColor: Brand.color.accent + '55', borderRadius: 0 },
+  calCellEdge:     { backgroundColor: Brand.color.accent },
   calCellToday:    { backgroundColor: Colors.surface },
   calCellText:     { fontFamily: Fonts.mono,     fontSize: 13, color: Colors.text },
   calCellTextActive: { fontFamily: Fonts.monoBold, color: Colors.text },
@@ -2110,7 +2112,7 @@ const s = StyleSheet.create({
   // Dropdown column pickers (reminder modal)
   dropCol:       { flex: 1, borderWidth: 1, borderColor: Colors.borderMid, borderRadius: Radius.lg, backgroundColor: Colors.surface },
   dropItem:      { paddingVertical: 9, paddingHorizontal: 10, alignItems: 'center' },
-  dropItemActive:{ backgroundColor: Colors.cyan, borderRadius: Radius.md },
+  dropItemActive:{ backgroundColor: Brand.color.accent, borderRadius: Radius.md },
   dropText:      { fontFamily: Fonts.mono,     fontSize: 13, color: Colors.muted },
   dropTextActive:{ fontFamily: Fonts.monoBold, fontSize: 13, color: Colors.white },
 });

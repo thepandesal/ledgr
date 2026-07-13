@@ -1,13 +1,13 @@
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Image, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Dimensions } from 'react-native';
+import LottieHero from '../components/LottieHero';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { supabase } from '../src/lib/supabase';
 import { useState } from 'react';
+import { Colors } from '../components/ui/theme';
 
 const { width, height } = Dimensions.get('window');
-const IMG_ASPECT = 1320 / 1830;
-const heroHeight = height * 0.9 * 0.48;
-const heroWidth = heroHeight * IMG_ASPECT;
+const heroSize = (height || 800) * 0.9 * 0.48;
 
 export default function LoginScreen() {
   const [loading, setLoading] = useState<'google' | 'apple' | null>(null);
@@ -29,11 +29,7 @@ export default function LoginScreen() {
       <View style={s.wrapper}>
 
         {/* Hero */}
-        <Image
-          source={require('../assets/login-vector.png')}
-          style={{ width: heroWidth, height: heroHeight, alignSelf: 'center' }}
-          resizeMode="contain"
-        />
+        <LottieHero size={heroSize} />
 
         {/* Content */}
         <View style={s.content}>
@@ -76,8 +72,8 @@ const s = StyleSheet.create({
     paddingHorizontal: 48,
     marginTop: 8,
   },
-  brand:     { fontFamily: 'MuseoModerno_Black', fontSize: 72, color: '#7fd8cd', letterSpacing: -1, marginBottom: 4 },
-  tagline:   { fontFamily: 'ChillaxMedium', fontSize: 14, color: '#545454', marginBottom: 32 },
+  brand:     { fontFamily: 'MuseoModerno_Black', fontSize: 72, color: Colors.cyan, letterSpacing: -1, marginBottom: 4 },
+  tagline:   { fontFamily: 'ChillaxMedium', fontSize: 14, color: Colors.text, marginBottom: 32 },
   buttons:   { width: '100%', gap: 12 },
   button: {
     borderRadius: 999,
@@ -88,7 +84,7 @@ const s = StyleSheet.create({
     borderColor: '#929090',
     backgroundColor: '#ffffff',
   },
-  buttonText: { fontFamily: 'CalSans', fontSize: 15, color: '#545454', letterSpacing: 1.5 },
-  legal:      { textAlign: 'center', fontFamily: 'DMSans_400Regular', fontSize: 11, color: '#929090', marginTop: 16, lineHeight: 18 },
-  legalLink:  { color: '#7fd8cd', fontFamily: 'DMSans_600SemiBold' },
+  buttonText: { fontFamily: 'CalSans', fontSize: 15, color: Colors.text, letterSpacing: 1.5 },
+  legal:      { textAlign: 'center', fontFamily: 'DMSans_400Regular', fontSize: 11, color: Colors.muted, marginTop: 16, lineHeight: 18 },
+  legalLink:  { color: Colors.cyan, fontFamily: 'DMSans_600SemiBold' },
 });
