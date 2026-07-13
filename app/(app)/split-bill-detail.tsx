@@ -844,14 +844,14 @@ export default function SplitBillDetailScreen() {
         return `<div style="display:flex;align-items:center;gap:12px;padding:13px 16px;border-bottom:1px solid #eef0f0">`+
           `<div style="width:30px;height:30px;border-radius:50%;background:#e8f5f4;display:flex;align-items:center;justify-content:center;flex-shrink:0">`+
           `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2A7A6F" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg></div>`+
-          `<span style="font-family:'DM Sans',sans-serif;font-size:13px;color:#2e3d3d;flex:1">${p}</span>`+
-          `<span style="font-family:'Roboto Mono',monospace;font-size:14px;font-weight:600;color:${color}">${total < 0 ? '-' : ''}${fmt2(total)}</span>`+
+          `<span style="font-family:'Chillax',sans-serif;font-weight:500;font-size:13px;color:#2e3d3d;flex:1">${p}</span>`+
+          `<span style="font-family:'Chillax',sans-serif;font-weight:700;font-size:14px;color:${color}">${total < 0 ? '-' : ''}${fmt2(total)}</span>`+
           `</div>`;
       }).join('');
       const totalRowHtml = `<div style="display:flex;align-items:center;gap:12px;padding:13px 16px;background:#e8f5f4">`+
-        `<div style="width:30px;height:30px;border-radius:50%;background:#b6e1de;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:'Roboto Mono',monospace;font-size:12px;color:#2A7A6F;font-weight:600">Σ</div>`+
-        `<span style="font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:#2A7A6F;flex:1">total</span>`+
-        `<span style="font-family:'Roboto Mono',monospace;font-size:14px;font-weight:600;color:#2A7A6F">${grandTotal < 0 ? '-' : ''}${fmt2(grandTotal)}</span>`+
+        `<div style="width:30px;height:30px;border-radius:50%;background:#b6e1de;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:'Chillax',sans-serif;font-weight:700;font-size:12px;color:#2A7A6F">Σ</div>`+
+        `<span style="font-family:'Chillax',sans-serif;font-weight:700;font-size:13px;font-weight:600;color:#2A7A6F;flex:1">total</span>`+
+        `<span style="font-family:'Chillax',sans-serif;font-weight:700;font-size:14px;color:#2A7A6F">${grandTotal < 0 ? '-' : ''}${fmt2(grandTotal)}</span>`+
         `</div>`;
 
       // Item rows — matching share page style
@@ -868,7 +868,7 @@ export default function SplitBillDetailScreen() {
       });
       const itemRowsHtml = recGroups.map((group) => {
         const groupHeader = recGroups.length > 1
-          ? `<div style="padding:8px 16px;background:#f0f8f7;font-family:'Roboto Mono',monospace;font-size:10px;font-weight:500;color:#2A7A6F;text-transform:uppercase;letter-spacing:0.8px">${group.recName}</div>`
+          ? `<div style="padding:8px 16px;background:#f0f8f7;font-family:'Chillax',sans-serif;font-weight:700;font-size:10px;color:#2A7A6F;text-transform:uppercase;letter-spacing:0.8px">${group.recName}</div>`
           : '';
         const rows = group.items.map((item: any, ii: number) => {
           const d = isDeductType(item.recording_type);
@@ -876,17 +876,17 @@ export default function SplitBillDetailScreen() {
           const people: string[] = item.people ?? [];
           const perPerson = people.length > 0 ? Number(item.cost) / people.length : 0;
           const peopleSection = people.length > 0
-            ? `<div style="font-family:'Roboto Mono',monospace;font-size:11px;color:${color};margin-bottom:4px">${d ? '-' : ''}${perPerson.toLocaleString('en-US', { minimumFractionDigits: 2 })} each</div>`+
+            ? `<div style="font-family:'Chillax',sans-serif;font-weight:500;font-size:11px;color:${color};margin-bottom:4px">${d ? '-' : ''}${perPerson.toLocaleString('en-US', { minimumFractionDigits: 2 })} each</div>`+
               `<div style="display:flex;flex-wrap:wrap;gap:4px">`+
-              people.map((p: string) => `<span style="background:#e8f5f4;border-radius:99px;padding:2px 9px;font-family:'Roboto Mono',monospace;font-size:10px;color:#2A7A6F">${p}</span>`).join('') +
+              people.map((p: string) => `<span style="background:#e8f5f4;border-radius:99px;padding:2px 9px;font-family:'Chillax',sans-serif;font-weight:500;font-size:10px;color:#2A7A6F">${p}</span>`).join('') +
               `</div>`
             : '';
           return `<div style="border-bottom:1px solid #eef0f0;padding:13px 16px;display:flex;align-items:flex-start;gap:12px">`+
-            `<div style="width:28px;height:28px;border-radius:50%;background:#e8f5f4;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:'Roboto Mono',monospace;font-size:12px;color:#2A7A6F;font-weight:500;margin-top:1px">${ii + 1}</div>`+
+            `<div style="width:28px;height:28px;border-radius:50%;background:#e8f5f4;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:'Chillax',sans-serif;font-weight:700;font-size:12px;color:#2A7A6F;margin-top:1px">${ii + 1}</div>`+
             `<div style="flex:1">`+
             `<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">`+
-            `<span style="font-family:'DM Sans',sans-serif;font-size:13px;color:#2e3d3d;flex:1;line-height:1.4">${item.name}</span>`+
-            `<span style="font-family:'Roboto Mono',monospace;font-size:14px;font-weight:500;color:${color};white-space:nowrap">${d ? '-' : ''}${Number(item.cost).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>`+
+            `<span style="font-family:'Chillax',sans-serif;font-weight:500;font-size:13px;color:#2e3d3d;flex:1;line-height:1.4">${item.name}</span>`+
+            `<span style="font-family:'Chillax',sans-serif;font-weight:700;font-size:14px;color:${color};white-space:nowrap">${d ? '-' : ''}${Number(item.cost).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>`+
             `</div>`+
             (people.length > 0 ? `<div style="margin-top:6px">${peopleSection}</div>` : '') +
             `</div></div>`;
@@ -916,26 +916,30 @@ export default function SplitBillDetailScreen() {
           `<div style="width:30px;height:30px;border-radius:50%;background:#b6e1de;display:flex;align-items:center;justify-content:center;flex-shrink:0">`+
           `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2A7A6F" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg></div>`+
           `<div style="flex:1;display:flex;flex-direction:column;gap:3px">`+
-          `<div style="font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;color:#2e3d3d">${a.bank ?? ''}</div>`+
-          `<div style="font-family:'Roboto Mono',monospace;font-size:10px;color:#929090">${a.holder_name ?? a.account_name ?? ''}</div>`+
-          `<div style="font-family:'Roboto Mono',monospace;font-size:13px;font-weight:500;color:#2e3d3d;letter-spacing:0.3px">${a.account_number ?? ''}</div>`+
+          `<div style="font-family:'Chillax',sans-serif;font-weight:700;font-size:14px;color:#2e3d3d">${a.bank ?? ''}</div>`+
+          `<div style="font-family:'Chillax',sans-serif;font-weight:500;font-size:10px;color:#929090">${a.holder_name ?? a.account_name ?? ''}</div>`+
+          `<div style="font-family:'Chillax',sans-serif;font-weight:700;font-size:13px;color:#2e3d3d;letter-spacing:0.3px">${a.account_number ?? ''}</div>`+
           `</div>${qrImg}</div>`;
       }).join('');
 
       const sectionLabel = (text: string) =>
-        `<div style="font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;color:#929090;letter-spacing:0.6px;text-transform:uppercase;margin:24px 0 10px">${text}</div>`;
+        `<div style="font-family:'Chillax',sans-serif;font-weight:500;font-size:11px;color:#929090;letter-spacing:0.6px;text-transform:uppercase;margin:24px 0 10px">${text}</div>`;
       const block = (inner: string) =>
         `<div style="border:1px solid #eef0f0;border-radius:14px;overflow:hidden">${inner}</div>`;
 
       const html = `<!DOCTYPE html><html><head><meta charset="utf-8">`+
-        `<style>@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@400;500;600&family=Roboto+Mono:wght@400;700&display=swap');*{box-sizing:border-box;margin:0;padding:0}body{font-family:'DM Sans',system-ui,sans-serif;background:#fff;padding:36px 32px;width:480px;margin:0 auto;-webkit-font-smoothing:antialiased}.mono{font-family:'Roboto Mono',monospace}</style>`+
+        `<style>`+
+        `@font-face{font-family:'CalSans';src:url('${(await (async()=>{const r=await fetch(require('../../assets/CalSans-Regular.ttf'));const b=await r.blob();return new Promise(res=>{const fr=new FileReader();fr.onload=()=>res(fr.result as string);fr.readAsDataURL(b);});})())}') format('truetype')}`+
+        `@font-face{font-family:'Chillax';font-weight:500;src:url('${(await (async()=>{const r=await fetch(require('../../assets/Chillax-Medium.otf'));const b=await r.blob();return new Promise(res=>{const fr=new FileReader();fr.onload=()=>res(fr.result as string);fr.readAsDataURL(b);});})())}') format('opentype')}`+
+        `@font-face{font-family:'Chillax';font-weight:700;src:url('${(await (async()=>{const r=await fetch(require('../../assets/Chillax-Bold.otf'));const b=await r.blob();return new Promise(res=>{const fr=new FileReader();fr.onload=()=>res(fr.result as string);fr.readAsDataURL(b);});})())}') format('opentype')}`+
+        `*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Chillax',sans-serif;font-weight:500;background:#fff;padding:36px 32px;width:480px;margin:0 auto;-webkit-font-smoothing:antialiased}</style>`+
         `</head><body>`+
-        `<div style="font-family:'DM Serif Display',serif;font-size:28px;font-weight:400;color:#1a2e2e;letter-spacing:-0.5px;margin-bottom:6px">${String(name).toLowerCase()}</div>`+
-        `<div style="font-family:'Roboto Mono',monospace;font-size:11px;color:#929090;margin-bottom:28px;letter-spacing:0.2px">${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>`+
+        `<div style="font-family:'CalSans',serif;font-size:28px;font-weight:400;color:#1a2e2e;letter-spacing:-0.5px;margin-bottom:6px">${String(name).toLowerCase()}</div>`+
+        `<div style="font-family:'Chillax',sans-serif;font-weight:500;font-size:11px;color:#929090;margin-bottom:28px;letter-spacing:0.2px">${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>`+
         sectionLabel('per person pay') + block(personRowsHtml + totalRowHtml) +
         (items.length > 0 ? sectionLabel('item breakdown') + block(itemRowsHtml) : '') +
         (payRowsHtml ? sectionLabel('payment information') + block(payRowsHtml) : '') +
-        `<div style="font-family:'Roboto Mono',monospace;font-size:10px;color:#c8d0d0;text-align:center;margin-top:32px">generated by LEDGR</div>`+
+        `<div style="font-family:'Chillax',sans-serif;font-weight:500;font-size:10px;color:#c8d0d0;text-align:center;margin-top:32px">generated by LEDGR</div>`+
         `</body></html>`;
 
       if (Platform.OS !== 'web') {
