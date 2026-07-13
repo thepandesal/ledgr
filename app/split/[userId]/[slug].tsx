@@ -236,8 +236,8 @@ export default function SplitShareSlugPage() {
   };
 
   const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2 });
-  const { width: screenW } = useWindowDimensions();
-  const qrSize = screenW * 0.9;
+  const { width: screenW, height: screenH } = useWindowDimensions();
+  const qrSize = Math.min(screenW * 0.9, screenH * 0.8);
 
   if (loading) return <View style={s.center}><ActivityIndicator color={ACCENT_DARK} /></View>;
   if (notFound || !recording) return (
@@ -477,7 +477,7 @@ export default function SplitShareSlugPage() {
           ) : (
             <ScrollView style={{ width: '100%' }} contentContainerStyle={{ padding: 24, paddingTop: 80, gap: 16 }} showsVerticalScrollIndicator={false}>
               {receiptModalPhotos.map((url, i) => (
-                <Image key={i} source={{ uri: url }} style={{ width: screenW - 48, height: (screenW - 48) * 1.4, borderRadius: 12, cursor: 'zoom-in' } as any} resizeMode="contain" />
+                <Image key={i} source={{ uri: url }} style={{ width: screenW - 48, height: screenH * 0.75, borderRadius: 12, cursor: 'zoom-in' } as any} resizeMode="contain" />
               ))}
             </ScrollView>
           )}

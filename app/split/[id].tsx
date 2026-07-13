@@ -186,7 +186,7 @@ export default function SplitSharePage() {
     : '';
 
   const grandTotal = perPerson.reduce((sum, p) => sum + p.total, 0);
-  const { width: screenW } = useWindowDimensions();
+  const { width: screenW, height: screenH } = useWindowDimensions();
 
   return (
     <>
@@ -379,7 +379,7 @@ export default function SplitSharePage() {
           {zoomPhoto && (
             <Image
               source={{ uri: zoomPhoto }}
-              style={{ width: screenW * 0.92, height: screenW * 0.92 * 1.5, maxHeight: '85vh' as any, borderRadius: 12, cursor: 'zoom-in' } as any}
+              style={{ width: screenW * 0.92, height: screenH * 0.82, borderRadius: 12, cursor: 'zoom-in' } as any}
               resizeMode="contain"
             />
           )}
