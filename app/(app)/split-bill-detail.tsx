@@ -16,6 +16,7 @@ import { useScreenAnim } from '@/components/ui/ScreenWrapper';
 import itemStyles from '@/components/ui/itemStyles';
 import { Brand } from '../../src/lib/brand';
 import { ocrReceiptImage, parseReceiptText, type ParsedItem } from '../../src/lib/receiptParser';
+import { CalSansBase64, ChillaxMediumBase64, ChillaxBoldBase64 } from '../../src/lib/fontBase64';
 
 const ACCENT      = Brand.color.accent;      // light mint — backgrounds/chips only
 const ACCENT_DARK = Brand.color.accentDark;  // #2A7A6F — text/icons on white
@@ -929,9 +930,9 @@ export default function SplitBillDetailScreen() {
 
       const html = `<!DOCTYPE html><html><head><meta charset="utf-8">`+
         `<style>`+
-        `@font-face{font-family:'CalSans';src:url('${(await (async()=>{const r=await fetch(require('../../assets/CalSans-Regular.ttf'));const b=await r.blob();return new Promise(res=>{const fr=new FileReader();fr.onload=()=>res(fr.result as string);fr.readAsDataURL(b);});})())}') format('truetype')}`+
-        `@font-face{font-family:'Chillax';font-weight:500;src:url('${(await (async()=>{const r=await fetch(require('../../assets/Chillax-Medium.otf'));const b=await r.blob();return new Promise(res=>{const fr=new FileReader();fr.onload=()=>res(fr.result as string);fr.readAsDataURL(b);});})())}') format('opentype')}`+
-        `@font-face{font-family:'Chillax';font-weight:700;src:url('${(await (async()=>{const r=await fetch(require('../../assets/Chillax-Bold.otf'));const b=await r.blob();return new Promise(res=>{const fr=new FileReader();fr.onload=()=>res(fr.result as string);fr.readAsDataURL(b);});})())}') format('opentype')}`+
+        `@font-face{font-family:'CalSans';src:url('${CalSansBase64}') format('truetype')}`+
+        `@font-face{font-family:'Chillax';font-weight:500;src:url('${ChillaxMediumBase64}') format('opentype')}`+
+        `@font-face{font-family:'Chillax';font-weight:700;src:url('${ChillaxBoldBase64}') format('opentype')}`+
         `*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Chillax',sans-serif;font-weight:500;background:#fff;padding:36px 32px;width:480px;margin:0 auto;-webkit-font-smoothing:antialiased}</style>`+
         `</head><body>`+
         `<div style="font-family:'CalSans',serif;font-size:28px;font-weight:400;color:#1a2e2e;letter-spacing:-0.5px;margin-bottom:6px">${String(name).toLowerCase()}</div>`+
