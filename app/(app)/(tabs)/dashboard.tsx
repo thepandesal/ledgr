@@ -291,7 +291,7 @@ export default function DashboardScreen() {
 
   const isAll = selectedTabs.has('all');
   const currentTypes = isAll
-    ? ['income','expense','debt','due']
+    ? ['income','expense','debt','due','return','payment']
     : ACTIVITY_TABS.filter(t => t.key !== 'all' && selectedTabs.has(t.key)).flatMap(t => t.types as string[]);
 
   const effectiveTypes = currentTypes;
@@ -358,16 +358,14 @@ export default function DashboardScreen() {
     return date <= to;
   });
 
-  const moneyInTotal  = allRecordings(['income']).reduce((s, r) =>
+  const moneyInTotal  = allRecordings(['income', 'due', 'return']).reduce((s, r) =>
     s + convert(Number(r.amount), r.currency ?? defaultCurrency, defaultCurrency), 0);
-  const moneyOutTotal  = allRecordings(['expense']).reduce((s, r) => {
-    const net = r.is_due ? Math.max(0, Number(r.amount) - Number(r.paid_amount ?? 0)) : Number(r.amount);
-    return s + convert(net, r.currency ?? defaultCurrency, defaultCurrency);
-  }, 0);
+  const moneyOutTotal = allRecordings(['expense', 'debt', 'payment']).reduce((s, r) =>
+    s + convert(Number(r.amount), r.currency ?? defaultCurrency, defaultCurrency), 0);
   const loansActive     = allRecordings(['debt']).filter(r => r.status !== 'paid').length;
   const loansPaid       = allRecordings(['debt']).filter(r => r.status === 'paid').length;
   const receivablesPending  = allRecordings(['due']).filter(r => r.status !== 'paid').length +
-    allRecordings(['expense']).filter(r => r.is_due && r.status !== 'paid').length;
+    allRecordings(['expense']).filter(r => r.is_due && Number(r.paid_amount ?? 0) < Number(r.amount) - 0.01).length;
   const receivablesReceived = allRecordings(['due']).filter(r => r.status === 'paid').length;
 
   const fmt     = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2 });
@@ -491,7 +489,20 @@ export default function DashboardScreen() {
   const typeLabel = (r: any) => {
     if (r.is_write_off) return { label: 'write-off', color: Colors.muted };
     if (r.type === 'income')  return { label: 'income',  color: ACCENT };
-    if (r.type === 'expense') return { label: r.is_due ? 'expense · due' : 'expense', color: PEACH };
+    if (r.type === 'return')  return { label: 'return',  color: ACCENT };
+    if (r.type === 'payment') return { label: 'payment', color: PEACH };
+    if (r.type === 'expense') {
+      if (r.is_due) {
+        const paid = Number(r.paid_amount ?? 0);
+        const total = Number(r.amount ?? 0);
+        const collected = total > 0 && paid >= total - 0.01;
+        const partial   = paid > 0 && !collected;
+        if (collected) return { label: 'expense · collected',     color: ACCENT };
+        if (partial)   return { label: 'expense · due · partial', color: PEACH };
+        return               { label: 'expense · due',            color: PEACH };
+      }
+      return { label: 'expense', color: PEACH };
+    }
     if (r.type === 'debt')    return r.status === 'paid'
       ? { label: 'debt · paid',    color: ACCENT }
       : r.status === 'partial'
