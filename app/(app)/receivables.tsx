@@ -193,20 +193,22 @@ export default function ReceivablesScreen() {
             <Text style={{ fontFamily: Fonts.mono, fontSize: 13, color: Colors.muted }}>no receivables found</Text>
           </View>
         ) : (
-          <ScrollView contentContainerStyle={{ paddingHorizontal: Spacing.page, paddingBottom: 120, gap: 10 }} showsVerticalScrollIndicator={false}>
+          <ScrollView contentContainerStyle={{ paddingHorizontal: Spacing.page, paddingBottom: 120, gap: 12 }} showsVerticalScrollIndicator={false}>
             {filtered.map(item => (
               <TouchableOpacity
                 key={item.id}
-                style={[s.recordingCard, { backgroundColor: statusBg(item.status) }]}
+                style={s.recordingCard}
                 activeOpacity={0.85}
                 onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: item.id } } as any)}
               >
-                <Ionicons name={item.categories?.icon ?? 'arrow-undo-outline'} size={22} color={statusColor(item.status)} style={{ flexShrink: 0 }} />
+                <View style={[s.recordingIconWrap, { backgroundColor: statusBg(item.status) }]}>
+                  <Ionicons name={item.categories?.icon ?? 'arrow-undo-outline'} size={18} color={statusColor(item.status)} />
+                </View>
                 <View style={s.recordingMiddle}>
-                  <Text style={s.recordingName} numberOfLines={1}>{item.name}</Text>
-                  <Text style={[s.recordingMeta, { fontFamily: Fonts.monoBold, color: statusColor(item.status) }]}>
+                  <Text style={s.recordingType}>
                     {item.status === 'received' ? 'received' : item.status === 'partial' ? 'partial' : 'pending'}
                   </Text>
+                  <Text style={s.recordingName} numberOfLines={1}>{item.name}</Text>
                   <Text style={s.recordingMeta}>{new Date(item.transaction_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</Text>
                 </View>
                 <View style={{ alignItems: 'flex-end', gap: 3 }}>
@@ -287,11 +289,13 @@ const s = StyleSheet.create({
   filterChipTextActive: { color: Colors.white },
   dateRangeBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, paddingHorizontal: 14, borderRadius: Radius.pill, borderWidth: 1, borderColor: Colors.borderMid, backgroundColor: Colors.surface },
   dateRangeBtnText: { fontFamily: Fonts.mono, fontSize: 11, color: Colors.muted, flex: 1 },
-  recordingCard: { flexDirection: 'row', alignItems: 'center', borderRadius: Radius.pill, paddingVertical: 12, paddingHorizontal: 16, gap: 12 },
-  recordingMiddle: { flex: 1, gap: 2, overflow: 'hidden' },
-  recordingName: { fontFamily: Brand.font.heading, fontSize: 13, color: Colors.text },
-  recordingMeta: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted },
-  recordingAmount: { fontFamily: Fonts.monoBold, fontSize: 14 },
+  recordingCard:   { flexDirection: 'row', alignItems: 'center', borderRadius: Radius.xl, paddingVertical: 14, gap: 14 },
+  recordingIconWrap:{ width: 46, height: 46, borderRadius: 23, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
+  recordingMiddle:  { flex: 1, gap: 2, overflow: 'hidden' },
+  recordingType:    { fontFamily: 'ChillaxRegular', fontSize: 10, color: Colors.muted, letterSpacing: 0.4, textTransform: 'uppercase' },
+  recordingName:    { fontFamily: 'ChillaxMedium', fontSize: 14, color: Colors.text, letterSpacing: 0.1, lineHeight: 20 },
+  recordingMeta:    { fontFamily: Fonts.mono, fontSize: 11, color: Colors.faint, letterSpacing: 0.2 },
+  recordingAmount:  { fontFamily: Fonts.monoBold, fontSize: 15, letterSpacing: -0.4 },
   pickerYearRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', paddingHorizontal: 4, marginBottom: 12 },
   pickerYearText: { fontFamily: Fonts.display, fontSize: 16, color: Colors.text },
   calCell: { width: '14.28%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center', borderRadius: Radius.pill },
