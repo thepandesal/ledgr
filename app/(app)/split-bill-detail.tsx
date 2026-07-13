@@ -1360,6 +1360,24 @@ export default function SplitBillDetailScreen() {
   const [chargeAccounts, setChargeAccounts] = useState<any[]>([]);
   const [chargeCategories, setChargeCategories] = useState<any[]>([]);
 
+  const { data: chargedExpenses = [], refetch: refetchChargedExpenses } = useQuery({
+    queryKey: ['split-bill-charged-expenses', splitBillId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('recordings')
+        .select('id, name, amount, transaction_date, space:space_id(name), account:account_id(account_name)')
+        .eq('split_bill_id', splitBillId)
+        .eq('type', 'expense')
+        .order('created_at');
+      return (data ?? []).map((r: any) => ({
+        ...r,
+        space: Array.isArray(r.space) ? r.space[0] : r.space,
+        account: Array.isArray(r.account) ? r.account[0] : r.account,
+      }));
+    },
+    enabled: !!splitBillId,
+  });
+
   // ── Cancel payment state ───────────────────────────────────────────────
   const [cancelPaymentModal, setCancelPaymentModal] = useState(false);
   const [cancelPaymentTarget, setCancelPaymentTarget] = useState<any>(null);
@@ -1606,6 +1624,7 @@ export default function SplitBillDetailScreen() {
         account_id: chargeAccountId || null,
         category_id: chargeCategoryId || null,
         split_bill_id: splitBillId,
+        split_bill_payment_id: paymentRowId,
       });
     }
 
@@ -1721,6 +1740,7 @@ export default function SplitBillDetailScreen() {
     setPaymentModal(false);
     refetchPayments();
     queryClient.invalidateQueries({ queryKey: ['split-bill-recordings', splitBillId] });
+    if (chargeToSpace) refetchChargedExpenses();
     // Check if any recordings are now fully paid by all people
     const updatedPayments = [...activePayments, { person_name: paymentPerson, amount }];
     checkAutoComplete(updatedPayments);
@@ -2107,6 +2127,38 @@ export default function SplitBillDetailScreen() {
                   </View>
                 ))}
               </ScrollView>
+            </>
+          )}
+
+          {/* Charged expenses */}
+          {chargedExpenses.length > 0 && (
+            <>
+              <View style={s.divider} />
+              <View style={s.sectionRow}>
+                <Text style={s.sectionHeader}>charged to spaces</Text>
+              </View>
+              <View style={s.list}>
+                {chargedExpenses.map((exp: any) => (
+                  <TouchableOpacity
+                    key={exp.id}
+                    style={s.recRow}
+                    activeOpacity={0.85}
+                    onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: exp.id } } as any)}
+                  >
+                    <View style={[s.recIconWrap, { backgroundColor: PEACH + '33' }]}>
+                      <Ionicons name="card-outline" size={16} color={PEACH} />
+                    </View>
+                    <View style={s.recMid}>
+                      <Text style={s.recName} numberOfLines={1}>{exp.name}</Text>
+                      <Text style={s.recDate}>
+                        {exp.space?.name ?? '—'}{exp.account?.account_name ? ` · ${exp.account.account_name}` : ''}
+                      </Text>
+                    </View>
+                    <Text style={[s.recAmount, { color: PEACH }]}>{fmt(Number(exp.amount))}</Text>
+                    <Ionicons name="chevron-forward" size={13} color={Colors.faint} />
+                  </TouchableOpacity>
+                ))}
+              </View>
             </>
           )}
 
