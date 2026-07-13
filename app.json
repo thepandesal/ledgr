@@ -28,6 +28,9 @@
       "supportsTablet": false,
       "entitlements": {
         "aps-environment": "production"
+      },
+      "config": {
+        "usesNonExemptEncryption": false
       }
     }
   }
