@@ -845,13 +845,13 @@ export default function SplitBillDetailScreen() {
           `<div style="width:30px;height:30px;border-radius:50%;background:#e8f5f4;display:flex;align-items:center;justify-content:center;flex-shrink:0">`+
           `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2A7A6F" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg></div>`+
           `<span style="font-family:'DM Sans',sans-serif;font-size:13px;color:#2e3d3d;flex:1">${p}</span>`+
-          `<span style="font-family:'Roboto Mono',monospace;font-size:13px;font-weight:600;color:${color}">${total < 0 ? '-' : ''}${fmt2(total)}</span>`+
+          `<span style="font-family:'Roboto Mono',monospace;font-size:14px;font-weight:600;color:${color}">${total < 0 ? '-' : ''}${fmt2(total)}</span>`+
           `</div>`;
       }).join('');
       const totalRowHtml = `<div style="display:flex;align-items:center;gap:12px;padding:13px 16px;background:#e8f5f4">`+
         `<div style="width:30px;height:30px;border-radius:50%;background:#b6e1de;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:'Roboto Mono',monospace;font-size:12px;color:#2A7A6F;font-weight:600">Σ</div>`+
         `<span style="font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:#2A7A6F;flex:1">total</span>`+
-        `<span style="font-family:'Roboto Mono',monospace;font-size:13px;font-weight:600;color:#2A7A6F">${grandTotal < 0 ? '-' : ''}${fmt2(grandTotal)}</span>`+
+        `<span style="font-family:'Roboto Mono',monospace;font-size:14px;font-weight:600;color:#2A7A6F">${grandTotal < 0 ? '-' : ''}${fmt2(grandTotal)}</span>`+
         `</div>`;
 
       // Item rows — matching share page style
@@ -878,7 +878,7 @@ export default function SplitBillDetailScreen() {
           const peopleSection = people.length > 0
             ? `<div style="font-family:'Roboto Mono',monospace;font-size:11px;color:${color};margin-bottom:4px">${d ? '-' : ''}${perPerson.toLocaleString('en-US', { minimumFractionDigits: 2 })} each</div>`+
               `<div style="display:flex;flex-wrap:wrap;gap:4px">`+
-              people.map((p: string) => `<span style="background:#e8f5f4;border-radius:99px;padding:2px 9px;font-family:'DM Sans',sans-serif;font-size:10px;color:#2A7A6F">${p}</span>`).join('') +
+              people.map((p: string) => `<span style="background:#e8f5f4;border-radius:99px;padding:2px 9px;font-family:'Roboto Mono',monospace;font-size:10px;color:#2A7A6F">${p}</span>`).join('') +
               `</div>`
             : '';
           return `<div style="border-bottom:1px solid #eef0f0;padding:13px 16px;display:flex;align-items:flex-start;gap:12px">`+
@@ -886,7 +886,7 @@ export default function SplitBillDetailScreen() {
             `<div style="flex:1">`+
             `<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">`+
             `<span style="font-family:'DM Sans',sans-serif;font-size:13px;color:#2e3d3d;flex:1;line-height:1.4">${item.name}</span>`+
-            `<span style="font-family:'Roboto Mono',monospace;font-size:13px;font-weight:500;color:${color};white-space:nowrap">${d ? '-' : ''}${Number(item.cost).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>`+
+            `<span style="font-family:'Roboto Mono',monospace;font-size:14px;font-weight:500;color:${color};white-space:nowrap">${d ? '-' : ''}${Number(item.cost).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>`+
             `</div>`+
             (people.length > 0 ? `<div style="margin-top:6px">${peopleSection}</div>` : '') +
             `</div></div>`;
@@ -923,7 +923,7 @@ export default function SplitBillDetailScreen() {
       }).join('');
 
       const sectionLabel = (text: string) =>
-        `<div style="font-family:'Roboto Mono',monospace;font-size:10px;font-weight:500;color:#929090;letter-spacing:0.8px;text-transform:uppercase;margin:24px 0 10px">${text}</div>`;
+        `<div style="font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;color:#929090;letter-spacing:0.6px;text-transform:uppercase;margin:24px 0 10px">${text}</div>`;
       const block = (inner: string) =>
         `<div style="border:1px solid #eef0f0;border-radius:14px;overflow:hidden">${inner}</div>`;
 
