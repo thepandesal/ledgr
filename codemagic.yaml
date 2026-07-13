@@ -8,9 +8,9 @@ workflows:
     environment:
       ios_signing:
         distribution_type: app_store
-        bundle_identifier: com.ledgr.app
+        bundle_identifier: art.ledgr.app
       vars:
-        BUNDLE_ID: com.ledgr.app
+        BUNDLE_ID: art.ledgr.app
         XCODE_WORKSPACE: ios/ledgr.xcworkspace
         XCODE_SCHEME: ledgr
       node: 20.18.0

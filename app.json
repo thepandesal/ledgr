@@ -23,7 +23,7 @@
       "typedRoutes": true
     },
     "ios": {
-      "bundleIdentifier": "com.ledgr.app",
+      "bundleIdentifier": "art.ledgr.app",
       "buildNumber": "1",
       "supportsTablet": false
     }
