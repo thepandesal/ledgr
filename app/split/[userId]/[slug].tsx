@@ -339,7 +339,7 @@ export default function SplitShareSlugPage() {
                     const perPersonCost = itemPeople.length > 0 ? Number(item.cost ?? 0) / itemPeople.length : 0;
                     return (
                       <View key={ii} style={s.itemCard}>
-                        <View style={[s.itemHeader, { paddingBottom: itemPeople.length > 0 ? 4 : 12 }]}>
+                        <View style={[s.itemHeader, { paddingBottom: 4 }]}>
                           <View style={[s.rowIconWrap, { backgroundColor: ACCENT + '44', alignSelf: 'flex-start', marginTop: 2 }]}>
                             <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 13, color: ACCENT_DARK }}>{ii + 1}</Text>
                           </View>
@@ -349,7 +349,7 @@ export default function SplitShareSlugPage() {
                               <Text style={[s.rowAmount, { color: deduct ? PEACH : ACCENT_DARK }]}>{deduct ? '-' : ''}{fmt(Number(item.cost ?? 0))}</Text>
                             </View>
                             {subs.length === 0 && itemPeople.length > 0 && (
-                              <View style={{ marginTop: 2, gap: 3 }}>
+                              <View style={{ marginTop: 4, gap: 6, paddingBottom: 10 }}>
                                 <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: deduct ? PEACH : ACCENT_DARK }}>
                                   {fmt(perPersonCost)} each
                                 </Text>
