@@ -6,6 +6,9 @@ workflows:
     integrations:
       app_store_connect: Codemagic
     environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: art.ledgr.app
       vars:
         BUNDLE_ID: art.ledgr.app
         XCODE_WORKSPACE: ios/ledgr.xcworkspace
@@ -26,13 +29,12 @@ workflows:
             --type IOS_APP_STORE \
             --create
           keychain add-certificates
-          xcode-project use-profiles --code-signing-setup-verbose
+          xcode-project use-profiles
       - name: Build iOS
         script: |
           xcode-project build-ipa \
             --workspace "$XCODE_WORKSPACE" \
-            --scheme "$XCODE_SCHEME" \
-            --config Release
+            --scheme "$XCODE_SCHEME"
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
