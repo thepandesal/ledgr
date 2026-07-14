@@ -160,6 +160,7 @@ function ProfileScreen() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
+    router.replace('/');
   };
 
   const handleDeleteAccount = async () => {

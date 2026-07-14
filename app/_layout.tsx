@@ -83,6 +83,18 @@ export default function RootLayout() {
     }
   }, []);
 
+  // Handle OAuth code on web (redirected back with ?code=...)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
+    if (code) {
+      supabase.auth.exchangeCodeForSession(code).then(() => {
+        window.history.replaceState({}, '', '/');
+      });
+    }
+  }, []);
+
   // Handle deep link OAuth callback
   useEffect(() => {
     const handleUrl = async (url: string) => {
