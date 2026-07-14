@@ -2,7 +2,7 @@
   "expo": {
     "name": "Ledgr",
     "slug": "ledgr",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/logo.png",
     "scheme": "ledgr",
@@ -24,7 +24,7 @@
     },
     "ios": {
       "bundleIdentifier": "art.ledgr.app",
-      "buildNumber": "25",
+      "buildNumber": "26",
       "supportsTablet": false,
       "entitlements": {
         "aps-environment": "production"
