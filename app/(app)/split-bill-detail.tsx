@@ -1492,7 +1492,8 @@ export default function SplitBillDetailScreen() {
         .from('recordings')
         .select('id, amount, space_id')
         .eq('id', pay.charged_recording_id)
-        .maybeSingle();
+        .limit(1)
+        .then(r => ({ data: r.data?.[0] ?? null, error: r.error }));
       if (chargedExp) {
         const newAmount = Number(chargedExp.amount) - Number(pay.amount);
         if (newAmount <= 0.001) {
@@ -1729,14 +1730,15 @@ export default function SplitBillDetailScreen() {
 
     // 5. Charge to space — upsert a single consolidated expense per split bill per space
     if (chargeToSpace && chargeSpaceId) {
-      const { data: existing } = await supabase
+      const { data: existingArr } = await supabase
         .from('recordings')
         .select('id, amount')
         .eq('split_bill_id', splitBillId)
         .eq('space_id', chargeSpaceId)
         .eq('type', 'expense')
         .is('linked_recording_id', null)
-        .maybeSingle();
+        .limit(1);
+      const existing = existingArr?.[0] ?? null;
       if (existing) {
         await supabase.from('recordings').update({
           amount: Number(existing.amount) + amount,
@@ -2245,6 +2247,11 @@ export default function SplitBillDetailScreen() {
                             <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: ACCENT_DARK }}>settled ✓</Text>
                           </View>
                         )}
+                        {!fullyPaid && paid > 0 && absOwed > 0 && (
+                          <View style={{ marginLeft: 10, paddingHorizontal: 10, paddingVertical: 5, backgroundColor: PEACH + '33', borderRadius: Radius.pill }}>
+                            <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: PEACH }}>partial ◑</Text>
+                          </View>
+                        )}
                       </View>
                       {/* Progress bar */}
                       {absOwed > 0 && (
@@ -2266,34 +2273,6 @@ export default function SplitBillDetailScreen() {
                             )}
                           </View>
                         </>
-                      )}
-                      {/* Relationship: linked recordings + manual items */}
-                      {(personRecRows.length > 0 || personManualOwed > 0) && (
-                        <View style={{ gap: 3 }}>
-                          {personRecRows.map((row) => (
-                            <TouchableOpacity
-                              key={row.recordingId}
-                              style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
-                              onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: row.recordingId } } as any)}
-                            >
-                              <Ionicons name="receipt-outline" size={10} color={Colors.muted} />
-                              <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: Colors.muted, flex: 1 }} numberOfLines={1}>
-                                {row.recording?.name ?? '—'}
-                              </Text>
-                              <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: ACCENT_DARK }}>
-                                {fmt(row.owed)}
-                              </Text>
-                              <Ionicons name="chevron-forward" size={10} color={Colors.faint} />
-                            </TouchableOpacity>
-                          ))}
-                          {personManualOwed > 0 && (
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                              <Ionicons name="create-outline" size={10} color={Colors.muted} />
-                              <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: Colors.muted, flex: 1 }}>manual items</Text>
-                              <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: ACCENT_DARK }}>{fmt(personManualOwed)}</Text>
-                            </View>
-                          )}
-                        </View>
                       )}
                       {/* Payment history rows - 3 per person, latest first, show more */}
                       {personPayments.slice().sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
@@ -3305,35 +3284,43 @@ export default function SplitBillDetailScreen() {
               {chargeToSpace && (
                 <View style={{ gap: 10, marginBottom: 8 }}>
                   <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase' }}>space</Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
-                    {chargeSpaces.map((sp: any) => (
-                      <TouchableOpacity key={sp.id} style={[s.modeBtn, chargeSpaceId === sp.id && s.modeBtnActive]} onPress={() => setChargeSpaceId(sp.id)}>
-                        <Text style={[s.modeBtnText, chargeSpaceId === sp.id && s.modeBtnTextActive]}>{sp.name}</Text>
+                  <View style={{ borderWidth: 1, borderColor: Colors.borderMid, borderRadius: Radius.md, overflow: 'hidden' }}>
+                    {[...chargeSpaces].sort((a: any, b: any) => a.name.localeCompare(b.name)).map((sp: any) => (
+                      <TouchableOpacity key={sp.id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 11, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: Colors.border, backgroundColor: chargeSpaceId === sp.id ? ACCENT + '22' : Colors.white }} onPress={() => setChargeSpaceId(sp.id)}>
+                        <Ionicons name={chargeSpaceId === sp.id ? 'radio-button-on' : 'radio-button-off'} size={16} color={chargeSpaceId === sp.id ? ACCENT_DARK : Colors.faint} style={{ marginRight: 10 }} />
+                        <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 13, color: chargeSpaceId === sp.id ? ACCENT_DARK : Colors.text }}>{sp.name}</Text>
                       </TouchableOpacity>
                     ))}
-                  </ScrollView>
+                  </View>
                   <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase' }}>account <Text style={{ fontFamily: Brand.font.mono, textTransform: 'none' }}>(optional)</Text></Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
-                    <TouchableOpacity style={[s.modeBtn, !chargeAccountId && s.modeBtnActive]} onPress={() => setChargeAccountId(null)}>
-                      <Text style={[s.modeBtnText, !chargeAccountId && s.modeBtnTextActive]}>none</Text>
+                  <View style={{ borderWidth: 1, borderColor: Colors.borderMid, borderRadius: Radius.md, overflow: 'hidden' }}>
+                    <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 11, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: Colors.border, backgroundColor: !chargeAccountId ? ACCENT + '22' : Colors.white }} onPress={() => setChargeAccountId(null)}>
+                      <Ionicons name={!chargeAccountId ? 'radio-button-on' : 'radio-button-off'} size={16} color={!chargeAccountId ? ACCENT_DARK : Colors.faint} style={{ marginRight: 10 }} />
+                      <Text style={{ fontFamily: Brand.font.mono, fontSize: 13, color: Colors.muted }}>none</Text>
                     </TouchableOpacity>
-                    {chargeAccounts.map((ac: any) => (
-                      <TouchableOpacity key={ac.id} style={[s.modeBtn, chargeAccountId === ac.id && s.modeBtnActive]} onPress={() => setChargeAccountId(ac.id)}>
-                        <Text style={[s.modeBtnText, chargeAccountId === ac.id && s.modeBtnTextActive]}>{ac.account_name}</Text>
+                    {[...chargeAccounts].sort((a: any, b: any) => a.account_name.localeCompare(b.account_name)).map((ac: any) => (
+                      <TouchableOpacity key={ac.id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 11, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: Colors.border, backgroundColor: chargeAccountId === ac.id ? ACCENT + '22' : Colors.white }} onPress={() => setChargeAccountId(ac.id)}>
+                        <Ionicons name={chargeAccountId === ac.id ? 'radio-button-on' : 'radio-button-off'} size={16} color={chargeAccountId === ac.id ? ACCENT_DARK : Colors.faint} style={{ marginRight: 10 }} />
+                        <View>
+                          <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 13, color: chargeAccountId === ac.id ? ACCENT_DARK : Colors.text }}>{ac.account_name}</Text>
+                          <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: Colors.muted }}>{ac.bank}</Text>
+                        </View>
                       </TouchableOpacity>
                     ))}
-                  </ScrollView>
+                  </View>
                   <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase' }}>category <Text style={{ fontFamily: Brand.font.mono, textTransform: 'none' }}>(optional)</Text></Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
-                    <TouchableOpacity style={[s.modeBtn, !chargeCategoryId && s.modeBtnActive]} onPress={() => setChargeCategoryId(null)}>
-                      <Text style={[s.modeBtnText, !chargeCategoryId && s.modeBtnTextActive]}>none</Text>
+                  <View style={{ borderWidth: 1, borderColor: Colors.borderMid, borderRadius: Radius.md, overflow: 'hidden' }}>
+                    <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 11, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: Colors.border, backgroundColor: !chargeCategoryId ? ACCENT + '22' : Colors.white }} onPress={() => setChargeCategoryId(null)}>
+                      <Ionicons name={!chargeCategoryId ? 'radio-button-on' : 'radio-button-off'} size={16} color={!chargeCategoryId ? ACCENT_DARK : Colors.faint} style={{ marginRight: 10 }} />
+                      <Text style={{ fontFamily: Brand.font.mono, fontSize: 13, color: Colors.muted }}>none</Text>
                     </TouchableOpacity>
-                    {chargeCategories.map((cat: any) => (
-                      <TouchableOpacity key={cat.id} style={[s.modeBtn, chargeCategoryId === cat.id && s.modeBtnActive]} onPress={() => setChargeCategoryId(cat.id)}>
-                        <Text style={[s.modeBtnText, chargeCategoryId === cat.id && s.modeBtnTextActive]}>{cat.name}</Text>
+                    {[...chargeCategories].sort((a: any, b: any) => a.name.localeCompare(b.name)).map((cat: any) => (
+                      <TouchableOpacity key={cat.id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 11, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: Colors.border, backgroundColor: chargeCategoryId === cat.id ? ACCENT + '22' : Colors.white }} onPress={() => setChargeCategoryId(cat.id)}>
+                        <Ionicons name={chargeCategoryId === cat.id ? 'radio-button-on' : 'radio-button-off'} size={16} color={chargeCategoryId === cat.id ? ACCENT_DARK : Colors.faint} style={{ marginRight: 10 }} />
+                        <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 13, color: chargeCategoryId === cat.id ? ACCENT_DARK : Colors.text }}>{cat.name}</Text>
                       </TouchableOpacity>
                     ))}
-                  </ScrollView>
+                  </View>
                 </View>
               )}
               <TouchableOpacity

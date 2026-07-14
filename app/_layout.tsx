@@ -104,19 +104,27 @@ export default function RootLayout() {
       if (path.startsWith('/split/')) { setReady(true); return; }
       if (!session || event === 'SIGNED_OUT') {
         setIsAuthenticated(false);
-        setReady(false);
-        router.replace('/');
         setReady(true);
+        if (event === 'SIGNED_OUT') {
+          if (typeof window !== 'undefined') {
+            window.location.href = '/';
+          } else {
+            router.replace('/');
+          }
+        }
       } else if (!session.user.user_metadata?.full_name) {
         setIsAuthenticated(true);
         setReady(true);
         router.replace('/onboarding');
-      } else {
+      } else if (event === 'SIGNED_IN') {
         setIsAuthenticated(true);
         setReady(true);
         if (!path || path === '/' || path === '/index') {
           router.replace('/(app)/(tabs)');
         }
+      } else {
+        setIsAuthenticated(true);
+        setReady(true);
       }
     });
     return () => subscription.unsubscribe();
@@ -133,7 +141,6 @@ export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
     <Stack
-      key={isAuthenticated ? 'authed' : 'unauthed'}
       screenOptions={{
         headerShown: false,
         animation: 'slide_from_right',

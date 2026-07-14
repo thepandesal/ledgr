@@ -119,6 +119,12 @@ export default function RecordingDetailScreen() {
   const [collectDueComplete, setCollectDueComplete] = useState<boolean | null>(null);
   const [collectDueLoading, setCollectDueLoading] = useState(false);
   const [collectDueSpaceId, setCollectDueSpaceId] = useState<string | null>(null);
+  const [collectDueChargeToSpace, setCollectDueChargeToSpace] = useState(false);
+  const [collectDueChargeSpaceId, setCollectDueChargeSpaceId] = useState<string | null>(null);
+  const [collectDueChargeAccountId, setCollectDueChargeAccountId] = useState<string | null>(null);
+  const [collectDueChargeCategoryId, setCollectDueChargeCategoryId] = useState<string | null>(null);
+  const [collectDueChargeAccounts, setCollectDueChargeAccounts] = useState<any[]>([]);
+  const [collectDueChargeCategories, setCollectDueChargeCategories] = useState<any[]>([]);
 
   // Shared spaces for space picker
   const [availableSpaces, setAvailableSpaces] = useState<{ id: string; name: string }[]>([]);
@@ -210,6 +216,7 @@ export default function RecordingDetailScreen() {
 
   // ── Linked split bill ────────────────────────────────────────────────────
   const [linkedSplitBill, setLinkedSplitBill] = useState<{ id: string; name: string } | null>(null);
+  const [chargedFromSplitBill, setChargedFromSplitBill] = useState<{ id: string; name: string } | null>(null);
   const [relatedSplitBillPayments, setRelatedSplitBillPayments] = useState<any[]>([]);
   const [splitBillModal, setSplitBillModal] = useState(false);
   const [splitBillName, setSplitBillName] = useState('');
@@ -224,6 +231,14 @@ export default function RecordingDetailScreen() {
       .eq('charged_recording_id', recordingId)
       .order('created_at', { ascending: false });
     setRelatedSplitBillPayments(data ?? []);
+    // Load the split bill this expense was charged from
+    if (data && data.length > 0) {
+      const { data: rec } = await supabase.from('recordings').select('split_bill_id').eq('id', recordingId).single();
+      if (rec?.split_bill_id) {
+        const { data: sb } = await supabase.from('split_bills').select('id, name').eq('id', rec.split_bill_id).single();
+        if (sb) setChargedFromSplitBill(sb);
+      }
+    }
   };
 
   const loadLinkedSplitBill = async () => {
@@ -235,13 +250,6 @@ export default function RecordingDetailScreen() {
       .maybeSingle();
     if (data?.split_bills) {
       const sb = Array.isArray(data.split_bills) ? data.split_bills[0] : data.split_bills;
-      if (sb) setLinkedSplitBill(sb);
-      return;
-    }
-    // Also check if this recording was charged from a split bill payment
-    const { data: rec } = await supabase.from('recordings').select('split_bill_id, type').eq('id', recordingId).single();
-    if (rec?.split_bill_id && rec?.type === 'expense') {
-      const { data: sb } = await supabase.from('split_bills').select('id, name').eq('id', rec.split_bill_id).single();
       if (sb) setLinkedSplitBill(sb);
     }
   };
@@ -484,11 +492,24 @@ export default function RecordingDetailScreen() {
     finally { setMarkCompleteLoading(false); }
   };
 
-  const openCollectDueModal = () => {
+  const openCollectDueModal = async () => {
     setCollectDueAmount('');
     setCollectDueDate(new Date().toISOString().split('T')[0]);
     setCollectDueComplete(null);
     setCollectDueSpaceId(recording?.space_id ?? null);
+    setCollectDueChargeToSpace(false);
+    setCollectDueChargeSpaceId(null);
+    setCollectDueChargeAccountId(null);
+    setCollectDueChargeCategoryId(null);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const [{ data: accs }, { data: cats }] = await Promise.all([
+        supabase.from('accounts').select('id, account_name, bank').eq('user_id', user.id).order('account_name'),
+        supabase.from('categories').select('id, name').eq('user_id', user.id).order('name'),
+      ]);
+      setCollectDueChargeAccounts(accs ?? []);
+      setCollectDueChargeCategories(cats ?? []);
+    }
     setCollectDueModal(true);
   };
 
@@ -520,6 +541,34 @@ export default function RecordingDetailScreen() {
       });
       await supabase.from('recordings').update({ paid_amount: cappedPaid, status: newStatus }).eq('id', recordingId);
       setRecording((prev: any) => ({ ...prev, paid_amount: cappedPaid, status: newStatus }));
+      // Charge to space
+      if (collectDueChargeToSpace && collectDueChargeSpaceId) {
+        const today = collectDueDate;
+        const { data: existingArr } = await supabase
+          .from('recordings')
+          .select('id, amount')
+          .eq('linked_recording_id', recordingId)
+          .eq('space_id', collectDueChargeSpaceId)
+          .eq('type', 'expense')
+          .limit(1);
+        const existing = existingArr?.[0] ?? null;
+        if (existing) {
+          await supabase.from('recordings').update({ amount: Number(existing.amount) + amount, transaction_date: today }).eq('id', existing.id);
+        } else {
+          await supabase.from('recordings').insert({
+            user_id: user.id,
+            space_id: collectDueChargeSpaceId,
+            name: recording.name,
+            type: 'expense',
+            amount,
+            transaction_date: today,
+            status: 'paid',
+            linked_recording_id: recordingId,
+            account_id: collectDueChargeAccountId || null,
+            category_id: collectDueChargeCategoryId || null,
+          });
+        }
+      }
       setCollectDueModal(false);
       loadPaymentData();
       if (excess > 0.01) {
@@ -1753,9 +1802,18 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
               </View>
               <View style={{ paddingHorizontal: PAGE }}>
                 {relatedSplitBillPayments.map((p: any) => (
-                  <View key={p.id} style={[rd.recRow, p.status === 'cancelled' && { opacity: 0.45 }]}>
+                  <TouchableOpacity
+                    key={p.id}
+                    style={[rd.recRow, p.status === 'cancelled' && { opacity: 0.45 }]}
+                    onPress={() => {
+                      if (chargedFromSplitBill) {
+                        router.push({ pathname: '/(app)/split-bill-detail', params: { splitBillId: chargedFromSplitBill.id, name: chargedFromSplitBill.name } } as any);
+                      }
+                    }}
+                    activeOpacity={chargedFromSplitBill ? 0.7 : 1}
+                  >
                     <View style={rd.recIconWrap}>
-                      <Ionicons name={p.status === 'cancelled' ? 'close-circle-outline' : 'person-outline'} size={14} color={ACCENT_DARK} />
+                      <Ionicons name={p.status === 'cancelled' ? 'close-circle-outline' : 'people-outline'} size={14} color={p.status === 'cancelled' ? Colors.muted : ACCENT_DARK} />
                     </View>
                     <View style={rd.recMid}>
                       <Text style={[rd.recName, p.status === 'cancelled' && { textDecorationLine: 'line-through', color: Colors.muted }]}>
@@ -1764,12 +1822,16 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                       <Text style={rd.recDate}>
                         {new Date(p.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                         {p.status === 'cancelled' ? ' · cancelled' : ''}
+                        {chargedFromSplitBill ? ` · ${chargedFromSplitBill.name}` : ''}
                       </Text>
                     </View>
                     <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 13, color: p.status === 'cancelled' ? Colors.muted : ACCENT_DARK }}>
                       {Number(p.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </Text>
-                  </View>
+                    {chargedFromSplitBill && p.status !== 'cancelled' && (
+                      <Ionicons name="chevron-forward" size={13} color={Colors.faint} />
+                    )}
+                  </TouchableOpacity>
                 ))}
               </View>
             </>
@@ -1956,6 +2018,16 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
         spaceId={collectDueSpaceId}
         setSpaceId={setCollectDueSpaceId}
         defaultSpaceId={recording?.space_id ?? null}
+        chargeToSpace={collectDueChargeToSpace}
+        setChargeToSpace={setCollectDueChargeToSpace}
+        chargeSpaceId={collectDueChargeSpaceId}
+        setChargeSpaceId={setCollectDueChargeSpaceId}
+        chargeAccounts={collectDueChargeAccounts}
+        chargeAccountId={collectDueChargeAccountId}
+        setChargeAccountId={setCollectDueChargeAccountId}
+        chargeCategories={collectDueChargeCategories}
+        chargeCategoryId={collectDueChargeCategoryId}
+        setChargeCategoryId={setCollectDueChargeCategoryId}
       />
 
       <ConfirmModal
