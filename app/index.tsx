@@ -24,7 +24,14 @@ export default function LoginScreen() {
       provider,
       options: { redirectTo, skipBrowserRedirect: true },
     });
-    if (data?.url) await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+    if (data?.url) {
+      const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+      if (result.type === 'success' && result.url) {
+        const params = new URL(result.url);
+        const code = params.searchParams.get('code');
+        if (code) await supabase.auth.exchangeCodeForSession(code);
+      }
+    }
     setLoading(null);
   };
 
