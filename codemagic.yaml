@@ -6,6 +6,11 @@ workflows:
     integrations:
       app_store_connect: Codemagic
     environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: art.ledgr.app
+        certificate_name: Ledgr Distribution
+        provisioning_profile_name: Ledgr AppStore
       vars:
         BUNDLE_ID: art.ledgr.app
         XCODE_WORKSPACE: ios/ledgr.xcworkspace
