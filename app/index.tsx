@@ -18,7 +18,7 @@ export default function LoginScreen() {
     await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: typeof window !== 'undefined' ? `${window.location.origin}/spaces` : 'ledgr://spaces',
+        redirectTo: typeof window !== 'undefined' && typeof window.location !== 'undefined' ? `${window.location.origin}/spaces` : 'ledgr://spaces',
       },
     });
     setLoading(null);
