@@ -469,7 +469,7 @@ export default function SpacesScreen() {
         )}
 
         {/* Date filter row */}
-        <View style={[s.dateFilterRow, { paddingTop: insets.top + 8 }]}>
+        <View style={s.dateFilterRow}>
           <TouchableOpacity style={s.modeSelectorBtn} onPress={openDateModal} activeOpacity={0.8}>
             <Ionicons name="options-outline" size={13} color={ACCENT_DARK} />
             <Text style={s.modeSelectorText}>filter</Text>

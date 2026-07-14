@@ -1,4 +1,5 @@
 import { View, TouchableOpacity, Text, StyleSheet, Animated, Dimensions, Platform, SafeAreaView, ScrollView, useWindowDimensions, Clipboard, TextInput, ActivityIndicator } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useRef, memo, useCallback, useEffect }from 'react';
 import { BlurView } from 'expo-blur';
@@ -341,6 +342,7 @@ export default function TabsLayout() {
   const router = useRouter();
   const { width: W } = useWindowDimensions();
   const { user } = useUser();
+  const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState('spaces');
   const [othersOpen, setOthersOpen] = useState(false);
   const activeTabRef = useRef('spaces');
@@ -518,7 +520,7 @@ export default function TabsLayout() {
     <View style={s.container}>
 
       {/* ── Shared flat header ── */}
-      <View style={s.waveBg}>
+      <View style={[s.waveBg, { paddingTop: insets.top + 10 }]}>
         <View style={s.appLabel}>
           <Text style={s.appLabelText}>L</Text>
         </View>
@@ -566,7 +568,7 @@ export default function TabsLayout() {
       )}
 
       {/* Bottom nav bar */}
-      <View style={s.navBar}>
+      <View style={[s.navBar, { paddingBottom: insets.bottom || 8 }]}>
         {MAIN_TABS.map(tab => {
           const isActive = tab.key === 'others' ? isOthersActive : tab.key === 'notifications-tab' ? isNotifTabActive : activeTab === tab.key;
           const showBadge = (tab.key === 'notifications-tab' && unreadCount > 0);
