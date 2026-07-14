@@ -1,7 +1,8 @@
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  SafeAreaView, Animated, Dimensions, ActivityIndicator, TextInput, Share, Platform, Image, Modal,
+  SafeAreaView, Animated, Dimensions, ActivityIndicator, TextInput, Platform, Image, Modal,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
@@ -803,9 +804,14 @@ export default function SplitBillDetailScreen() {
     await refetchShareRow();
   };
 
-  const copyShareLink = () => {
+  const copyShareLink = async () => {
     if (!shareLink) return;
-    if (Platform.OS !== 'web') { Share.share({ message: shareLink, url: shareLink }); return; }
+    if (Platform.OS !== 'web') {
+      await Clipboard.setStringAsync(shareLink);
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 2000);
+      return;
+    }
     if (typeof navigator !== 'undefined' && navigator.clipboard) {
       navigator.clipboard.writeText(shareLink)
         .then(() => { setShareCopied(true); setTimeout(() => setShareCopied(false), 2000); })
