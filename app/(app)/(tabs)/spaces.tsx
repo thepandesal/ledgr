@@ -2,6 +2,7 @@ import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
   SafeAreaView, TextInput, ActivityIndicator, useWindowDimensions, Animated, RefreshControl,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../../src/lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
@@ -48,6 +49,7 @@ export default function SpacesScreen() {
   const queryClient = useQueryClient();
   const { userId, userName, defaultCurrency } = useUser();
   const { convert, rateMap } = useExchangeRates();
+  const insets = useSafeAreaInsets();
   const [createModal, setCreateModal] = useState(false);
   const [spaceName, setSpaceName] = useState('');
   const [spaceBudget, setSpaceBudget] = useState('');
@@ -467,7 +469,7 @@ export default function SpacesScreen() {
         )}
 
         {/* Date filter row */}
-        <View style={s.dateFilterRow}>
+        <View style={[s.dateFilterRow, { paddingTop: insets.top + 8 }]}>
           <TouchableOpacity style={s.modeSelectorBtn} onPress={openDateModal} activeOpacity={0.8}>
             <Ionicons name="options-outline" size={13} color={ACCENT_DARK} />
             <Text style={s.modeSelectorText}>filter</Text>
