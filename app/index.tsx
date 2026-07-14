@@ -19,6 +19,16 @@ export default function LoginScreen() {
 
   const signIn = async (provider: 'google' | 'apple') => {
     setLoading(provider);
+    // Web: direct redirect — avoids COOP popup issues
+    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+      await supabase.auth.signInWithOAuth({
+        provider,
+        options: { redirectTo: window.location.origin },
+      });
+      setLoading(null);
+      return;
+    }
+    // Native: use WebBrowser in-app flow
     const redirectTo = Linking.createURL('spaces');
     const { data } = await supabase.auth.signInWithOAuth({
       provider,
