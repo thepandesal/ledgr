@@ -210,10 +210,21 @@ export default function RecordingDetailScreen() {
 
   // ── Linked split bill ────────────────────────────────────────────────────
   const [linkedSplitBill, setLinkedSplitBill] = useState<{ id: string; name: string } | null>(null);
+  const [relatedSplitBillPayments, setRelatedSplitBillPayments] = useState<any[]>([]);
   const [splitBillModal, setSplitBillModal] = useState(false);
   const [splitBillName, setSplitBillName] = useState('');
   const [existingSplitBills, setExistingSplitBills] = useState<any[]>([]);
 
+
+  const loadRelatedSplitBillPayments = async () => {
+    if (!recordingId) return;
+    const { data } = await supabase
+      .from('split_bill_payments')
+      .select('id, person_name, amount, created_at, status')
+      .eq('charged_recording_id', recordingId)
+      .order('created_at', { ascending: false });
+    setRelatedSplitBillPayments(data ?? []);
+  };
 
   const loadLinkedSplitBill = async () => {
     if (!recordingId) return;
@@ -307,6 +318,7 @@ export default function RecordingDetailScreen() {
       loadItems(),
       loadLinkedReceipt(),
       loadLinkedSplitBill(),
+      loadRelatedSplitBillPayments(),
       loadAvailableSpaces(),
       supabase.from('split_shares').select('id').eq('recording_id', recordingId).maybeSingle()
         .then(({ data }) => { if (data) setShareRowId(data.id); }),
@@ -1731,6 +1743,36 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
             </View>
           ) : (
             <View style={rd.emptyWrap}><Text style={{ fontFamily: Brand.font.mono, fontSize: 12, color: Colors.muted }}>no split bill linked</Text></View>
+          )}
+          {/* Related records — payments charged to this expense from a split bill */}
+          {relatedSplitBillPayments.length > 0 && (
+            <>
+              <View style={rd.divider} />
+              <View style={rd.sectionRow}>
+                <Text style={rd.sectionHeader}>related records</Text>
+              </View>
+              <View style={{ paddingHorizontal: PAGE }}>
+                {relatedSplitBillPayments.map((p: any) => (
+                  <View key={p.id} style={[rd.recRow, p.status === 'cancelled' && { opacity: 0.45 }]}>
+                    <View style={rd.recIconWrap}>
+                      <Ionicons name={p.status === 'cancelled' ? 'close-circle-outline' : 'person-outline'} size={14} color={ACCENT_DARK} />
+                    </View>
+                    <View style={rd.recMid}>
+                      <Text style={[rd.recName, p.status === 'cancelled' && { textDecorationLine: 'line-through', color: Colors.muted }]}>
+                        {p.person_name}
+                      </Text>
+                      <Text style={rd.recDate}>
+                        {new Date(p.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        {p.status === 'cancelled' ? ' · cancelled' : ''}
+                      </Text>
+                    </View>
+                    <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 13, color: p.status === 'cancelled' ? Colors.muted : ACCENT_DARK }}>
+                      {Number(p.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </>
           )}
           <View style={{ height: 20 }} />
 

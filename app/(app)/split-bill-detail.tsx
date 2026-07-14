@@ -2328,6 +2328,37 @@ export default function SplitBillDetailScreen() {
             );
           })()}
 
+          {/* Payment logs */}
+          {chargedExpenses.length > 0 && (
+            <>
+              <View style={s.divider} />
+              <View style={s.sectionRow}>
+                <Text style={s.sectionHeader}>payment logs</Text>
+              </View>
+              <View style={s.list}>
+                {chargedExpenses.map((exp: any) => (
+                  <TouchableOpacity
+                    key={exp.id}
+                    style={s.recRow}
+                    activeOpacity={0.85}
+                    onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: exp.id } } as any)}
+                  >
+                    <View style={[s.recIconWrap, { backgroundColor: ACCENT + '44' }]}>
+                      <Ionicons name="receipt-outline" size={16} color={ACCENT_DARK} />
+                    </View>
+                    <View style={s.recMid}>
+                      <Text style={s.recName} numberOfLines={1}>{exp.name}</Text>
+                      <Text style={s.recDate}>{exp.space?.name ?? '—'}{exp.account?.account_name ? ' · ' + exp.account.account_name : ''}</Text>
+                      <Text style={s.recDate}>{exp.transaction_date ? new Date(exp.transaction_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}</Text>
+                    </View>
+                    <Text style={[s.recAmount, { color: ACCENT_DARK }]}>{fmt(Number(exp.amount))}</Text>
+                    <Ionicons name="chevron-forward" size={13} color={Colors.faint} />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </>
+          )}
+
           {/* moved to actions row above recordings */}
           <View style={{ height: 20 }} />
         </ScrollView>

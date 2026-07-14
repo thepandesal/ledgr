@@ -145,14 +145,8 @@ function ProfileScreen() {
     : '';
 
   const handleLogout = async () => {
-    try {
-      await supabase.auth.signOut();
-    } catch (e) {}
-    if (typeof window !== 'undefined') {
-      window.location.href = '/';
-    } else {
-      router.replace('/' as any);
-    }
+    await supabase.auth.signOut();
+    router.replace('/' as any);
   };
 
   const handleDeleteAccount = async () => {
