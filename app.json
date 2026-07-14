@@ -11,6 +11,20 @@
       "favicon": "./assets/logo.png",
       "bundler": "metro"
     },
+    "assets": [
+      "./assets/avenelle.ttf",
+      "./assets/CalSans-Regular.ttf",
+      "./assets/MuseoModerno-Black.ttf",
+      "./assets/MuseoModerno-Medium.ttf",
+      "./assets/MuseoModerno-Regular.ttf",
+      "./assets/Chillax-Medium.otf",
+      "./assets/Chillax-Regular.otf",
+      "./assets/Chillax-Bold.otf",
+      "./assets/Chillax-Semibold.otf",
+      "./assets/Chillax-Light.otf",
+      "./assets/GlacialIndifference-Regular.otf",
+      "./assets/GlacialIndifference-Bold.otf"
+    ],
     "plugins": [
       "expo-router",
       "expo-font",
@@ -24,7 +38,7 @@
     },
     "ios": {
       "bundleIdentifier": "art.ledgr.app",
-      "buildNumber": "26",
+      "buildNumber": "27",
       "supportsTablet": false,
       "entitlements": {
         "aps-environment": "production"

@@ -35,50 +35,54 @@ export default function RootLayout() {
   const [fontsLoaded, setFontsLoaded] = useState(false);
 
   useEffect(() => {
-    Font.loadAsync({
-      PlusJakartaSans_400Regular,
-      PlusJakartaSans_500Medium,
-      PlusJakartaSans_600SemiBold,
-      PlusJakartaSans_700Bold,
-      DMSans_400Regular,
-      DMSans_500Medium,
-      DMSans_600SemiBold,
-      DMSans_700Bold,
-      RobotoMono_400Regular,
-      RobotoMono_700Bold,
-      Inter_400Regular,
-      Inter_500Medium,
-      Inter_600SemiBold,
-      Inter_700Bold,
-      Outfit_400Regular,
-      Outfit_600SemiBold,
-      Outfit_700Bold,
-      Fraunces_400Regular,
-      Fraunces_600SemiBold,
-      Fraunces_700Bold,
-      Fraunces_900Black,
-      Avenelle: require('../assets/avenelle.ttf'),
-      MuseoModerno_Black: require('../assets/MuseoModerno-Black.ttf'),
-      MuseoModerno_Medium: require('../assets/MuseoModerno-Medium.ttf'),
-      MuseoModerno_Regular: require('../assets/MuseoModerno-Regular.ttf'),
-      CalSans: require('../assets/CalSans-Regular.ttf'),
-    }).catch((e) => {
-      if (__DEV__) console.warn('[fonts] base fonts failed to load:', e);
-    }).then(() => {
-      return Font.loadAsync({
-        ChillaxMedium: require('../assets/Chillax-Medium.otf'),
-        ChillaxRegular: require('../assets/Chillax-Regular.otf'),
-        ChillaxBold: require('../assets/Chillax-Bold.otf'),
-        ChillaxSemibold: require('../assets/Chillax-Semibold.otf'),
-        ChillaxLight: require('../assets/Chillax-Light.otf'),
-        GlacialIndifference: require('../assets/GlacialIndifference-Regular.otf'),
-        GlacialIndifferenceBold: require('../assets/GlacialIndifference-Bold.otf'),
-      }).catch((e) => {
-        if (__DEV__) console.warn('[fonts] otf fonts failed to load:', e);
-      });
-    }).finally(() => {
+    (async () => {
+      try {
+        await Font.loadAsync({
+          PlusJakartaSans_400Regular,
+          PlusJakartaSans_500Medium,
+          PlusJakartaSans_600SemiBold,
+          PlusJakartaSans_700Bold,
+          DMSans_400Regular,
+          DMSans_500Medium,
+          DMSans_600SemiBold,
+          DMSans_700Bold,
+          RobotoMono_400Regular,
+          RobotoMono_700Bold,
+          Inter_400Regular,
+          Inter_500Medium,
+          Inter_600SemiBold,
+          Inter_700Bold,
+          Outfit_400Regular,
+          Outfit_600SemiBold,
+          Outfit_700Bold,
+          Fraunces_400Regular,
+          Fraunces_600SemiBold,
+          Fraunces_700Bold,
+          Fraunces_900Black,
+          Avenelle: require('../assets/avenelle.ttf'),
+          MuseoModerno_Black: require('../assets/MuseoModerno-Black.ttf'),
+          MuseoModerno_Medium: require('../assets/MuseoModerno-Medium.ttf'),
+          MuseoModerno_Regular: require('../assets/MuseoModerno-Regular.ttf'),
+          CalSans: require('../assets/CalSans-Regular.ttf'),
+        });
+      } catch (e) {
+        console.warn('[fonts] base fonts failed to load:', e);
+      }
+      try {
+        await Font.loadAsync({
+          ChillaxMedium: require('../assets/Chillax-Medium.otf'),
+          ChillaxRegular: require('../assets/Chillax-Regular.otf'),
+          ChillaxBold: require('../assets/Chillax-Bold.otf'),
+          ChillaxSemibold: require('../assets/Chillax-Semibold.otf'),
+          ChillaxLight: require('../assets/Chillax-Light.otf'),
+          GlacialIndifference: require('../assets/GlacialIndifference-Regular.otf'),
+          GlacialIndifferenceBold: require('../assets/GlacialIndifference-Bold.otf'),
+        });
+      } catch (e) {
+        console.warn('[fonts] otf fonts failed to load:', e);
+      }
       setFontsLoaded(true);
-    });
+    })();
   }, []);
 
   const router = useRouter();
