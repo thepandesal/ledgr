@@ -130,6 +130,20 @@ function ProfileScreen() {
   const [deleteError, setDeleteError] = useState('');
   const email = user?.email ?? '';
 
+  // Redirect to login if session is gone
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!session || event === 'SIGNED_OUT') {
+        if (typeof window !== 'undefined') {
+          window.location.href = '/';
+        } else {
+          router.replace('/');
+        }
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
   const copyCode = () => {
     if (!profileCode) return;
     if (typeof navigator !== 'undefined' && navigator.clipboard) {
