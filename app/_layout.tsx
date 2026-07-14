@@ -96,6 +96,7 @@ export default function RootLayout() {
   }, []);
 
   useEffect(() => {
+    if (!fontsLoaded) return;
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (__DEV__) console.log('[auth] event:', String(event).replace(/[\r\n]/g, ' '));
       const path = typeof window !== 'undefined' && typeof window.location !== 'undefined' ? window.location.pathname : '';
