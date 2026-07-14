@@ -1359,6 +1359,7 @@ export default function SplitBillDetailScreen() {
   const [paymentRecord, setPaymentRecord]   = useState(true);
   const [paymentSaving, setPaymentSaving]   = useState(false);
   const [chargeToSpace, setChargeToSpace]   = useState(false);
+  const [showMorePayments, setShowMorePayments] = useState<Record<string, boolean>>({});
   const [chargeSpaceId, setChargeSpaceId]   = useState<string | null>(null);
   const [chargeAccountId, setChargeAccountId] = useState<string | null>(null);
   const [chargeCategoryId, setChargeCategoryId] = useState<string | null>(null);
@@ -1374,6 +1375,7 @@ export default function SplitBillDetailScreen() {
         .select('id, name, amount, transaction_date, space:space_id(name), account:account_id(account_name)')
         .eq('split_bill_id', splitBillId)
         .eq('type', 'expense')
+        .is('linked_recording_id', null)
         .order('created_at');
       return (data ?? []).map((r: any) => ({
         ...r,
@@ -2293,17 +2295,28 @@ export default function SplitBillDetailScreen() {
                           )}
                         </View>
                       )}
-                      {/* Payment history rows */}
-                      {personPayments.map((pay: any) => (
+                      {/* Payment history rows - 3 per person, latest first, show more */}
+                      {personPayments.slice().sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                        .slice(0, (showMorePayments[p] ? undefined : 3))
+                        .map((pay: any) => (
                         <View key={pay.id} style={[
                           { flexDirection: 'row', alignItems: 'center', paddingTop: 4 },
                           pay.status === 'cancelled' && { opacity: 0.45 },
                         ]}>
                           <View style={{ flex: 1, gap: 2 }}>
-                            <Text style={[
-                              { fontFamily: Brand.font.monoBold, fontSize: 11, color: ACCENT_DARK },
-                              pay.status === 'cancelled' && { textDecorationLine: 'line-through', color: Colors.muted },
-                            ]}>{fmt(Number(pay.amount))}</Text>
+                            {pay.charged_recording_id ? (
+                              <TouchableOpacity onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: pay.charged_recording_id } } as any)}>
+                                <Text style={[
+                                  { fontFamily: Brand.font.monoBold, fontSize: 11, color: ACCENT_DARK, textDecorationLine: 'underline' },
+                                  pay.status === 'cancelled' && { textDecorationLine: 'line-through', color: Colors.muted },
+                                ]}>{fmt(Number(pay.amount))}</Text>
+                              </TouchableOpacity>
+                            ) : (
+                              <Text style={[
+                                { fontFamily: Brand.font.monoBold, fontSize: 11, color: ACCENT_DARK },
+                                pay.status === 'cancelled' && { textDecorationLine: 'line-through', color: Colors.muted },
+                              ]}>{fmt(Number(pay.amount))}</Text>
+                            )}
                             {pay.status === 'cancelled' && (
                               <Text style={{ fontFamily: Brand.font.mono, fontSize: 9, color: Colors.muted }}>
                                 cancelled{pay.cancelled_reason ? ` · ${pay.cancelled_reason}` : ''}
@@ -2321,6 +2334,16 @@ export default function SplitBillDetailScreen() {
                           )}
                         </View>
                       ))}
+                      {personPayments.length > 3 && (
+                        <TouchableOpacity
+                          onPress={() => setShowMorePayments(prev => ({ ...prev, [p]: !prev[p] }))}
+                          style={{ paddingTop: 6 }}
+                        >
+                          <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: ACCENT_DARK }}>
+                            {showMorePayments[p] ? 'show less' : `show ${personPayments.length - 3} more`}
+                          </Text>
+                        </TouchableOpacity>
+                      )}
                     </View>
                   );
                 })}
