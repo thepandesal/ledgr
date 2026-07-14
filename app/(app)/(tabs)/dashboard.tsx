@@ -593,9 +593,18 @@ export default function DashboardScreen() {
                       <Text style={s.rowName} numberOfLines={1}>{item.name}</Text>
                       {item.space?.name ? <Text style={s.rowSpace}>{item.space.name}</Text> : null}
                     </View>
-                    <Text style={[s.rowAmount, { color: tl?.color ?? Colors.cyan }]}>
-                      {item.currency ?? defaultCurrency} {Number(item.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                    </Text>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={[s.rowAmount, { color: tl?.color ?? Colors.cyan }]}>
+                        {item.currency ?? defaultCurrency} {item.is_due
+                          ? Math.max(0, Number(item.amount) - Number(item.paid_amount ?? 0)).toLocaleString('en-US', { minimumFractionDigits: 2 })
+                          : Number(item.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      </Text>
+                      {item.is_due && Number(item.paid_amount ?? 0) > 0 && (
+                        <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted }}>
+                          {item.currency ?? defaultCurrency} {Number(item.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        </Text>
+                      )}
+                    </View>
                   </TouchableOpacity>
                 </View>
               );

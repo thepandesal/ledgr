@@ -1341,11 +1341,18 @@ export default function SpaceDetailScreen() {
                           <Text style={s.rowDate}>{smartDateLabel(item.transaction_date)}</Text>
                         )}
                       </View>
-                      <Text style={[s.rowAmount, { color: tl.color }]}>
-                        {item.is_due
-                          ? Math.max(0, Number(item.amount) - Number(item.paid_amount ?? 0)).toLocaleString('en-US', { minimumFractionDigits: 2 })
-                          : fmtAmount(Number(item.amount))}
-                      </Text>
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={[s.rowAmount, { color: tl.color }]}>
+                          {item.is_due
+                            ? Math.max(0, Number(item.amount) - Number(item.paid_amount ?? 0)).toLocaleString('en-US', { minimumFractionDigits: 2 })
+                            : fmtAmount(Number(item.amount))}
+                        </Text>
+                        {item.is_due && Number(item.paid_amount ?? 0) > 0 && (
+                          <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted }}>
+                            {Number(item.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                          </Text>
+                        )}
+                      </View>
                     </TouchableOpacity>
                   );
                 })}
