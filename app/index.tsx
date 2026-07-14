@@ -6,7 +6,7 @@ import { supabase } from '../src/lib/supabase';
 import { useState } from 'react';
 import { Colors } from '../components/ui/theme';
 import * as WebBrowser from 'expo-web-browser';
-import { makeRedirectUri } from 'expo-auth-session';
+import * as Linking from 'expo-linking';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -19,8 +19,8 @@ export default function LoginScreen() {
 
   const signIn = async (provider: 'google' | 'apple') => {
     setLoading(provider);
-    const redirectTo = makeRedirectUri({ scheme: 'ledgr', path: 'spaces' });
-    const { data, error } = await supabase.auth.signInWithOAuth({
+    const redirectTo = Linking.createURL('spaces');
+    const { data } = await supabase.auth.signInWithOAuth({
       provider,
       options: { redirectTo, skipBrowserRedirect: true },
     });

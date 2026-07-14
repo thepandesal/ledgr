@@ -10,6 +10,7 @@ import { View, ActivityIndicator } from 'react-native';
 import { useEffect, useState } from 'react';
 import { supabase } from '../src/lib/supabase';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import * as Linking from 'expo-linking';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -80,8 +81,21 @@ export default function RootLayout() {
     }
   }, []);
 
+  // Handle deep link OAuth callback
   useEffect(() => {
-    if (!fontsLoaded) return;
+    const handleUrl = async (url: string) => {
+      if (url.includes('access_token') || url.includes('code=')) {
+        const { data } = await supabase.auth.getSessionFromUrl ? 
+          (supabase.auth as any).getSessionFromUrl({ url }) :
+          { data: null };
+      }
+    };
+    Linking.getInitialURL().then(url => { if (url) handleUrl(url); });
+    const sub = Linking.addEventListener('url', ({ url }) => handleUrl(url));
+    return () => sub.remove();
+  }, []);
+
+  useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (__DEV__) console.log('[auth] event:', String(event).replace(/[\r\n]/g, ' '));
       const path = typeof window !== 'undefined' && typeof window.location !== 'undefined' ? window.location.pathname : '';
