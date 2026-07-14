@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView, Image, ActivityIndicator, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView, Image, ActivityIndicator, TextInput, Alert, RefreshControl } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useState } from 'react';
@@ -138,6 +138,13 @@ export default function ReceiptsScreen() {
     }
   };
 
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await queryClient.invalidateQueries({ queryKey: ['receipts', userId] });
+    setRefreshing(false);
+  };
+
   return (
     <SafeAreaView style={s.container}>
       {loading ? (
@@ -153,6 +160,7 @@ export default function ReceiptsScreen() {
           showsVerticalScrollIndicator={false}
           onScroll={handleScroll}
           scrollEventThrottle={400}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         >
           {paginatedEntries.map(entry => (
             <TouchableOpacity key={entry.id} style={s.card} activeOpacity={0.85}

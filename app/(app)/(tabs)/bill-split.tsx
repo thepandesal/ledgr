@@ -1,6 +1,6 @@
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  SafeAreaView, TextInput, ActivityIndicator,
+  SafeAreaView, TextInput, ActivityIndicator, RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useMemo } from 'react';
@@ -222,6 +222,14 @@ export default function BillSplitScreen() {
     }
   };
 
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await queryClient.invalidateQueries({ queryKey: ['split-bills', userId] });
+    await queryClient.invalidateQueries({ queryKey: ['split-bills-by-person', userId] });
+    setRefreshing(false);
+  };
+
   return (
     <SafeAreaView style={s.container}>
       <ScrollView
@@ -229,6 +237,7 @@ export default function BillSplitScreen() {
         showsVerticalScrollIndicator={false}
         onScroll={handleScroll}
         scrollEventThrottle={400}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
         {isLoading ? (
           <ActivityIndicator color={Brand.color.accent} style={{ marginTop: 40 }} />

@@ -1,6 +1,6 @@
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  SafeAreaView, TextInput, ActivityIndicator, useWindowDimensions, Animated,
+  SafeAreaView, TextInput, ActivityIndicator, useWindowDimensions, Animated, RefreshControl,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../../src/lib/supabase';
@@ -420,9 +420,17 @@ export default function SpacesScreen() {
     enabled: !!userId,
   });
 
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await queryClient.invalidateQueries({ queryKey: ['spaces', userId] });
+    await queryClient.invalidateQueries({ queryKey: ['shared-spaces', userId] });
+    setRefreshing(false);
+  };
+
   return (
     <SafeAreaView style={s.root}>
-      <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
         {/* Pending space invites */}
         {pendingInvites.length > 0 && (
           <View style={{ paddingHorizontal: Spacing.page, paddingTop: 16, gap: 8 }}>

@@ -1,6 +1,6 @@
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  SafeAreaView, TextInput, ActivityIndicator,
+  SafeAreaView, TextInput, ActivityIndicator, RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useCallback } from 'react';
@@ -284,9 +284,16 @@ export default function RemindersScreen() {
     </TouchableOpacity>
   );
 
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await queryClient.invalidateQueries({ queryKey: ['reminders', userId] });
+    setRefreshing(false);
+  };
+
   return (
     <SafeAreaView style={s.root}>
-      <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
 
         {/* Add button */}
         <TouchableOpacity style={s.addBtn} onPress={openAdd} activeOpacity={0.8}>

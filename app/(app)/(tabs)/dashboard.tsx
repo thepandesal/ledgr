@@ -1,6 +1,6 @@
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  SafeAreaView, ActivityIndicator, TextInput, Animated,
+  SafeAreaView, ActivityIndicator, TextInput, Animated, RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useRef, useContext, useEffect } from 'react';
@@ -256,6 +256,13 @@ export default function DashboardScreen() {
   const [qaCatId,    setQaCatId]    = useState<string | null>(null);
   const [qaLoading,  setQaLoading]  = useState(false);
   const [qaError,    setQaError]    = useState('');
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await queryClient.invalidateQueries({ queryKey: ['dashboard-activities', userId] });
+    setRefreshing(false);
+  };
+
   const headerAnim  = useRef(new Animated.Value(1)).current;
   const lastScrollY = useRef(0);
   const onScroll = (e: any) => {
@@ -564,7 +571,7 @@ export default function DashboardScreen() {
             <Text style={pageStyles.emptyText}>no {activeTabData.label.toLowerCase()} found for this period</Text>
           </View>
         ) : (
-          <ScrollView key={filtered.map(i => i.id).join() + amountSort} contentContainerStyle={s.list} showsVerticalScrollIndicator={false} onScroll={onScroll} scrollEventThrottle={16}>
+          <ScrollView key={filtered.map(i => i.id).join() + amountSort} contentContainerStyle={s.list} showsVerticalScrollIndicator={false} onScroll={onScroll} scrollEventThrottle={16} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
             {sortedFiltered(filtered).map((item, idx) => {
               const prevDate = sortedFiltered(filtered)[idx - 1]?.transaction_date;
               const showDate = item.transaction_date !== prevDate;
