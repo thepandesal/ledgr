@@ -7,7 +7,7 @@ import { Fraunces_400Regular, Fraunces_600SemiBold, Fraunces_700Bold, Fraunces_9
 import { PlusJakartaSans_400Regular, PlusJakartaSans_500Medium, PlusJakartaSans_600SemiBold, PlusJakartaSans_700Bold } from '@expo-google-fonts/plus-jakarta-sans';
 import { Outfit_400Regular, Outfit_600SemiBold, Outfit_700Bold } from '@expo-google-fonts/outfit';
 import { View, ActivityIndicator } from 'react-native';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../src/lib/supabase';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import * as Linking from 'expo-linking';
@@ -70,6 +70,7 @@ export default function RootLayout() {
   const router = useRouter();
   const [ready, setReady] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const justSignedOut = useRef(false);
 
   useEffect(() => {
     if (typeof document === 'undefined') return;
@@ -103,26 +104,30 @@ export default function RootLayout() {
       const path = typeof window !== 'undefined' && typeof window.location !== 'undefined' ? window.location.pathname : '';
       if (path.startsWith('/split/')) { setReady(true); return; }
       if (!session || event === 'SIGNED_OUT') {
+        justSignedOut.current = true;
         setIsAuthenticated(false);
         setReady(true);
         if (event === 'SIGNED_OUT') {
           if (typeof window !== 'undefined') {
             window.location.href = '/';
           } else {
-            router.replace('/');
+            setTimeout(() => router.replace('/'), 0);
           }
         }
       } else if (!session.user.user_metadata?.full_name) {
+        justSignedOut.current = false;
         setIsAuthenticated(true);
         setReady(true);
         router.replace('/onboarding');
       } else if (event === 'SIGNED_IN') {
+        if (justSignedOut.current) { justSignedOut.current = false; return; }
         setIsAuthenticated(true);
         setReady(true);
         if (!path || path === '/' || path === '/index') {
           router.replace('/(app)/(tabs)');
         }
       } else {
+        justSignedOut.current = false;
         setIsAuthenticated(true);
         setReady(true);
       }
