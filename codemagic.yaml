@@ -22,7 +22,7 @@ workflows:
       - name: Expo prebuild
         script: npx expo prebuild --clean --platform ios
       - name: Install CocoaPods
-        script: cd ios && pod install
+        script: cd ios && pod repo update && pod install --clean-install
       - name: Set up code signing
         script: |
           keychain initialize
