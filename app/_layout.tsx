@@ -102,16 +102,15 @@ export default function RootLayout() {
       const path = typeof window !== 'undefined' && typeof window.location !== 'undefined' ? window.location.pathname : '';
       // Don't redirect if on split share page
       if (path.startsWith('/split/')) { setReady(true); return; }
-      if (!session) {
-        setReady(true);
+      if (!session || event === 'SIGNED_OUT') {
+        setReady(false);
         router.replace('/');
+        setReady(true);
       } else if (!session.user.user_metadata?.full_name) {
         setReady(true);
         router.replace('/onboarding');
       } else {
         setReady(true);
-        // If already inside the app (e.g. restoring after minimize), don't redirect.
-        // Let Expo Router stay on the current URL.
         if (!path || path === '/' || path === '/index') {
           router.replace('/(app)/(tabs)');
         }
