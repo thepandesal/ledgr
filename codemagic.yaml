@@ -9,8 +9,6 @@ workflows:
       ios_signing:
         distribution_type: app_store
         bundle_identifier: art.ledgr.app
-        certificate_name: Ledgr Distribution
-        provisioning_profile_name: Ledgr Appstore
       vars:
         BUNDLE_ID: art.ledgr.app
         XCODE_WORKSPACE: ios/ledgr.xcworkspace
@@ -23,15 +21,6 @@ workflows:
         script: npx expo prebuild --clean --platform ios
       - name: Install CocoaPods
         script: cd ios && pod install
-      - name: Set up code signing
-        script: |
-          keychain initialize
-          app-store-connect fetch-signing-files \
-            "$BUNDLE_ID" \
-            --type IOS_APP_STORE \
-            --create
-          keychain add-certificates
-          xcode-project use-profiles
       - name: Build iOS
         script: |
           xcode-project build-ipa \
