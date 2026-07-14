@@ -69,6 +69,7 @@ export default function RootLayout() {
 
   const router = useRouter();
   const [ready, setReady] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (typeof document === 'undefined') return;
@@ -100,16 +101,18 @@ export default function RootLayout() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (__DEV__) console.log('[auth] event:', String(event).replace(/[\r\n]/g, ' '));
       const path = typeof window !== 'undefined' && typeof window.location !== 'undefined' ? window.location.pathname : '';
-      // Don't redirect if on split share page
       if (path.startsWith('/split/')) { setReady(true); return; }
       if (!session || event === 'SIGNED_OUT') {
+        setIsAuthenticated(false);
         setReady(false);
         router.replace('/');
         setReady(true);
       } else if (!session.user.user_metadata?.full_name) {
+        setIsAuthenticated(true);
         setReady(true);
         router.replace('/onboarding');
       } else {
+        setIsAuthenticated(true);
         setReady(true);
         if (!path || path === '/' || path === '/index') {
           router.replace('/(app)/(tabs)');
@@ -130,6 +133,7 @@ export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
     <Stack
+      key={isAuthenticated ? 'authed' : 'unauthed'}
       screenOptions={{
         headerShown: false,
         animation: 'slide_from_right',
