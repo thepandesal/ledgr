@@ -679,7 +679,7 @@ const s = StyleSheet.create({
   // ── Shared header
   waveBg:       { backgroundColor: HEADER_BG, paddingHorizontal: Spacing.page, paddingTop: 28, paddingBottom: 16, zIndex: 10, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#333' },
   appLabel:     { width: 36, height: 36, borderRadius: 18, backgroundColor: '#B6E1DE22', alignItems: 'center', justifyContent: 'center' },
-  appLabelText: { fontFamily: 'MuseoModerno_Black', fontSize: 18, color: HEADER_TEXT },
+  appLabelText: { fontFamily: Fonts.display, fontSize: 18, color: HEADER_TEXT },
   pageTitle:    { flex: 1, fontFamily: 'CalSans', fontSize: 20, color: HEADER_TEXT, letterSpacing: -0.3, textAlign: 'center' },
   pageSubtitle: { display: 'none' as any },
   waveTitleRow: { flex: 1, flexDirection: 'row', alignItems: 'center' },
@@ -699,10 +699,10 @@ const s = StyleSheet.create({
   navItem: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 3 },
   navIconWrap: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
   navIconWrapActive: {},
-  navLabel:       { fontFamily: 'ChillaxRegular', fontSize: 10, color: NAV_INACTIVE, letterSpacing: 0.4 },
-  navLabelActive: { fontFamily: 'ChillaxMedium',  fontSize: 10, color: NAV_ACCENT },
+  navLabel:       { fontFamily: Fonts.regular, fontSize: 10, color: NAV_INACTIVE, letterSpacing: 0.4 },
+  navLabelActive: { fontFamily: Fonts.semiBold, fontSize: 10, color: NAV_ACCENT },
   navBadge: { position: 'absolute', top: -2, right: -4, minWidth: 16, height: 16, borderRadius: 8, backgroundColor: '#ed6a6a', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
-  navBadgeText: { fontFamily: 'ChillaxMedium', fontSize: 9, color: '#fff', lineHeight: 14 },
+  navBadgeText: { fontFamily: Fonts.semiBold, fontSize: 9, color: '#fff', lineHeight: 14 },
 
   // Bubble
   bubbleWrap: {
@@ -717,8 +717,8 @@ const s = StyleSheet.create({
   bubbleGridItemActive: { backgroundColor: Colors.headerBg },
   bubbleGridIcon:       { width: 40, height: 40, borderRadius: Radius.md, backgroundColor: Colors.white, justifyContent: 'center', alignItems: 'center' },
   bubbleGridIconActive: { backgroundColor: 'rgba(255,255,255,0.15)' },
-  bubbleGridLabel:      { fontFamily: 'ChillaxRegular', fontSize: 10, color: Colors.text, textAlign: 'center' },
-  bubbleGridLabelActive:{ fontFamily: 'ChillaxMedium',  fontSize: 10, color: '#fff', textAlign: 'center' },
+  bubbleGridLabel:      { fontFamily: Fonts.regular, fontSize: 10, color: Colors.text, textAlign: 'center' },
+  bubbleGridLabelActive:{ fontFamily: Fonts.semiBold, fontSize: 10, color: '#fff', textAlign: 'center' },
   // legacy compat
   bubbleItem:         {},
   bubbleItemBorder:   {},
@@ -743,7 +743,7 @@ const p = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center',
     marginBottom: 4,
   },
-  avatarText: { fontFamily: 'MuseoModerno_Black', fontSize: 28, color: HEADER_TEXT },
+  avatarText: { fontFamily: Fonts.display, fontSize: 28, color: HEADER_TEXT },
   name:  { fontFamily: 'CalSans', fontSize: 22, color: Colors.text, letterSpacing: -0.3 },
   email: { fontFamily: Fonts.mono, fontSize: 12, color: Colors.muted },
 
@@ -757,7 +757,7 @@ const p = StyleSheet.create({
   rowIcon: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.surface, justifyContent: 'center', alignItems: 'center' },
   rowBody: { flex: 1, gap: 2 },
   rowLabel: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted, letterSpacing: 0.3, textTransform: 'uppercase' },
-  rowValue: { fontFamily: 'ChillaxMedium', fontSize: 14, color: Colors.text },
+  rowValue: { fontFamily: Fonts.display, fontSize: 14, color: Colors.text },
   divider:  { height: 0 }, // kept for compat but unused
 
   // ── Action buttons
@@ -767,7 +767,7 @@ const p = StyleSheet.create({
     borderWidth: 1, borderColor: Colors.border,
     paddingVertical: 14, marginTop: 8,
   },
-  logoutText: { fontFamily: 'ChillaxMedium', fontSize: 14, color: Colors.text },
+  logoutText: { fontFamily: Fonts.semiBold, fontSize: 14, color: Colors.text },
 
   deleteBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
@@ -775,7 +775,7 @@ const p = StyleSheet.create({
     borderWidth: 1, borderColor: PROFILE_DANGER,
     paddingVertical: 14,
   },
-  deleteText: { fontFamily: 'ChillaxMedium', fontSize: 14, color: PROFILE_DANGER },
+  deleteText: { fontFamily: Fonts.semiBold, fontSize: 14, color: PROFILE_DANGER },
 
   // ── Modals
   modalOverlay: {

@@ -1004,7 +1004,7 @@ const s = StyleSheet.create({
   saveBtnText:     { fontFamily: Fonts.monoBold, fontSize: 13, color: Colors.text },
   budgetWrap:      { gap: 6, padding: 14, backgroundColor: Colors.surface, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.border, marginTop: 10 },
   budgetLabelRow:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  budgetLabel:     { fontFamily: 'ChillaxRegular', fontSize: 11, color: Colors.muted, letterSpacing: 0.3 },
+  budgetLabel:     { fontFamily: Fonts.regular, fontSize: 11, color: Colors.muted, letterSpacing: 0.3 },
   budgetValue:     { fontFamily: Fonts.monoBold, fontSize: 11, color: Colors.text, letterSpacing: 0.2 },
   budgetTrack:     { height: 6, backgroundColor: Colors.border, borderRadius: Radius.pill, overflow: 'hidden' },
   budgetFill:      { height: '100%', borderRadius: Radius.pill },

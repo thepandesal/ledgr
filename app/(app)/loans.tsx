@@ -270,8 +270,8 @@ const s = StyleSheet.create({
   row:         { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: Colors.border },
   rowIconWrap: { width: 34, height: 34, borderRadius: 17, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.surface },
   rowMid:      { flex: 1, gap: 2 },
-  rowType:     { fontFamily: 'ChillaxRegular', fontSize: 10, color: Colors.muted, letterSpacing: 0.4, textTransform: 'uppercase' },
-  rowName:     { fontFamily: 'ChillaxMedium', fontSize: 14, color: Colors.text, letterSpacing: 0.1, lineHeight: 20 },
+  rowType:     { fontFamily: Fonts.regular, fontSize: 10, color: Colors.muted, letterSpacing: 0.4, textTransform: 'uppercase' },
+  rowName:     { fontFamily: Fonts.display, fontSize: 14, color: Colors.text, letterSpacing: 0.1, lineHeight: 20 },
   rowSub:      { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted },
   rowAmount:   { fontFamily: Fonts.monoBold, fontSize: 14, letterSpacing: -0.3 },
 

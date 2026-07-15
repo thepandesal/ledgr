@@ -447,7 +447,7 @@ export default function SpacesScreen() {
             {pendingInvites.map(invite => (
               <View key={invite.id} style={{ backgroundColor: ACCENT + '22', borderRadius: Radius.lg, padding: 14, gap: 8 }}>
                 <View style={{ gap: 2 }}>
-                  <Text style={{ fontFamily: 'ChillaxMedium', fontSize: 13, color: Colors.text }}>{invite.spaceName}</Text>
+                  <Text style={{ fontFamily: Fonts.display, fontSize: 13, color: Colors.text }}>{invite.spaceName}</Text>
                   <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted }}>
                     from {invite.ownerName} · role: {invite.role}
                   </Text>
@@ -885,8 +885,8 @@ const s = StyleSheet.create({
   tabCircleActive:      { backgroundColor: ACCENT },
   tabCircleValue:       { fontFamily: Fonts.monoBold, fontSize: 14, color: Colors.muted },
   tabCircleValueActive: { color: ACCENT_TEXT },
-  tabLabel:             { fontFamily: 'ChillaxRegular', fontSize: 9, color: Colors.muted, marginTop: 5, letterSpacing: 0.2 },
-  tabLabelActive:       { fontFamily: 'ChillaxMedium', fontSize: 9, color: ACCENT_TEXT },
+  tabLabel:             { fontFamily: Fonts.regular, fontSize: 9, color: Colors.muted, marginTop: 5, letterSpacing: 0.2 },
+  tabLabelActive:       { fontFamily: Fonts.semiBold, fontSize: 9, color: ACCENT_TEXT },
 
   // ── Empty ────────────────────────────────────────────────────────────────
   emptyWrap: { paddingVertical: 48, alignItems: 'center', paddingHorizontal: Spacing.page },
@@ -899,7 +899,7 @@ const s = StyleSheet.create({
   // ── Card ─────────────────────────────────────────────────────────────────
   card:         { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, borderRadius: Radius.pill, borderWidth: 1, borderColor: Colors.border, marginBottom: 10 },
   cardLeft:     { width: 120, gap: 4, paddingLeft: 8, paddingRight: 12, marginRight: 12, borderRightWidth: 3, borderRightColor: ACCENT },
-  cardName:     { fontFamily: 'ChillaxMedium', fontSize: 14, color: Colors.text },
+  cardName:     { fontFamily: Fonts.display, fontSize: 14, color: Colors.text },
   cardMeta:     { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted },
   cardRight:    { flex: 1, gap: 3 },
   cardRow:      { flexDirection: 'row', alignItems: 'center', gap: 8 },

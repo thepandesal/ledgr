@@ -139,7 +139,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.white },
   inner: { flex: 1, paddingHorizontal: 24, justifyContent: 'center', gap: 12 },
   welcome: {
-    fontFamily: 'MuseoModerno_Black',
+    fontFamily: 'CalSans',
     fontSize: 14,
     color: Colors.cyan,
     letterSpacing: 2,

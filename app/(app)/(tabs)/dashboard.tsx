@@ -994,8 +994,8 @@ const s = StyleSheet.create({
   row:         { backgroundColor: Colors.white, borderRadius: Radius.xl, flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14 },
   rowIconWrap: { width: 46, height: 46, borderRadius: 23, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.surface },
   rowMid:      { flex: 1, gap: 2 },
-  rowType:     { fontFamily: 'ChillaxRegular', fontSize: 10, color: Colors.muted, letterSpacing: 0.4, textTransform: 'uppercase' },
-  rowName:     { fontFamily: 'ChillaxMedium',  fontSize: 14, color: Colors.text, letterSpacing: 0.1, lineHeight: 20 },
+  rowType:     { fontFamily: Fonts.regular, fontSize: 10, color: Colors.muted, letterSpacing: 0.4, textTransform: 'uppercase' },
+  rowName:     { fontFamily: Fonts.display,  fontSize: 14, color: Colors.text, letterSpacing: 0.1, lineHeight: 20 },
   rowSpace:    { fontFamily: Fonts.mono,        fontSize: 11, color: Colors.faint, letterSpacing: 0.2 },
   rowAmount:   { fontFamily: Fonts.monoBold,    fontSize: 15, letterSpacing: -0.4 },
 
