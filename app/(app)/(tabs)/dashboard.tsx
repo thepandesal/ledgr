@@ -102,6 +102,8 @@ export default function DashboardScreen() {
     ? { from: customFrom, to: customTo }
     : getRangeForPreset(activePreset, cutoffDay, rangeOffset);
 
+  const settingsLoadedRef = useRef(false);
+
   // ── load saved settings ──
   useQuery({
     queryKey: ['user-settings', userId],
@@ -112,6 +114,10 @@ export default function DashboardScreen() {
         .eq('user_id', userId)
         .maybeSingle();
       if (!data) return data;
+
+      // Only apply on first load — never overwrite user navigation
+      if (settingsLoadedRef.current) return data;
+      settingsLoadedRef.current = true;
 
       // Apply global spaces filter settings first (as defaults)
       const globalMode   = data.spaces_date_mode   ?? 'monthly';
@@ -164,7 +170,6 @@ export default function DashboardScreen() {
         { onConflict: 'user_id' }
       );
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['user-settings', userId] }),
   });
 
   const applyPreset = (key: Preset, cutoff?: number) => {
@@ -298,7 +303,7 @@ export default function DashboardScreen() {
 
   const isAll = selectedTabs.has('all');
   const currentTypes = isAll
-    ? ['income','expense','debt','due','return','payment']
+    ? ['income','expense','debt','due','receivable','return']
     : ACTIVITY_TABS.filter(t => t.key !== 'all' && selectedTabs.has(t.key)).flatMap(t => t.types as string[]);
 
   const effectiveTypes = currentTypes;
@@ -311,7 +316,8 @@ export default function DashboardScreen() {
   const filtered = recordings.filter(r => {
     if (!effectiveTypes.includes(r.type)) return false;
     if (r.status === 'voided') return false;
-    // When Due tab is selected, only show is_due expenses (not all expenses)
+    if (r.type === 'return'  && r.linked_recording_id) return false;
+    if (r.type === 'payment' && r.linked_recording_id) return false;
     if (!isAll && selectedTabs.has('receivables') && r.type === 'expense' && !r.is_due) return false;
     if (!isAllSpaces     && !selectedSpaces.has(r.space_id))                    return false;
     if (!isAllCategories && !selectedCategories.has(r.category_id)) return false;
@@ -365,7 +371,7 @@ export default function DashboardScreen() {
     return date <= to;
   });
 
-  const moneyInTotal  = allRecordings(['income', 'due', 'return']).reduce((s, r) =>
+  const moneyInTotal  = allRecordings(['income', 'due', 'receivable', 'return']).reduce((s, r) =>
     s + convert(Number(r.amount), r.currency ?? defaultCurrency, defaultCurrency), 0);
   const moneyOutTotal = allRecordings(['expense', 'debt', 'payment']).reduce((s, r) =>
     s + convert(Number(r.amount), r.currency ?? defaultCurrency, defaultCurrency), 0);
@@ -538,8 +544,8 @@ export default function DashboardScreen() {
             selectedTabs={selectedTabs}
             onToggle={handleTabToggle}
             tabValue={tabValue}
-            activeColor={ACCENT}
-            activeTextColor={ACCENT_TEXT}
+            activeColor='#7fd8cd'
+            activeTextColor='#fff'
           />
           <View style={s.filterRow}>
             <View style={s.dateNavRow}>

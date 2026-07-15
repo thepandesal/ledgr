@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
+import Constants from 'expo-constants';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import type { User } from '@supabase/supabase-js';
@@ -24,13 +25,25 @@ function generateProfileCode(): string {
 
 async function registerPushToken(userId: string) {
   if (Platform.OS === 'web') return;
-  const { status } = await Notifications.requestPermissionsAsync();
-  if (status !== 'granted') return;
-  const token = (await Notifications.getExpoPushTokenAsync()).data;
-  await supabase.from('push_tokens').upsert(
-    { user_id: userId, token, platform: Platform.OS },
-    { onConflict: 'user_id,token' }
-  );
+  try {
+    const { status: existing } = await Notifications.getPermissionsAsync();
+    let finalStatus = existing;
+    if (existing !== 'granted') {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+    if (finalStatus !== 'granted') return;
+    const { data: token } = await Notifications.getExpoPushTokenAsync({
+      projectId: Constants.expoConfig?.extra?.eas?.projectId,
+    });
+    if (!token) return;
+    await supabase.from('push_tokens').upsert(
+      { user_id: userId, token, platform: Platform.OS },
+      { onConflict: 'user_id,token' }
+    );
+  } catch (e) {
+    console.warn('[push] token registration failed:', e);
+  }
 }
 
 /**
@@ -68,16 +81,20 @@ export function useUser(): UseUserResult {
         .maybeSingle();
       if (!data?.profile_code) {
         const code = generateProfileCode();
-        await supabase.from('user_settings').upsert(
-          { user_id: user!.id, profile_code: code, updated_at: new Date().toISOString() },
-          { onConflict: 'user_id' }
-        );
-        return { ...data, profile_code: code };
+        const { data: upserted } = await supabase
+          .from('user_settings')
+          .upsert(
+            { user_id: user!.id, profile_code: code, updated_at: new Date().toISOString() },
+            { onConflict: 'user_id' }
+          )
+          .select('profile_code, default_currency')
+          .maybeSingle();
+        return upserted ?? { profile_code: code, default_currency: data?.default_currency ?? 'PHP' };
       }
       return data;
     },
     enabled: !!user?.id,
-    staleTime: Infinity,
+    staleTime: 5 * 60 * 1000,
   });
 
   const setDefaultCurrency = async (currency: string) => {

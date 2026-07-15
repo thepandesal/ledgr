@@ -1,10 +1,10 @@
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  SafeAreaView, Animated, Dimensions, ScrollView, ActivityIndicator,
+  ScrollView, ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useUser } from '../../src/hooks/useUser';
 import { supabase } from '../../src/lib/supabase';
@@ -12,7 +12,6 @@ import ConfirmModal from '@/components/ui/ConfirmModal';
 import { Colors, Fonts, Radius, Spacing } from '@/components/ui/theme';
 import { Brand } from '../../src/lib/brand';
 
-const { width } = Dimensions.get('window');
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
 function isSameDay(a: Date, b: Date) {
@@ -21,9 +20,7 @@ function isSameDay(a: Date, b: Date) {
 
 export default function ReceivablesScreen() {
   const router = useRouter();
-  const slideAnim = useRef(new Animated.Value(width)).current;
   const { userId } = useUser();
-
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
   const [dateFrom, setDateFrom] = useState<Date | null>(null);
   const [dateTo, setDateTo] = useState<Date | null>(null);
@@ -32,11 +29,7 @@ export default function ReceivablesScreen() {
   const [pickerYear, setPickerYear] = useState(new Date().getFullYear());
   const [pickingDate, setPickingDate] = useState<'from' | 'to'>('from');
 
-  useEffect(() => {
-    Animated.timing(slideAnim, { toValue: 0, duration: 280, useNativeDriver: true }).start();
-  }, []);
-
-  const { data: receivables = [], isLoading } = useQuery({
+const { data: receivables = [], isLoading } = useQuery({
     queryKey: ['receivables', userId],
     queryFn: async () => {
       const { data } = await supabase
@@ -117,44 +110,30 @@ export default function ReceivablesScreen() {
   };
 
   const statusColor = (status: string) => {
-    if (status === 'received') return Colors.income;
-    if (status === 'partial') return Colors.cyan;
-    return Colors.pending;
+    if (status === 'received') return Brand.color.accentDark;
+    if (status === 'partial') return Brand.color.accentDark;
+    return '#FFAB91'; // peach — pending/unreceived
   };
 
   const statusBg = (status: string) => {
-    if (status === 'received') return '#f0fff8';
-    if (status === 'partial') return '#f0f8ff';
-    return '#f8edfd';
+    if (status === 'received') return Brand.color.accent + '22';
+    if (status === 'partial') return Brand.color.accent + '22';
+    return '#FFAB91' + '22';
   };
 
   const firstDay = new Date(pickerYear, pickerMonth, 1).getDay();
   const daysInMonth = new Date(pickerYear, pickerMonth + 1, 0).getDate();
   const cells = Array(firstDay).fill(null).concat(Array.from({ length: daysInMonth }, (_, i) => i + 1));
 
-  const handleBack = () => {
-    Animated.timing(slideAnim, { toValue: width, duration: 250, useNativeDriver: true }).start(() => router.back());
-  };
-
   return (
-    <Animated.View style={[{ flex: 1, backgroundColor: Colors.white }, { transform: [{ translateX: slideAnim }] }]}>
-      <SafeAreaView style={{ flex: 1 }}>
-
-        {/* Dark header */}
-        <View style={s.header}>
-          <TouchableOpacity onPress={handleBack} style={s.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="arrow-back" size={20} color={Brand.color.accent} />
-          </TouchableOpacity>
-          <Text style={s.headerTitle}>receivables</Text>
-          <View style={{ width: 36 }} />
-        </View>
+    <View style={{ flex: 1 }}>
 
         {/* Stats as filter toggles */}
         <View style={{ flexDirection: 'row', gap: 8, marginHorizontal: Spacing.page, marginTop: 14, marginBottom: 16 }}>
           {[
-            { key: 'pending',    label: 'pending',       value: countPending, color: Colors.pending },
-            { key: 'unreceived', label: 'pending total', value: totalPending.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }), color: Colors.expense },
-            { key: 'received',   label: 'received',      value: totalReceived.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }), color: Colors.income },
+            { key: 'pending',    label: 'pending',       value: countPending, color: '#FFAB91' },
+            { key: 'unreceived', label: 'pending total', value: totalPending.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }), color: '#FFAB91' },
+            { key: 'received',   label: 'received',      value: totalReceived.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }), color: Brand.color.accentDark },
           ].map((st) => {
             const isActive = activeFilters.includes(st.key);
             return (
@@ -225,7 +204,6 @@ export default function ReceivablesScreen() {
             ))}
           </ScrollView>
         )}
-      </SafeAreaView>
 
       {/* Date range picker */}
       <ConfirmModal
@@ -272,7 +250,7 @@ export default function ReceivablesScreen() {
           })}
         </View>
       </ConfirmModal>
-    </Animated.View>
+    </View>
   );
 }
 
