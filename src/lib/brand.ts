@@ -52,7 +52,7 @@ export const BrandColors = {
 
 export const BrandFonts = {
   display:        'CalSans',              // page titles, space names
-  appLabel:       'DMSans_700Bold',       // LEDGR wordmark
+  appLabel:       'CalSans',              // LEDGR wordmark
   heading:        'DMSans_600SemiBold',   // section headings, card names
   headingBold:    'DMSans_700Bold',       // strong headings
   body:           'DMSans_400Regular',    // body text, nav labels, subtitles

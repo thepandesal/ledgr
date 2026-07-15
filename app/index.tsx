@@ -96,8 +96,8 @@ const s = StyleSheet.create({
     paddingHorizontal: 48,
     marginTop: 8,
   },
-  brand:     { fontFamily: 'MuseoModerno_Black', fontSize: 72, color: Colors.cyan, letterSpacing: -1, marginBottom: 4 },
-  tagline:   { fontFamily: 'ChillaxMedium', fontSize: 14, color: Colors.text, marginBottom: 32 },
+  brand:     { fontFamily: 'CalSans', fontSize: 72, color: Colors.cyan, letterSpacing: -1, marginBottom: 4 },
+  tagline:   { fontFamily: 'DMSans_400Regular', fontSize: 14, color: Colors.text, marginBottom: 32 },
   buttons:   { width: '100%', gap: 12 },
   button: {
     borderRadius: 999,
