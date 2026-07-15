@@ -21,6 +21,17 @@ workflows:
     scripts:
       - name: Install dependencies
         script: npm install
+      - name: Write env file
+        script: |
+          cat > .env << 'EOF'
+          EXPO_PUBLIC_SUPABASE_URL=https://vzylpnuvsuianmuwqsnr.supabase.co
+          EXPO_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_SE1OPKy63BYHkZfQkbIb_A_nAgXKGTQ
+          EXPO_PUBLIC_R2_ENDPOINT=https://8095a062e38cbfdda1283f4df7a57621.r2.cloudflarestorage.com
+          EXPO_PUBLIC_R2_ACCESS_KEY=a0a80ae15d748c118b0d5f742b0c3cd0
+          EXPO_PUBLIC_R2_SECRET_KEY=aaed9dc2a6e6cc13a8c542bf6347c78ec7b8ce895d39cd485c4aca5c2a8fd5c4
+          EXPO_PUBLIC_R2_BUCKET=ledgr-receipts
+          EXPO_PUBLIC_R2_PUBLIC_URL=https://cdn.ledgr.art
+          EOF
       - name: Expo prebuild
         script: npx expo prebuild --clean --platform ios
       - name: Install CocoaPods
