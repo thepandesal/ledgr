@@ -104,7 +104,6 @@ const s = StyleSheet.create({
     paddingVertical: 14,
     alignItems: 'center',
     borderWidth: 3,
-    borderStyle: 'dotted',
     borderColor: '#929090',
     backgroundColor: '#ffffff',
   },

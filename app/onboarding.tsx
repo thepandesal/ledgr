@@ -1,6 +1,6 @@
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  SafeAreaView, ActivityIndicator, KeyboardAvoidingView, Platform,
+  SafeAreaView, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
