@@ -31,6 +31,10 @@ const queryClient = new QueryClient({
   },
 });
 
+ErrorUtils.setGlobalHandler((error, isFatal) => {
+  console.error('[global error]', isFatal ? 'FATAL' : 'non-fatal', error?.message, error?.stack);
+});
+
 export default function RootLayout() {
   const [fontsLoaded, setFontsLoaded] = useState(false);
 
@@ -102,13 +106,16 @@ export default function RootLayout() {
   }, []);
 
   // Handle OAuth code on web (redirected back with ?code=...)
+  const [exchangingCode, setExchangingCode] = useState(false);
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const params = new URLSearchParams(window.location.search);
     const code = params.get('code');
     if (code) {
+      setExchangingCode(true);
       supabase.auth.exchangeCodeForSession(code).then(() => {
         window.history.replaceState({}, '', '/');
+        setExchangingCode(false);
       });
     }
   }, []);
@@ -117,9 +124,13 @@ export default function RootLayout() {
   useEffect(() => {
     const handleUrl = async (url: string) => {
       if (url.includes('access_token') || url.includes('code=')) {
-        const { data } = await supabase.auth.getSessionFromUrl ? 
-          (supabase.auth as any).getSessionFromUrl({ url }) :
-          { data: null };
+        try {
+          if (typeof (supabase.auth as any).getSessionFromUrl === 'function') {
+            await (supabase.auth as any).getSessionFromUrl({ url });
+          }
+        } catch (e) {
+          console.warn('[auth] getSessionFromUrl failed:', e);
+        }
       }
     };
     Linking.getInitialURL().then(url => { if (url) handleUrl(url); });
@@ -165,7 +176,7 @@ export default function RootLayout() {
     return () => subscription.unsubscribe();
   }, [fontsLoaded]);
 
-  if (!fontsLoaded || !ready) {
+  if (!fontsLoaded || !ready || exchangingCode) {
     return (
       <View style={{ flex: 1, backgroundColor: '#f5f5f5', justifyContent: 'center', alignItems: 'center' }}>
         <ActivityIndicator color="#00bf63" />
