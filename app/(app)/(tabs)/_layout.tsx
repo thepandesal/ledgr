@@ -1,7 +1,7 @@
 import { View, TouchableOpacity, Text, StyleSheet, Animated, Dimensions, Platform, SafeAreaView, ScrollView, useWindowDimensions, Clipboard, TextInput, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useState, useRef, memo, useCallback, useEffect }from 'react';
+import { useState, useRef, memo, useCallback, useEffect } from 'react';
 import { BlurView } from 'expo-blur';
 import SpacesScreen from './spaces';
 import AccountsScreen from './accounts';
@@ -13,7 +13,7 @@ import DashboardScreen from './dashboard';
 import NotificationsScreen from '../notifications';
 import RemindersScreen from './reminders';
 import { Colors, Fonts, Radius, Spacing } from '@/components/ui/theme';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { supabase } from '../../../src/lib/supabase';
 import { useUser } from '../../../src/hooks/useUser';
 import TourTarget from '@/components/TourTarget';
@@ -65,12 +65,12 @@ const OTHERS_ITEMS = [
   { key: 'contacts',    label: 'Contacts',    icon: 'people-circle-outline', route: null },
   { key: 'categories',  label: 'Categories',  icon: 'pricetag-outline',      route: null },
   { key: 'reminders',   label: 'Reminders',   icon: 'alarm-outline',         route: null },
-  { key: 'loans',       label: 'Loans',       icon: 'cash-outline',          route: '/(app)/loans' },
-  { key: 'receivables', label: 'Receivables', icon: 'arrow-undo-outline',    route: '/(app)/receivables' },
+  { key: 'loans',       label: 'Loans',       icon: 'cash-outline',          route: null },
+  { key: 'receivables', label: 'Receivables', icon: 'arrow-undo-outline',    route: null },
   { key: 'profile',     label: 'Profile',     icon: 'person-outline',        route: null },
 ];
 
-const SLIDE_KEYS = ['spaces', 'accounts', 'dashboard', 'categories', 'receipts', 'bill-split', 'contacts', 'notifications-page', 'reminders', 'profile'];
+const SLIDE_KEYS = ['spaces', 'accounts', 'dashboard', 'categories', 'receipts', 'bill-split', 'contacts', 'notifications-page', 'reminders', 'loans', 'receivables', 'profile'];
 
 const PROFILE_DANGER   = '#FFAB91';
 const PROFILE_DANGEBG  = '#FFF5F2';
@@ -84,6 +84,11 @@ const MemoContacts       = memo(ContactsScreen);
 const MemoNotifications  = memo(NotificationsScreen);
 const MemoReminders      = memo(RemindersScreen);
 
+import LoansScreen from '../loans';
+import ReceivablesScreen from '../receivables';
+const MemoLoans       = memo(LoansScreen);
+const MemoReceivables = memo(ReceivablesScreen);
+
 const SCREENS: Record<string, React.ReactNode> = {
   spaces:               <MemoSpaces />,
   accounts:             <MemoAccounts />,
@@ -94,6 +99,8 @@ const SCREENS: Record<string, React.ReactNode> = {
   contacts:             <MemoContacts />,
   'notifications-page': <MemoNotifications />,
   reminders:            <MemoReminders />,
+  loans:                <MemoLoans />,
+  receivables:          <MemoReceivables />,
 };
 
 const CURRENCIES = [
@@ -348,12 +355,13 @@ const NAV_TOUR_IDS: Record<string, string> = {
 
 export default function TabsLayout() {
   const router = useRouter();
+  const { tab: initialTab } = useLocalSearchParams<{ tab?: string }>();
   const { width: W } = useWindowDimensions();
   const { user } = useUser();
   const insets = useSafeAreaInsets();
-  const [activeTab, setActiveTab] = useState('spaces');
+  const [activeTab, setActiveTab] = useState(initialTab ?? 'spaces');
   const [othersOpen, setOthersOpen] = useState(false);
-  const activeTabRef = useRef('spaces');
+  const activeTabRef = useRef(initialTab ?? 'spaces');
   const titleAnim = useRef(new Animated.Value(1)).current;
   const blurAnim   = useRef(new Animated.Value(0)).current;
   const [blurActive, setBlurActive] = useState(false);
@@ -405,11 +413,13 @@ export default function TabsLayout() {
   }, [userId]);
 
   useEffect(() => {
-    fetchUnread();
     if (!userId) return;
-    // Realtime subscription — badge updates live on new notification
+    fetchUnread();
+    const channelName = `notifications-badge-${userId}`;
+    const existing = supabase.getChannels().find(c => c.topic === `realtime:${channelName}`);
+    if (existing) supabase.removeChannel(existing);
     const channel = supabase
-      .channel('notifications-badge')
+      .channel(channelName)
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
@@ -418,7 +428,7 @@ export default function TabsLayout() {
       }, () => fetchUnread())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [userId, fetchUnread]);
+  }, [userId]);
 
   const slideAnims = useRef<Record<string, Animated.Value>>(
     Object.fromEntries(SLIDE_KEYS.map((k, i) => [k, new Animated.Value(i === 0 ? 0 : width)]))
@@ -426,18 +436,24 @@ export default function TabsLayout() {
 
   // Notification slide anim — no longer needed (notifications-page is in SLIDE_KEYS)
 
+  const [mountedTabs, setMountedTabs] = useState<Set<string>>(() => new Set([initialTab ?? 'spaces']));
+
   const switchTab = useCallback((key: string) => {
     if (key === activeTabRef.current) return;
+    setMountedTabs(prev => { prev.add(key); return new Set(prev); });
     const prev = activeTabRef.current;
     activeTabRef.current = key;
 
     const incoming = slideAnims[key];
     const outgoing = slideAnims[prev];
-    incoming?.setValue(width);
+    const prevIndex = SLIDE_KEYS.indexOf(prev);
+    const nextIndex = SLIDE_KEYS.indexOf(key);
+    const direction = nextIndex >= prevIndex ? 1 : -1;
+    incoming?.setValue(width * direction);
 
     Animated.parallel([
       Animated.timing(incoming, { toValue: 0, duration: 320, useNativeDriver: true }),
-      Animated.timing(outgoing, { toValue: -width, duration: 320, useNativeDriver: true }),
+      Animated.timing(outgoing, { toValue: -width * direction, duration: 320, useNativeDriver: true }),
     ]).start(() => { outgoing?.setValue(width); });
 
     Animated.timing(titleAnim, { toValue: 0, duration: 180, useNativeDriver: true }).start(() => {
@@ -454,7 +470,7 @@ export default function TabsLayout() {
     ]).start();
   }, []);
 
-  const closeOthers = useCallback(() => {
+const closeOthers = useCallback(() => {
     Animated.parallel([
       Animated.timing(bubbleAnim,  { toValue: 0, duration: 180, useNativeDriver: true }),
       Animated.timing(bubbleScale, { toValue: 0.92, duration: 180, useNativeDriver: true }),
@@ -546,7 +562,7 @@ export default function TabsLayout() {
             style={[s.screen, { transform: [{ translateX: slideAnims[key] }], zIndex: activeTab === key ? 10 : 0 }]}
             pointerEvents={activeTab === key ? 'auto' : 'none'}
           >
-            {key === 'profile' ? <MemoProfile /> : SCREENS[key]}
+            {mountedTabs.has(key) ? (key === 'profile' ? <MemoProfile /> : SCREENS[key]) : null}
           </Animated.View>
         ))}
       </View>
@@ -634,36 +650,24 @@ function BubbleContent({ items, activeTab, onPress, unreadCount }: {
   unreadCount: number;
 }) {
   return (
-    <>
-      {items.map((item, i) => {
+    <View style={s.bubbleGrid}>
+      {items.map((item) => {
         const isActive = activeTab === item.key;
-        const showBadge = false;
         return (
           <TouchableOpacity
             key={item.key}
-            style={[s.bubbleItem, i < items.length - 1 && s.bubbleItemBorder]}
+            style={[s.bubbleGridItem, isActive && s.bubbleGridItemActive]}
             onPress={() => onPress(item)}
             activeOpacity={0.7}
           >
-            <View style={[s.bubbleIconWrap, isActive && s.bubbleIconWrapActive]}>
-              <Ionicons name={item.icon as any} size={16} color={isActive ? NAV_ACCENT : Colors.text} />
-              {showBadge && (
-                <View style={s.bubbleBadge}>
-                  <Text style={s.navBadgeText}>{unreadCount > 9 ? '9+' : String(unreadCount)}</Text>
-                </View>
-              )}
+            <View style={[s.bubbleGridIcon, isActive && s.bubbleGridIconActive]}>
+              <Ionicons name={item.icon as any} size={20} color={isActive ? '#fff' : Colors.text} />
             </View>
-            <Text style={[s.bubbleItemLabel, isActive && s.bubbleItemLabelActive]}>{item.label}</Text>
-            {showBadge && (
-              <View style={s.bubbleBadgeLabel}>
-                <Text style={s.bubbleBadgeLabelText}>{unreadCount > 9 ? '9+' : String(unreadCount)}</Text>
-              </View>
-            )}
-            <Ionicons name="chevron-forward" size={12} color={Colors.faint} style={{ marginLeft: showBadge ? 0 : 'auto' }} />
+            <Text style={[s.bubbleGridLabel, isActive && s.bubbleGridLabelActive]}>{item.label}</Text>
           </TouchableOpacity>
         );
       })}
-    </>
+    </View>
   );
 }
 
@@ -706,17 +710,25 @@ const s = StyleSheet.create({
     borderRadius: Radius.xl, overflow: 'hidden', zIndex: 100,
     borderWidth: 1, borderColor: Colors.border,
   },
-  bubbleInner:        { paddingVertical: 6, borderRadius: Radius.xl, overflow: 'hidden' },
+  bubbleInner:        { paddingVertical: 12, paddingHorizontal: 12, borderRadius: Radius.xl, overflow: 'hidden' },
   bubbleInnerAndroid: { backgroundColor: 'rgba(255,255,255,0.97)' },
-  bubbleItem:         { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, paddingHorizontal: 20 },
-  bubbleItemBorder:   { borderBottomWidth: 1, borderBottomColor: Colors.border },
-  bubbleIconWrap:       { width: 32, height: 32, borderRadius: Radius.md, backgroundColor: Colors.surface, justifyContent: 'center', alignItems: 'center' },
-  bubbleIconWrapActive: { backgroundColor: BUBBLE_ACTIVE_BG },
-  bubbleItemLabel:       { fontFamily: 'ChillaxRegular', fontSize: 14, color: Colors.text },
-  bubbleItemLabelActive: { fontFamily: 'ChillaxMedium',  fontSize: 14, color: NAV_ACCENT },
-  bubbleBadge:           { position: 'absolute', top: -4, right: -4, minWidth: 16, height: 16, borderRadius: 8, backgroundColor: '#ed6a6a', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
-  bubbleBadgeLabel:      { marginLeft: 'auto', minWidth: 20, height: 20, borderRadius: 10, backgroundColor: '#ed6a6a', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },
-  bubbleBadgeLabelText:  { fontFamily: 'ChillaxMedium', fontSize: 10, color: '#fff', lineHeight: 14 },
+  bubbleGrid:         { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  bubbleGridItem:     { width: '22%', alignItems: 'center', gap: 6, paddingVertical: 12, borderRadius: Radius.lg, backgroundColor: Colors.surface },
+  bubbleGridItemActive: { backgroundColor: Colors.headerBg },
+  bubbleGridIcon:       { width: 40, height: 40, borderRadius: Radius.md, backgroundColor: Colors.white, justifyContent: 'center', alignItems: 'center' },
+  bubbleGridIconActive: { backgroundColor: 'rgba(255,255,255,0.15)' },
+  bubbleGridLabel:      { fontFamily: 'ChillaxRegular', fontSize: 10, color: Colors.text, textAlign: 'center' },
+  bubbleGridLabelActive:{ fontFamily: 'ChillaxMedium',  fontSize: 10, color: '#fff', textAlign: 'center' },
+  // legacy compat
+  bubbleItem:         {},
+  bubbleItemBorder:   {},
+  bubbleIconWrap:       {},
+  bubbleIconWrapActive: {},
+  bubbleItemLabel:       {},
+  bubbleItemLabelActive: {},
+  bubbleBadge:           {},
+  bubbleBadgeLabel:      {},
+  bubbleBadgeLabelText:  {},
 });
 
 const p = StyleSheet.create({

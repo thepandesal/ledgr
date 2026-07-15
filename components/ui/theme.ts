@@ -41,35 +41,33 @@ export const Colors = {
 } as const;
 
 export const Fonts = {
-  // Display — page titles, space names
+  // Display — page titles
   display: 'CalSans',
 
-  // Section headers — Chillax
-  heading: 'ChillaxMedium',
-  headingRegular: 'ChillaxRegular',
-  headingBold: 'ChillaxBold',
-  headingSemibold: 'ChillaxSemibold',
-  headingLight: 'ChillaxLight',
+  // Primary UI font — DM Sans
+  heading:        'DMSans_600SemiBold',
+  headingRegular: 'DMSans_400Regular',
+  headingBold:    'DMSans_700Bold',
+  headingSemibold:'DMSans_600SemiBold',
+  headingLight:   'DMSans_400Regular',
 
-  // Museo Moderno
-  museoBlack: 'MuseoModerno_Black',
-  museoMedium: 'MuseoModerno_Medium',
+  // Museo / CalSans / Glacial kept but not actively used
+  museoBlack:   'MuseoModerno_Black',
+  museoMedium:  'MuseoModerno_Medium',
   museoRegular: 'MuseoModerno_Regular',
+  calSans:      'CalSans',
+  glacial:      'GlacialIndifference',
+  glacialBold:  'GlacialIndifferenceBold',
 
-  // CalSans
-  calSans: 'CalSans',
-  glacial: 'GlacialIndifference',
-  glacialBold: 'GlacialIndifferenceBold',
+  // Body / data / labels — DM Sans
+  mono:     'DMSans_400Regular',
+  monoBold: 'DMSans_600SemiBold',
 
-  // Body / data / labels
-  mono: 'RobotoMono_400Regular',
-  monoBold: 'RobotoMono_700Bold',
-
-  // General UI (login, onboarding, categories, spaces setup)
-  sans: 'DMSans_400Regular',
-  sansMedium: 'DMSans_500Medium',
+  // General UI
+  sans:         'DMSans_400Regular',
+  sansMedium:   'DMSans_500Medium',
   sansSemiBold: 'DMSans_600SemiBold',
-  sansBold: 'DMSans_700Bold',
+  sansBold:     'DMSans_700Bold',
 } as const;
 
 export const Radius = {

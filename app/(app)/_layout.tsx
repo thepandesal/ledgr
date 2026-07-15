@@ -20,6 +20,7 @@ export default function AppLayout() {
       <Stack.Screen name="loans" options={{ animation: 'none', presentation: 'transparentModal' }} />
       <Stack.Screen name="receivables" options={{ animation: 'none', presentation: 'transparentModal' }} />
       <Stack.Screen name="notifications" options={{ animation: 'none', presentation: 'transparentModal' }} />
+      <Stack.Screen name="tag-detail" options={{ animation: 'none', presentation: 'transparentModal' }} />
       <Stack.Screen name="crop-qr" options={{ animation: 'fade', presentation: 'fullScreenModal', headerShown: false }} />
       <Stack.Screen name="capture-receipt" options={{ animation: 'none', presentation: 'transparentModal' }} />
     </Stack>

@@ -2,7 +2,7 @@
   "expo": {
     "name": "Ledgr",
     "slug": "ledgr",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "orientation": "portrait",
     "icon": "./assets/logo.png",
     "scheme": "ledgr",
@@ -11,34 +11,29 @@
       "favicon": "./assets/logo.png",
       "bundler": "metro"
     },
-    "assets": [
-      "./assets/avenelle.ttf",
-      "./assets/CalSans-Regular.ttf",
-      "./assets/MuseoModerno-Black.ttf",
-      "./assets/MuseoModerno-Medium.ttf",
-      "./assets/MuseoModerno-Regular.ttf",
-      "./assets/Chillax-Medium.otf",
-      "./assets/Chillax-Regular.otf",
-      "./assets/Chillax-Bold.otf",
-      "./assets/Chillax-Semibold.otf",
-      "./assets/Chillax-Light.otf",
-      "./assets/GlacialIndifference-Regular.otf",
-      "./assets/GlacialIndifference-Bold.otf"
-    ],
     "plugins": [
       "expo-router",
       "expo-font",
-      ["expo-notifications", {
-        "icon": "./assets/icon.png",
-        "color": "#1A1A1A"
-      }]
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#1A1A1A"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
     },
+    "extra": {
+      "eas": {
+        "projectId": "07745f0d-5f7b-4905-bdc7-1608e505f595"
+      },
+      "router": {}
+    },
     "ios": {
       "bundleIdentifier": "art.ledgr.app",
-      "buildNumber": "27",
+      "buildNumber": "29",
       "supportsTablet": false,
       "entitlements": {
         "aps-environment": "production"
@@ -46,6 +41,7 @@
       "config": {
         "usesNonExemptEncryption": false
       }
-    }
+    },
+    "owner": "adminthepandesals-team"
   }
 }

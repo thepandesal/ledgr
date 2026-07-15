@@ -1,11 +1,11 @@
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  SafeAreaView, Animated, Dimensions, ScrollView, ActivityIndicator,
+  ScrollView, ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useRef, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useUser } from '../../src/hooks/useUser';
 import { supabase } from '../../src/lib/supabase';
 import BottomSheet from '@/components/ui/BottomSheet';
@@ -33,17 +33,7 @@ const fmtC = (n: number) => {
 
 export default function LoansScreen() {
   const router = useRouter();
-  const queryClient = useQueryClient();
   const { userId } = useUser();
-  const slideAnim = useRef(new Animated.Value(Dimensions.get('window').width)).current;
-
-  useEffect(() => {
-    Animated.timing(slideAnim, { toValue: 0, duration: 280, useNativeDriver: true }).start();
-  }, []);
-
-  const handleBack = () => {
-    Animated.timing(slideAnim, { toValue: Dimensions.get('window').width, duration: 250, useNativeDriver: true }).start(() => router.back());
-  };
 
   const [statusFilter, setStatusFilter] = useState<'all' | 'unpaid' | 'partial' | 'paid'>('all');
   const [showPicker, setShowPicker] = useState(false);
@@ -122,19 +112,7 @@ export default function LoansScreen() {
   });
 
   return (
-    <Animated.View style={[{ flex: 1, backgroundColor: Colors.white }, { transform: [{ translateX: slideAnim }] }]}>
-      <SafeAreaView style={{ flex: 1 }}>
-
-        {/* Header */}
-        <View style={s.header}>
-          <TouchableOpacity onPress={handleBack} style={s.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="arrow-back" size={20} color="#B6E1DE" />
-          </TouchableOpacity>
-          <Text style={s.title}>loans</Text>
-          <TouchableOpacity style={s.headerBtn} onPress={() => { setPickingDate('from'); setShowPicker(true); }} activeOpacity={0.8}>
-            <Ionicons name="calendar-outline" size={16} color="#B6E1DE" />
-          </TouchableOpacity>
-        </View>
+    <View style={{ flex: 1 }}>
 
         {/* Stats row */}
         <View style={s.statsRow}>
@@ -219,7 +197,6 @@ export default function LoansScreen() {
             <Text style={s.footer}>managed by LEDGR</Text>
           </ScrollView>
         )}
-      </SafeAreaView>
 
       {/* Date picker */}
       <BottomSheet visible={showPicker} onClose={() => { setShowPicker(false); setPickingDate('from'); }} title={pickingDate === 'from' ? 'start date' : 'end date'} height="55%">
@@ -261,13 +238,13 @@ export default function LoansScreen() {
           <Text style={s.clearBtnText}>clear dates</Text>
         </TouchableOpacity>
       </BottomSheet>
-    </Animated.View>
+    </View>
   );
 }
 
 const s = StyleSheet.create({
   // Header
-  header:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 25, paddingTop: 16, paddingBottom: 16, gap: 10, backgroundColor: Colors.headerBg, borderBottomWidth: 1, borderBottomColor: Colors.borderMid },
+  header:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 25, paddingTop: 16, paddingBottom: 16, gap: 10, backgroundColor: Colors.headerBg, borderBottomWidth: 1, borderBottomColor: '#333' },
   backBtn:   { width: 36, height: 36, borderRadius: 18, backgroundColor: Brand.color.accent + '22', alignItems: 'center', justifyContent: 'center' },
   title:     { flex: 1, fontFamily: Brand.font.display, fontSize: 20, color: Brand.color.accent, letterSpacing: -0.3, textAlign: 'center' },
   headerBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: Brand.color.accent + '22', alignItems: 'center', justifyContent: 'center' },
@@ -293,8 +270,8 @@ const s = StyleSheet.create({
   row:         { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: Colors.border },
   rowIconWrap: { width: 34, height: 34, borderRadius: 17, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.surface },
   rowMid:      { flex: 1, gap: 2 },
-  rowType:     { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted, letterSpacing: 0.4, textTransform: 'uppercase' },
-  rowName:     { ...Brand.type.cardTitle },
+  rowType:     { fontFamily: 'ChillaxRegular', fontSize: 10, color: Colors.muted, letterSpacing: 0.4, textTransform: 'uppercase' },
+  rowName:     { fontFamily: 'ChillaxMedium', fontSize: 14, color: Colors.text, letterSpacing: 0.1, lineHeight: 20 },
   rowSub:      { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted },
   rowAmount:   { fontFamily: Fonts.monoBold, fontSize: 14, letterSpacing: -0.3 },
 
