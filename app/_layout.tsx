@@ -24,9 +24,11 @@ const queryClient = new QueryClient({
   },
 });
 
-ErrorUtils.setGlobalHandler((error, isFatal) => {
-  console.error('[global error]', isFatal ? 'FATAL' : 'non-fatal', error?.message, error?.stack);
-});
+if (typeof ErrorUtils !== 'undefined') {
+  ErrorUtils.setGlobalHandler((error, isFatal) => {
+    console.error('[global error]', isFatal ? 'FATAL' : 'non-fatal', error?.message, error?.stack);
+  });
+}
 
 export default function RootLayout() {
   const fontsLoaded = true;
