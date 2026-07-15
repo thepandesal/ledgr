@@ -9,11 +9,11 @@
     "userInterfaceStyle": "dark",
     "web": {
       "favicon": "./assets/logo.png",
-      "bundler": "metro"
+      "bundler": "metro",
+      "output": "static"
     },
     "plugins": [
       "expo-router",
-      "expo-font",
       [
         "expo-notifications",
         {

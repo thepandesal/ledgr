@@ -1,8 +1,6 @@
 import { Stack, useRouter } from 'expo-router';
 import * as Notifications from 'expo-notifications';
-import { DMSans_400Regular, DMSans_600SemiBold, DMSans_700Bold } from '@expo-google-fonts/dm-sans';
-import * as Font from 'expo-font';
-import { View, ActivityIndicator, Platform } from 'react-native';
+import { View, ActivityIndicator } from 'react-native';
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../src/lib/supabase';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -31,25 +29,7 @@ ErrorUtils.setGlobalHandler((error, isFatal) => {
 });
 
 export default function RootLayout() {
-  const [fontsLoaded, setFontsLoaded] = useState(false);
-
-  useEffect(() => {
-    if (Platform.OS === 'ios') { setFontsLoaded(true); return; }
-    (async () => {
-      try {
-        await Font.loadAsync({
-          DMSans_400Regular,
-          DMSans_600SemiBold,
-          DMSans_700Bold,
-          CalSans: require('../assets/CalSans-Regular.ttf'),
-        });
-      } catch (e) {
-        console.warn('[fonts] base fonts failed to load:', e);
-      }
-
-      setFontsLoaded(true);
-    })();
-  }, []);
+  const fontsLoaded = true;
 
   const router = useRouter();
   const [ready, setReady] = useState(false);
@@ -58,6 +38,26 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (typeof document === 'undefined') return;
+    // Load DMSans from Google Fonts
+    if (!document.getElementById('google-fonts')) {
+      const link = document.createElement('link');
+      link.id = 'google-fonts';
+      link.rel = 'stylesheet';
+      link.href = 'https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700&display=swap';
+      document.head.appendChild(link);
+    }
+    // Load CalSans from local assets
+    if (!document.getElementById('calsans-font')) {
+      const style = document.createElement('style');
+      style.id = 'calsans-font';
+      style.textContent = `
+        @font-face { font-family: 'CalSans'; src: url('/assets/assets/CalSans-Regular.ttf') format('truetype'); font-display: swap; }
+        @font-face { font-family: 'DMSans_400Regular'; src: url('https://fonts.gstatic.com/s/dmsans/v17/rP2tp2ywxg089UriI5-g4vlH9VoD8CmcqZG40F9JadbnoEwAopxhTg.ttf') format('truetype'); font-weight: 400; font-display: swap; }
+        @font-face { font-family: 'DMSans_600SemiBold'; src: url('https://fonts.gstatic.com/s/dmsans/v17/rP2tp2ywxg089UriI5-g4vlH9VoD8CmcqZG40F9JadbnoEwAfJthTg.ttf') format('truetype'); font-weight: 600; font-display: swap; }
+        @font-face { font-family: 'DMSans_700Bold'; src: url('https://fonts.gstatic.com/s/dmsans/v17/rP2tp2ywxg089UriI5-g4vlH9VoD8CmcqZG40F9JadbnoEwARZthTg.ttf') format('truetype'); font-weight: 700; font-display: swap; }
+      `;
+      document.head.appendChild(style);
+    }
     const id = 'no-scroll-shift';
     if (!document.getElementById(id)) {
       const style = document.createElement('style');
