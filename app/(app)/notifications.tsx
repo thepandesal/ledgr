@@ -3,12 +3,13 @@ import {
   SafeAreaView, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../src/lib/supabase';
 import { useUser } from '../../src/hooks/useUser';
-import { Colors } from '@/components/ui/theme';
+import { Colors, Fonts } from '@/components/ui/theme';
 import { Brand } from '../../src/lib/brand';
+import TagRequestsScreen from './tag-request';
 
 const ACCENT      = Brand.color.accent;
 const ACCENT_DARK = Brand.color.accentDark;
@@ -30,6 +31,10 @@ const TYPE_ICON: Record<string, string> = {
   dues_reminder:           'time-outline',
   dues_end_of_month:       'calendar-outline',
   dues_month_summary:      'bar-chart-outline',
+  tag_accepted:            'checkmark-circle-outline',
+  tag_declined:            'close-circle-outline',
+  tag_payment_update:      'cash-outline',
+  expense_tag:             'person-add-outline',
   default:                 'notifications-outline',
 };
 
@@ -46,8 +51,20 @@ function smartGroup(dateStr: string): string {
 export default function NotificationsScreen() {
   const router = useRouter();
   const { userId } = useUser();
+  const [activeTab, setActiveTab] = useState<'notifications' | 'requests'>('notifications');
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [pendingCount, setPendingCount] = useState(0);
+
+  const fetchPendingCount = useCallback(async () => {
+    if (!userId) return;
+    const { count } = await supabase
+      .from('recording_tags')
+      .select('*', { count: 'exact', head: true })
+      .eq('tagged_user_id', userId)
+      .eq('status', 'pending');
+    setPendingCount(count ?? 0);
+  }, [userId]);
 
   useEffect(() => {
     if (!userId) return;
@@ -71,8 +88,8 @@ export default function NotificationsScreen() {
     };
 
     load();
+    fetchPendingCount();
 
-    // Realtime — new notifications appear instantly without refresh
     const channel = supabase
       .channel('notifications-live')
       .on('postgres_changes', {
@@ -83,17 +100,21 @@ export default function NotificationsScreen() {
       }, async (payload) => {
         const n = payload.new as any;
         setNotifications(prev => [n, ...prev]);
-        // Auto-mark as saw since the page is open
         await supabase.from('notifications').update({ status: 'saw', is_read: true, read: true }).eq('id', n.id);
         setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, status: 'saw' } : x));
       })
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'recording_tags',
+        filter: `tagged_user_id=eq.${userId}`,
+      }, () => fetchPendingCount())
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [userId]);
+  }, [userId, fetchPendingCount]);
 
   const handleTap = async (n: any) => {
-    // Mark as opened
     if (n.status !== 'opened') {
       await supabase.from('notifications').update({ status: 'opened' }).eq('id', n.id);
       setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, status: 'opened' } : x));
@@ -102,28 +123,26 @@ export default function NotificationsScreen() {
     if (n.type === 'friend_request' || n.type === 'friend_request_accepted') {
       router.push('/(app)/(tabs)/contacts' as any); return;
     }
+    if (n.type === 'expense_tag') {
+      setActiveTab('requests'); return;
+    }
+    if (n.type === 'tag_accepted' || n.type === 'tag_declined' || n.type === 'tag_payment_update') {
+      if (data.recordingId) router.push({ pathname: '/(app)/recording-detail', params: { recordingId: data.recordingId } } as any);
+      return;
+    }
     if (n.type === 'split_bill_invite' && data.splitBillId) {
       router.push({ pathname: '/(app)/split-bill-detail', params: { splitBillId: data.splitBillId, name: data.splitBillName ?? 'split bill' } } as any); return;
     }
-    if (n.type === 'space_invite') {
-      router.push('/(app)/(tabs)/spaces' as any); return;
-    }
+    if (n.type === 'space_invite') { router.push('/(app)/(tabs)/spaces' as any); return; }
     if (n.type === 'budget_warning_80' || n.type === 'budget_limit_reached') {
       if (data.spaceId) router.push({ pathname: '/(app)/space-detail', params: { spaceId: data.spaceId, name: data.spaceName ?? 'space' } } as any);
       return;
     }
-    if (n.type === 'savings_reminder') {
-      if (data.spaceId) router.push({ pathname: '/(app)/space-detail', params: { spaceId: data.spaceId, name: data.spaceName ?? 'space' } } as any);
-      return;
-    }
     if (n.type === 'dues_reminder' || n.type === 'dues_month_summary' || n.type === 'dues_end_of_month') {
-      router.push('/(app)/(tabs)/dashboard' as any);
-      return;
+      router.push('/(app)/(tabs)/dashboard' as any); return;
     }
     if (data.recordingId) {
       router.push({ pathname: '/(app)/recording-detail', params: { recordingId: data.recordingId } } as any);
-    } else if (data.recurringRecordId) {
-      router.push({ pathname: '/(app)/space-detail', params: { spaceId: data.spaceId ?? 'all', name: data.spaceName ?? 'space' } } as any);
     } else if (data.splitBillId) {
       router.push({ pathname: '/(app)/split-bill-detail', params: { splitBillId: data.splitBillId, name: data.splitBillName ?? 'split bill' } } as any);
     }
@@ -142,7 +161,32 @@ export default function NotificationsScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white }}>
-      {loading ? (
+      {/* Sub-tabs */}
+      <View style={s.tabRow}>
+        <TouchableOpacity
+          style={[s.tab, activeTab === 'notifications' && s.tabActive]}
+          onPress={() => setActiveTab('notifications')}
+          activeOpacity={0.75}
+        >
+          <Text style={[s.tabText, activeTab === 'notifications' && s.tabTextActive]}>notifications</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[s.tab, activeTab === 'requests' && s.tabActive]}
+          onPress={() => setActiveTab('requests')}
+          activeOpacity={0.75}
+        >
+          <Text style={[s.tabText, activeTab === 'requests' && s.tabTextActive]}>requests</Text>
+          {pendingCount > 0 && (
+            <View style={s.badge}>
+              <Text style={s.badgeText}>{pendingCount > 9 ? '9+' : String(pendingCount)}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+      </View>
+
+      {activeTab === 'requests' ? (
+        <TagRequestsScreen />
+      ) : loading ? (
         <ActivityIndicator color={ACCENT_DARK} style={{ marginTop: 40 }} />
       ) : notifications.length === 0 ? (
         <View style={s.emptyWrap}>
@@ -170,9 +214,7 @@ export default function NotificationsScreen() {
                       <Ionicons name={icon as any} size={18} color={highlighted ? ACCENT_DARK : Colors.muted} />
                     </View>
                     <View style={s.mid}>
-                      <Text style={[s.rowTitle, highlighted && s.rowTitleHighlighted]} numberOfLines={1}>
-                        {n.title}
-                      </Text>
+                      <Text style={[s.rowTitle, highlighted && s.rowTitleHighlighted]} numberOfLines={1}>{n.title}</Text>
                       {n.body ? <Text style={s.rowBody} numberOfLines={2}>{n.body}</Text> : null}
                     </View>
                     <View style={{ alignItems: 'flex-end', gap: 4 }}>
@@ -192,23 +234,23 @@ export default function NotificationsScreen() {
 }
 
 const s = StyleSheet.create({
+  tabRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: Colors.border, paddingHorizontal: PAGE },
+  tab: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 12, paddingHorizontal: 4, marginRight: 24, borderBottomWidth: 2, borderBottomColor: 'transparent' },
+  tabActive:     { borderBottomColor: ACCENT_DARK },
+  tabText:       { fontFamily: Fonts.mono, fontSize: 13, color: Colors.muted },
+  tabTextActive: { fontFamily: Fonts.monoBold, fontSize: 13, color: ACCENT_DARK },
+  badge:     { minWidth: 18, height: 18, borderRadius: 9, backgroundColor: '#ed6a6a', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
+  badgeText: { fontFamily: Fonts.monoBold, fontSize: 10, color: Colors.white },
+
   scroll:    { paddingBottom: 60 },
   emptyWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, paddingTop: 80 },
   emptyText: { fontFamily: Brand.font.mono, fontSize: 13, color: Colors.muted },
-
-  groupLabel: {
-    fontFamily: Brand.font.monoBold, fontSize: 10, color: Colors.muted,
-    letterSpacing: 1.2, textTransform: 'uppercase',
-    paddingHorizontal: PAGE, paddingTop: 20, paddingBottom: 6,
-  },
-
+  groupLabel: { fontFamily: Brand.font.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 1.2, textTransform: 'uppercase', paddingHorizontal: PAGE, paddingTop: 20, paddingBottom: 6 },
   row:     { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingVertical: 14, paddingHorizontal: PAGE, borderBottomWidth: 1, borderBottomColor: Colors.border, backgroundColor: Colors.white },
   rowNew:  { backgroundColor: ACCENT + '22' },
   rowSaw:  { backgroundColor: ACCENT + '0C' },
-
   iconWrap:            { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 },
   iconWrapHighlighted: { backgroundColor: ACCENT + '44' },
-
   mid:                 { flex: 1, gap: 3 },
   rowTitle:            { fontFamily: Brand.font.monoBold, fontSize: 13, color: Colors.muted },
   rowTitleHighlighted: { color: Colors.text },

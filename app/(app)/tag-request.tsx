@@ -1,21 +1,18 @@
 import {
-  View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  SafeAreaView, ActivityIndicator,
+  View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState, useCallback } from 'react';
-import { useRouter } from 'expo-router';
 import { supabase } from '../../src/lib/supabase';
 import { useUser } from '../../src/hooks/useUser';
 import { Colors, Fonts, Radius, Spacing } from '@/components/ui/theme';
 import { Brand } from '../../src/lib/brand';
 
-const ACCENT      = Brand.color.accent;
 const ACCENT_DARK = Brand.color.accentDark;
+const ACCENT      = Brand.color.accent;
 
 export default function TagRequestsScreen() {
   const { userId, userName, defaultCurrency } = useUser();
-  const router = useRouter();
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [responding, setResponding] = useState<string | null>(null);
@@ -24,14 +21,13 @@ export default function TagRequestsScreen() {
     if (!userId) return;
     const { data } = await supabase
       .from('recording_tags')
-      .select('*, recordings:recording_id(id, name, amount, transaction_date, currency, type)')
+      .select('*, recordings:recording_id(id, name, amount, transaction_date, currency)')
       .eq('tagged_user_id', userId)
       .eq('status', 'pending')
       .order('created_at', { ascending: false });
 
     if (!data) { setLoading(false); return; }
 
-    // Fetch tagger names
     const taggerIds = [...new Set(data.map((r: any) => r.tagger_user_id))];
     const names: Record<string, string> = {};
     await Promise.all(taggerIds.map(async (id: string) => {
@@ -49,10 +45,6 @@ export default function TagRequestsScreen() {
     setResponding(tag.id);
     try {
       if (accept) {
-        // Create a read-only due recording on User B's side
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-
         const rec = tag.recordings;
         const { data: mirrored } = await supabase.from('recordings').insert({
           user_id: userId,
@@ -69,38 +61,30 @@ export default function TagRequestsScreen() {
         await supabase.from('recording_tags').update({
           status: 'accepted',
           mirrored_recording_id: mirrored?.id ?? null,
-          updated_at: new Date().toISOString(),
         }).eq('id', tag.id);
 
-        // Notify tagger
         await supabase.from('notifications').insert({
           user_id: tag.tagger_user_id,
           type: 'tag_accepted',
           title: `${userName || 'Someone'} accepted your expense tag`,
-          body: `They will now see "${rec?.name ?? 'expense'}" as a due in their account.`,
+          body: `"${rec?.name ?? 'expense'}" is now a due in their account.`,
           data: { recordingId: tag.recording_id, tagId: tag.id },
           status: 'new',
           is_read: false,
         });
       } else {
-        await supabase.from('recording_tags').update({
-          status: 'declined',
-          updated_at: new Date().toISOString(),
-        }).eq('id', tag.id);
+        await supabase.from('recording_tags').update({ status: 'declined' }).eq('id', tag.id);
 
-        // Notify tagger
-        const rec = tag.recordings;
         await supabase.from('notifications').insert({
           user_id: tag.tagger_user_id,
           type: 'tag_declined',
           title: `${userName || 'Someone'} declined your expense tag`,
-          body: `"${rec?.name ?? 'expense'}" tag was declined.`,
+          body: `"${tag.recordings?.name ?? 'expense'}" tag was declined.`,
           data: { recordingId: tag.recording_id, tagId: tag.id },
           status: 'new',
           is_read: false,
         });
       }
-
       setRequests(prev => prev.filter(r => r.id !== tag.id));
     } catch (e) {
       console.warn('[tag] respond failed:', e);
@@ -140,18 +124,16 @@ export default function TagRequestsScreen() {
                 <Text style={s.sub}>tagged you in an expense</Text>
               </View>
             </View>
-
             <View style={s.detail}>
               <Text style={s.recName}>{rec?.name ?? '—'}</Text>
-              <Text style={s.recMeta}>{fmt(rec?.transaction_date)} · {rec?.currency ?? defaultCurrency}</Text>
+              <Text style={s.recMeta}>{fmt(rec?.transaction_date)}</Text>
               <Text style={s.amount}>
                 {rec?.currency ?? defaultCurrency} {Number(tag.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
               </Text>
               <Text style={s.note}>
-                if you accept, this will appear as a <Text style={{ fontFamily: Fonts.monoBold }}>due</Text> in your account. payment is managed by {tag.taggerName}.
+                if you accept, this appears as a <Text style={{ fontFamily: Fonts.monoBold }}>due</Text> in your account. payment is managed by {tag.taggerName}.
               </Text>
             </View>
-
             <View style={s.actions}>
               <TouchableOpacity
                 style={[s.declineBtn, isResponding && { opacity: 0.5 }]}
@@ -181,32 +163,22 @@ export default function TagRequestsScreen() {
 }
 
 const s = StyleSheet.create({
-  scroll: { padding: Spacing.page, gap: 12 },
-  empty:  { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, paddingTop: 80 },
+  scroll:    { padding: Spacing.page, gap: 12 },
+  empty:     { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, paddingTop: 80 },
   emptyText: { fontFamily: Brand.font.mono, fontSize: 13, color: Colors.muted },
-
-  card: {
-    backgroundColor: Colors.white,
-    borderRadius: Radius.xl,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    padding: 16,
-    gap: 12,
-  },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  iconWrap:   { width: 40, height: 40, borderRadius: 20, backgroundColor: ACCENT + '44', alignItems: 'center', justifyContent: 'center' },
-  tagger:     { fontFamily: Fonts.monoBold, fontSize: 14, color: Colors.text },
-  sub:        { fontFamily: Fonts.mono, fontSize: 11, color: Colors.muted },
-
-  detail:   { backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: 12, gap: 4 },
-  recName:  { fontFamily: Fonts.monoBold, fontSize: 14, color: Colors.text },
-  recMeta:  { fontFamily: Fonts.mono, fontSize: 11, color: Colors.muted },
-  amount:   { fontFamily: Fonts.monoBold, fontSize: 18, color: ACCENT_DARK, marginTop: 4 },
-  note:     { fontFamily: Fonts.mono, fontSize: 11, color: Colors.muted, lineHeight: 16, marginTop: 6 },
-
-  actions:    { flexDirection: 'row', gap: 10 },
-  declineBtn: { flex: 1, paddingVertical: 12, borderRadius: Radius.pill, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.borderMid, alignItems: 'center' },
+  card:      { backgroundColor: Colors.white, borderRadius: Radius.xl, borderWidth: 1, borderColor: Colors.border, padding: 16, gap: 12 },
+  cardHeader:{ flexDirection: 'row', alignItems: 'center', gap: 12 },
+  iconWrap:  { width: 40, height: 40, borderRadius: 20, backgroundColor: ACCENT + '44', alignItems: 'center', justifyContent: 'center' },
+  tagger:    { fontFamily: Fonts.monoBold, fontSize: 14, color: Colors.text },
+  sub:       { fontFamily: Fonts.mono, fontSize: 11, color: Colors.muted },
+  detail:    { backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: 12, gap: 4 },
+  recName:   { fontFamily: Fonts.monoBold, fontSize: 14, color: Colors.text },
+  recMeta:   { fontFamily: Fonts.mono, fontSize: 11, color: Colors.muted },
+  amount:    { fontFamily: Fonts.monoBold, fontSize: 18, color: ACCENT_DARK, marginTop: 4 },
+  note:      { fontFamily: Fonts.mono, fontSize: 11, color: Colors.muted, lineHeight: 16, marginTop: 6 },
+  actions:   { flexDirection: 'row', gap: 10 },
+  declineBtn:     { flex: 1, paddingVertical: 12, borderRadius: Radius.pill, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.borderMid, alignItems: 'center' },
   declineBtnText: { fontFamily: Fonts.monoBold, fontSize: 13, color: Colors.muted },
-  acceptBtn:  { flex: 2, paddingVertical: 12, borderRadius: Radius.pill, backgroundColor: ACCENT_DARK, alignItems: 'center' },
-  acceptBtnText: { fontFamily: Fonts.monoBold, fontSize: 13, color: Colors.white },
+  acceptBtn:      { flex: 2, paddingVertical: 12, borderRadius: Radius.pill, backgroundColor: ACCENT_DARK, alignItems: 'center' },
+  acceptBtnText:  { fontFamily: Fonts.monoBold, fontSize: 13, color: Colors.white },
 });
