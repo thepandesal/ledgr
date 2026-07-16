@@ -15,9 +15,6 @@ const ACCENT_DARK = Brand.color.accentDark;
 const PAGE        = 20;
 
 const TYPE_ICON: Record<string, string> = {
-  expense_tag:             'person-add-outline',
-  expense_tag_accepted:    'checkmark-circle-outline',
-  expense_tag_declined:    'close-circle-outline',
   recurring_due:           'repeat-outline',
   recurring_debt:          'repeat-outline',
   overdue:                 'alert-circle-outline',
@@ -77,7 +74,7 @@ export default function NotificationsScreen() {
 
     // Realtime — new notifications appear instantly without refresh
     const channel = supabase
-      .channel(`notifications-live-${userId}-${Date.now()}`)
+      .channel('notifications-live')
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
@@ -102,12 +99,6 @@ export default function NotificationsScreen() {
       setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, status: 'opened' } : x));
     }
     const data = n.data ?? {};
-    if (n.type === 'expense_tag' && data.recordingId) {
-      router.push({ pathname: '/(app)/tag-detail', params: { recordingId: data.recordingId, notificationId: n.id } } as any); return;
-    }
-    if ((n.type === 'expense_tag_accepted' || n.type === 'expense_tag_declined') && data.recordingId) {
-      router.push({ pathname: '/(app)/recording-detail', params: { recordingId: data.recordingId } } as any); return;
-    }
     if (n.type === 'friend_request' || n.type === 'friend_request_accepted') {
       router.push('/(app)/(tabs)/contacts' as any); return;
     }

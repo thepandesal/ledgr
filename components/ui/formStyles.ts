@@ -5,12 +5,12 @@
  *
  * Rules:
  * - Sheet: white bg, borderTopRadius 24, padding 24, height '90%'
- * - Header: DMSans_600SemiBold sub 11px #929090 + CalSans title 26px #425252
- * - Inputs: white bg, borderRadius 10, border #e8e8e8, DMSans_400Regular 16px #425252
- * - Section labels: DMSans_400Regular 10px #929090 uppercase
+ * - Header: ChillaxMedium sub 11px #929090 + CalSans title 26px #425252
+ * - Inputs: white bg, borderRadius 10, border #e8e8e8, RobotoMono 16px #425252
+ * - Section labels: RobotoMono 10px #929090 uppercase
  * - Cancel btn: #f5f5f5 bg, #8a8a8a text
  * - Primary btn: #425252 bg, white text
- * - Both buttons: borderRadius 999, paddingVertical 13, flex 1, DMSans_700Bold 13px
+ * - Both buttons: borderRadius 999, paddingVertical 13, flex 1, RobotoMono_700Bold 13px
  */
 
 import { StyleSheet } from 'react-native';
@@ -34,7 +34,7 @@ const formStyles = StyleSheet.create({
     marginBottom: 16,
   },
   headerSub: {
-    fontFamily: 'DMSans_600SemiBold',
+    fontFamily: 'ChillaxMedium',
     fontSize: 11,
     color: '#929090',
   },
@@ -52,7 +52,7 @@ const formStyles = StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    fontFamily: 'DMSans_400Regular',
+    fontFamily: 'RobotoMono_400Regular',
     fontSize: 16,
     color: '#425252',
     borderWidth: 1,
@@ -61,7 +61,7 @@ const formStyles = StyleSheet.create({
   /** Input inside a card / infoBlock row */
   inlineInput: {
     flex: 1,
-    fontFamily: 'DMSans_400Regular',
+    fontFamily: 'RobotoMono_400Regular',
     fontSize: 16,
     color: '#425252',
     padding: 0,
@@ -69,7 +69,7 @@ const formStyles = StyleSheet.create({
 
   // ─── Section label (above a group of inputs) ─────────────────────────────────
   sectionLabel: {
-    fontFamily: 'DMSans_400Regular',
+    fontFamily: 'RobotoMono_400Regular',
     fontSize: 10,
     color: '#929090',
     textTransform: 'uppercase',
@@ -97,7 +97,7 @@ const formStyles = StyleSheet.create({
     gap: 10,
   },
   blockLabel: {
-    fontFamily: 'DMSans_400Regular',
+    fontFamily: 'RobotoMono_400Regular',
     fontSize: 11,
     color: '#929090',
     width: 60,
@@ -128,13 +128,13 @@ const formStyles = StyleSheet.create({
     borderColor: '#B6E1DE',
   },
   chipText: {
-    fontFamily: 'DMSans_400Regular',
+    fontFamily: 'RobotoMono_400Regular',
     fontSize: 12,
     color: '#929090',
   },
   chipTextActive: {
     color: '#ffffff',
-    fontFamily: 'DMSans_700Bold',
+    fontFamily: 'RobotoMono_700Bold',
   },
   chipsRow: {
     flexDirection: 'row',
@@ -155,17 +155,17 @@ const formStyles = StyleSheet.create({
     borderColor: '#f0f0f0',
   },
   selectorPlaceholder: {
-    fontFamily: 'DMSans_400Regular',
+    fontFamily: 'RobotoMono_400Regular',
     fontSize: 16,
     color: '#c0c0c0',
   },
   selectorValue: {
-    fontFamily: 'DMSans_400Regular',
+    fontFamily: 'RobotoMono_400Regular',
     fontSize: 16,
     color: '#425252',
   },
   selectorSub: {
-    fontFamily: 'DMSans_400Regular',
+    fontFamily: 'RobotoMono_400Regular',
     fontSize: 10,
     color: '#929090',
     marginTop: 1,
@@ -185,7 +185,7 @@ const formStyles = StyleSheet.create({
     alignItems: 'center',
   },
   cancelBtnText: {
-    fontFamily: 'DMSans_700Bold',
+    fontFamily: 'RobotoMono_700Bold',
     fontSize: 13,
     color: '#8a8a8a',
   },
@@ -197,7 +197,7 @@ const formStyles = StyleSheet.create({
     alignItems: 'center',
   },
   primaryBtnText: {
-    fontFamily: 'DMSans_700Bold',
+    fontFamily: 'RobotoMono_700Bold',
     fontSize: 13,
     color: '#ffffff',
   },
@@ -224,17 +224,17 @@ const formStyles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   listItemText: {
-    fontFamily: 'DMSans_400Regular',
+    fontFamily: 'RobotoMono_400Regular',
     fontSize: 13,
     color: '#425252',
     flex: 1,
   },
   listItemTextActive: {
-    fontFamily: 'DMSans_700Bold',
+    fontFamily: 'RobotoMono_700Bold',
     color: '#ffffff',
   },
   listItemSub: {
-    fontFamily: 'DMSans_400Regular',
+    fontFamily: 'RobotoMono_400Regular',
     fontSize: 10,
     color: '#929090',
   },
@@ -242,7 +242,7 @@ const formStyles = StyleSheet.create({
     color: 'rgba(255,255,255,0.7)',
   },
   listEmpty: {
-    fontFamily: 'DMSans_400Regular',
+    fontFamily: 'RobotoMono_400Regular',
     fontSize: 12,
     color: '#c0c0c0',
     textAlign: 'center',
@@ -255,7 +255,7 @@ const formStyles = StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    fontFamily: 'DMSans_400Regular',
+    fontFamily: 'RobotoMono_400Regular',
     fontSize: 16,
     color: '#425252',
     borderWidth: 1,
@@ -265,20 +265,20 @@ const formStyles = StyleSheet.create({
 
   // ─── Hint text ────────────────────────────────────────────────────────────────
   hint: {
-    fontFamily: 'DMSans_400Regular',
+    fontFamily: 'RobotoMono_400Regular',
     fontSize: 10,
     color: '#2A7A6F',
     marginTop: 4,
   },
   hintMuted: {
-    fontFamily: 'DMSans_400Regular',
+    fontFamily: 'RobotoMono_400Regular',
     fontSize: 10,
     color: '#929090',
   },
 
   // ─── Error text ───────────────────────────────────────────────────────────────
   errorText: {
-    fontFamily: 'DMSans_400Regular',
+    fontFamily: 'RobotoMono_400Regular',
     fontSize: 11,
     color: '#ed6a6a',
     marginBottom: 8,

@@ -41,19 +41,35 @@ export const Colors = {
 } as const;
 
 export const Fonts = {
-  display:     'CalSans',             // titles only
-  regular:     'DMSans_400Regular',
-  semiBold:    'DMSans_600SemiBold',
-  bold:        'DMSans_700Bold',
+  // Display — page titles, space names
+  display: 'CalSans',
 
-  // aliases used across the app
-  heading:     'DMSans_600SemiBold',
-  headingBold: 'DMSans_700Bold',
-  mono:        'DMSans_400Regular',
-  monoBold:    'DMSans_600SemiBold',
-  sans:        'DMSans_400Regular',
-  sansSemiBold:'DMSans_600SemiBold',
-  sansBold:    'DMSans_700Bold',
+  // Section headers — Chillax
+  heading: 'ChillaxMedium',
+  headingRegular: 'ChillaxRegular',
+  headingBold: 'ChillaxBold',
+  headingSemibold: 'ChillaxSemibold',
+  headingLight: 'ChillaxLight',
+
+  // Museo Moderno
+  museoBlack: 'MuseoModerno_Black',
+  museoMedium: 'MuseoModerno_Medium',
+  museoRegular: 'MuseoModerno_Regular',
+
+  // CalSans
+  calSans: 'CalSans',
+  glacial: 'GlacialIndifference',
+  glacialBold: 'GlacialIndifferenceBold',
+
+  // Body / data / labels
+  mono: 'RobotoMono_400Regular',
+  monoBold: 'RobotoMono_700Bold',
+
+  // General UI (login, onboarding, categories, spaces setup)
+  sans: 'DMSans_400Regular',
+  sansMedium: 'DMSans_500Medium',
+  sansSemiBold: 'DMSans_600SemiBold',
+  sansBold: 'DMSans_700Bold',
 } as const;
 
 export const Radius = {

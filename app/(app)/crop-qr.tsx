@@ -170,8 +170,8 @@ const styles = StyleSheet.create({
   resizeHandle: { position: 'absolute', bottom: 4, right: 4, width: 28, height: 28, justifyContent: 'center', alignItems: 'center' },
   header: { position: 'absolute', top: 52, left: 0, right: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24 },
   headerBtn: { width: 44, height: 44, justifyContent: 'center', alignItems: 'center' },
-  headerTitle: { fontFamily: 'DMSans_400Regular', fontSize: 11, color: 'rgba(255,255,255,0.7)' },
+  headerTitle: { fontFamily: 'RobotoMono_400Regular', fontSize: 11, color: 'rgba(255,255,255,0.7)' },
   saveBtn: { position: 'absolute', bottom: 48, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#0ccfcf', borderRadius: 999, paddingVertical: 14, paddingHorizontal: 32 },
-  saveBtnText: { fontFamily: 'DMSans_700Bold', fontSize: 14, color: '#000' },
+  saveBtnText: { fontFamily: 'RobotoMono_700Bold', fontSize: 14, color: '#000' },
 });
 

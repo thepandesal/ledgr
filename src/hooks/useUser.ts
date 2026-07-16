@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { Platform } from 'react-native';
+import * as Notifications from 'expo-notifications';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import type { User } from '@supabase/supabase-js';
@@ -20,8 +22,15 @@ function generateProfileCode(): string {
   return code;
 }
 
-async function registerPushToken(_userId: string) {
-  // expo-notifications disabled temporarily for iOS 26 compatibility
+async function registerPushToken(userId: string) {
+  if (Platform.OS === 'web') return;
+  const { status } = await Notifications.requestPermissionsAsync();
+  if (status !== 'granted') return;
+  const token = (await Notifications.getExpoPushTokenAsync()).data;
+  await supabase.from('push_tokens').upsert(
+    { user_id: userId, token, platform: Platform.OS },
+    { onConflict: 'user_id,token' }
+  );
 }
 
 /**
@@ -59,20 +68,16 @@ export function useUser(): UseUserResult {
         .maybeSingle();
       if (!data?.profile_code) {
         const code = generateProfileCode();
-        const { data: upserted } = await supabase
-          .from('user_settings')
-          .upsert(
-            { user_id: user!.id, profile_code: code, updated_at: new Date().toISOString() },
-            { onConflict: 'user_id' }
-          )
-          .select('profile_code, default_currency')
-          .maybeSingle();
-        return upserted ?? { profile_code: code, default_currency: data?.default_currency ?? 'PHP' };
+        await supabase.from('user_settings').upsert(
+          { user_id: user!.id, profile_code: code, updated_at: new Date().toISOString() },
+          { onConflict: 'user_id' }
+        );
+        return { ...data, profile_code: code };
       }
       return data;
     },
     enabled: !!user?.id,
-    staleTime: 5 * 60 * 1000,
+    staleTime: Infinity,
   });
 
   const setDefaultCurrency = async (currency: string) => {

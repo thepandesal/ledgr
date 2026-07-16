@@ -1516,18 +1516,6 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                 </Text>
               </View>
             )}
-            {recording?.tag_status && (
-              <View style={rd.summaryCell}>
-                <Text style={rd.summaryLabel}>tag status</Text>
-                <Text style={[rd.summaryValue, {
-                  color: recording.tag_status === 'accepted' ? ACCENT_DARK
-                       : recording.tag_status === 'declined' ? '#FFAB91'
-                       : Colors.muted
-                }]}>
-                  {recording.tag_status}
-                </Text>
-              </View>
-            )}
             <View style={rd.summaryCell}>
               <Text style={rd.summaryLabel}>category</Text>
               <Text style={rd.summaryValue}>{recording?.categories?.name ?? '—'}</Text>
@@ -1696,17 +1684,6 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                 <Text style={rd.infoLabel}>linked receivable</Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                   <Text style={[rd.infoValue, { color: ACCENT_DARK }]}>{truncate(linkedReceivable.name, 16)}</Text>
-                  <Ionicons name="chevron-forward" size={11} color={ACCENT_DARK} />
-                </View>
-              </TouchableOpacity>
-            )}
-            {recording?.tag_linked_recording_id && (
-              <TouchableOpacity style={rd.infoRow} onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: recording.tag_linked_recording_id } } as any)}>
-                <Text style={rd.infoLabel}>
-                  {recording.tag_status === 'accepted' ? 'their loan' : 'tagged debt'}
-                </Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <Text style={[rd.infoValue, { color: ACCENT_DARK }]}>view recording</Text>
                   <Ionicons name="chevron-forward" size={11} color={ACCENT_DARK} />
                 </View>
               </TouchableOpacity>

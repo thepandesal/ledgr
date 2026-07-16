@@ -1,6 +1,6 @@
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  SafeAreaView, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView,
+  SafeAreaView, ActivityIndicator, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
@@ -139,7 +139,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.white },
   inner: { flex: 1, paddingHorizontal: 24, justifyContent: 'center', gap: 12 },
   welcome: {
-    fontFamily: 'CalSans',
+    fontFamily: 'MuseoModerno_Black',
     fontSize: 14,
     color: Colors.cyan,
     letterSpacing: 2,

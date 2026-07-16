@@ -126,11 +126,6 @@ export default function AddRecordingScreen({ inlineProps }: {
   const [showExpenseModal, setShowExpenseModal]         = useState(false);
   const [expenseList, setExpenseList]                   = useState<any[]>([]);
 
-  // ── Friend tagging ────────────────────────────────────────────────────────
-  const [friends, setFriends] = useState<{ id: string; name: string }[]>([]);
-  const [taggedFriend, setTaggedFriend] = useState<{ id: string; name: string } | null>(null);
-  const [showFriendModal, setShowFriendModal] = useState(false);
-
   // ── Type dropdown ─────────────────────────────────────────────────────────
   const [showTypeModal, setShowTypeModal] = useState(false);
 
@@ -177,9 +172,6 @@ export default function AddRecordingScreen({ inlineProps }: {
     ));
     const allNames = [...new Set([...friendNames.filter(Boolean), ...contactNames])].sort();
     setPersonSuggestions(allNames);
-    // Store friends with their IDs for tagging
-    const friendList = friendIds.map((id: string, i: number) => ({ id, name: friendNames[i] ?? '' })).filter(f => f.name);
-    setFriends(friendList);
 
     // Load space budget if adding a new expense
     if (!editId && spaceId) {
@@ -293,9 +285,7 @@ export default function AddRecordingScreen({ inlineProps }: {
             category_id: selectedCategory?.id || null,
             account_id: selectedAccount?.id || null,
             status: 'paid', is_due: true,
-            person_name: taggedFriend ? taggedFriend.name : personName.trim() || null,
-            tagged_friend_id: taggedFriend?.id ?? null,
-            tag_status: taggedFriend ? 'pending' : null,
+            person_name: personName.trim() || null,
             currency,
           }).select('id').single();
           if (expErr) throw expErr;
@@ -307,25 +297,11 @@ export default function AddRecordingScreen({ inlineProps }: {
             category_id: selectedCategory?.id || null,
             account_id: receiveToAccount?.id || null,
             status: 'pending',
-            person_name: taggedFriend ? taggedFriend.name : personName.trim() || null,
+            person_name: personName.trim() || null,
             linked_recording_id: expRec!.id,
             currency,
           });
           if (recErr) throw recErr;
-          // Send notification to tagged friend
-          if (taggedFriend?.id && expRec?.id) {
-            const { data: { user: me } } = await supabase.auth.getUser();
-            const { data: myName } = await supabase.rpc('get_user_display_name', { user_id: me!.id });
-            await supabase.from('notifications').insert({
-              user_id: taggedFriend.id,
-              type: 'expense_tag',
-              title: `${myName ?? 'someone'} tagged you on an expense`,
-              body: `"${recName.trim()}" · ${currency} ${parseFloat(amount).toLocaleString('en-US', { minimumFractionDigits: 2 })} — tap to view`,
-              message: `"${recName.trim()}" — tap to accept or decline`,
-              data: { recordingId: expRec.id },
-              is_read: false, status: 'new',
-            });
-          }
           setPendingFocusDate(date);
           handleClose();
           return;
@@ -612,38 +588,19 @@ export default function AddRecordingScreen({ inlineProps }: {
       {isComboType && (
         <FormBlock>
           <FormRow label="owes you">
-            <TouchableOpacity style={s.typeDropRow} onPress={() => setShowFriendModal(true)} activeOpacity={0.8}>
-              {taggedFriend ? (
-                <>
-                  <View style={[s.catDot, { backgroundColor: Colors.cyan + '44' }]}>
-                    <Text style={{ fontFamily: Fonts.monoBold, fontSize: 10, color: Colors.cyan }}>
-                      {taggedFriend.name.charAt(0).toUpperCase()}
-                    </Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontFamily: Fonts.mono, fontSize: 13, color: Colors.text }}>{taggedFriend.name}</Text>
-                    <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: Colors.cyan }}>friend · will be notified</Text>
-                  </View>
-                  <TouchableOpacity onPress={() => { setTaggedFriend(null); setPersonName(''); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Ionicons name="close" size={13} color={Colors.muted} />
-                  </TouchableOpacity>
-                </>
-              ) : personName.trim() ? (
-                <>
-                  <View style={[s.catDot, { backgroundColor: Colors.surface }]}>
-                    <Ionicons name="person-outline" size={11} color={Colors.muted} />
-                  </View>
-                  <Text style={{ fontFamily: Fonts.mono, fontSize: 13, color: Colors.text, flex: 1 }}>{personName}</Text>
-                  <TouchableOpacity onPress={() => setPersonName('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Ionicons name="close" size={13} color={Colors.muted} />
-                  </TouchableOpacity>
-                </>
-              ) : (
-                <Text style={{ fontFamily: Fonts.mono, fontSize: 13, color: Colors.faint, flex: 1 }}>select friend or enter name</Text>
-              )}
-              <Ionicons name="chevron-down" size={13} color={Colors.faint} />
-            </TouchableOpacity>
+            <TextInput style={s.inlineInput} placeholder="e.g. john" placeholderTextColor={Colors.faint} value={personName} onChangeText={setPersonName} />
           </FormRow>
+          {personSuggestions.length > 0 && (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingVertical: 8 }}>
+              {personSuggestions
+                .filter(n => !personName.trim() || n.toLowerCase().includes(personName.toLowerCase()))
+                .map(n => (
+                  <TouchableOpacity key={n} style={s.suggestionChip} onPress={() => setPersonName(n)}>
+                    <Text style={s.suggestionChipText}>{n}</Text>
+                  </TouchableOpacity>
+                ))}
+            </ScrollView>
+          )}
         </FormBlock>
       )}
 
@@ -869,68 +826,6 @@ export default function AddRecordingScreen({ inlineProps }: {
         <FormActions onCancel={() => setShowReceiveToModal(false)} onConfirm={() => setShowReceiveToModal(false)} cancelLabel="cancel" confirmLabel="done" />
       </BottomSheet>
 
-      {/* ── Friend picker modal ── */}
-      <BottomSheet visible={showFriendModal} onClose={() => setShowFriendModal(false)} title="who owes you?">
-        {friends.length > 0 && (
-          <>
-            <Text style={{ fontFamily: Fonts.monoBold, fontSize: 9, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8 }}>friends</Text>
-            {friends.map(f => (
-              <TouchableOpacity
-                key={f.id}
-                style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border }}
-                onPress={() => { setTaggedFriend(f); setPersonName(f.name); setShowFriendModal(false); }}
-                activeOpacity={0.75}
-              >
-                <View style={[s.catDot, { backgroundColor: Colors.cyan + '44', width: 32, height: 32, borderRadius: 16 }]}>
-                  <Text style={{ fontFamily: Fonts.monoBold, fontSize: 13, color: Colors.cyan }}>{f.name.charAt(0).toUpperCase()}</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontFamily: Fonts.mono, fontSize: 13, color: Colors.text }}>{f.name}</Text>
-                  <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: Colors.cyan }}>will receive a notification</Text>
-                </View>
-                {taggedFriend?.id === f.id && <Ionicons name="checkmark" size={16} color={Colors.cyan} />}
-              </TouchableOpacity>
-            ))}
-          </>
-        )}
-        {personSuggestions.filter(n => !friends.some(f => f.name === n)).length > 0 && (
-          <>
-            <Text style={{ fontFamily: Fonts.monoBold, fontSize: 9, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginTop: 16, marginBottom: 8 }}>manual contacts</Text>
-            {personSuggestions.filter(n => !friends.some(f => f.name === n)).map(n => (
-              <TouchableOpacity
-                key={n}
-                style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border }}
-                onPress={() => { setTaggedFriend(null); setPersonName(n); setShowFriendModal(false); }}
-                activeOpacity={0.75}
-              >
-                <View style={[s.catDot, { backgroundColor: Colors.surface, width: 32, height: 32, borderRadius: 16 }]}>
-                  <Ionicons name="person-outline" size={14} color={Colors.muted} />
-                </View>
-                <Text style={{ fontFamily: Fonts.mono, fontSize: 13, color: Colors.text, flex: 1 }}>{n}</Text>
-              </TouchableOpacity>
-            ))}
-          </>
-        )}
-        <Text style={{ fontFamily: Fonts.mono, fontSize: 11, color: Colors.muted, marginTop: 16, marginBottom: 8 }}>or type a name</Text>
-        <TextInput
-          style={[s.inlineInput, { borderWidth: 1, borderColor: Colors.borderMid, borderRadius: Radius.lg, paddingHorizontal: 14, paddingVertical: 10 }]}
-          placeholder="e.g. john"
-          placeholderTextColor={Colors.faint}
-          value={personName}
-          onChangeText={v => { setPersonName(v); setTaggedFriend(null); }}
-          returnKeyType="done"
-          onSubmitEditing={() => setShowFriendModal(false)}
-        />
-        <TouchableOpacity
-          style={[s.saveBtn, { marginTop: 12 }, !personName.trim() && s.saveBtnDisabled]}
-          onPress={() => setShowFriendModal(false)}
-          disabled={!personName.trim()}
-          activeOpacity={0.8}
-        >
-          <Text style={s.saveBtnText}>confirm</Text>
-        </TouchableOpacity>
-      </BottomSheet>
-
       {/* ── Expense picker modal ── */}
       <BottomSheet visible={showExpenseModal} onClose={() => setShowExpenseModal(false)} sub="receivable" title="link to expense">
         <SearchableList
@@ -1004,7 +899,7 @@ const s = StyleSheet.create({
   saveBtnText:     { fontFamily: Fonts.monoBold, fontSize: 13, color: Colors.text },
   budgetWrap:      { gap: 6, padding: 14, backgroundColor: Colors.surface, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.border, marginTop: 10 },
   budgetLabelRow:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  budgetLabel:     { fontFamily: Fonts.regular, fontSize: 11, color: Colors.muted, letterSpacing: 0.3 },
+  budgetLabel:     { fontFamily: 'ChillaxRegular', fontSize: 11, color: Colors.muted, letterSpacing: 0.3 },
   budgetValue:     { fontFamily: Fonts.monoBold, fontSize: 11, color: Colors.text, letterSpacing: 0.2 },
   budgetTrack:     { height: 6, backgroundColor: Colors.border, borderRadius: Radius.pill, overflow: 'hidden' },
   budgetFill:      { height: '100%', borderRadius: Radius.pill },

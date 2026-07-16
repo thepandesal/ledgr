@@ -24,15 +24,9 @@ export function setPendingFocusDate(date: string | null) { pendingFocusDate = da
 // ── Constants ────────────────────────────────────────────────────────────────
 const { width } = Dimensions.get('window');
 
-const BG   = '#F7F9F9';
-const INK  = '#1A1A1A';
-const MUTED = '#888888';
-const TEAL  = '#B6E1DE';
-const TEAL_DARK = '#2A7A6F';
-
 const today = new Date();
 const PEACH = '#FFAB91';
-const PAGE_HEIGHT = 1200;
+const PAGE_HEIGHT = 1200; // px per image slice (at scale 2 = 2400px actual)
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
@@ -91,14 +85,14 @@ function fmtAmount(n: number) {
 }
 
 function getTypeLabel(type: string, status: string, is_due?: boolean, paid_amount?: number, amount?: number) {
-  if (type === 'income')  return { label: 'income',  color: TEAL_DARK };
+  if (type === 'income')  return { label: 'income',  color: Brand.color.accentDark };
   if (type === 'expense') {
     if (is_due) {
       const paid = Number(paid_amount ?? 0);
       const total = Number(amount ?? 0);
       const collected = total > 0 && paid >= total - 0.01;
       const partial   = paid > 0 && !collected;
-      if (collected) return { label: 'expense · collected',        color: TEAL_DARK };
+      if (collected) return { label: 'expense · collected',        color: Brand.color.accentDark };
       if (partial)   return { label: 'expense · due · partial',    color: PEACH };
       return               { label: 'expense · due',               color: PEACH };
     }
@@ -110,13 +104,13 @@ function getTypeLabel(type: string, status: string, is_due?: boolean, paid_amoun
     return                           { label: 'debt',                  color: PEACH };
   }
   if (type === 'due') {
-    if (status === 'paid')    return { label: 'due · collected',        color: TEAL_DARK };
-    if (status === 'partial') return { label: 'due · partially paid',   color: TEAL_DARK };
-    return                           { label: 'due',                    color: TEAL_DARK };
+    if (status === 'paid')    return { label: 'due · collected',        color: Brand.color.accentDark };
+    if (status === 'partial') return { label: 'due · partially paid',   color: Brand.color.accentDark };
+    return                           { label: 'due',                    color: Brand.color.accentDark };
   }
   if (type === 'payment') return { label: 'payment', color: PEACH };
-  if (type === 'return')  return { label: 'return',  color: TEAL_DARK };
-  return { label: type, color: MUTED };
+  if (type === 'return')  return { label: 'return',  color: Brand.color.accentDark };
+  return { label: type, color: Colors.muted };
 }
 
 import { smartDateLabel } from '../../src/lib/smartDateLabel';
@@ -1202,13 +1196,13 @@ export default function SpaceDetailScreen() {
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
-    <Animated.View style={[{ flex: 1, backgroundColor: BG }, { transform: [{ translateX: slideAnim }] }]}>
-      <SafeAreaView style={{ flex: 1, backgroundColor: BG }}>
+    <Animated.View style={[{ flex: 1, backgroundColor: Colors.white }, { transform: [{ translateX: slideAnim }] }]}>
+      <SafeAreaView style={{ flex: 1 }}>
 
         {/* Header */}
         <View style={s.header}>
           <TouchableOpacity onPress={handleBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={s.backBtn}>
-            <Ionicons name="arrow-back" size={20} color={TEAL} />
+            <Ionicons name="arrow-back" size={20} color="#B6E1DE" />
           </TouchableOpacity>
           <Text style={s.title} numberOfLines={1}>{name}</Text>
           {canViewOnly && (
@@ -1228,8 +1222,8 @@ export default function SpaceDetailScreen() {
             disabled={statementLoading}
           >
             {statementLoading
-              ? <ActivityIndicator size="small" color={TEAL} />
-              : <Ionicons name="document-text-outline" size={16} color={TEAL} />}
+              ? <ActivityIndicator size="small" color="#B6E1DE" />
+              : <Ionicons name="document-text-outline" size={16} color="#B6E1DE" />}
           </TouchableOpacity>
           {spaceId !== 'all' && canAddRecordings && (
             <TouchableOpacity
@@ -1237,12 +1231,12 @@ export default function SpaceDetailScreen() {
               onPress={() => setShowAddChoice(true)}
               activeOpacity={0.8}
             >
-              <Ionicons name="add" size={18} color={TEAL} />
+              <Ionicons name="add" size={18} color="#B6E1DE" />
             </TouchableOpacity>
           )}
           {isOwner && spaceId !== 'all' && (
             <TouchableOpacity style={s.addBtn} onPress={() => setMembersModal(true)} activeOpacity={0.8}>
-              <Ionicons name="people-outline" size={16} color={TEAL} />
+              <Ionicons name="people-outline" size={16} color="#B6E1DE" />
             </TouchableOpacity>
           )}
         </View>
@@ -1265,29 +1259,29 @@ export default function SpaceDetailScreen() {
           <View style={s.filterControlsRow}>
             {spaceId !== 'all' && (
               <TouchableOpacity onPress={handleSortToggle} activeOpacity={0.75} style={s.filterBtn}>
-                <Ionicons name={sortBy === 'date' ? 'calendar-outline' : 'pricetag-outline'} size={13} color={TEAL} />
-                <Text style={[s.filterBtnText, { color: TEAL }]}>{sortBy}</Text>
+                <Ionicons name={sortBy === 'date' ? 'calendar-outline' : 'pricetag-outline'} size={13} color={Brand.color.accentDark} />
+                <Text style={[s.filterBtnText, { color: Brand.color.accentDark }]}>{sortBy}</Text>
               </TouchableOpacity>
             )}
             <View style={s.dateNavRow}>
               {localMode !== 'custom' && (
                 <TouchableOpacity style={s.dateNavArrow} onPress={() => navigateRange(-1)} activeOpacity={0.7}>
-                  <Ionicons name="chevron-back" size={14} color={TEAL} />
+                  <Ionicons name="chevron-back" size={14} color={Brand.color.accentDark} />
                 </TouchableOpacity>
               )}
               <TouchableOpacity style={s.filterBtn} onPress={() => setShowLocalFilter(true)} activeOpacity={0.75}>
-                <Ionicons name="calendar-outline" size={13} color={TEAL} />
+                <Ionicons name="calendar-outline" size={13} color={Brand.color.accentDark} />
                 <Text style={s.filterBtnText}>{rangeLabel}</Text>
               </TouchableOpacity>
               {localMode !== 'custom' && (
                 <TouchableOpacity style={s.dateNavArrow} onPress={() => navigateRange(1)} activeOpacity={0.7}>
-                  <Ionicons name="chevron-forward" size={14} color={TEAL} />
+                  <Ionicons name="chevron-forward" size={14} color={Brand.color.accentDark} />
                 </TouchableOpacity>
               )}
             </View>
             <TouchableOpacity style={s.filterBtn} onPress={handleCategoryFilter} activeOpacity={0.75}>
-              <Ionicons name="options-outline" size={13} color={!isAllCats ? TEAL : MUTED} />
-              <Text style={[s.filterBtnText, !isAllCats && { color: TEAL }]}>Filter</Text>
+              <Ionicons name="options-outline" size={13} color={!isAllCats ? Brand.color.accentDark : Colors.muted} />
+              <Text style={[s.filterBtnText, !isAllCats && { color: Brand.color.accentDark }]}>Filter</Text>
             </TouchableOpacity>
           </View>
 
@@ -1337,8 +1331,8 @@ export default function SpaceDetailScreen() {
                       onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: item.id } } as any)}
                       onLongPress={() => { if (!canDeleteRecording(item.user_id)) return; setPendingDeleteId(item.id); setPendingDeleteName(item.name); setConfirmModal(true); }}
                     >
-                      <View style={[s.rowIconWrap, { backgroundColor: (tl.color === TEAL_DARK ? TEAL : tl.color) + '22' }]}>
-                        <Ionicons name={(item.categories?.icon ?? 'ellipse-outline') as any} size={18} color={tl.color} />
+                      <View style={s.rowIconWrap}>
+                        <Ionicons name={(item.categories?.icon ?? 'ellipse-outline') as any} size={18} color={Brand.color.accentDark} />
                       </View>
                       <View style={s.rowMid}>
                         <Text style={s.rowType}>{tl.label}</Text>
@@ -2047,87 +2041,85 @@ export default function SpaceDetailScreen() {
 }
 
 const s = StyleSheet.create({
-  // Header — flat black like dashboard
-  header:  { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 16, gap: 10, backgroundColor: INK },
-  backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#2A2A2A', alignItems: 'center', justifyContent: 'center' },
-  title:   { flex: 1, fontFamily: Fonts.sansBold, fontSize: 18, color: '#fff', letterSpacing: -0.3, textAlign: 'center' },
-  addBtn:  { width: 36, height: 36, borderRadius: 18, backgroundColor: '#2A2A2A', alignItems: 'center', justifyContent: 'center' },
+  // Header
+  header:  { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 25, paddingTop: 16, paddingBottom: 16, gap: 10, backgroundColor: Colors.headerBg, borderBottomWidth: 1, borderBottomColor: Colors.borderMid },
+  backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: Brand.color.accent + '22', alignItems: 'center', justifyContent: 'center' },
+  title:   { flex: 1, fontFamily: Brand.font.display, fontSize: 20, color: Brand.color.accent, letterSpacing: -0.3, textAlign: 'center' },
+  addBtn:  { width: 36, height: 36, borderRadius: 18, backgroundColor: Brand.color.accent + '22', alignItems: 'center', justifyContent: 'center' },
 
   // Scroll
-  scroll:  { paddingHorizontal: 20, paddingBottom: 80, backgroundColor: BG },
-  divider: { height: 1, backgroundColor: '#EFEFEF', marginHorizontal: -20, marginVertical: 8 },
+  scroll: { paddingHorizontal: 25, paddingBottom: 80 },
+  divider: { height: 8, backgroundColor: Colors.surface, marginHorizontal: -25, marginVertical: 8 },
 
-  // Section
+  // Section row (recordings only)
   sectionRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 16, paddingBottom: 8 },
-  sectionHeader: { fontFamily: Fonts.sansSemiBold, fontSize: 11, color: MUTED, letterSpacing: 1, textTransform: 'uppercase' },
-
-  // Filter controls
-  filterControlsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingTop: 12, paddingBottom: 4 },
+  sectionHeader: { ...Brand.type.sectionHeader },
+  // Filter controls row
+  filterControlsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingTop: 16, paddingBottom: 4 },
   filterRow:    { flexDirection: 'row', alignItems: 'center', gap: 4 },
   dateNavRow:   { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  dateNavArrow: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: '#EFEFEF' },
-  filterBtn:    { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: '#fff', borderWidth: 1, borderColor: '#EFEFEF' },
-  filterBtnText: { fontFamily: Fonts.sans, fontSize: 11, color: INK },
+  dateNavArrow: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.surface },
+  filterBtn:    { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: Colors.white, borderWidth: 1, borderColor: Colors.borderMid },
+  filterBtnText: { fontFamily: Fonts.mono, fontSize: 11, color: Colors.text },
+
+  // Tab circles — now in ActivityTabs component
 
   // Empty
   emptyWrap: { alignItems: 'center', paddingVertical: 24 },
-  emptyText: { fontFamily: Fonts.sans, fontSize: 13, color: MUTED },
+  emptyText: { ...Brand.type.emptyText },
 
   // Date groups
   dateHeaderRow:  { marginTop: 12, marginBottom: 6, paddingTop: 12 },
-  dateHeaderText: { fontFamily: Fonts.sansSemiBold, fontSize: 11, color: MUTED, letterSpacing: 1, textTransform: 'uppercase' },
+  dateHeaderText: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted, letterSpacing: 1.4, textTransform: 'uppercase' },
 
-  // Recording row — flat with bottom border
-  row:         { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, paddingHorizontal: 4, borderBottomWidth: 1, borderBottomColor: '#EFEFEF' },
-  rowIconWrap: { width: 40, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center', backgroundColor: '#EFEFEF' },
+  // Recording row
+  row:         { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  rowIconWrap: { width: 34, height: 34, borderRadius: 17, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.surface },
   rowMid:      { flex: 1, gap: 2 },
-  rowType:     { fontFamily: Fonts.sans, fontSize: 11, color: MUTED },
-  rowName:     { fontFamily: Fonts.sansSemiBold, fontSize: 15, color: INK },
-  rowDate:     { fontFamily: Fonts.sans, fontSize: 10, color: MUTED },
-  rowAmount:   { fontFamily: Fonts.sansBold, fontSize: 15, letterSpacing: -0.3 },
+  rowType:     { fontFamily: Fonts.mono,     fontSize: 10, color: Colors.muted, letterSpacing: 0.4, textTransform: 'uppercase' },
+  rowName:     { ...Brand.type.cardTitle },
+  rowDate:     { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted },
+  rowAmount:   { fontFamily: Fonts.monoBold, fontSize: 14, letterSpacing: -0.3 },
 
   // Modal chips
   chipRow:        { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
-  chip:           { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: '#EFEFEF' },
-  chipActive:     { backgroundColor: INK },
-  chipText:       { fontFamily: Fonts.sans,         fontSize: 12, color: MUTED },
-  chipTextActive: { fontFamily: Fonts.sansSemiBold, fontSize: 12, color: '#fff' },
-  modalLabel:     { fontFamily: Fonts.sans, fontSize: 12, color: INK, marginBottom: 10 },
-  sectionLabel:   { fontFamily: Fonts.sansSemiBold, fontSize: 11, color: MUTED, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8, marginTop: 4 },
-  clearBtn:       { alignSelf: 'flex-end', marginBottom: 12, paddingHorizontal: 14, paddingVertical: 7, borderRadius: Radius.pill, backgroundColor: '#EFEFEF' },
-  clearBtnText:   { fontFamily: Fonts.sansSemiBold, fontSize: 12, color: INK },
+  chip:           { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: Colors.surface },
+  chipActive:     { backgroundColor: Brand.color.accent },
+  chipText:       { fontFamily: Fonts.mono,     fontSize: 12, color: Colors.muted },
+  chipTextActive: { fontFamily: Fonts.monoBold, fontSize: 12, color: Colors.white },
+  modalLabel:     { fontFamily: Fonts.mono, fontSize: 12, color: Colors.text, marginBottom: 10 },
+  sectionLabel:   { fontFamily: Fonts.monoBold, fontSize: 11, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8, marginTop: 4 },
+  clearBtn:       { alignSelf: 'flex-end', marginBottom: 12, paddingHorizontal: 14, paddingVertical: 7, borderRadius: Radius.pill, backgroundColor: Colors.surface },
+  clearBtnText:   { fontFamily: Fonts.monoBold, fontSize: 12, color: Brand.color.accentDark },
 
   // Calendar
-  calWrap:           { width: '100%' },
-  calHint:           { fontFamily: Fonts.sans, fontSize: 11, color: TEAL_DARK, marginBottom: 10 },
-  pickerNav:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', paddingHorizontal: 4, marginBottom: 10 },
-  pickerMonthText:   { fontFamily: Fonts.sansBold, fontSize: 15, color: INK },
-  calDay:            { flex: 1, textAlign: 'center', fontFamily: Fonts.sans, fontSize: 10, color: MUTED },
-  calCell:           { width: '14.28%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center', borderRadius: Radius.pill },
-  calCellRange:      { backgroundColor: TEAL + '44', borderRadius: 0 },
-  calCellEdge:       { backgroundColor: INK },
-  calCellToday:      { backgroundColor: TEAL + '33' },
-  calCellText:       { fontFamily: Fonts.sans,     fontSize: 13, color: INK },
-  calCellTextActive: { fontFamily: Fonts.sansBold, color: '#fff' },
+  calWrap:         { width: '100%' },
+  calHint:         { fontFamily: Fonts.mono, fontSize: 11, color: Brand.color.accentDark, marginBottom: 10 },
+  pickerNav:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', paddingHorizontal: 4, marginBottom: 10 },
+  pickerMonthText: { fontFamily: Fonts.monoBold, fontSize: 15, color: Colors.text },
+  calDay:          { flex: 1, textAlign: 'center', fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted },
+  calCell:         { width: '14.28%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center', borderRadius: Radius.pill },
+  calCellRange:    { backgroundColor: Brand.color.accent + '55', borderRadius: 0 },
+  calCellEdge:     { backgroundColor: Brand.color.accent },
+  calCellToday:    { backgroundColor: Colors.surface },
+  calCellText:     { fontFamily: Fonts.mono,     fontSize: 13, color: Colors.text },
+  calCellTextActive: { fontFamily: Fonts.monoBold, color: Colors.text },
 
   // Load more
   loadMoreWrap: { alignItems: 'center', paddingVertical: 20 },
-  loadMoreText: { fontFamily: Fonts.sans, fontSize: 11, color: MUTED },
-
+  loadMoreText: { fontFamily: Fonts.mono, fontSize: 11, color: Colors.muted },
   // Ghost rows
-  ghostRow:        { borderStyle: 'dashed', borderWidth: 1, borderColor: '#EFEFEF', borderRadius: Radius.md, marginBottom: 4, backgroundColor: '#FAFAFA' },
+  ghostRow:        { borderStyle: 'dashed', borderWidth: 1, borderColor: Colors.borderMid, borderRadius: Radius.md, marginBottom: 4, backgroundColor: Colors.surface },
   ghostRowOverdue: { borderColor: '#F97316', backgroundColor: '#F9731608' },
-
   // Choice sheet
-  choiceRow:  { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#EFEFEF' },
+  choiceRow:  { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: Colors.border },
   choiceIcon: { width: 40, height: 40, borderRadius: Radius.md, justifyContent: 'center', alignItems: 'center' },
-  choiceTitle:{ fontFamily: Fonts.sansSemiBold, fontSize: 14, color: INK },
-  choiceSub:  { fontFamily: Fonts.sans, fontSize: 11, color: MUTED, marginTop: 2 },
-
-  // Dropdown column pickers
-  dropCol:       { flex: 1, borderWidth: 1, borderColor: '#EFEFEF', borderRadius: Radius.lg, backgroundColor: '#FAFAFA' },
+  choiceTitle:{ fontFamily: Fonts.monoBold, fontSize: 14, color: Colors.text },
+  choiceSub:  { fontFamily: Fonts.mono, fontSize: 11, color: Colors.muted, marginTop: 2 },
+  // Dropdown column pickers (reminder modal)
+  dropCol:       { flex: 1, borderWidth: 1, borderColor: Colors.borderMid, borderRadius: Radius.lg, backgroundColor: Colors.surface },
   dropItem:      { paddingVertical: 9, paddingHorizontal: 10, alignItems: 'center' },
-  dropItemActive:{ backgroundColor: INK, borderRadius: Radius.md },
-  dropText:      { fontFamily: Fonts.sans,         fontSize: 13, color: MUTED },
-  dropTextActive:{ fontFamily: Fonts.sansSemiBold, fontSize: 13, color: '#fff' },
+  dropItemActive:{ backgroundColor: Brand.color.accent, borderRadius: Radius.md },
+  dropText:      { fontFamily: Fonts.mono,     fontSize: 13, color: Colors.muted },
+  dropTextActive:{ fontFamily: Fonts.monoBold, fontSize: 13, color: Colors.white },
 });

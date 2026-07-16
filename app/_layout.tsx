@@ -1,15 +1,28 @@
 import { Stack, useRouter } from 'expo-router';
+import * as Notifications from 'expo-notifications';
 import { View, ActivityIndicator } from 'react-native';
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../src/lib/supabase';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import * as Linking from 'expo-linking';
 
+try {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+    }),
+  });
+} catch (e) {
+  console.warn('[notifications] setNotificationHandler failed:', e);
+}
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60 * 5,  // 5 min — show cached data instantly, refetch in background
-      gcTime: 1000 * 60 * 30,    // keep unused cache for 30 min
+      staleTime: 1000 * 60 * 5,
+      gcTime: 1000 * 60 * 30,
       retry: 2,
     },
   },
@@ -17,12 +30,7 @@ const queryClient = new QueryClient({
 
 if (typeof ErrorUtils !== 'undefined') {
   ErrorUtils.setGlobalHandler((error, isFatal) => {
-    const msg = `[${isFatal ? 'FATAL' : 'ERROR'}] ${error?.message}\n${error?.stack}`;
-    console.error(msg);
-    fetch('https://ntfy.sh/ledgr-crash-debug-x7k2', {
-      method: 'POST',
-      body: msg,
-    }).catch(() => {});
+    console.error('[global error]', isFatal ? 'FATAL' : 'non-fatal', error?.message, error?.stack);
   });
 }
 
@@ -36,7 +44,6 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (typeof document === 'undefined') return;
-    // Load DMSans from Google Fonts
     if (!document.getElementById('google-fonts')) {
       const link = document.createElement('link');
       link.id = 'google-fonts';
@@ -44,7 +51,6 @@ export default function RootLayout() {
       link.href = 'https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700&display=swap';
       document.head.appendChild(link);
     }
-    // Load CalSans from local assets
     if (!document.getElementById('calsans-font')) {
       const style = document.createElement('style');
       style.id = 'calsans-font';
@@ -65,7 +71,6 @@ export default function RootLayout() {
     }
   }, []);
 
-  // Handle OAuth code on web (redirected back with ?code=...)
   const [exchangingCode, setExchangingCode] = useState(false);
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -80,7 +85,6 @@ export default function RootLayout() {
     }
   }, []);
 
-  // Handle deep link OAuth callback
   useEffect(() => {
     const handleUrl = async (url: string) => {
       if (url.includes('access_token') || url.includes('code=')) {
@@ -163,4 +167,3 @@ export default function RootLayout() {
     </QueryClientProvider>
   );
 }
-

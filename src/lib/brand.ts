@@ -52,12 +52,12 @@ export const BrandColors = {
 
 export const BrandFonts = {
   display:        'CalSans',              // page titles, space names
-  appLabel:       'CalSans',              // LEDGR wordmark
-  heading:        'DMSans_600SemiBold',   // section headings, card names
-  headingBold:    'DMSans_700Bold',       // strong headings
-  body:           'DMSans_400Regular',    // body text, nav labels, subtitles
-  mono:           'DMSans_400Regular',    // amounts, dates, metadata
-  monoBold:       'DMSans_600SemiBold',   // bold amounts, labels
+  appLabel:       'MuseoModerno_Black',   // LEDGR wordmark
+  heading:        'ChillaxMedium',        // section headings, card names
+  headingBold:    'ChillaxBold',          // strong headings
+  body:           'ChillaxRegular',       // body text, nav labels, subtitles
+  mono:           'RobotoMono_400Regular',// amounts, dates, metadata
+  monoBold:       'RobotoMono_700Bold',   // bold amounts, labels
 } as const;
 
 // ─── Typography ──────────────────────────────────────────────────────────────

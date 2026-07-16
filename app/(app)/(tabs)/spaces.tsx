@@ -36,13 +36,6 @@ const fmtCompact = (n: number) => {
 
 import { getDateRange, getDateLabel, parseLocalDate, type DateMode, type WeekStart } from '../../../src/lib/dateUtils';
 
-const AmtView = ({ currency, value, color, style }: { currency: string; value: number; color?: string; style?: any }) => (
-  <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 2 }, style]}>
-    <Text style={{ fontFamily: Fonts.monoBold, fontSize: 9, color: Colors.faint, alignSelf: 'center' }}>{currency}</Text>
-    <Text style={{ fontFamily: Fonts.monoBold, fontSize: 13, color: color ?? Colors.text, letterSpacing: -0.2, marginLeft: 4 }}>{fmtCompact(value)}</Text>
-  </View>
-);
-
 const MOTIVATIONS = [
   'Every peso saved is a step forward.',
   'Small habits build big wealth.',
@@ -148,7 +141,7 @@ export default function SpacesScreen() {
           countMap[r.space_id] = (countMap[r.space_id] || 0) + 1;
         }
         const amt = convert(Number(r.amount), r.currency ?? defaultCurrency, defaultCurrency);
-        if (r.type === 'income' || r.type === 'due' || r.type === 'receivable' || r.type === 'return') {
+        if (r.type === 'income' || r.type === 'due') {
           savedMap[r.space_id] = (savedMap[r.space_id] || 0) + amt;
         } else if (r.type === 'expense') {
           spentMap[r.space_id] = (spentMap[r.space_id] || 0) + amt;
@@ -288,10 +281,10 @@ export default function SpacesScreen() {
           <Text style={s.cardMeta}>{space.count ?? 0} transaction{(space.count ?? 0) !== 1 ? 's' : ''}</Text>
         </View>
         <View style={s.cardRight}>
-          <View style={s.cardRow}><Text style={s.cardRowLabel}>money in</Text><AmtView currency={defaultCurrency} value={space.saved ?? 0} /></View>
-          <View style={s.cardRow}><Text style={s.cardRowLabel}>money out</Text><AmtView currency={defaultCurrency} value={value} color={over ? Colors.expense : undefined} /></View>
+          <View style={s.cardRow}><Text style={s.cardRowLabel}>money in</Text><Text style={s.cardRowValue}>{defaultCurrency} {fmtCompact(space.saved ?? 0)}</Text></View>
+          <View style={s.cardRow}><Text style={s.cardRowLabel}>money out</Text><Text style={[s.cardRowValue, over && { color: Colors.expense }]}>{defaultCurrency} {fmtCompact(value)}</Text></View>
           {budget > 0 && (
-            <View style={s.cardRow}><Text style={s.cardRowLabel}>budget</Text><AmtView currency={defaultCurrency} value={budget} color={statusColor} /></View>
+            <View style={s.cardRow}><Text style={s.cardRowLabel}>budget</Text><Text style={[s.cardRowValue, { color: statusColor }]}>{defaultCurrency} {fmtCompact(budget)}</Text></View>
           )}
         </View>
         <TouchableOpacity onPress={() => { setSelectedSpace(space); setMenuModal(true); setBlur(true); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -315,11 +308,11 @@ export default function SpacesScreen() {
           <Text style={s.cardMeta}>{space.count ?? 0} transaction{(space.count ?? 0) !== 1 ? 's' : ''}</Text>
         </View>
         <View style={s.cardRight}>
-          <View style={s.cardRow}><Text style={s.cardRowLabel}>saved</Text><AmtView currency={defaultCurrency} value={value} color={ACCENT_DARK} /></View>
-          <View style={s.cardRow}><Text style={s.cardRowLabel}>all time</Text><AmtView currency={defaultCurrency} value={allTime} color={ACCENT_DARK} /></View>
+          <View style={s.cardRow}><Text style={s.cardRowLabel}>saved</Text><Text style={[s.cardRowValue, { color: ACCENT_DARK }]}>{defaultCurrency} {fmtCompact(value)}</Text></View>
+          <View style={s.cardRow}><Text style={s.cardRowLabel}>all time</Text><Text style={[s.cardRowValue, { color: ACCENT_DARK }]}>{defaultCurrency} {fmtCompact(allTime)}</Text></View>
           {budget > 0 && (<>
-            <View style={s.cardRow}><Text style={s.cardRowLabel}>goal</Text><AmtView currency={defaultCurrency} value={budget} /></View>
-            <View style={s.cardRow}><Text style={s.cardRowLabel}>remaining</Text><AmtView currency={defaultCurrency} value={remaining} color={statusColor} /></View>
+            <View style={s.cardRow}><Text style={s.cardRowLabel}>goal</Text><Text style={s.cardRowValue}>{defaultCurrency} {fmtCompact(budget)}</Text></View>
+            <View style={s.cardRow}><Text style={s.cardRowLabel}>remaining</Text><Text style={[s.cardRowValue, { color: statusColor }]}>{defaultCurrency} {fmtCompact(remaining)}</Text></View>
           </>)}
         </View>
         <TouchableOpacity onPress={() => { setSelectedSpace(space); setMenuModal(true); setBlur(true); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -417,7 +410,7 @@ export default function SpacesScreen() {
         savedAllTimeMap[r.space_id] = Number(r.income_total ?? 0) - Number(r.expense_total ?? 0);
       });
       (allRecs ?? []).forEach((r: any) => {
-        if (r.type === 'income' || r.type === 'due' || r.type === 'receivable' || r.type === 'return') savedMap[r.space_id] = (savedMap[r.space_id] ?? 0) + Number(r.amount);
+        if (r.type === 'income' || r.type === 'due') savedMap[r.space_id] = (savedMap[r.space_id] ?? 0) + Number(r.amount);
         else if (r.type === 'expense' || r.type === 'debt') spentMap[r.space_id] = (spentMap[r.space_id] ?? 0) + Number(r.amount);
       });
       return spaceRows.map((sp: any) => {
@@ -447,7 +440,7 @@ export default function SpacesScreen() {
             {pendingInvites.map(invite => (
               <View key={invite.id} style={{ backgroundColor: ACCENT + '22', borderRadius: Radius.lg, padding: 14, gap: 8 }}>
                 <View style={{ gap: 2 }}>
-                  <Text style={{ fontFamily: Fonts.display, fontSize: 13, color: Colors.text }}>{invite.spaceName}</Text>
+                  <Text style={{ fontFamily: 'ChillaxMedium', fontSize: 13, color: Colors.text }}>{invite.spaceName}</Text>
                   <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted }}>
                     from {invite.ownerName} · role: {invite.role}
                   </Text>
@@ -885,8 +878,8 @@ const s = StyleSheet.create({
   tabCircleActive:      { backgroundColor: ACCENT },
   tabCircleValue:       { fontFamily: Fonts.monoBold, fontSize: 14, color: Colors.muted },
   tabCircleValueActive: { color: ACCENT_TEXT },
-  tabLabel:             { fontFamily: Fonts.regular, fontSize: 9, color: Colors.muted, marginTop: 5, letterSpacing: 0.2 },
-  tabLabelActive:       { fontFamily: Fonts.semiBold, fontSize: 9, color: ACCENT_TEXT },
+  tabLabel:             { fontFamily: 'ChillaxRegular', fontSize: 9, color: Colors.muted, marginTop: 5, letterSpacing: 0.2 },
+  tabLabelActive:       { fontFamily: 'ChillaxMedium', fontSize: 9, color: ACCENT_TEXT },
 
   // ── Empty ────────────────────────────────────────────────────────────────
   emptyWrap: { paddingVertical: 48, alignItems: 'center', paddingHorizontal: Spacing.page },
@@ -899,14 +892,12 @@ const s = StyleSheet.create({
   // ── Card ─────────────────────────────────────────────────────────────────
   card:         { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, borderRadius: Radius.pill, borderWidth: 1, borderColor: Colors.border, marginBottom: 10 },
   cardLeft:     { width: 120, gap: 4, paddingLeft: 8, paddingRight: 12, marginRight: 12, borderRightWidth: 3, borderRightColor: ACCENT },
-  cardName:     { fontFamily: Fonts.display, fontSize: 14, color: Colors.text },
+  cardName:     { fontFamily: 'ChillaxMedium', fontSize: 14, color: Colors.text },
   cardMeta:     { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted },
   cardRight:    { flex: 1, gap: 3 },
   cardRow:      { flexDirection: 'row', alignItems: 'center', gap: 8 },
   cardRowLabel: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted, letterSpacing: 0.3, width: 72 },
-  cardRowValue: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  cardRowCurrency: { fontFamily: Fonts.monoBold, fontSize: 9, color: Colors.text, letterSpacing: 0.2, alignSelf: 'center' },
-  cardRowAmount:   { fontFamily: Fonts.monoBold, fontSize: 13, color: Colors.text, letterSpacing: -0.2 },
+  cardRowValue: { fontFamily: Fonts.monoBold, fontSize: 12, color: Colors.text, letterSpacing: -0.2 },
 
   // ── Modal ─────────────────────────────────────────────────────────────────
   error:   { fontFamily: Fonts.mono, fontSize: 12, color: Colors.expense, marginBottom: 8 },

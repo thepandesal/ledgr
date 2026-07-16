@@ -8,11 +8,7 @@ import { Colors } from '../components/ui/theme';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 
-try {
-  WebBrowser.maybeCompleteAuthSession();
-} catch (e) {
-  console.warn('[auth] maybeCompleteAuthSession failed:', e);
-}
+WebBrowser.maybeCompleteAuthSession();
 
 const { width, height } = Dimensions.get('window');
 const heroSize = (height || 800) * 0.9 * 0.48;
@@ -23,16 +19,6 @@ export default function LoginScreen() {
 
   const signIn = async (provider: 'google' | 'apple') => {
     setLoading(provider);
-    // Web: direct redirect
-    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-      await supabase.auth.signInWithOAuth({
-        provider,
-        options: { redirectTo: window.location.origin },
-      });
-      setLoading(null);
-      return;
-    }
-    // Native: use WebBrowser in-app flow
     const redirectTo = Linking.createURL('spaces');
     const { data } = await supabase.auth.signInWithOAuth({
       provider,
@@ -43,10 +29,7 @@ export default function LoginScreen() {
       if (result.type === 'success' && result.url) {
         const params = new URL(result.url);
         const code = params.searchParams.get('code');
-        if (code) {
-          await supabase.auth.exchangeCodeForSession(code);
-          router.replace('/(app)/(tabs)');
-        }
+        if (code) await supabase.auth.exchangeCodeForSession(code);
       }
     }
     setLoading(null);
@@ -100,14 +83,15 @@ const s = StyleSheet.create({
     paddingHorizontal: 48,
     marginTop: 8,
   },
-  brand:     { fontFamily: 'CalSans', fontSize: 72, color: Colors.cyan, letterSpacing: -1, marginBottom: 4 },
-  tagline:   { fontFamily: 'DMSans_400Regular', fontSize: 14, color: Colors.text, marginBottom: 32 },
+  brand:     { fontFamily: 'MuseoModerno_Black', fontSize: 72, color: Colors.cyan, letterSpacing: -1, marginBottom: 4 },
+  tagline:   { fontFamily: 'ChillaxMedium', fontSize: 14, color: Colors.text, marginBottom: 32 },
   buttons:   { width: '100%', gap: 12 },
   button: {
     borderRadius: 999,
     paddingVertical: 14,
     alignItems: 'center',
     borderWidth: 3,
+    borderStyle: 'dotted',
     borderColor: '#929090',
     backgroundColor: '#ffffff',
   },
