@@ -26,7 +26,7 @@
     },
     "ios": {
       "bundleIdentifier": "art.ledgr.app",
-      "buildNumber": "53",
+      "buildNumber": "54",
       "supportsTablet": false,
       "config": {
         "usesNonExemptEncryption": false
