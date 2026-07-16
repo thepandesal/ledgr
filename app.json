@@ -9,14 +9,11 @@
     "userInterfaceStyle": "dark",
     "web": {
       "favicon": "./assets/logo.png",
-      "bundler": "metro"
+      "bundler": "metro",
+      "output": "static"
     },
     "plugins": [
-      "expo-router",
-      ["expo-notifications", {
-        "icon": "./assets/icon.png",
-        "color": "#1A1A1A"
-      }]
+      "expo-router"
     ],
     "experiments": {
       "typedRoutes": true
@@ -29,14 +26,12 @@
     },
     "ios": {
       "bundleIdentifier": "art.ledgr.app",
-      "buildNumber": "50",
+      "buildNumber": "51",
       "supportsTablet": false,
-      "entitlements": {
-        "aps-environment": "production"
-      },
       "config": {
         "usesNonExemptEncryption": false
       }
-    }
+    },
+    "owner": "adminthepandesals-team"
   }
 }
