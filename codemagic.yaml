@@ -20,7 +20,7 @@ workflows:
       node: 20.18.0
     scripts:
       - name: Install dependencies
-        script: npm install
+        script: npm install --legacy-peer-deps
       - name: Write env file
         script: |
           cat > .env << 'EOF'
