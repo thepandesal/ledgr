@@ -39,7 +39,7 @@ export default function RecordingDetailScreen() {
   const router = useRouter();
   const { slideAnim, handleBack } = useScreenAnim();
   const webviewRef = useRef<any>(null);
-  const { defaultCurrency, userId, userName } = useUser();
+  const { defaultCurrency } = useUser();
 
   const [recording, setRecording] = useState<any>(null);
   const [people, setPeople] = useState<string[]>([]);
@@ -196,15 +196,6 @@ export default function RecordingDetailScreen() {
   const [receivableManualAmount, setReceivableManualAmount] = useState('');
   const [receivableSelectedPeople, setReceivableSelectedPeople] = useState<string[]>([]);
   const [receivableLoading, setReceivableLoading] = useState(false);
-
-  // Tag a friend
-  const [tagFriendModal, setTagFriendModal] = useState(false);
-  const [tagFriends, setTagFriends] = useState<{ id: string; name: string }[]>([]);
-  const [tagSelectedFriend, setTagSelectedFriend] = useState<{ id: string; name: string } | null>(null);
-  const [tagAmount, setTagAmount] = useState('');
-  const [tagLoading, setTagLoading] = useState(false);
-  const [tagError, setTagError] = useState('');
-  const [existingTags, setExistingTags] = useState<any[]>([]);
 
   // Add item form state
   const [itemForms, setItemForms] = useState<{ name: string; cost: string; people: string[]; subitemForms: { name: string; people: string[] }[] }[]>([{ name: '', cost: '', people: [], subitemForms: [] }]);
@@ -580,8 +571,6 @@ export default function RecordingDetailScreen() {
       }
       setCollectDueModal(false);
       loadPaymentData();
-      // Sync tagged friends' mirrored expense
-      syncTaggedExpenses(amount, cappedPaid, newStatus);
       if (excess > 0.01) {
         setOverpaymentAmount(Math.round(excess * 100) / 100);
         setOverpaymentModal(true);
@@ -699,7 +688,6 @@ export default function RecordingDetailScreen() {
       setRecording((prev: any) => ({ ...prev, status: collectComplete ? 'paid' : 'partial', paid_amount: cappedPaid }));
       setCollectModal(false);
       loadPaymentData();
-      syncTaggedExpenses(amount, cappedPaid, collectComplete ? 'paid' : 'partial');
       if (excess > 0.01) {
         setOverpaymentAmount(Math.round(excess * 100) / 100);
         setOverpaymentModal(true);
@@ -846,135 +834,9 @@ export default function RecordingDetailScreen() {
     finally { setReceivableLoading(false); }
   };
 
-  const syncTaggedExpenses = async (paymentAmount: number, totalPaid: number, status: string) => {
-    if (!recordingId || !userId) return;
-    try {
-      const { data: tags } = await supabase
-        .from('recording_tags')
-        .select('*')
-        .eq('recording_id', recordingId)
-        .eq('status', 'accepted');
-      if (!tags || tags.length === 0) return;
-      for (const tag of tags) {
-        if (!tag.tagged_user_id) continue;
-        // Upsert the mirrored expense for User B
-        if (tag.mirrored_expense_id) {
-          // Update existing expense amount
-          await supabase.from('recordings').update({
-            amount: totalPaid,
-            status: status === 'paid' ? 'paid' : 'partial',
-            updated_at: new Date().toISOString(),
-          }).eq('id', tag.mirrored_expense_id);
-        } else {
-          // Create new expense for User B
-          const { data: newExp } = await supabase.from('recordings').insert({
-            user_id: tag.tagged_user_id,
-            name: recording?.name ?? 'tagged expense',
-            type: 'expense',
-            amount: totalPaid,
-            transaction_date: new Date().toISOString().split('T')[0],
-            status: status === 'paid' ? 'paid' : 'partial',
-            currency: recording?.currency ?? 'PHP',
-            notes: `from ${userName || 'someone'} · auto-recorded`,
-            is_tagged: true,
-          }).select('id').single();
-          if (newExp?.id) {
-            await supabase.from('recording_tags').update({ mirrored_expense_id: newExp.id }).eq('id', tag.id);
-          }
-        }
-        // Notify User B
-        await supabase.from('notifications').insert({
-          user_id: tag.tagged_user_id,
-          type: 'tag_payment_update',
-          title: `${userName || 'Someone'} logged a payment`,
-          body: `${recording?.name ?? 'expense'} · ${totalPaid.toLocaleString('en-US', { minimumFractionDigits: 2 })} paid so far`,
-          data: { recordingId, tagId: tag.id },
-          status: 'new',
-          is_read: false,
-        });
-      }
-    } catch (e) {
-      console.warn('[tag] sync failed:', e);
-    }
-  };
-
   const loadExistingShare = async () => {
     // no-op: share data is now fetched live on the share page
   };
-
-  const openTagFriendModal = async () => {
-    setTagError('');
-    setTagAmount(String(recording?.amount ?? ''));
-    setTagSelectedFriend(null);
-    // Load friends
-    const { data } = await supabase
-      .from('friendships')
-      .select('requester_id, receiver_id')
-      .eq('status', 'accepted')
-      .or(`requester_id.eq.${userId},receiver_id.eq.${userId}`);
-    if (!data) { setTagFriends([]); setTagFriendModal(true); return; }
-    const friendIds = data.map((r: any) => r.requester_id === userId ? r.receiver_id : r.requester_id);
-    const names = await Promise.all(friendIds.map(async (id: string) => {
-      const { data: n } = await supabase.rpc('get_user_display_name', { user_id: id });
-      return { id, name: n ?? 'unknown' };
-    }));
-    setTagFriends(names);
-    // Load existing tags for this recording
-    const { data: tags } = await supabase
-      .from('recording_tags')
-      .select('*, tagged_user:tagged_user_id(id)')
-      .eq('recording_id', recordingId)
-      .in('status', ['pending', 'accepted']);
-    setExistingTags(tags ?? []);
-    setTagFriendModal(true);
-  };
-
-  const confirmTagFriend = async () => {
-    if (!tagSelectedFriend || !tagAmount) return;
-    setTagLoading(true);
-    setTagError('');
-    try {
-      const amount = parseFloat(tagAmount);
-      if (isNaN(amount) || amount <= 0) { setTagError('enter a valid amount'); setTagLoading(false); return; }
-      // Check if already tagged
-      const alreadyTagged = existingTags.some(t => t.tagged_user_id === tagSelectedFriend.id);
-      if (alreadyTagged) { setTagError('this friend is already tagged'); setTagLoading(false); return; }
-      await supabase.from('recording_tags').insert({
-        recording_id: recordingId,
-        tagger_user_id: userId,
-        tagged_user_id: tagSelectedFriend.id,
-        amount,
-        status: 'pending',
-      });
-      // Send notification
-      await supabase.from('notifications').insert({
-        user_id: tagSelectedFriend.id,
-        type: 'expense_tag',
-        title: `${userName || 'Someone'} tagged you in an expense`,
-        body: `Tap Requests in Notifications to view and respond.`,
-        data: { recordingId, taggerName: userName },
-        status: 'new',
-        is_read: false,
-      });
-      setTagFriendModal(false);
-      setTagSelectedFriend(null);
-      setTagAmount('');
-      // Reload existing tags
-      const { data: tags } = await supabase.from('recording_tags').select('*').eq('recording_id', recordingId).in('status', ['pending', 'accepted']);
-      setExistingTags(tags ?? []);
-    } catch (e: any) {
-      setTagError(e.message ?? 'something went wrong');
-    } finally {
-      setTagLoading(false);
-    }
-  };
-
-  // Load existing tags on mount
-  useEffect(() => {
-    if (!recordingId || !userId) return;
-    supabase.from('recording_tags').select('*, tagged_user_id').eq('recording_id', recordingId).in('status', ['pending', 'accepted'])
-      .then(({ data }) => setExistingTags(data ?? []));
-  }, [recordingId, userId]);
 
   const addReceiptFromCamera = async () => {
     try {
@@ -1663,16 +1525,10 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
           {/* Actions */}
           <View style={rd.divider} />
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ paddingVertical: 12 }} contentContainerStyle={{ paddingHorizontal: PAGE, gap: 8 }}>
-            {recording?.type === 'expense' && !linkedPayable && !linkedReceivable && !recording?.is_due && !recording?.is_tagged && (
+            {recording?.type === 'expense' && !linkedPayable && !linkedReceivable && !recording?.is_due && (
               <TouchableOpacity style={rd.actionChip} onPress={() => { setReceivableMode('full'); setReceivableManualAmount(''); setReceivableSelectedPeople([]); setReceivableModal(true); }}>
                 <Ionicons name="arrow-undo-outline" size={13} color={ACCENT_DARK} />
                 <Text style={rd.actionChipText}>tag as due</Text>
-              </TouchableOpacity>
-            )}
-            {recording?.type === 'expense' && recording?.is_due && (
-              <TouchableOpacity style={rd.actionChip} onPress={openTagFriendModal}>
-                <Ionicons name="person-add-outline" size={13} color={ACCENT_DARK} />
-                <Text style={rd.actionChipText}>tag a friend{existingTags.length > 0 ? ` (${existingTags.length})` : ''}</Text>
               </TouchableOpacity>
             )}
             {recording?.type === 'expense' && recording?.is_due && (() => {
@@ -1728,17 +1584,11 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                 <Text style={[rd.actionChipText, { color: Colors.success }]}>fully paid</Text>
               </View>
             )}
-            {recording?.type === 'due' && recording?.status !== 'paid' && !recording?.is_tagged && (
+            {recording?.type === 'due' && recording?.status !== 'paid' && (
               <TouchableOpacity style={rd.actionChip} onPress={openCollectModal}>
                 <Ionicons name="arrow-down-circle-outline" size={13} color={ACCENT_DARK} />
                 <Text style={rd.actionChipText}>collect</Text>
               </TouchableOpacity>
-            )}
-            {recording?.type === 'due' && recording?.status !== 'paid' && recording?.is_tagged && (
-              <View style={[rd.actionChip, { backgroundColor: Colors.surface }]}>
-                <Ionicons name="lock-closed-outline" size={13} color={Colors.muted} />
-                <Text style={[rd.actionChipText, { color: Colors.muted }]}>managed by tagger</Text>
-              </View>
             )}
             {recording?.type === 'due' && recording?.status === 'paid' && (
               <View style={[rd.actionChip, { backgroundColor: Colors.successBg }]}>
@@ -1820,12 +1670,6 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
               <Text style={rd.infoLabel}>notes</Text>
               <Text style={{ fontFamily: Brand.font.mono, fontSize: 12, color: Colors.text, lineHeight: 18, flex: 1, textAlign: 'right' }}>{recording?.notes ?? '—'}</Text>
             </View>
-            {recording?.is_tagged && (
-              <View style={rd.infoRow}>
-                <Text style={rd.infoLabel}>tagged by</Text>
-                <Text style={[rd.infoValue, { color: ACCENT_DARK }]}>payment managed by tagger</Text>
-              </View>
-            )}
             {linkedPayable && (
               <TouchableOpacity style={rd.infoRow} onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: linkedPayable.id } } as any)}>
                 <Text style={rd.infoLabel}>{recording?.type === 'return' ? 'linked due' : 'linked debt'}</Text>
@@ -2435,49 +2279,6 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
         </TouchableOpacity>
         <TouchableOpacity style={[rd.doneBtn, { backgroundColor: Colors.surface, marginTop: 8 }]} onPress={() => setOverpaymentModal(false)}>
           <Text style={[rd.doneBtnText, { color: Colors.muted }]}>ignore</Text>
-        </TouchableOpacity>
-      </BottomSheet>
-
-      {/* Tag friend modal */}
-      <BottomSheet visible={tagFriendModal} onClose={() => { setTagFriendModal(false); setTagError(''); }} title="tag a friend">
-        {tagError ? <Text style={{ fontFamily: Brand.font.mono, fontSize: 12, color: Colors.expense, marginBottom: 8 }}>{tagError}</Text> : null}
-        <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 8 }}>amount they owe</Text>
-        <TextInput
-          style={{ fontFamily: Brand.font.monoBold, fontSize: 16, color: Colors.text, backgroundColor: Colors.surface, borderRadius: Radius.lg, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1, borderColor: Colors.borderMid, marginBottom: 16 }}
-          value={tagAmount}
-          onChangeText={setTagAmount}
-          keyboardType="decimal-pad"
-          placeholder="0.00"
-          placeholderTextColor={Colors.faint}
-        />
-        <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 8 }}>select friend</Text>
-        {tagFriends.length === 0 ? (
-          <Text style={{ fontFamily: Brand.font.mono, fontSize: 13, color: Colors.muted, marginBottom: 16 }}>no friends yet — add friends in Contacts first</Text>
-        ) : (
-          <ScrollView style={{ maxHeight: 200 }} showsVerticalScrollIndicator={false}>
-            {tagFriends.map(f => {
-              const alreadyTagged = existingTags.some(t => t.tagged_user_id === f.id);
-              return (
-                <TouchableOpacity
-                  key={f.id}
-                  style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 10, opacity: alreadyTagged ? 0.4 : 1 }}
-                  onPress={() => !alreadyTagged && setTagSelectedFriend(f)}
-                  disabled={alreadyTagged}
-                >
-                  <Ionicons name={tagSelectedFriend?.id === f.id ? 'checkmark-circle' : 'ellipse-outline'} size={20} color={tagSelectedFriend?.id === f.id ? ACCENT_DARK : Colors.faint} />
-                  <Text style={{ fontFamily: Brand.font.heading, fontSize: 14, color: Colors.text, flex: 1 }}>{f.name}</Text>
-                  {alreadyTagged && <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: Colors.muted }}>already tagged</Text>}
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        )}
-        <TouchableOpacity
-          style={[rd.doneBtn, { marginTop: 16, opacity: (!tagSelectedFriend || !tagAmount || tagLoading) ? 0.4 : 1 }]}
-          onPress={confirmTagFriend}
-          disabled={!tagSelectedFriend || !tagAmount || tagLoading}
-        >
-          {tagLoading ? <ActivityIndicator color={ACCENT_DARK} size="small" /> : <Text style={rd.doneBtnText}>send tag request</Text>}
         </TouchableOpacity>
       </BottomSheet>
 
