@@ -8,7 +8,11 @@ import { Colors } from '../components/ui/theme';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 
-WebBrowser.maybeCompleteAuthSession();
+try {
+  WebBrowser.maybeCompleteAuthSession();
+} catch (e) {
+  console.warn('[auth] maybeCompleteAuthSession failed:', e);
+}
 
 const { width, height } = Dimensions.get('window');
 const heroSize = (height || 800) * 0.9 * 0.48;
