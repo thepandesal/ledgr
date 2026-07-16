@@ -24,13 +24,17 @@ function generateProfileCode(): string {
 
 async function registerPushToken(userId: string) {
   if (Platform.OS === 'web') return;
-  const { status } = await Notifications.requestPermissionsAsync();
-  if (status !== 'granted') return;
-  const token = (await Notifications.getExpoPushTokenAsync()).data;
-  await supabase.from('push_tokens').upsert(
-    { user_id: userId, token, platform: Platform.OS },
-    { onConflict: 'user_id,token' }
-  );
+  try {
+    const { status } = await Notifications.requestPermissionsAsync();
+    if (status !== 'granted') return;
+    const token = (await Notifications.getExpoPushTokenAsync()).data;
+    await supabase.from('push_tokens').upsert(
+      { user_id: userId, token, platform: Platform.OS },
+      { onConflict: 'user_id,token' }
+    );
+  } catch (e) {
+    console.warn('[push] token registration failed:', e);
+  }
 }
 
 /**

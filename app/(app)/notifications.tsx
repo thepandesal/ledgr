@@ -3,12 +3,13 @@ import {
   SafeAreaView, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../src/lib/supabase';
 import { useUser } from '../../src/hooks/useUser';
-import { Colors } from '@/components/ui/theme';
+import { Colors, Fonts, Radius, Spacing } from '@/components/ui/theme';
 import { Brand } from '../../src/lib/brand';
+import TagRequestsScreen from './tag-request';
 
 const ACCENT      = Brand.color.accent;
 const ACCENT_DARK = Brand.color.accentDark;
@@ -30,6 +31,9 @@ const TYPE_ICON: Record<string, string> = {
   dues_reminder:           'time-outline',
   dues_end_of_month:       'calendar-outline',
   dues_month_summary:      'bar-chart-outline',
+  tag_accepted:            'checkmark-circle-outline',
+  tag_declined:            'close-circle-outline',
+  tag_payment_update:      'cash-outline',
   default:                 'notifications-outline',
 };
 
@@ -46,8 +50,20 @@ function smartGroup(dateStr: string): string {
 export default function NotificationsScreen() {
   const router = useRouter();
   const { userId } = useUser();
+  const [activeTab, setActiveTab] = useState<'notifications' | 'requests'>('notifications');
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [pendingRequestCount, setPendingRequestCount] = useState(0);
+
+  const fetchPendingCount = useCallback(async () => {
+    if (!userId) return;
+    const { count } = await supabase
+      .from('recording_tags')
+      .select('*', { count: 'exact', head: true })
+      .eq('tagged_user_id', userId)
+      .eq('status', 'pending');
+    setPendingRequestCount(count ?? 0);
+  }, [userId]);
 
   useEffect(() => {
     if (!userId) return;
@@ -71,8 +87,8 @@ export default function NotificationsScreen() {
     };
 
     load();
+    fetchPendingCount();
 
-    // Realtime — new notifications appear instantly without refresh
     const channel = supabase
       .channel('notifications-live')
       .on('postgres_changes', {
@@ -83,17 +99,21 @@ export default function NotificationsScreen() {
       }, async (payload) => {
         const n = payload.new as any;
         setNotifications(prev => [n, ...prev]);
-        // Auto-mark as saw since the page is open
         await supabase.from('notifications').update({ status: 'saw', is_read: true, read: true }).eq('id', n.id);
         setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, status: 'saw' } : x));
       })
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'recording_tags',
+        filter: `tagged_user_id=eq.${userId}`,
+      }, () => fetchPendingCount())
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [userId]);
+  }, [userId, fetchPendingCount]);
 
   const handleTap = async (n: any) => {
-    // Mark as opened
     if (n.status !== 'opened') {
       await supabase.from('notifications').update({ status: 'opened' }).eq('id', n.id);
       setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, status: 'opened' } : x));
@@ -101,6 +121,10 @@ export default function NotificationsScreen() {
     const data = n.data ?? {};
     if (n.type === 'friend_request' || n.type === 'friend_request_accepted') {
       router.push('/(app)/(tabs)/contacts' as any); return;
+    }
+    if (n.type === 'tag_accepted' || n.type === 'tag_declined' || n.type === 'tag_payment_update') {
+      if (data.recordingId) router.push({ pathname: '/(app)/recording-detail', params: { recordingId: data.recordingId } } as any);
+      return;
     }
     if (n.type === 'split_bill_invite' && data.splitBillId) {
       router.push({ pathname: '/(app)/split-bill-detail', params: { splitBillId: data.splitBillId, name: data.splitBillName ?? 'split bill' } } as any); return;
@@ -112,18 +136,11 @@ export default function NotificationsScreen() {
       if (data.spaceId) router.push({ pathname: '/(app)/space-detail', params: { spaceId: data.spaceId, name: data.spaceName ?? 'space' } } as any);
       return;
     }
-    if (n.type === 'savings_reminder') {
-      if (data.spaceId) router.push({ pathname: '/(app)/space-detail', params: { spaceId: data.spaceId, name: data.spaceName ?? 'space' } } as any);
-      return;
-    }
     if (n.type === 'dues_reminder' || n.type === 'dues_month_summary' || n.type === 'dues_end_of_month') {
-      router.push('/(app)/(tabs)/dashboard' as any);
-      return;
+      router.push('/(app)/(tabs)/dashboard' as any); return;
     }
     if (data.recordingId) {
       router.push({ pathname: '/(app)/recording-detail', params: { recordingId: data.recordingId } } as any);
-    } else if (data.recurringRecordId) {
-      router.push({ pathname: '/(app)/space-detail', params: { spaceId: data.spaceId ?? 'all', name: data.spaceName ?? 'space' } } as any);
     } else if (data.splitBillId) {
       router.push({ pathname: '/(app)/split-bill-detail', params: { splitBillId: data.splitBillId, name: data.splitBillName ?? 'split bill' } } as any);
     }
@@ -142,7 +159,33 @@ export default function NotificationsScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white }}>
-      {loading ? (
+      {/* ── Sub-tabs ── */}
+      <View style={s.tabRow}>
+        <TouchableOpacity
+          style={[s.tab, activeTab === 'notifications' && s.tabActive]}
+          onPress={() => setActiveTab('notifications')}
+          activeOpacity={0.75}
+        >
+          <Text style={[s.tabText, activeTab === 'notifications' && s.tabTextActive]}>notifications</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[s.tab, activeTab === 'requests' && s.tabActive]}
+          onPress={() => setActiveTab('requests')}
+          activeOpacity={0.75}
+        >
+          <Text style={[s.tabText, activeTab === 'requests' && s.tabTextActive]}>requests</Text>
+          {pendingRequestCount > 0 && (
+            <View style={s.badge}>
+              <Text style={s.badgeText}>{pendingRequestCount > 9 ? '9+' : String(pendingRequestCount)}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+      </View>
+
+      {/* ── Content ── */}
+      {activeTab === 'requests' ? (
+        <TagRequestsScreen />
+      ) : loading ? (
         <ActivityIndicator color={ACCENT_DARK} style={{ marginTop: 40 }} />
       ) : notifications.length === 0 ? (
         <View style={s.emptyWrap}>
@@ -192,6 +235,33 @@ export default function NotificationsScreen() {
 }
 
 const s = StyleSheet.create({
+  tabRow: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+    paddingHorizontal: PAGE,
+  },
+  tab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+    marginRight: 24,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  tabActive:     { borderBottomColor: ACCENT_DARK },
+  tabText:       { fontFamily: Fonts.mono, fontSize: 13, color: Colors.muted },
+  tabTextActive: { fontFamily: Fonts.monoBold, fontSize: 13, color: ACCENT_DARK },
+  badge: {
+    minWidth: 18, height: 18, borderRadius: 9,
+    backgroundColor: '#ed6a6a',
+    alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  badgeText: { fontFamily: Fonts.monoBold, fontSize: 10, color: Colors.white },
+
   scroll:    { paddingBottom: 60 },
   emptyWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, paddingTop: 80 },
   emptyText: { fontFamily: Brand.font.mono, fontSize: 13, color: Colors.muted },
