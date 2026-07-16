@@ -1,22 +1,9 @@
 import { Stack, useRouter } from 'expo-router';
-import * as Notifications from 'expo-notifications';
 import { View, ActivityIndicator } from 'react-native';
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../src/lib/supabase';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import * as Linking from 'expo-linking';
-
-try {
-  Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowAlert: true,
-      shouldPlaySound: true,
-      shouldSetBadge: false,
-    }),
-  });
-} catch (e) {
-  console.warn('[notifications] setNotificationHandler failed:', e);
-}
 
 const queryClient = new QueryClient({
   defaultOptions: {

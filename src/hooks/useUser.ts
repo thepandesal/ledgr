@@ -1,7 +1,4 @@
 import { useEffect, useState } from 'react';
-import { Platform } from 'react-native';
-import * as Notifications from 'expo-notifications';
-import Constants from 'expo-constants';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import type { User } from '@supabase/supabase-js';
@@ -23,27 +20,8 @@ function generateProfileCode(): string {
   return code;
 }
 
-async function registerPushToken(userId: string) {
-  if (Platform.OS === 'web') return;
-  try {
-    const { status: existing } = await Notifications.getPermissionsAsync();
-    let finalStatus = existing;
-    if (existing !== 'granted') {
-      const { status } = await Notifications.requestPermissionsAsync();
-      finalStatus = status;
-    }
-    if (finalStatus !== 'granted') return;
-    const { data: token } = await Notifications.getExpoPushTokenAsync({
-      projectId: Constants.expoConfig?.extra?.eas?.projectId,
-    });
-    if (!token) return;
-    await supabase.from('push_tokens').upsert(
-      { user_id: userId, token, platform: Platform.OS },
-      { onConflict: 'user_id,token' }
-    );
-  } catch (e) {
-    console.warn('[push] token registration failed:', e);
-  }
+async function registerPushToken(_userId: string) {
+  // expo-notifications disabled temporarily for iOS 26 compatibility
 }
 
 /**

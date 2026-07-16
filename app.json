@@ -13,14 +13,7 @@
       "output": "static"
     },
     "plugins": [
-      "expo-router",
-      [
-        "expo-notifications",
-        {
-          "icon": "./assets/icon.png",
-          "color": "#1A1A1A"
-        }
-      ]
+      "expo-router"
     ],
     "experiments": {
       "typedRoutes": true
@@ -33,7 +26,7 @@
     },
     "ios": {
       "bundleIdentifier": "art.ledgr.app",
-      "buildNumber": "38",
+      "buildNumber": "39",
       "supportsTablet": false,
       "entitlements": {
         "aps-environment": "production"
