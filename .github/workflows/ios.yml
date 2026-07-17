@@ -1,0 +1,98 @@
+name: iOS TestFlight
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.18.0'
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Write env file
+        run: |
+          cat > .env << 'EOF'
+          EXPO_PUBLIC_SUPABASE_URL=https://vzylpnuvsuianmuwqsnr.supabase.co
+          EXPO_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_SE1OPKy63BYHkZfQkbIb_A_nAgXKGTQ
+          EXPO_PUBLIC_R2_ENDPOINT=https://8095a062e38cbfdda1283f4df7a57621.r2.cloudflarestorage.com
+          EXPO_PUBLIC_R2_ACCESS_KEY=a0a80ae15d748c118b0d5f742b0c3cd0
+          EXPO_PUBLIC_R2_SECRET_KEY=aaed9dc2a6e6cc13a8c542bf6347c78ec7b8ce895d39cd485c4aca5c2a8fd5c4
+          EXPO_PUBLIC_R2_BUCKET=ledgr-receipts
+          EXPO_PUBLIC_R2_PUBLIC_URL=https://cdn.ledgr.art
+          EOF
+
+      - name: Expo prebuild
+        run: npx expo prebuild --clean --platform ios
+
+      - name: Install CocoaPods
+        run: |
+          cd ios
+          pod repo update
+          pod install --clean-install
+
+      - name: Write App Store Connect API key
+        run: |
+          mkdir -p ~/.appstoreconnect/private_keys
+          echo "${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}" | base64 --decode > ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}.p8
+
+      - name: Create ExportOptions.plist
+        run: |
+          cat > /tmp/ExportOptions.plist << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store</string>
+            <key>teamID</key>
+            <string>URQL424MCG</string>
+            <key>uploadBitcode</key>
+            <false/>
+            <key>uploadSymbols</key>
+            <true/>
+            <key>signingStyle</key>
+            <string>automatic</string>
+          </dict>
+          </plist>
+          EOF
+
+      - name: Archive
+        run: |
+          xcodebuild -workspace ios/ledgr.xcworkspace \
+            -scheme Ledgr \
+            -configuration Release \
+            -archivePath $RUNNER_TEMP/ledgr.xcarchive \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}.p8 \
+            -authenticationKeyID ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }} \
+            -authenticationKeyIssuerID ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }} \
+            archive
+
+      - name: Export IPA
+        run: |
+          xcodebuild -exportArchive \
+            -archivePath $RUNNER_TEMP/ledgr.xcarchive \
+            -exportOptionsPlist /tmp/ExportOptions.plist \
+            -exportPath $RUNNER_TEMP/ledgr \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}.p8 \
+            -authenticationKeyID ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }} \
+            -authenticationKeyIssuerID ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
+
+      - name: Upload to TestFlight
+        run: |
+          xcrun altool --upload-app \
+            --type ios \
+            --file "$RUNNER_TEMP/ledgr/Ledgr.ipa" \
+            --apiKey ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }} \
+            --apiIssuer ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
