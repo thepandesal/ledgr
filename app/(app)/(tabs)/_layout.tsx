@@ -384,7 +384,7 @@ export default function TabsLayout() {
       .from('notifications')
       .select('*', { count: 'exact', head: true })
       .eq('user_id', userId)
-      .eq('status', 'new');
+      .in('status', ['new', 'saw']);
     setUnreadCount(count ?? 0);
   }, [userId]);
 
@@ -450,7 +450,17 @@ export default function TabsLayout() {
   const handleNavPress = (key: string) => {
     if (key === 'others') { othersOpen ? closeOthers() : openOthers(); return; }
     if (othersOpen) closeOthers();
-    if (key === 'notifications-tab') { setUnreadCount(0); switchTab('notifications-page'); return; }
+    if (key === 'notifications-tab') {
+      setUnreadCount(0);
+      switchTab('notifications-page');
+      // Mark all new/saw as saw so badge stays cleared
+      supabase.from('notifications')
+        .update({ status: 'saw', is_read: true, read: true })
+        .eq('user_id', userId)
+        .in('status', ['new'])
+        .neq('type', 'expense_tag');
+      return;
+    }
     switchTab(key);
   };
 
