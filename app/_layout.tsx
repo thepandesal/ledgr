@@ -1,5 +1,4 @@
 import { Stack, useRouter } from 'expo-router';
-import * as Notifications from 'expo-notifications';
 import { useFonts, DMSans_400Regular, DMSans_500Medium, DMSans_600SemiBold, DMSans_700Bold } from '@expo-google-fonts/dm-sans';
 import { RobotoMono_400Regular, RobotoMono_700Bold } from '@expo-google-fonts/roboto-mono';
 import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
@@ -19,14 +18,6 @@ if (typeof ErrorUtils !== 'undefined') {
     showGlobalError(`${isFatal ? '[FATAL] ' : ''}${error?.message}\n\n${error?.stack ?? ''}`);
   });
 }
-
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
-});
 
 const queryClient = new QueryClient({
   defaultOptions: {
