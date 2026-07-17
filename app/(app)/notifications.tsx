@@ -31,10 +31,6 @@ const TYPE_ICON: Record<string, string> = {
   dues_reminder:           'time-outline',
   dues_end_of_month:       'calendar-outline',
   dues_month_summary:      'bar-chart-outline',
-  tag_accepted:            'checkmark-circle-outline',
-  tag_declined:            'close-circle-outline',
-  tag_payment_update:      'cash-outline',
-  expense_tag:             'person-add-outline',
   default:                 'notifications-outline',
 };
 
@@ -90,6 +86,7 @@ export default function NotificationsScreen() {
     load();
     fetchPendingCount();
 
+    // Realtime — new notifications appear instantly without refresh
     const channel = supabase
       .channel('notifications-live')
       .on('postgres_changes', {
@@ -100,21 +97,17 @@ export default function NotificationsScreen() {
       }, async (payload) => {
         const n = payload.new as any;
         setNotifications(prev => [n, ...prev]);
+        // Auto-mark as saw since the page is open
         await supabase.from('notifications').update({ status: 'saw', is_read: true, read: true }).eq('id', n.id);
         setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, status: 'saw' } : x));
       })
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'recording_tags',
-        filter: `tagged_user_id=eq.${userId}`,
-      }, () => fetchPendingCount())
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
   }, [userId, fetchPendingCount]);
 
   const handleTap = async (n: any) => {
+    // Mark as opened
     if (n.status !== 'opened') {
       await supabase.from('notifications').update({ status: 'opened' }).eq('id', n.id);
       setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, status: 'opened' } : x));
@@ -123,26 +116,28 @@ export default function NotificationsScreen() {
     if (n.type === 'friend_request' || n.type === 'friend_request_accepted') {
       router.push('/(app)/(tabs)/contacts' as any); return;
     }
-    if (n.type === 'expense_tag') {
-      setActiveTab('requests'); return;
-    }
-    if (n.type === 'tag_accepted' || n.type === 'tag_declined' || n.type === 'tag_payment_update') {
-      if (data.recordingId) router.push({ pathname: '/(app)/recording-detail', params: { recordingId: data.recordingId } } as any);
-      return;
-    }
     if (n.type === 'split_bill_invite' && data.splitBillId) {
       router.push({ pathname: '/(app)/split-bill-detail', params: { splitBillId: data.splitBillId, name: data.splitBillName ?? 'split bill' } } as any); return;
     }
-    if (n.type === 'space_invite') { router.push('/(app)/(tabs)/spaces' as any); return; }
+    if (n.type === 'space_invite') {
+      router.push('/(app)/(tabs)/spaces' as any); return;
+    }
     if (n.type === 'budget_warning_80' || n.type === 'budget_limit_reached') {
       if (data.spaceId) router.push({ pathname: '/(app)/space-detail', params: { spaceId: data.spaceId, name: data.spaceName ?? 'space' } } as any);
       return;
     }
+    if (n.type === 'savings_reminder') {
+      if (data.spaceId) router.push({ pathname: '/(app)/space-detail', params: { spaceId: data.spaceId, name: data.spaceName ?? 'space' } } as any);
+      return;
+    }
     if (n.type === 'dues_reminder' || n.type === 'dues_month_summary' || n.type === 'dues_end_of_month') {
-      router.push('/(app)/(tabs)/dashboard' as any); return;
+      router.push('/(app)/(tabs)/dashboard' as any);
+      return;
     }
     if (data.recordingId) {
       router.push({ pathname: '/(app)/recording-detail', params: { recordingId: data.recordingId } } as any);
+    } else if (data.recurringRecordId) {
+      router.push({ pathname: '/(app)/space-detail', params: { spaceId: data.spaceId ?? 'all', name: data.spaceName ?? 'space' } } as any);
     } else if (data.splitBillId) {
       router.push({ pathname: '/(app)/split-bill-detail', params: { splitBillId: data.splitBillId, name: data.splitBillName ?? 'split bill' } } as any);
     }
@@ -214,7 +209,9 @@ export default function NotificationsScreen() {
                       <Ionicons name={icon as any} size={18} color={highlighted ? ACCENT_DARK : Colors.muted} />
                     </View>
                     <View style={s.mid}>
-                      <Text style={[s.rowTitle, highlighted && s.rowTitleHighlighted]} numberOfLines={1}>{n.title}</Text>
+                      <Text style={[s.rowTitle, highlighted && s.rowTitleHighlighted]} numberOfLines={1}>
+                        {n.title}
+                      </Text>
                       {n.body ? <Text style={s.rowBody} numberOfLines={2}>{n.body}</Text> : null}
                     </View>
                     <View style={{ alignItems: 'flex-end', gap: 4 }}>
@@ -236,21 +233,28 @@ export default function NotificationsScreen() {
 const s = StyleSheet.create({
   tabRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: Colors.border, paddingHorizontal: PAGE },
   tab: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 12, paddingHorizontal: 4, marginRight: 24, borderBottomWidth: 2, borderBottomColor: 'transparent' },
-  tabActive:     { borderBottomColor: ACCENT_DARK },
+  tabActive:     { borderBottomColor: Brand.color.accentDark },
   tabText:       { fontFamily: Fonts.mono, fontSize: 13, color: Colors.muted },
-  tabTextActive: { fontFamily: Fonts.monoBold, fontSize: 13, color: ACCENT_DARK },
+  tabTextActive: { fontFamily: Fonts.monoBold, fontSize: 13, color: Brand.color.accentDark },
   badge:     { minWidth: 18, height: 18, borderRadius: 9, backgroundColor: '#ed6a6a', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
   badgeText: { fontFamily: Fonts.monoBold, fontSize: 10, color: Colors.white },
-
   scroll:    { paddingBottom: 60 },
   emptyWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, paddingTop: 80 },
   emptyText: { fontFamily: Brand.font.mono, fontSize: 13, color: Colors.muted },
-  groupLabel: { fontFamily: Brand.font.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 1.2, textTransform: 'uppercase', paddingHorizontal: PAGE, paddingTop: 20, paddingBottom: 6 },
+
+  groupLabel: {
+    fontFamily: Brand.font.monoBold, fontSize: 10, color: Colors.muted,
+    letterSpacing: 1.2, textTransform: 'uppercase',
+    paddingHorizontal: PAGE, paddingTop: 20, paddingBottom: 6,
+  },
+
   row:     { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingVertical: 14, paddingHorizontal: PAGE, borderBottomWidth: 1, borderBottomColor: Colors.border, backgroundColor: Colors.white },
   rowNew:  { backgroundColor: ACCENT + '22' },
   rowSaw:  { backgroundColor: ACCENT + '0C' },
+
   iconWrap:            { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 },
   iconWrapHighlighted: { backgroundColor: ACCENT + '44' },
+
   mid:                 { flex: 1, gap: 3 },
   rowTitle:            { fontFamily: Brand.font.monoBold, fontSize: 13, color: Colors.muted },
   rowTitleHighlighted: { color: Colors.text },

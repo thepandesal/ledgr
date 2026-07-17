@@ -1,5 +1,5 @@
 import {
-  View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, TextInput,
+  View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState, useCallback } from 'react';
@@ -74,7 +74,6 @@ export default function TagRequestsScreen() {
         });
       } else {
         await supabase.from('recording_tags').update({ status: 'declined' }).eq('id', tag.id);
-
         await supabase.from('notifications').insert({
           user_id: tag.tagger_user_id,
           type: 'tag_declined',

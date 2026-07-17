@@ -849,9 +849,7 @@ export default function RecordingDetailScreen() {
   };
 
   const openTagFriendModal = async () => {
-    setTagError('');
-    setTagAmount(String(recording?.amount ?? ''));
-    setTagSelectedFriend(null);
+    setTagError(''); setTagAmount(String(recording?.amount ?? '')); setTagSelectedFriend(null);
     const { data } = await supabase.from('friendships').select('requester_id, receiver_id').eq('status', 'accepted').or(`requester_id.eq.${userId},receiver_id.eq.${userId}`);
     if (!data) { setTagFriends([]); setTagFriendModal(true); return; }
     const friendIds = data.map((r: any) => r.requester_id === userId ? r.receiver_id : r.requester_id);
