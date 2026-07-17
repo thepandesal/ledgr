@@ -76,6 +76,8 @@ jobs:
             -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}.p8 \
             -authenticationKeyID ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }} \
             -authenticationKeyIssuerID ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }} \
+            DEVELOPMENT_TEAM=URQL424MCG \
+            CODE_SIGN_STYLE=Automatic \
             archive
 
       - name: Export IPA
