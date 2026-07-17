@@ -9,7 +9,6 @@ import { supabase } from '../../src/lib/supabase';
 import { useUser } from '../../src/hooks/useUser';
 import { useScreenAnim } from '@/components/ui/ScreenWrapper';
 import { Animated } from 'react-native';
-import BottomSheet from '@/components/ui/BottomSheet';
 import { Colors, Fonts, Radius, Spacing } from '@/components/ui/theme';
 import { Brand } from '../../src/lib/brand';
 
@@ -25,111 +24,97 @@ export default function TagDetailScreen() {
   const { slideAnim, handleBack } = useScreenAnim();
 
   const [recording, setRecording] = useState<any>(null);
+  const [tag, setTag] = useState<any>(null);
   const [taggerName, setTaggerName] = useState('');
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
-
-  // Space picker for accept flow
-  const [spaces, setSpaces] = useState<{ id: string; name: string }[]>([]);
-  const [showSpacePicker, setShowSpacePicker] = useState(false);
-  const [selectedSpaceId, setSelectedSpaceId] = useState<string | null>(null);
 
   useEffect(() => {
     load();
   }, [recordingId]);
 
   const load = async () => {
-    if (!recordingId) return;
-    const { data: rec } = await supabase
-      .from('recordings')
-      .select('*, categories:category_id(name, color, icon)')
-      .eq('id', recordingId)
-      .single();
-    if (rec) {
+    if (!recordingId || !userId) return;
+    const { data: tagRow } = await supabase
+      .from('recording_tags')
+      .select('*, recordings:recording_id(id, name, amount, transaction_date, currency, notes, category_id, categories:category_id(name, color, icon))')
+      .eq('recording_id', recordingId)
+      .eq('tagged_user_id', userId)
+      .maybeSingle();
+    if (tagRow) {
+      setTag(tagRow);
+      const rec = tagRow.recordings;
       setRecording({
         ...rec,
-        categories: Array.isArray(rec.categories) ? rec.categories[0] : rec.categories,
+        categories: Array.isArray(rec?.categories) ? rec.categories[0] : rec?.categories,
       });
-      // Get tagger name
-      const { data: name } = await supabase.rpc('get_user_display_name', { user_id: rec.user_id });
+      const { data: name } = await supabase.rpc('get_user_display_name', { user_id: tagRow.tagger_user_id });
       setTaggerName(name ?? 'someone');
     }
-    // Load spaces for the current user
-    const { data: spaceRows } = await supabase
-      .from('spaces')
-      .select('id, name')
-      .eq('user_id', userId)
-      .order('name');
-    setSpaces(spaceRows ?? []);
     setLoading(false);
   };
 
   const handleDecline = async () => {
+    if (!tag) return;
     setActionLoading(true);
     try {
-      await supabase.from('recordings').update({ tag_status: 'declined' }).eq('id', recordingId);
-      // Notify tagger
+      await supabase.from('recording_tags').update({ status: 'declined' }).eq('id', tag.id);
       await supabase.from('notifications').insert({
-        user_id: recording.user_id,
-        type: 'expense_tag_declined',
-        title: `${userName} declined your expense tag`,
-        body: `"${recording.name}" tag was declined`,
-        message: `"${recording.name}" tag was declined`,
-        data: { recordingId },
-        is_read: false, status: 'new',
+        user_id: tag.tagger_user_id,
+        type: 'tag_declined',
+        title: `${userName || 'Someone'} declined your expense tag`,
+        body: `"${recording?.name ?? 'expense'}" tag was declined.`,
+        data: { recordingId, tagId: tag.id },
+        status: 'new',
+        is_read: false,
       });
       if (notificationId) {
         await supabase.from('notifications').update({ status: 'opened' }).eq('id', notificationId);
       }
-      handleBack();
+      setTag((prev: any) => ({ ...prev, status: 'declined' }));
     } catch (e) { /* silent */ }
     finally { setActionLoading(false); }
   };
 
   const handleAccept = async () => {
-    if (!selectedSpaceId) { setShowSpacePicker(true); return; }
+    if (!tag) return;
     setActionLoading(true);
     try {
-      // Create a debt recording on the tagged friend's side
-      const { data: debtRec } = await supabase.from('recordings').insert({
+      const { data: mirrored } = await supabase.from('recordings').insert({
         user_id: userId,
-        space_id: selectedSpaceId,
-        name: recording.name,
-        type: 'debt',
-        amount: recording.amount,
-        transaction_date: recording.transaction_date,
-        notes: recording.notes ?? null,
-        category_id: recording.category_id ?? null,
+        name: recording?.name ?? 'tagged expense',
+        type: 'due',
+        amount: tag.amount,
+        transaction_date: recording?.transaction_date ?? new Date().toISOString().split('T')[0],
         status: 'unpaid',
-        person_name: taggerName,
-        tag_linked_recording_id: recordingId,
-        currency: recording.currency ?? 'PHP',
+        currency: recording?.currency ?? 'PHP',
+        notes: `tagged by ${taggerName}`,
+        is_tagged: true,
       }).select('id').single();
 
-      // Update original recording tag status and link
-      await supabase.from('recordings').update({
-        tag_status: 'accepted',
-        tag_linked_recording_id: debtRec?.id ?? null,
-      }).eq('id', recordingId);
+      await supabase.from('recording_tags').update({
+        status: 'accepted',
+        mirrored_recording_id: mirrored?.id ?? null,
+      }).eq('id', tag.id);
 
-      // Notify tagger
       await supabase.from('notifications').insert({
-        user_id: recording.user_id,
-        type: 'expense_tag_accepted',
-        title: `${userName} accepted your expense tag`,
-        body: `"${recording.name}" — a loan was created on their end`,
-        message: `"${recording.name}" — a loan was created on their end`,
-        data: { recordingId },
-        is_read: false, status: 'new',
+        user_id: tag.tagger_user_id,
+        type: 'tag_accepted',
+        title: `${userName || 'Someone'} accepted your expense tag`,
+        body: `"${recording?.name ?? 'expense'}" is now a due in their account.`,
+        data: { recordingId, tagId: tag.id },
+        status: 'new',
+        is_read: false,
       });
 
       if (notificationId) {
         await supabase.from('notifications').update({ status: 'opened' }).eq('id', notificationId);
       }
 
-      // Navigate to the newly created debt recording
-      if (debtRec?.id) {
-        router.replace({ pathname: '/(app)/recording-detail', params: { recordingId: debtRec.id } } as any);
+      setTag((prev: any) => ({ ...prev, status: 'accepted' }));
+
+      if (mirrored?.id) {
+        router.replace({ pathname: '/(app)/recording-detail', params: { recordingId: mirrored.id } } as any);
       } else {
         handleBack();
       }
@@ -214,13 +199,13 @@ export default function TagDetailScreen() {
           </View>
 
           {/* Tag status */}
-          {recording.tag_status === 'accepted' && (
+          {tag?.status === 'accepted' && (
             <View style={[s.statusBanner, { backgroundColor: Colors.successBg }]}>
               <Ionicons name="checkmark-circle" size={16} color={Colors.success} />
-              <Text style={[s.statusText, { color: Colors.success }]}>you accepted this tag — a loan was created</Text>
+              <Text style={[s.statusText, { color: Colors.success }]}>you accepted this tag — a due was created</Text>
             </View>
           )}
-          {recording.tag_status === 'declined' && (
+          {tag?.status === 'declined' && (
             <View style={[s.statusBanner, { backgroundColor: Colors.dangerBg }]}>
               <Ionicons name="close-circle" size={16} color={Colors.danger} />
               <Text style={[s.statusText, { color: Colors.danger }]}>you declined this tag</Text>
@@ -228,14 +213,14 @@ export default function TagDetailScreen() {
           )}
 
           {/* Actions — only show if still pending */}
-          {(!recording.tag_status || recording.tag_status === 'pending') && (
+          {(!tag?.status || tag?.status === 'pending') && (
             <View style={s.actions}>
               <Text style={s.actionsHint}>
                 accepting will create a loan on your end. you can pay it off when you're ready.
               </Text>
               <TouchableOpacity
                 style={[s.acceptBtn, actionLoading && { opacity: 0.5 }]}
-                onPress={() => selectedSpaceId ? handleAccept() : setShowSpacePicker(true)}
+                onPress={handleAccept}
                 disabled={actionLoading}
                 activeOpacity={0.8}
               >
@@ -261,30 +246,7 @@ export default function TagDetailScreen() {
         </ScrollView>
       )}
 
-      {/* Space picker */}
-      <BottomSheet visible={showSpacePicker} onClose={() => setShowSpacePicker(false)} title="put loan in which space?" height="50%">
-        <ScrollView showsVerticalScrollIndicator={false}>
-          {spaces.length === 0 ? (
-            <Text style={{ fontFamily: Fonts.mono, fontSize: 13, color: Colors.muted, textAlign: 'center', paddingVertical: 24 }}>
-              no spaces found — create one first
-            </Text>
-          ) : (
-            spaces.map(sp => (
-              <TouchableOpacity
-                key={sp.id}
-                style={[s.spaceRow, selectedSpaceId === sp.id && s.spaceRowActive]}
-                onPress={() => { setSelectedSpaceId(sp.id); setShowSpacePicker(false); handleAccept(); }}
-                activeOpacity={0.75}
-              >
-                <Text style={[s.spaceRowText, selectedSpaceId === sp.id && { color: ACCENT_DARK, fontFamily: Fonts.monoBold }]}>
-                  {sp.name}
-                </Text>
-                {selectedSpaceId === sp.id && <Ionicons name="checkmark" size={16} color={ACCENT_DARK} />}
-              </TouchableOpacity>
-            ))
-          )}
-        </ScrollView>
-      </BottomSheet>
+
     </Animated.View>
   );
 }
@@ -320,7 +282,5 @@ const s = StyleSheet.create({
   declineBtn:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: Colors.dangerBg, borderRadius: Radius.pill, paddingVertical: 14, borderWidth: 1, borderColor: Colors.danger + '44' },
   declineBtnText:{ fontFamily: Fonts.monoBold, fontSize: 14, color: Colors.danger },
 
-  spaceRow:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  spaceRowActive: { backgroundColor: ACCENT + '22', borderRadius: Radius.md, paddingHorizontal: 8 },
-  spaceRowText:   { fontFamily: Fonts.mono, fontSize: 14, color: Colors.text },
+
 });

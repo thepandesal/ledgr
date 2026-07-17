@@ -92,7 +92,6 @@ const SCREENS: Record<string, React.ReactNode> = {
   'bill-split':         <MemoBillSplit />,
   receipts:             <MemoReceipts />,
   contacts:             <MemoContacts />,
-  'notifications-page': <MemoNotifications />,
   reminders:            <MemoReminders />,
 };
 
@@ -399,8 +398,10 @@ export default function TabsLayout() {
         event: 'INSERT',
         schema: 'public',
         table: 'notifications',
-        filter: `user_id=eq.${userId}`,
-      }, () => fetchUnread())
+      }, (payload) => {
+        const n = payload.new as any;
+        if (n.user_id === userId) fetchUnread();
+      })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [userId, fetchUnread]);
@@ -531,7 +532,7 @@ export default function TabsLayout() {
             style={[s.screen, { transform: [{ translateX: slideAnims[key] }], zIndex: activeTab === key ? 10 : 0 }]}
             pointerEvents={activeTab === key ? 'auto' : 'none'}
           >
-            {key === 'profile' ? <MemoProfile /> : SCREENS[key]}
+            {key === 'profile' ? <MemoProfile /> : key === 'notifications-page' ? <MemoNotifications isActive={activeTab === 'notifications-page'} /> : SCREENS[key]}
           </Animated.View>
         ))}
       </View>

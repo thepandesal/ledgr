@@ -10,14 +10,6 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../src/lib/supabase';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import * as Linking from 'expo-linking';
-import GlobalErrorModal, { showGlobalError } from '../components/GlobalErrorModal';
-
-if (typeof ErrorUtils !== 'undefined') {
-  ErrorUtils.setGlobalHandler((error, isFatal) => {
-    console.error('[global error]', isFatal ? 'FATAL' : 'non-fatal', error?.message);
-    showGlobalError(`${isFatal ? '[FATAL] ' : ''}${error?.message}\n\n${error?.stack ?? ''}`);
-  });
-}
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -139,7 +131,6 @@ export default function RootLayout() {
 
   return (
     <QueryClientProvider client={queryClient}>
-    <GlobalErrorModal />
     <Stack
       screenOptions={{
         headerShown: false,

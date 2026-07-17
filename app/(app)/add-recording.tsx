@@ -126,6 +126,16 @@ export default function AddRecordingScreen({ inlineProps }: {
   const [showExpenseModal, setShowExpenseModal]         = useState(false);
   const [expenseList, setExpenseList]                   = useState<any[]>([]);
 
+  // ── Person picker ─────────────────────────────────────────────────────────
+  const [showPersonModal, setShowPersonModal] = useState(false);
+  const [friendSuggestions, setFriendSuggestions] = useState<string[]>([]);
+  const [friendIdMap, setFriendIdMap] = useState<Record<string, string>>({}); // name -> userId
+  const [contactSuggestions, setContactSuggestions] = useState<string[]>([]);
+  const [personSearch, setPersonSearch] = useState('');
+  const [showAllFriends, setShowAllFriends] = useState(false);
+  const [showAllContacts, setShowAllContacts] = useState(false);
+  const [selectedFriendUserId, setSelectedFriendUserId] = useState<string | null>(null);
+
   // ── Type dropdown ─────────────────────────────────────────────────────────
   const [showTypeModal, setShowTypeModal] = useState(false);
 
@@ -167,10 +177,18 @@ export default function AddRecordingScreen({ inlineProps }: {
     ]);
     const contactNames = (contactsData ?? []).map((c: any) => c.name);
     const friendIds = (friendships ?? []).map((f: any) => f.requester_id === user.id ? f.receiver_id : f.requester_id);
-    const friendNames = await Promise.all(friendIds.map((id: string) =>
-      supabase.rpc('get_user_display_name', { user_id: id }).then(({ data: n }) => n ?? '')
-    ));
-    const allNames = [...new Set([...friendNames.filter(Boolean), ...contactNames])].sort();
+    const friendEntries = await Promise.all(friendIds.map(async (id: string) => {
+      const { data: n } = await supabase.rpc('get_user_display_name', { user_id: id });
+      return n ? { id, name: n as string } : null;
+    }));
+    const validFriends = friendEntries.filter(Boolean) as { id: string; name: string }[];
+    const idMap: Record<string, string> = {};
+    validFriends.forEach(f => { idMap[f.name] = f.id; });
+    setFriendIdMap(idMap);
+    const friendNames = validFriends.map(f => f.name);
+    setFriendSuggestions(friendNames);
+    setContactSuggestions(contactNames);
+    const allNames = [...new Set([...friendNames, ...contactNames])].sort();
     setPersonSuggestions(allNames);
 
     // Load space budget if adding a new expense
@@ -286,10 +304,11 @@ export default function AddRecordingScreen({ inlineProps }: {
             account_id: selectedAccount?.id || null,
             status: 'paid', is_due: true,
             person_name: personName.trim() || null,
+            tagged_friend_user_id: selectedFriendUserId || null,
             currency,
           }).select('id').single();
           if (expErr) throw expErr;
-          const { error: recErr } = await supabase.from('recordings').insert({
+          const { data: recRec, error: recErr } = await supabase.from('recordings').insert({
             space_id: spaceId, user_id: user!.id,
             name: recName.trim(), type: 'receivable',
             amount: parseFloat(amount), transaction_date: date,
@@ -298,10 +317,35 @@ export default function AddRecordingScreen({ inlineProps }: {
             account_id: receiveToAccount?.id || null,
             status: 'pending',
             person_name: personName.trim() || null,
+            tagged_friend_user_id: selectedFriendUserId || null,
             linked_recording_id: expRec!.id,
             currency,
-          });
+          }).select('id').single();
           if (recErr) throw recErr;
+          // Send tag notification if a friend was selected
+          if (selectedFriendUserId && recRec?.id) {
+            const { data: profile } = await supabase.rpc('get_user_display_name', { user_id: user!.id });
+            await supabase.from('notifications').insert({
+              user_id: selectedFriendUserId,
+              type: 'expense_tag',
+              title: `${profile || 'Someone'} tagged you in an expense`,
+              body: `"${recName.trim()}" — tap to accept or decline.`,
+              message: `"${recName.trim()}" — tap to accept or decline.`,
+              data: {
+                sourceRecordingId: recRec.id,
+                taggerUserId: user!.id,
+                taggerName: profile || 'Someone',
+                friendId: selectedFriendUserId,
+                amount: parseFloat(amount),
+                recordingName: recName.trim(),
+                transactionDate: date,
+                currency,
+                categoryId: selectedCategory?.id ?? null,
+              },
+              status: 'new',
+              is_read: false,
+            });
+          }
           setPendingFocusDate(date);
           handleClose();
           return;
@@ -320,12 +364,38 @@ export default function AddRecordingScreen({ inlineProps }: {
             : selectedAccount?.id || null,
           status: statusMap[effectiveType] ?? 'paid',
           person_name: isLoanType ? personName.trim() || null : null,
+          tagged_friend_user_id: isLoanType ? selectedFriendUserId || null : null,
           linked_recording_id: effectiveType === 'receivable' && linkedExpense ? linkedExpense.id : null,
           decreased_from_account_id: effectiveType === 'receivable' ? decreasedFromAccount?.id || null : null,
           receive_to_account_id: effectiveType === 'receivable' ? receiveToAccount?.id || null : null,
           currency,
         }).select('id').single();
         if (err) throw err;
+
+        // Send tag notification for plain receivable if a friend was selected
+        if (effectiveType === 'receivable' && selectedFriendUserId && newRec?.id) {
+          const { data: profile } = await supabase.rpc('get_user_display_name', { user_id: user!.id });
+          await supabase.from('notifications').insert({
+            user_id: selectedFriendUserId,
+            type: 'expense_tag',
+            title: `${profile || 'Someone'} tagged you in an expense`,
+            body: `"${recName.trim()}" — tap to accept or decline.`,
+            message: `"${recName.trim()}" — tap to accept or decline.`,
+            data: {
+              sourceRecordingId: newRec.id,
+              taggerUserId: user!.id,
+              taggerName: profile || 'Someone',
+              friendId: selectedFriendUserId,
+              amount: parseFloat(amount),
+              recordingName: recName.trim(),
+              transactionDate: date,
+              currency,
+              categoryId: selectedCategory?.id ?? null,
+            },
+            status: 'new',
+            is_read: false,
+          });
+        }
 
         if (effectiveType === 'receivable' && decreasedFromAccount && newRec) {
           await supabase.from('recordings').insert({
@@ -562,25 +632,21 @@ export default function AddRecordingScreen({ inlineProps }: {
       {isLoanType && (
         <FormBlock>
           <FormRow label={type === 'payable' ? 'paying' : 'owes you'}>
-            <TextInput
-              style={s.inlineInput}
-              placeholder="e.g. john"
-              placeholderTextColor={Colors.faint}
-              value={personName}
-              onChangeText={setPersonName}
-            />
-          </FormRow>
-          {personSuggestions.length > 0 && (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingVertical: 8 }}>
-              {personSuggestions
-                .filter(n => !personName.trim() || n.toLowerCase().includes(personName.toLowerCase()))
-                .map(n => (
-                  <TouchableOpacity key={n} style={s.suggestionChip} onPress={() => setPersonName(n)}>
-                    <Text style={s.suggestionChipText}>{n}</Text>
+            <TouchableOpacity style={s.typeDropRow} onPress={() => setShowPersonModal(true)} activeOpacity={0.8}>
+              {personName ? (
+                <>
+                  <Ionicons name="person-outline" size={13} color={Colors.cyan} />
+                  <Text style={{ fontFamily: Fonts.mono, fontSize: 13, color: Colors.text, flex: 1 }}>{personName}</Text>
+                  <TouchableOpacity onPress={() => { setPersonName(''); setSelectedFriendUserId(null); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Ionicons name="close" size={13} color={Colors.muted} />
                   </TouchableOpacity>
-                ))}
-            </ScrollView>
-          )}
+                </>
+              ) : (
+                <Text style={{ fontFamily: Fonts.mono, fontSize: 13, color: Colors.faint, flex: 1 }}>select person</Text>
+              )}
+              <Ionicons name="chevron-down" size={13} color={Colors.faint} />
+            </TouchableOpacity>
+          </FormRow>
         </FormBlock>
       )}
 
@@ -588,19 +654,21 @@ export default function AddRecordingScreen({ inlineProps }: {
       {isComboType && (
         <FormBlock>
           <FormRow label="owes you">
-            <TextInput style={s.inlineInput} placeholder="e.g. john" placeholderTextColor={Colors.faint} value={personName} onChangeText={setPersonName} />
-          </FormRow>
-          {personSuggestions.length > 0 && (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingVertical: 8 }}>
-              {personSuggestions
-                .filter(n => !personName.trim() || n.toLowerCase().includes(personName.toLowerCase()))
-                .map(n => (
-                  <TouchableOpacity key={n} style={s.suggestionChip} onPress={() => setPersonName(n)}>
-                    <Text style={s.suggestionChipText}>{n}</Text>
+            <TouchableOpacity style={s.typeDropRow} onPress={() => setShowPersonModal(true)} activeOpacity={0.8}>
+              {personName ? (
+                <>
+                  <Ionicons name="person-outline" size={13} color={Colors.cyan} />
+                  <Text style={{ fontFamily: Fonts.mono, fontSize: 13, color: Colors.text, flex: 1 }}>{personName}</Text>
+                  <TouchableOpacity onPress={() => { setPersonName(''); setSelectedFriendUserId(null); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Ionicons name="close" size={13} color={Colors.muted} />
                   </TouchableOpacity>
-                ))}
-            </ScrollView>
-          )}
+                </>
+              ) : (
+                <Text style={{ fontFamily: Fonts.mono, fontSize: 13, color: Colors.faint, flex: 1 }}>select person</Text>
+              )}
+              <Ionicons name="chevron-down" size={13} color={Colors.faint} />
+            </TouchableOpacity>
+          </FormRow>
         </FormBlock>
       )}
 
@@ -726,6 +794,7 @@ export default function AddRecordingScreen({ inlineProps }: {
       >
         {loading ? <ActivityIndicator color={Colors.white} /> : <Text style={s.saveBtnText}>save recording</Text>}
       </TouchableOpacity>
+      {/* ── Currency picker modal ── */}
       <BottomSheet visible={showCurrencyModal} onClose={() => setShowCurrencyModal(false)} title="currency" height="50%">
         <ScrollView showsVerticalScrollIndicator={false}>
           {CURRENCIES.map(c => (
@@ -848,6 +917,72 @@ export default function AddRecordingScreen({ inlineProps }: {
 
       </ScrollView>
       </View>
+
+      {/* ── All modals outside ScrollView ── */}
+      {/* Person picker modal */}
+      <BottomSheet visible={showPersonModal} onClose={() => { setShowPersonModal(false); setPersonSearch(''); setShowAllFriends(false); setShowAllContacts(false); }} title="select person">
+        <TextInput
+          style={{ fontFamily: Fonts.mono, fontSize: 14, color: Colors.text, backgroundColor: Colors.surface, borderRadius: Radius.lg, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1, borderColor: Colors.borderMid, marginBottom: 16 }}
+          placeholder="search..."
+          placeholderTextColor={Colors.faint}
+          value={personSearch}
+          onChangeText={setPersonSearch}
+          autoFocus
+        />
+        {(() => {
+          const query = personSearch.toLowerCase();
+          const filteredFriends = friendSuggestions.filter(n => n.toLowerCase().includes(query));
+          const filteredContacts = contactSuggestions.filter(n => n.toLowerCase().includes(query));
+          const visibleFriends = showAllFriends ? filteredFriends : filteredFriends.slice(0, 3);
+          const visibleContacts = showAllContacts ? filteredContacts : filteredContacts.slice(0, 3);
+          return (
+            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 320 }}>
+              {filteredFriends.length > 0 && (
+                <>
+                  <Text style={{ fontFamily: Fonts.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8 }}>friends</Text>
+                  {visibleFriends.map(n => (
+                    <TouchableOpacity key={n} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border }} onPress={() => { setPersonName(n); setSelectedFriendUserId(friendIdMap[n] ?? null); setShowPersonModal(false); setPersonSearch(''); setShowAllFriends(false); setShowAllContacts(false); }} activeOpacity={0.75}>
+                      <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.cyan + '33', alignItems: 'center', justifyContent: 'center' }}>
+                        <Ionicons name="people-outline" size={14} color={Colors.cyan} />
+                      </View>
+                      <Text style={{ fontFamily: Fonts.mono, fontSize: 14, color: Colors.text, flex: 1 }}>{n}</Text>
+                    </TouchableOpacity>
+                  ))}
+                  {filteredFriends.length > 3 && !showAllFriends && (
+                    <TouchableOpacity onPress={() => setShowAllFriends(true)} style={{ paddingVertical: 10 }}>
+                      <Text style={{ fontFamily: Fonts.monoBold, fontSize: 12, color: Colors.cyan }}>show {filteredFriends.length - 3} more</Text>
+                    </TouchableOpacity>
+                  )}
+                </>
+              )}
+              {filteredContacts.length > 0 && (
+                <>
+                  <Text style={{ fontFamily: Fonts.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginTop: filteredFriends.length > 0 ? 16 : 0, marginBottom: 8 }}>manual contacts</Text>
+                  {visibleContacts.map(n => (
+                    <TouchableOpacity key={n} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border }} onPress={() => { setPersonName(n); setSelectedFriendUserId(null); setShowPersonModal(false); setPersonSearch(''); setShowAllFriends(false); setShowAllContacts(false); }} activeOpacity={0.75}>
+                      <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.borderMid }}>
+                        <Ionicons name="person-outline" size={14} color={Colors.muted} />
+                      </View>
+                      <Text style={{ fontFamily: Fonts.mono, fontSize: 14, color: Colors.text, flex: 1 }}>{n}</Text>
+                    </TouchableOpacity>
+                  ))}
+                  {filteredContacts.length > 3 && !showAllContacts && (
+                    <TouchableOpacity onPress={() => setShowAllContacts(true)} style={{ paddingVertical: 10 }}>
+                      <Text style={{ fontFamily: Fonts.monoBold, fontSize: 12, color: Colors.cyan }}>show {filteredContacts.length - 3} more</Text>
+                    </TouchableOpacity>
+                  )}
+                </>
+              )}
+              {filteredFriends.length === 0 && filteredContacts.length === 0 && (
+                <Text style={{ fontFamily: Fonts.mono, fontSize: 13, color: Colors.muted, textAlign: 'center', paddingVertical: 24 }}>
+                  {personSearch ? 'no results found' : 'no contacts yet — add friends or contacts first'}
+                </Text>
+              )}
+            </ScrollView>
+          );
+        })()}
+        <FormActions onCancel={() => { setShowPersonModal(false); setPersonSearch(''); setShowAllFriends(false); setShowAllContacts(false); }} onConfirm={() => { setShowPersonModal(false); setPersonSearch(''); }} cancelLabel="cancel" confirmLabel="done" />
+      </BottomSheet>
       </View>
     </Modal>
   );

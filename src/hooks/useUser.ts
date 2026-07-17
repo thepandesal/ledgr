@@ -21,7 +21,7 @@ function generateProfileCode(): string {
 }
 
 async function registerPushToken(_userId: string) {
-  // expo-notifications not installed
+  // expo-notifications not installed locally
 }
 
 /**
@@ -68,7 +68,7 @@ export function useUser(): UseUserResult {
       return data;
     },
     enabled: !!user?.id,
-    staleTime: Infinity,
+    staleTime: 5 * 60 * 1000,
   });
 
   const setDefaultCurrency = async (currency: string) => {

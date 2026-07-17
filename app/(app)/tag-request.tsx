@@ -2,7 +2,8 @@ import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'expo-router';
 import { supabase } from '../../src/lib/supabase';
 import { useUser } from '../../src/hooks/useUser';
 import { Colors, Fonts, Radius, Spacing } from '@/components/ui/theme';
@@ -13,80 +14,122 @@ const ACCENT      = Brand.color.accent;
 
 export default function TagRequestsScreen() {
   const { userId, userName, defaultCurrency } = useUser();
+  const router = useRouter();
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [responding, setResponding] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    if (!userId) return;
-    const { data } = await supabase
-      .from('recording_tags')
-      .select('*, recordings:recording_id(id, name, amount, transaction_date, currency)')
-      .eq('tagged_user_id', userId)
-      .eq('status', 'pending')
-      .order('created_at', { ascending: false });
+  useEffect(() => {
+    if (!userId) { setLoading(false); return; }
 
-    if (!data) { setLoading(false); return; }
+    const load = () => supabase
+      .from('notifications')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('type', 'expense_tag')
+      .in('status', ['new', 'saw'])
+      .order('created_at', { ascending: false })
+      .then(({ data }) => {
+        setRequests(data ?? []);
+        setLoading(false);
+      });
 
-    const taggerIds = [...new Set(data.map((r: any) => r.tagger_user_id))];
-    const names: Record<string, string> = {};
-    await Promise.all(taggerIds.map(async (id: string) => {
-      const { data: n } = await supabase.rpc('get_user_display_name', { user_id: id });
-      names[id] = n ?? 'someone';
-    }));
+    load();
 
-    setRequests(data.map((r: any) => ({ ...r, taggerName: names[r.tagger_user_id] ?? 'someone' })));
-    setLoading(false);
+    const channel = supabase
+      .channel(`tag-requests-live-${userId}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'notifications',
+      }, (payload) => {
+        const n = payload.new as any;
+        if (n.user_id !== userId || n.type !== 'expense_tag') return;
+        setRequests(prev => [n, ...prev]);
+      })
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'notifications',
+      }, (payload) => {
+        const n = payload.new as any;
+        if (n.user_id !== userId || n.type !== 'expense_tag') return;
+        if (!['new', 'saw'].includes(n.status)) {
+          setRequests(prev => prev.filter(r => r.id !== n.id));
+        }
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, [userId]);
 
-  useEffect(() => { load(); }, [load]);
-
-  const respond = async (tag: any, accept: boolean) => {
-    setResponding(tag.id);
+  const accept = async (notif: any) => {
+    setResponding(notif.id);
     try {
-      if (accept) {
-        const rec = tag.recordings;
-        const { data: mirrored } = await supabase.from('recordings').insert({
-          user_id: userId,
-          name: rec?.name ?? 'tagged expense',
-          type: 'due',
-          amount: tag.amount,
-          transaction_date: rec?.transaction_date ?? new Date().toISOString().split('T')[0],
-          status: 'unpaid',
-          currency: rec?.currency ?? defaultCurrency,
-          notes: `tagged by ${tag.taggerName}`,
-          is_tagged: true,
-        }).select('id').single();
+      const d = notif.data ?? {};
+      // create the due recording on the friend's account
+      const { data: rec } = await supabase.from('recordings').insert({
+        user_id: userId,
+        name: d.recordingName ?? 'tagged expense',
+        type: 'due',
+        amount: d.amount,
+        transaction_date: d.transactionDate ?? new Date().toISOString().split('T')[0],
+        currency: d.currency ?? defaultCurrency,
+        status: 'unpaid',
+        notes: `tagged by ${d.taggerName || 'someone'}`,
+        is_tagged: true,
+        tagged_by_user_id: d.taggerUserId,
+        source_recording_id: d.sourceRecordingId ?? null,
+        category_id: d.categoryId ?? null,
+      }).select('id').single();
 
-        await supabase.from('recording_tags').update({
-          status: 'accepted',
-          mirrored_recording_id: mirrored?.id ?? null,
-        }).eq('id', tag.id);
+      // mark notification as opened
+      await supabase.from('notifications').update({ status: 'opened' }).eq('id', notif.id);
 
-        await supabase.from('notifications').insert({
-          user_id: tag.tagger_user_id,
-          type: 'tag_accepted',
-          title: `${userName || 'Someone'} accepted your expense tag`,
-          body: `"${rec?.name ?? 'expense'}" is now a due in their account.`,
-          data: { recordingId: tag.recording_id, tagId: tag.id },
-          status: 'new',
-          is_read: false,
-        });
-      } else {
-        await supabase.from('recording_tags').update({ status: 'declined' }).eq('id', tag.id);
-        await supabase.from('notifications').insert({
-          user_id: tag.tagger_user_id,
-          type: 'tag_declined',
-          title: `${userName || 'Someone'} declined your expense tag`,
-          body: `"${tag.recordings?.name ?? 'expense'}" tag was declined.`,
-          data: { recordingId: tag.recording_id, tagId: tag.id },
-          status: 'new',
-          is_read: false,
-        });
+      // notify tagger
+      await supabase.from('notifications').insert({
+        user_id: d.taggerUserId,
+        type: 'tag_accepted',
+        title: `${userName || 'Someone'} accepted your expense tag`,
+        body: `"${d.recordingName}" is now a due in their account.`,
+        message: `"${d.recordingName}" is now a due in their account.`,
+        data: { sourceRecordingId: d.sourceRecordingId, acceptedRecordingId: rec?.id },
+        status: 'new',
+        is_read: false,
+      });
+
+      setRequests(prev => prev.filter(r => r.id !== notif.id));
+
+      // navigate to the new recording
+      if (rec?.id) {
+        router.push({ pathname: '/(app)/recording-detail', params: { recordingId: rec.id } } as any);
       }
-      setRequests(prev => prev.filter(r => r.id !== tag.id));
     } catch (e) {
-      console.warn('[tag] respond failed:', e);
+      console.warn('[tag-request] accept failed:', e);
+    } finally {
+      setResponding(null);
+    }
+  };
+
+  const decline = async (notif: any) => {
+    setResponding(notif.id);
+    try {
+      await supabase.from('notifications').update({ status: 'opened' }).eq('id', notif.id);
+
+      await supabase.from('notifications').insert({
+        user_id: notif.data?.taggerUserId,
+        type: 'tag_declined',
+        title: `${userName || 'Someone'} declined your expense tag`,
+        body: `"${notif.data?.recordingName ?? 'expense'}" tag was declined.`,
+        message: `"${notif.data?.recordingName ?? 'expense'}" tag was declined.`,
+        data: { sourceRecordingId: notif.data?.sourceRecordingId },
+        status: 'new',
+        is_read: false,
+      });
+
+      setRequests(prev => prev.filter(r => r.id !== notif.id));
+    } catch (e) {
+      console.warn('[tag-request] decline failed:', e);
     } finally {
       setResponding(null);
     }
@@ -103,40 +146,40 @@ export default function TagRequestsScreen() {
   if (requests.length === 0) return (
     <View style={s.empty}>
       <Ionicons name="checkmark-circle-outline" size={36} color={Colors.faint} />
-      <Text style={s.emptyText}>no pending requests</Text>
+      <Text style={s.emptyText}>no pending tags</Text>
     </View>
   );
 
   return (
     <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
-      {requests.map(tag => {
-        const rec = tag.recordings;
-        const isResponding = responding === tag.id;
+      {requests.map(notif => {
+        const d = notif.data ?? {};
+        const isResponding = responding === notif.id;
         return (
-          <View key={tag.id} style={s.card}>
+          <View key={notif.id} style={s.card}>
             <View style={s.cardHeader}>
               <View style={s.iconWrap}>
                 <Ionicons name="person-add-outline" size={18} color={ACCENT_DARK} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={s.tagger}>{tag.taggerName}</Text>
+                <Text style={s.tagger}>{d.taggerName || 'someone'}</Text>
                 <Text style={s.sub}>tagged you in an expense</Text>
               </View>
             </View>
             <View style={s.detail}>
-              <Text style={s.recName}>{rec?.name ?? '—'}</Text>
-              <Text style={s.recMeta}>{fmt(rec?.transaction_date)}</Text>
+              <Text style={s.recName}>{d.recordingName ?? '—'}</Text>
+              <Text style={s.recMeta}>{fmt(d.transactionDate)}</Text>
               <Text style={s.amount}>
-                {rec?.currency ?? defaultCurrency} {Number(tag.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                {d.currency ?? defaultCurrency} {Number(d.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
               </Text>
               <Text style={s.note}>
-                if you accept, this appears as a <Text style={{ fontFamily: Fonts.monoBold }}>due</Text> in your account. payment is managed by {tag.taggerName}.
+                if you accept, this appears as a <Text style={{ fontFamily: Fonts.monoBold }}>due</Text> in your account.
               </Text>
             </View>
             <View style={s.actions}>
               <TouchableOpacity
                 style={[s.declineBtn, isResponding && { opacity: 0.5 }]}
-                onPress={() => respond(tag, false)}
+                onPress={() => decline(notif)}
                 disabled={isResponding}
                 activeOpacity={0.8}
               >
@@ -144,7 +187,7 @@ export default function TagRequestsScreen() {
               </TouchableOpacity>
               <TouchableOpacity
                 style={[s.acceptBtn, isResponding && { opacity: 0.5 }]}
-                onPress={() => respond(tag, true)}
+                onPress={() => accept(notif)}
                 disabled={isResponding}
                 activeOpacity={0.8}
               >
@@ -162,20 +205,20 @@ export default function TagRequestsScreen() {
 }
 
 const s = StyleSheet.create({
-  scroll:    { padding: Spacing.page, gap: 12 },
-  empty:     { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, paddingTop: 80 },
-  emptyText: { fontFamily: Brand.font.mono, fontSize: 13, color: Colors.muted },
-  card:      { backgroundColor: Colors.white, borderRadius: Radius.xl, borderWidth: 1, borderColor: Colors.border, padding: 16, gap: 12 },
-  cardHeader:{ flexDirection: 'row', alignItems: 'center', gap: 12 },
-  iconWrap:  { width: 40, height: 40, borderRadius: 20, backgroundColor: ACCENT + '44', alignItems: 'center', justifyContent: 'center' },
-  tagger:    { fontFamily: Fonts.monoBold, fontSize: 14, color: Colors.text },
-  sub:       { fontFamily: Fonts.mono, fontSize: 11, color: Colors.muted },
-  detail:    { backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: 12, gap: 4 },
-  recName:   { fontFamily: Fonts.monoBold, fontSize: 14, color: Colors.text },
-  recMeta:   { fontFamily: Fonts.mono, fontSize: 11, color: Colors.muted },
-  amount:    { fontFamily: Fonts.monoBold, fontSize: 18, color: ACCENT_DARK, marginTop: 4 },
-  note:      { fontFamily: Fonts.mono, fontSize: 11, color: Colors.muted, lineHeight: 16, marginTop: 6 },
-  actions:   { flexDirection: 'row', gap: 10 },
+  scroll:         { padding: Spacing.page, gap: 12 },
+  empty:          { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, paddingTop: 80 },
+  emptyText:      { fontFamily: Brand.font.mono, fontSize: 13, color: Colors.muted },
+  card:           { backgroundColor: Colors.white, borderRadius: Radius.xl, borderWidth: 1, borderColor: Colors.border, padding: 16, gap: 12 },
+  cardHeader:     { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  iconWrap:       { width: 40, height: 40, borderRadius: 20, backgroundColor: ACCENT + '44', alignItems: 'center', justifyContent: 'center' },
+  tagger:         { fontFamily: Fonts.monoBold, fontSize: 14, color: Colors.text },
+  sub:            { fontFamily: Fonts.mono, fontSize: 11, color: Colors.muted },
+  detail:         { backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: 12, gap: 4 },
+  recName:        { fontFamily: Fonts.monoBold, fontSize: 14, color: Colors.text },
+  recMeta:        { fontFamily: Fonts.mono, fontSize: 11, color: Colors.muted },
+  amount:         { fontFamily: Fonts.monoBold, fontSize: 18, color: ACCENT_DARK, marginTop: 4 },
+  note:           { fontFamily: Fonts.mono, fontSize: 11, color: Colors.muted, lineHeight: 16, marginTop: 6 },
+  actions:        { flexDirection: 'row', gap: 10 },
   declineBtn:     { flex: 1, paddingVertical: 12, borderRadius: Radius.pill, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.borderMid, alignItems: 'center' },
   declineBtnText: { fontFamily: Fonts.monoBold, fontSize: 13, color: Colors.muted },
   acceptBtn:      { flex: 2, paddingVertical: 12, borderRadius: Radius.pill, backgroundColor: ACCENT_DARK, alignItems: 'center' },
