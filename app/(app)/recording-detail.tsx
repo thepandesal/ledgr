@@ -659,6 +659,48 @@ export default function RecordingDetailScreen() {
       });
       await supabase.from('recordings').update({ paid_amount: cappedPaid, status: newStatus }).eq('id', recordingId);
       setRecording((prev: any) => ({ ...prev, paid_amount: cappedPaid, status: newStatus }));
+
+      // Sync to friend's payable if this recording has a tagged friend
+      if (recording.tagged_friend_user_id) {
+        const { data: friendPayable } = await supabase
+          .from('recordings')
+          .select('id, paid_amount, amount, space_id')
+          .eq('source_recording_id', recordingId)
+          .eq('tagged_by_user_id', recording.tagged_friend_user_id)
+          .eq('type', 'payable')
+          .maybeSingle();
+        if (friendPayable) {
+          const fPrevPaid = Number(friendPayable.paid_amount ?? 0);
+          const fTotal = Number(friendPayable.amount ?? 0);
+          const fNewPaid = Math.min(fPrevPaid + amount, fTotal);
+          const fNewStatus = collectDueComplete ? 'paid' : fNewPaid > 0 ? 'partial' : 'unpaid';
+          await supabase.from('recordings').update({ paid_amount: fNewPaid, status: fNewStatus }).eq('id', friendPayable.id);
+          const { data: existingExpense } = await supabase
+            .from('recordings')
+            .select('id, amount')
+            .eq('linked_recording_id', friendPayable.id)
+            .eq('type', 'expense')
+            .eq('tagged_by_user_id', recording.tagged_friend_user_id)
+            .maybeSingle();
+          if (existingExpense) {
+            await supabase.from('recordings').update({ amount: Number(existingExpense.amount) + amount }).eq('id', existingExpense.id);
+          } else {
+            await supabase.from('recordings').insert({
+              user_id: recording.tagged_friend_user_id,
+              space_id: friendPayable.space_id ?? null,
+              name: recording.name,
+              type: 'expense',
+              amount,
+              transaction_date: collectDueDate,
+              status: 'paid',
+              linked_recording_id: friendPayable.id,
+              tagged_by_user_id: recording.tagged_friend_user_id,
+              category_id: recording.category_id ?? null,
+            });
+          }
+        }
+      }
+
       // Charge to space
       if (collectDueChargeToSpace && collectDueChargeSpaceId) {
         const today = collectDueDate;
@@ -804,6 +846,49 @@ export default function RecordingDetailScreen() {
         paid_amount: cappedPaid,
       }).eq('id', recordingId);
       setRecording((prev: any) => ({ ...prev, status: collectComplete ? 'paid' : 'partial', paid_amount: cappedPaid }));
+
+      // Sync to friend's payable if this recording has a tagged friend
+      if (recording.tagged_friend_user_id) {
+        const { data: friendPayable } = await supabase
+          .from('recordings')
+          .select('id, paid_amount, amount, space_id')
+          .eq('source_recording_id', recordingId)
+          .eq('tagged_by_user_id', recording.tagged_friend_user_id)
+          .eq('type', 'payable')
+          .maybeSingle();
+        if (friendPayable) {
+          const fPrevPaid = Number(friendPayable.paid_amount ?? 0);
+          const fTotal = Number(friendPayable.amount ?? 0);
+          const fNewPaid = Math.min(fPrevPaid + amount, fTotal);
+          const fNewStatus = collectComplete ? 'paid' : fNewPaid > 0 ? 'partial' : 'unpaid';
+          await supabase.from('recordings').update({ paid_amount: fNewPaid, status: fNewStatus }).eq('id', friendPayable.id);
+          // Create a linked expense on the friend's side (read-only payment record)
+          const { data: existingExpense } = await supabase
+            .from('recordings')
+            .select('id, amount')
+            .eq('linked_recording_id', friendPayable.id)
+            .eq('type', 'expense')
+            .eq('tagged_by_user_id', recording.tagged_friend_user_id)
+            .maybeSingle();
+          if (existingExpense) {
+            await supabase.from('recordings').update({ amount: Number(existingExpense.amount) + amount }).eq('id', existingExpense.id);
+          } else {
+            await supabase.from('recordings').insert({
+              user_id: recording.tagged_friend_user_id,
+              space_id: friendPayable.space_id ?? null,
+              name: recording.name,
+              type: 'expense',
+              amount,
+              transaction_date: collectDate,
+              status: 'paid',
+              linked_recording_id: friendPayable.id,
+              tagged_by_user_id: recording.tagged_friend_user_id,
+              category_id: recording.category_id ?? null,
+            });
+          }
+        }
+      }
+
       setCollectModal(false);
       loadPaymentData();
       if (excess > 0.01) {
@@ -1887,7 +1972,26 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
             <View style={rd.infoRow}>
               <Text style={rd.infoLabel}>{recording?.type === 'debt' ? 'paying' : 'owes you'}</Text>
               <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
-                <Text style={rd.infoValue}>{recording?.person_name ?? '—'}</Text>
+                <View style={{ alignItems: 'flex-end', gap: 3 }}>
+                  <Text style={rd.infoValue}>{recording?.person_name ?? '—'}</Text>
+                  {recording?.tagged_friend_user_id && (
+                    <View style={[
+                      { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: Radius.pill },
+                      existingTags.length > 0
+                        ? { backgroundColor: ACCENT + '22' }
+                        : { backgroundColor: Colors.successBg },
+                    ]}>
+                      <Ionicons
+                        name={existingTags.length > 0 ? 'time-outline' : 'checkmark-circle-outline'}
+                        size={10}
+                        color={existingTags.length > 0 ? ACCENT_DARK : Colors.success}
+                      />
+                      <Text style={[{ fontFamily: Brand.font.mono, fontSize: 10 }, existingTags.length > 0 ? { color: ACCENT_DARK } : { color: Colors.success }]}>
+                        {existingTags.length > 0 ? 'pending' : 'accepted'}
+                      </Text>
+                    </View>
+                  )}
+                </View>
                 {(recording?.type === 'receivable' || (recording?.type === 'expense' && recording?.is_due)) && (
                   <TouchableOpacity onPress={openOwesYouEdit} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                     <Ionicons name="create-outline" size={13} color={ACCENT_DARK} />

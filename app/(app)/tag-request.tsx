@@ -75,7 +75,7 @@ export default function TagRequestsScreen() {
     setSpacePicker({ notif });
     const [{ data: own }, { data: members }] = await Promise.all([
       supabase.from('spaces').select('id, name').eq('user_id', userId).order('name'),
-      supabase.from('space_members').select('space_id').eq('user_id', userId).eq('status', 'accepted'),
+      supabase.from('space_members').select('space_id').eq('user_id', userId).eq('status', 'accepted').in('role', ['owner', 'co-owner']),
     ]);
     const sharedIds = (members ?? []).map((m: any) => m.space_id);
     let shared: any[] = [];
@@ -100,16 +100,17 @@ export default function TagRequestsScreen() {
         user_id: userId,
         space_id: selectedSpaceId ?? null,
         name: d.recordingName ?? 'tagged expense',
-        type: 'due',
+        type: 'payable',
         amount: d.amount,
         transaction_date: d.transactionDate ?? new Date().toISOString().split('T')[0],
         currency: d.currency ?? defaultCurrency,
         status: 'unpaid',
-        notes: `tagged by ${d.taggerName || 'someone'}`,
+        notes: `owed to ${d.taggerName || 'someone'}`,
         is_tagged: true,
         tagged_by_user_id: d.taggerUserId,
         source_recording_id: d.sourceRecordingId ?? null,
         category_id: d.categoryId ?? null,
+        person_name: d.taggerName ?? null,
       }).select('id').single();
 
       await supabase.from('notifications').update({ status: 'opened' }).eq('id', notif.id);
@@ -198,7 +199,7 @@ export default function TagRequestsScreen() {
                   {d.currency ?? defaultCurrency} {Number(d.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                 </Text>
                 <Text style={s.note}>
-                  if you accept, this appears as a <Text style={{ fontFamily: Fonts.monoBold }}>due</Text> in your account.
+                  if you accept, this appears as a <Text style={{ fontFamily: Fonts.monoBold }}>loan (payable)</Text> in your account.
                 </Text>
               </View>
               <View style={s.actions}>
