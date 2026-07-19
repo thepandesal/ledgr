@@ -1,5 +1,7 @@
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Colors, Fonts } from './theme';
+import { AppFont } from '../../src/lib/fonts';
+import { DC } from '../../src/lib/design';
 
 export const ACTIVITY_TABS = [
   { key: 'all',         label: 'All',      types: ['income','expense','debt','due','payment','return'] },
@@ -19,17 +21,17 @@ interface Props {
   activeTextColor?: string;
 }
 
-export default function ActivityTabs({ selectedTabs, onToggle, tabValue, activeColor = Colors.cyan, activeTextColor = Colors.white }: Props) {
+export default function ActivityTabs({ selectedTabs, onToggle, tabValue, activeColor = DC.tabActiveBg, activeTextColor = DC.tabActiveText }: Props) {
   return (
     <View style={s.tabRow}>
       {ACTIVITY_TABS.map(tab => {
         const isActive = selectedTabs.has(tab.key);
         return (
           <TouchableOpacity key={tab.key} style={s.tabWrap} onPress={() => onToggle(tab.key)} activeOpacity={0.75}>
-            <View style={[s.tabCircle, isActive && { backgroundColor: activeColor }]}>
-              <Text style={[s.tabCircleValue, isActive && { color: activeTextColor }]}>{tabValue(tab.key)}</Text>
+            <View style={[s.tabCircle, { backgroundColor: isActive ? activeColor : '#111111' }]}>
+              <Text style={[s.tabCircleValue, { color: isActive ? activeTextColor : '#ffffff' }]}>{tabValue(tab.key)}</Text>
             </View>
-            <Text style={[s.tabLabel, isActive && { color: activeColor, fontFamily: Fonts.monoBold }]}>{tab.label}</Text>
+            <Text style={[s.tabLabel, isActive && { color: activeTextColor, fontFamily: AppFont.semiBold }]}>{tab.label}</Text>
           </TouchableOpacity>
         );
       })}
@@ -38,9 +40,9 @@ export default function ActivityTabs({ selectedTabs, onToggle, tabValue, activeC
 }
 
 const s = StyleSheet.create({
-  tabRow:               { flexDirection: 'row', justifyContent: 'space-between', paddingTop: 16, paddingBottom: 4 },
-  tabWrap:              { flex: 1, alignItems: 'center' },
-  tabCircle:            { width: 56, height: 56, borderRadius: 28, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.surface },
-  tabCircleValue:       { fontFamily: Fonts.monoBold, fontSize: 11, color: Colors.muted, letterSpacing: -0.3 },
-  tabLabel:             { fontFamily: Fonts.mono, fontSize: 9, color: Colors.muted, marginTop: 5, letterSpacing: 0.2 },
+  tabRow:         { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
+  tabWrap:        { flex: 1, alignItems: 'center' },
+  tabCircle:      { width: 48, height: 48, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
+  tabCircleValue: { fontFamily: AppFont.bold, fontSize: 11, color: '#ffffff', letterSpacing: -0.3 },
+  tabLabel:       { fontFamily: AppFont.regular, fontSize: 9, color: DC.pageTextMuted, marginTop: 5, letterSpacing: 0.2 },
 });

@@ -1,7 +1,7 @@
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView, Image, ActivityIndicator, TextInput, Alert, RefreshControl } from 'react-native';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useUser } from '../../../src/hooks/useUser';
 import { supabase } from '../../../src/lib/supabase';
@@ -23,10 +23,16 @@ interface Entry {
   photoCount: number;
 }
 
-export default function ReceiptsScreen() {
+export default function ReceiptsScreen({ isActive }: { isActive?: boolean }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { userId } = useUser();
+
+  useEffect(() => {
+    if (isActive && userId) {
+      queryClient.invalidateQueries({ queryKey: ['receipts', userId] });
+    }
+  }, [isActive, userId]);
   const [addModal, setAddModal] = useState(false);
   const [addStep, setAddStep] = useState<'name' | 'photos'>('name');
   const [folderName, setFolderName] = useState('');
@@ -35,10 +41,7 @@ export default function ReceiptsScreen() {
   const [displayCount, setDisplayCount] = useState(10);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
-  useFocusEffect(useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: ['receipts', userId] });
-    setDisplayCount(10);
-  }, [userId]));
+  // useFocusEffect removed — isActive prop handles refresh
 
   const { data: entries = [], isLoading: loading } = useQuery({
     queryKey: ['receipts', userId],

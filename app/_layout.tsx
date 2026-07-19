@@ -22,7 +22,7 @@ const queryClient = new QueryClient({
 });
 
 export default function RootLayout() {
-  const [fontsLoaded] = useFonts({
+  const [fontsLoaded, fontError] = useFonts({
     PlusJakartaSans_400Regular,
     PlusJakartaSans_500Medium,
     PlusJakartaSans_600SemiBold,
@@ -37,6 +37,10 @@ export default function RootLayout() {
     Inter_500Medium,
     Inter_600SemiBold,
     Inter_700Bold,
+    'Poppins-Regular': require('../assets/Poppins-Regular.ttf'),
+    'Poppins-Medium': require('../assets/Poppins-Medium.ttf'),
+    'Poppins-SemiBold': require('../assets/Poppins-SemiBold.ttf'),
+    'Poppins-Bold': require('../assets/Poppins-Bold.ttf'),
     Outfit_400Regular,
     Outfit_600SemiBold,
     Outfit_700Bold,
@@ -88,7 +92,7 @@ export default function RootLayout() {
   }, []);
 
   useEffect(() => {
-    if (!fontsLoaded) return;
+    if (!fontsLoaded && !fontError) return;
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (__DEV__) console.log('[auth] event:', String(event).replace(/[\r\n]/g, ' '));
       const path = typeof window !== 'undefined' && typeof window.location !== 'undefined' ? window.location.pathname : '';
@@ -119,9 +123,9 @@ export default function RootLayout() {
       }
     });
     return () => subscription.unsubscribe();
-  }, [fontsLoaded]);
+  }, [fontsLoaded, fontError]);
 
-  if (!fontsLoaded || !ready) {
+  if ((!fontsLoaded && !fontError) || !ready) {
     return (
       <View style={{ flex: 1, backgroundColor: '#f5f5f5', justifyContent: 'center', alignItems: 'center' }}>
         <ActivityIndicator color="#00bf63" />

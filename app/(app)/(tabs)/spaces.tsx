@@ -1,9 +1,10 @@
-import {
+﻿import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
   SafeAreaView, TextInput, ActivityIndicator, useWindowDimensions, Animated, RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { useNav } from '../../../src/lib/NavContext';
 import { supabase } from '../../../src/lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -13,6 +14,9 @@ import { useExchangeRates } from '../../../src/lib/useExchangeRates';
 import BottomSheet from '@/components/ui/BottomSheet';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import { Colors, Fonts, Radius, Spacing } from '@/components/ui/theme';
+import { AppFont } from '../../../src/lib/fonts';
+import { DC } from '../../../src/lib/design';
+import DateNavBar from '@/components/ui/DateNavBar';
 import { Brand } from '../../../src/lib/brand';
 import { BlurContext } from '../../../src/lib/BlurContext';
 import TourTarget from '@/components/TourTarget';
@@ -31,6 +35,7 @@ const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2,
 const fmtCompact = (n: number) => {
   if (n >= 1_000_000_000) return (n / 1_000_000_000).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 2 }) + 'B';
   if (n >= 1_000_000)     return (n / 1_000_000).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 2 }) + 'M';
+  if (n >= 1_000)         return (n / 1_000).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + 'K';
   return fmt(n);
 };
 
@@ -44,12 +49,29 @@ const MOTIVATIONS = [
   'Consistency beats perfection.',
 ];
 
-export default function SpacesScreen() {
+const DashLine = ({ color, style }: { color: string; style?: any }) => (
+  <View style={[{ flexDirection: 'row', alignItems: 'center', overflow: 'hidden' }, style]}>
+    {Array.from({ length: 20 }).map((_, i) => (
+      <View key={i} style={{ width: DC.barDashWidth, height: DC.barDashThickness, backgroundColor: color, marginRight: DC.barDashGap }} />
+    ))}
+  </View>
+);
+
+export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
   const router = useRouter();
+  const { openSpace } = useNav();
   const queryClient = useQueryClient();
   const { userId, userName, defaultCurrency } = useUser();
   const { convert, rateMap } = useExchangeRates();
   const insets = useSafeAreaInsets();
+
+  useEffect(() => {
+    if (isActive && userId) {
+      queryClient.invalidateQueries({ queryKey: ['spaces', userId] });
+      queryClient.invalidateQueries({ queryKey: ['shared-spaces', userId] });
+      queryClient.invalidateQueries({ queryKey: ['pending-space-invites', userId] });
+    }
+  }, [isActive, userId]);
   const [createModal, setCreateModal] = useState(false);
   const [spaceName, setSpaceName] = useState('');
   const [spaceBudget, setSpaceBudget] = useState('');
@@ -106,7 +128,7 @@ export default function SpacesScreen() {
   const { data: spaces = [] } = useQuery<SpaceData[]>({
     queryKey: ['spaces', userId, dateMode, dateOffset, weekStart, useCutoff, cutoffDay],
     queryFn: async () => {
-      const { data } = await supabase.from('spaces').select().eq('user_id', userId).order('created_at');
+      const { data } = await supabase.from('spaces').select().eq('user_id', userId).order('sort_order', { ascending: true, nullsFirst: false }).order('created_at');
       if (!data) return [];
       const { from, to } = getDateRange(dateMode, dateOffset, weekStart, useCutoff, cutoffDay);
       // Convert dates to YYYY-MM-DD strings in local timezone to avoid UTC conversion issues
@@ -269,55 +291,82 @@ export default function SpacesScreen() {
   };
 
   const renderExpenseCard = (space: SpaceData) => {
-    const value       = space.spent ?? 0;
-    const budget      = space.budget ? convert(space.budget, space.budget_currency ?? 'PHP', defaultCurrency) : 0;
-    const over        = budget > 0 && value > budget;
-    const remaining   = budget - value;
-    const statusColor = over ? Colors.expense : budget > 0 && remaining / budget < 0.2 ? '#F97316' : ACCENT_DARK;
+    const value     = space.spent ?? 0;
+    const budget    = space.budget ? convert(space.budget, space.budget_currency ?? 'PHP', defaultCurrency) : 0;
+    const over      = budget > 0 && value > budget;
+    const remaining = budget - value;
+    const pct       = budget > 0 ? Math.min(value / budget, 1) : 0;
+    const dotColor  = over ? DC.overBudgetColor : DC.accent1;
     return (
-      <TouchableOpacity key={space.id} style={s.card} activeOpacity={0.85} onPress={() => router.push({ pathname: '/(app)/space-detail', params: { spaceId: space.id, name: space.name, color: space.color } })}>
-        <View style={s.cardLeft}>
-          <Text style={s.cardName}>{String(space.name).toLowerCase()}</Text>
-          <Text style={s.cardMeta}>{space.count ?? 0} transaction{(space.count ?? 0) !== 1 ? 's' : ''}</Text>
+      <TouchableOpacity key={space.id} style={[s.card, over && s.cardOver]} activeOpacity={0.85} onPress={() => openSpace(space.id, space.name)}>
+        <View style={s.cardHeader}>
+          <Text style={s.cardName}>{space.name}</Text>
+          <TouchableOpacity onPress={() => { setSelectedSpace(space); setMenuModal(true); setBlur(true); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name="ellipsis-horizontal" size={14} color={Colors.muted} />
+          </TouchableOpacity>
         </View>
-        <View style={s.cardRight}>
-          <View style={s.cardRow}><Text style={s.cardRowLabel}>money in</Text><Text style={s.cardRowValue}>{defaultCurrency} {fmtCompact(space.saved ?? 0)}</Text></View>
-          <View style={s.cardRow}><Text style={s.cardRowLabel}>money out</Text><Text style={[s.cardRowValue, over && { color: Colors.expense }]}>{defaultCurrency} {fmtCompact(value)}</Text></View>
-          {budget > 0 && (
-            <View style={s.cardRow}><Text style={s.cardRowLabel}>budget</Text><Text style={[s.cardRowValue, { color: statusColor }]}>{defaultCurrency} {fmtCompact(budget)}</Text></View>
-          )}
+        <View style={s.barRow}>
+          <View style={s.barSide}>
+            <Text style={s.barCurrency}>{defaultCurrency}</Text>
+            <Text style={[s.barValue, over && { color: DC.overBudgetColor }]}>{fmtCompact(value)}</Text>
+            <Text style={s.barLabel}>Money Out</Text>
+          </View>
+          <View style={s.barCenter}>
+            <View style={s.barTrack}>
+              <DashLine color="#CCCCCC" style={[s.barLeft, { width: `${pct * 100}%` as any }]} />
+              <View style={[s.barDot, { left: `${pct * 100}%` as any, backgroundColor: dotColor }]} />
+              <DashLine color="#3d3f3e" style={[s.barRight, { width: `${(1 - pct) * 100}%` as any, right: 0 }]} />
+            </View>
+            {budget > 0 && <Text style={s.barRemaining}>{fmt(Math.abs(remaining))} {over ? 'Over' : 'Left'}</Text>}
+          </View>
+          {budget > 0 ? (
+            <View style={s.barSide}>
+              <Text style={s.barCurrency}>{defaultCurrency}</Text>
+              <Text style={s.barValue}>{fmtCompact(budget)}</Text>
+              <Text style={s.barLabel}>Budget</Text>
+            </View>
+          ) : <View style={s.barSide} />}
         </View>
-        <TouchableOpacity onPress={() => { setSelectedSpace(space); setMenuModal(true); setBlur(true); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Ionicons name="ellipsis-horizontal" size={14} color={Colors.muted} />
-        </TouchableOpacity>
       </TouchableOpacity>
     );
   };
 
   const renderSavingsCard = (space: SpaceData) => {
-    const value       = space.saved ?? 0;
-    const allTime     = space.savedAllTime ?? 0;
-    const budget      = space.budget ? convert(space.budget, space.budget_currency ?? 'PHP', defaultCurrency) : 0;
-    const remaining   = Math.max(budget - allTime, 0);
-    const pct         = budget > 0 ? Math.min(allTime / budget, 1) : 0;
-    const statusColor = pct >= 1 ? ACCENT_DARK : '#F97316';
+    const allTime   = space.savedAllTime ?? 0;
+    const budget    = space.budget ? convert(space.budget, space.budget_currency ?? 'PHP', defaultCurrency) : 0;
+    const remaining = Math.max(budget - allTime, 0);
+    const pct       = budget > 0 ? Math.min(allTime / budget, 1) : 0;
+    const dotColor  = pct >= 1 ? DC.accent1 : DC.accent1;
     return (
-      <TouchableOpacity key={space.id} style={s.card} activeOpacity={0.85} onPress={() => router.push({ pathname: '/(app)/space-detail', params: { spaceId: space.id, name: space.name, color: space.color } })}>
-        <View style={s.cardLeft}>
-          <Text style={s.cardName}>{String(space.name).toLowerCase()}</Text>
-          <Text style={s.cardMeta}>{space.count ?? 0} transaction{(space.count ?? 0) !== 1 ? 's' : ''}</Text>
+      <TouchableOpacity key={space.id} style={s.card} activeOpacity={0.85} onPress={() => openSpace(space.id, space.name)}>
+        <View style={s.cardHeader}>
+          <Text style={s.cardName}>{space.name}</Text>
+          <TouchableOpacity onPress={() => { setSelectedSpace(space); setMenuModal(true); setBlur(true); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name="ellipsis-horizontal" size={14} color={Colors.muted} />
+          </TouchableOpacity>
         </View>
-        <View style={s.cardRight}>
-          <View style={s.cardRow}><Text style={s.cardRowLabel}>saved</Text><Text style={[s.cardRowValue, { color: ACCENT_DARK }]}>{defaultCurrency} {fmtCompact(value)}</Text></View>
-          <View style={s.cardRow}><Text style={s.cardRowLabel}>all time</Text><Text style={[s.cardRowValue, { color: ACCENT_DARK }]}>{defaultCurrency} {fmtCompact(allTime)}</Text></View>
-          {budget > 0 && (<>
-            <View style={s.cardRow}><Text style={s.cardRowLabel}>goal</Text><Text style={s.cardRowValue}>{defaultCurrency} {fmtCompact(budget)}</Text></View>
-            <View style={s.cardRow}><Text style={s.cardRowLabel}>remaining</Text><Text style={[s.cardRowValue, { color: statusColor }]}>{defaultCurrency} {fmtCompact(remaining)}</Text></View>
-          </>)}
+        <View style={s.barRow}>
+          <View style={s.barSide}>
+            <Text style={s.barCurrency}>{defaultCurrency}</Text>
+            <Text style={[s.barValue, { color: DC.accent1 }]}>{fmtCompact(allTime)}</Text>
+            <Text style={s.barLabel}>Money In</Text>
+          </View>
+          <View style={s.barCenter}>
+            <View style={s.barTrack}>
+              <DashLine color="#CCCCCC" style={[s.barLeft, { width: `${pct * 100}%` as any }]} />
+              <View style={[s.barDot, { left: `${pct * 100}%` as any, backgroundColor: dotColor }]} />
+              <DashLine color="#3d3f3e" style={[s.barRight, { width: `${(1 - pct) * 100}%` as any, right: 0 }]} />
+            </View>
+            {budget > 0 && <Text style={s.barRemaining}>{fmt(remaining)} Left</Text>}
+          </View>
+          {budget > 0 ? (
+            <View style={s.barSide}>
+              <Text style={s.barCurrency}>{defaultCurrency}</Text>
+              <Text style={s.barValue}>{fmtCompact(budget)}</Text>
+              <Text style={s.barLabel}>Goal</Text>
+            </View>
+          ) : <View style={s.barSide} />}
         </View>
-        <TouchableOpacity onPress={() => { setSelectedSpace(space); setMenuModal(true); setBlur(true); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Ionicons name="ellipsis-horizontal" size={14} color={Colors.muted} />
-        </TouchableOpacity>
       </TouchableOpacity>
     );
   };
@@ -430,37 +479,63 @@ export default function SpacesScreen() {
     setRefreshing(false);
   };
 
+  // ── Drag to reorder ──────────────────────────────────────────────────────
+  const [resetConfirmVisible, setResetConfirmVisible] = useState(false);
+
+  const handleDragEnd = async (data: SpaceData[]) => {
+    // Optimistically update query cache
+    queryClient.setQueryData(['spaces', userId, dateMode, dateOffset, weekStart, useCutoff, cutoffDay], (old: SpaceData[] | undefined) => {
+      if (!old) return old;
+      return old.map(s => {
+        const idx = data.findIndex(d => d.id === s.id);
+        return idx >= 0 ? { ...s, sort_order: idx + 1 } : s;
+      });
+    });
+    // Persist to DB
+    await Promise.all(
+      data.map((space, idx) =>
+        supabase.from('spaces').update({ sort_order: idx + 1 }).eq('id', space.id)
+      )
+    );
+  };
+
+  const handleResetOrder = async () => {
+    setResetConfirmVisible(false);
+    await supabase.rpc('reset_space_sort_order', { p_user_id: userId });
+    queryClient.invalidateQueries({ queryKey: ['spaces', userId] });
+  };
+
   return (
     <SafeAreaView style={s.root}>
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
         {/* Pending space invites */}
         {pendingInvites.length > 0 && (
-          <View style={{ paddingHorizontal: Spacing.page, paddingTop: 16, gap: 8 }}>
+          <View style={{ paddingHorizontal: DC.pagePadding, paddingTop: 16, gap: 8 }}>
             <Text style={s.sectionHeader}>space invites</Text>
             {pendingInvites.map(invite => (
               <View key={invite.id} style={{ backgroundColor: ACCENT + '22', borderRadius: Radius.lg, padding: 14, gap: 8 }}>
                 <View style={{ gap: 2 }}>
-                  <Text style={{ fontFamily: 'ChillaxMedium', fontSize: 13, color: Colors.text }}>{invite.spaceName}</Text>
-                  <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted }}>
+                  <Text style={{ fontFamily: AppFont.medium, fontSize: 13, color: Colors.text }}>{invite.spaceName}</Text>
+                  <Text style={{ fontFamily: AppFont.regular, fontSize: 10, color: Colors.muted }}>
                     from {invite.ownerName} · role: {invite.role}
                   </Text>
                 </View>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
                   <TouchableOpacity
-                    style={{ flex: 1, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: Colors.surface, alignItems: 'center', borderWidth: 1, borderColor: Colors.borderMid }}
+                    style={{ flex: 1, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: DC.btnBg, alignItems: 'center', borderWidth: DC.btnBorderWidth }}
                     onPress={() => respondToSpaceInvite(invite.id, false)}
                     disabled={respondingInvite === invite.id}
                   >
-                    <Text style={{ fontFamily: Fonts.monoBold, fontSize: 12, color: Colors.muted }}>decline</Text>
+                    <Text style={{ fontFamily: AppFont.semiBold, fontSize: 12, color: DC.btnText }}>decline</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={{ flex: 2, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: ACCENT_DARK, alignItems: 'center' }}
+                    style={{ flex: 2, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: DC.btnBg, alignItems: 'center', borderWidth: DC.btnBorderWidth }}
                     onPress={() => respondToSpaceInvite(invite.id, true)}
                     disabled={respondingInvite === invite.id}
                   >
                     {respondingInvite === invite.id
-                      ? <ActivityIndicator size="small" color={Colors.white} />
-                      : <Text style={{ fontFamily: Fonts.monoBold, fontSize: 12, color: Colors.white }}>accept</Text>}
+                      ? <ActivityIndicator size="small" color={DC.btnText} />
+                      : <Text style={{ fontFamily: AppFont.semiBold, fontSize: 12, color: DC.btnText }}>accept</Text>}
                   </TouchableOpacity>
                 </View>
               </View>
@@ -470,26 +545,14 @@ export default function SpacesScreen() {
 
         {/* Date filter row */}
         <View style={s.dateFilterRow}>
-          <TouchableOpacity style={s.modeSelectorBtn} onPress={openDateModal} activeOpacity={0.8}>
-            <Ionicons name="options-outline" size={13} color={ACCENT_DARK} />
-            <Text style={s.modeSelectorText}>filter</Text>
+          <TouchableOpacity style={[s.modeSelectorBtn, { flex: 1.8 }]} onPress={openDateModal} activeOpacity={0.8}>
+            <View style={s.filterDot} />
+            <Text style={s.modeSelectorText}>Filters</Text>
           </TouchableOpacity>
-          <View style={s.dateNav}>
-            <TouchableOpacity style={s.dateNavArrow} onPress={() => { const next = dateOffset - 1; setDateOffset(next); saveSetting({ spaces_date_offset: next }); }} activeOpacity={0.7}>
-              <Ionicons name="chevron-back" size={14} color={ACCENT_DARK} />
-            </TouchableOpacity>
-            <TouchableOpacity style={s.dateLabelBtn} onPress={openMonthYearModal} activeOpacity={0.8}>
-              <Ionicons name="calendar-outline" size={13} color={ACCENT_DARK} />
-              <Text style={s.dateLabelText}>{dateLabel}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={s.dateNavArrow} onPress={() => { const next = dateOffset + 1; setDateOffset(next); saveSetting({ spaces_date_offset: next }); }} activeOpacity={0.7}>
-              <Ionicons name="chevron-forward" size={14} color={ACCENT_DARK} />
-            </TouchableOpacity>
-          </View>
+          <DateNavBar style={{ flex: 6.4 }} label={dateLabel} onPrev={() => { const next = dateOffset - 1; setDateOffset(next); saveSetting({ spaces_date_offset: next }); }} onNext={() => { const next = dateOffset + 1; setDateOffset(next); saveSetting({ spaces_date_offset: next }); }} onLabelPress={openMonthYearModal} />
           <TourTarget id="tour-new-space">
-            <TouchableOpacity style={s.modeSelectorBtn} onPress={openCreate} activeOpacity={0.8}>
-              <Ionicons name="add" size={13} color={ACCENT_DARK} />
-              <Text style={s.modeSelectorText}>new space</Text>
+            <TouchableOpacity style={[s.modeSelectorBtn, { flex: 1.8 }]} onPress={openCreate} activeOpacity={0.8}>
+              <Text style={s.modeSelectorText}>New Space</Text>
             </TouchableOpacity>
           </TourTarget>
         </View>
@@ -510,15 +573,20 @@ export default function SpacesScreen() {
                 )}
                 {expenseActive.length > 0 && (
                   <>
-                    <Text style={s.sectionHeader}>expense trackers</Text>
+                    <Text style={s.sectionHeader}>Expense Tracker</Text>
                     <View style={s.list}>{expenseActive.map(space => renderExpenseCard(space))}</View>
                   </>
                 )}
                 {savingsActive.length > 0 && (
                   <>
-                    <Text style={s.sectionHeader}>savings trackers</Text>
+                    <Text style={s.sectionHeader}>Savings Tracker</Text>
                     <View style={s.list}>{savingsActive.map(space => renderSavingsCard(space))}</View>
                   </>
+                )}
+                {(expenseActive.length > 0 || savingsActive.length > 0) && (
+                  <TouchableOpacity style={s.resetBtn} onPress={() => setResetConfirmVisible(true)} activeOpacity={0.7}>
+                    <Text style={s.resetBtnText}>Reset Order</Text>
+                  </TouchableOpacity>
                 )}
               </View>
 
@@ -529,13 +597,13 @@ export default function SpacesScreen() {
                 )}
                 {expenseInactive.length > 0 && (
                   <>
-                    <Text style={s.sectionHeader}>expense trackers</Text>
+                    <Text style={s.sectionHeader}>Expense Tracker</Text>
                     <View style={s.list}>{expenseInactive.map(space => renderExpenseCard(space))}</View>
                   </>
                 )}
                 {savingsInactive.length > 0 && (
                   <>
-                    <Text style={s.sectionHeader}>savings trackers</Text>
+                    <Text style={s.sectionHeader}>Savings Tracker</Text>
                     <View style={s.list}>{savingsInactive.map(space => renderSavingsCard(space))}</View>
                   </>
                 )}
@@ -550,7 +618,7 @@ export default function SpacesScreen() {
         {/* ── Shared spaces ── */}
         {sharedSpaces.length > 0 && (
           <>
-            <Text style={[s.sectionHeader, { marginTop: 24 }]}>shared spaces</Text>
+            <Text style={[s.sectionHeader, { marginTop: 24 }]}>Shared Spaces</Text>
             <View style={s.list}>
               {sharedSpaces.map((space: any) => {
                 const isExpense = (space.space_type ?? 'expense') === 'expense';
@@ -566,36 +634,39 @@ export default function SpacesScreen() {
                 return (
                   <TouchableOpacity
                     key={space.id}
-                    style={s.card}
+                    style={[s.card, isExpense && over && s.cardOver]}
                     activeOpacity={0.85}
-                    onPress={() => router.push({ pathname: '/(app)/space-detail', params: { spaceId: space.id, name: space.name, color: space.color } })}
+                    onPress={() => openSpace(space.id, space.name)}
                   >
-                    <View style={s.cardLeft}>
-                      <Text style={s.cardName}>{String(space.name).toLowerCase()}</Text>
-                      <Text style={s.cardMeta}>{isExpense ? 'expense tracker' : 'savings tracker'}</Text>
-                      <Text style={[s.cardMeta, { color: ACCENT_DARK }]}>{space.role} · {space.ownerName}</Text>
+                    <View style={s.cardHeader}>
+                      <View>
+                        <Text style={s.cardName}>{space.name}</Text>
+                        <Text style={{ fontFamily: AppFont.regular, fontSize: 9, color: Colors.muted }}>{space.role} · {space.ownerName}</Text>
+                      </View>
+                      <Ionicons name="people-outline" size={14} color={Colors.muted} />
                     </View>
-                    <View style={s.cardRight}>
-                      {isExpense ? (
-                        <>
-                          <View style={s.cardRow}><Text style={s.cardRowLabel}>money in</Text><Text style={s.cardRowValue}>{fmtCompact(saved)}</Text></View>
-                          <View style={s.cardRow}><Text style={s.cardRowLabel}>money out</Text><Text style={[s.cardRowValue, over && { color: Colors.expense }]}>{fmtCompact(value)}</Text></View>
-                          {budget > 0 && <View style={s.cardRow}><Text style={s.cardRowLabel}>budget</Text><Text style={[s.cardRowValue, { color: statusColor }]}>{fmtCompact(budget)}</Text></View>}
-                        </>
-                      ) : (
-                        <>
-                          <View style={s.cardRow}><Text style={s.cardRowLabel}>saved</Text><Text style={[s.cardRowValue, { color: ACCENT_DARK }]}>{fmtCompact(saved)}</Text></View>
-                          <View style={s.cardRow}><Text style={s.cardRowLabel}>all time</Text><Text style={[s.cardRowValue, { color: ACCENT_DARK }]}>{fmtCompact(allTime)}</Text></View>
-                          {budget > 0 && (
-                            <>
-                              <View style={s.cardRow}><Text style={s.cardRowLabel}>goal</Text><Text style={s.cardRowValue}>{fmtCompact(budget)}</Text></View>
-                              <View style={s.cardRow}><Text style={s.cardRowLabel}>remaining</Text><Text style={[s.cardRowValue, { color: savingsColor }]}>{fmtCompact(remaining)}</Text></View>
-                            </>
-                          )}
-                        </>
+                    <View style={s.barRow}>
+                      <View style={s.barSide}>
+                        <Text style={s.barCurrency}>{defaultCurrency}</Text>
+                        <Text style={[s.barValue, isExpense && over && { color: Colors.expense }]}>{fmtCompact(isExpense ? value : allTime)}</Text>
+                        <Text style={s.barLabel}>{isExpense ? 'Money Out' : 'Money In'}</Text>
+                      </View>
+                      <View style={s.barCenter}>
+                        <View style={s.barTrack}>
+                          <DashLine color="#CCCCCC" style={[s.barLeft, { width: `${(isExpense ? (budget > 0 ? Math.min(value/budget,1) : 0) : savingsPct) * 100}%` as any }]} />
+                          <View style={[s.barDot, { left: `${(isExpense ? (budget > 0 ? Math.min(value/budget,1) : 0) : savingsPct) * 100}%` as any, backgroundColor: isExpense ? (over ? Colors.expense : DC.dotDefault) : (savingsPct >= 1 ? ACCENT_DARK : DC.dotDefault) }]} />
+                          <DashLine color="#3d3f3e" style={[s.barRight, { width: `${(1 - (isExpense ? (budget > 0 ? Math.min(value/budget,1) : 0) : savingsPct)) * 100}%` as any, right: 0 }]} />
+                        </View>
+                        {budget > 0 && <Text style={s.barRemaining}>{fmt(Math.abs(remaining))} {isExpense && over ? 'Over' : 'Left'}</Text>}
+                      </View>
+                      {budget > 0 && (
+                        <View style={s.barSide}>
+                          <Text style={s.barCurrency}>{defaultCurrency}</Text>
+                          <Text style={s.barValue}>{fmtCompact(budget)}</Text>
+                          <Text style={s.barLabel}>{isExpense ? 'Budget' : 'Goal'}</Text>
+                        </View>
                       )}
                     </View>
-                    <Ionicons name="people-outline" size={14} color={Colors.muted} />
                   </TouchableOpacity>
                 );
               })}
@@ -624,7 +695,7 @@ export default function SpacesScreen() {
             style={{ paddingHorizontal: 12, paddingVertical: 12, borderRadius: Radius.lg, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.borderMid }}
             onPress={() => setShowBudgetCurrencyModal(true)}
           >
-            <Text style={{ fontFamily: Fonts.monoBold, fontSize: 13, color: Colors.text }}>{spaceBudgetCurrency}</Text>
+            <Text style={{ fontFamily: AppFont.bold, fontSize: 13, color: Colors.text }}>{spaceBudgetCurrency}</Text>
           </TouchableOpacity>
         </View>
         {spaceType === 'savings' && (
@@ -646,12 +717,22 @@ export default function SpacesScreen() {
               style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.border }}
               onPress={() => { setSpaceBudgetCurrency(c); setShowBudgetCurrencyModal(false); }}
             >
-              <Text style={{ fontFamily: spaceBudgetCurrency === c ? Fonts.monoBold : Fonts.mono, fontSize: 14, color: Colors.text }}>{c}</Text>
+              <Text style={{ fontFamily: spaceBudgetCurrency === c ? AppFont.bold : AppFont.regular, fontSize: 14, color: Colors.text }}>{c}</Text>
               {spaceBudgetCurrency === c && <Ionicons name="checkmark" size={16} color={ACCENT_DARK} />}
             </TouchableOpacity>
           ))}
         </ScrollView>
       </BottomSheet>
+
+      <ConfirmModal
+        visible={resetConfirmVisible}
+        onClose={() => setResetConfirmVisible(false)}
+        title="reset order?"
+        actions={[
+          { label: 'cancel', onPress: () => setResetConfirmVisible(false), muted: true },
+          { label: 'reset', onPress: handleResetOrder, destructive: true },
+        ]}
+      />
 
       <ConfirmModal
         visible={menuModal}
@@ -737,7 +818,7 @@ export default function SpacesScreen() {
             </View>
             {useCutoff && (
               <>
-                <Text style={s.dateModalLabel}>cutoff day <Text style={{ textTransform: 'none', fontFamily: Fonts.mono }}>(1–31)</Text></Text>
+                <Text style={s.dateModalLabel}>cutoff day <Text style={{ textTransform: 'none', fontFamily: AppFont.regular }}>(1–31)</Text></Text>
                 <TextInput
                   style={s.cutoffInput}
                   value={String(cutoffDay)}
@@ -867,6 +948,12 @@ const s = StyleSheet.create({
   root:   { flex: 1, backgroundColor: Colors.white },
   scroll: { paddingBottom: 60 },
 
+  // ── Page header ──────────────────────────────────────────────────────────────
+  pageHeader:      { alignItems: 'center', paddingTop: 16, paddingBottom: 12 },
+  pageHeaderBrand: { fontFamily: 'MuseoModerno_Regular', fontSize: 13, color: DC.pageText, letterSpacing: 2 },
+  pageHeaderTitle: { fontFamily: AppFont.bold, fontSize: 28, color: DC.pageText, letterSpacing: -0.5 },
+  divider:         { height: 1, backgroundColor: Colors.border, marginBottom: 4 },
+
   // ── Header ──────────────────────────────────────────────────────────────
   slideOuter: { overflow: 'hidden' },
   slidePair:  { flexDirection: 'row' },
@@ -876,71 +963,87 @@ const s = StyleSheet.create({
   tabWrap:              { alignItems: 'center' },
   tabCircle:            { width: 56, height: 56, borderRadius: 28, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.surface },
   tabCircleActive:      { backgroundColor: ACCENT },
-  tabCircleValue:       { fontFamily: Fonts.monoBold, fontSize: 14, color: Colors.muted },
+  tabCircleValue:       { fontFamily: AppFont.bold, fontSize: 14, color: DC.pageTextMuted },
   tabCircleValueActive: { color: ACCENT_TEXT },
-  tabLabel:             { fontFamily: 'ChillaxRegular', fontSize: 9, color: Colors.muted, marginTop: 5, letterSpacing: 0.2 },
-  tabLabelActive:       { fontFamily: 'ChillaxMedium', fontSize: 9, color: ACCENT_TEXT },
+  tabLabel:             { fontFamily: AppFont.regular, fontSize: 9, color: DC.pageTextMuted, marginTop: 5, letterSpacing: 0.2 },
+  tabLabelActive:       { fontFamily: AppFont.semiBold, fontSize: 9, color: ACCENT_TEXT },
 
   // ── Empty ────────────────────────────────────────────────────────────────
-  emptyWrap: { paddingVertical: 48, alignItems: 'center', paddingHorizontal: Spacing.page },
-  emptyText: { fontFamily: Fonts.mono, fontSize: 13, color: Colors.muted },
+  emptyWrap: { paddingVertical: 48, alignItems: 'center', paddingHorizontal: DC.pagePadding },
+  emptyText: { fontFamily: AppFont.regular, fontSize: 13, color: DC.pageTextMuted },
 
   // ── Section ──────────────────────────────────────────────────────────────
-  sectionHeader: { ...Brand.type.sectionHeader, marginBottom: 8, marginTop: Brand.spacing.section, paddingHorizontal: Spacing.page, textAlign: 'center' },
-  list: { marginBottom: 8, paddingHorizontal: Spacing.page },
+  sectionHeader: { fontFamily: AppFont.bold, fontSize: 15, color: DC.pageText, marginBottom: 8, marginTop: Brand.spacing.section, paddingHorizontal: DC.pagePadding, textAlign: 'center' },
+  list: { marginBottom: 8, paddingHorizontal: DC.pagePadding },
 
   // ── Card ─────────────────────────────────────────────────────────────────
-  card:         { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, borderRadius: Radius.pill, borderWidth: 1, borderColor: Colors.border, marginBottom: 10 },
-  cardLeft:     { width: 120, gap: 4, paddingLeft: 8, paddingRight: 12, marginRight: 12, borderRightWidth: 3, borderRightColor: ACCENT },
-  cardName:     { fontFamily: 'ChillaxMedium', fontSize: 14, color: Colors.text },
-  cardMeta:     { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted },
-  cardRight:    { flex: 1, gap: 3 },
-  cardRow:      { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  cardRowLabel: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted, letterSpacing: 0.3, width: 72 },
-  cardRowValue: { fontFamily: Fonts.monoBold, fontSize: 12, color: Colors.text, letterSpacing: -0.2 },
+  card:        { paddingVertical: 14, paddingHorizontal: 16, borderRadius: DC.cardRadius, borderWidth: DC.cardBorderWidth, borderColor: DC.cardBorder, marginBottom: DC.cardGap, backgroundColor: DC.cardBg, overflow: 'hidden' },
+  cardOver:    { borderColor: DC.overBudgetColor, borderWidth: 1.5 },
+  cardHeader:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, paddingBottom: 10, marginHorizontal: -16, paddingHorizontal: 16, borderBottomWidth: 1.5, borderBottomColor: DC.cardBorder },
+  cardName:    { fontFamily: AppFont.bold, fontSize: 14, color: DC.pageText },
+  barRow:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 16 },
+  barSide:     { alignItems: 'center', justifyContent: 'center', width: 60, gap: 3 },
+  barCurrency: { fontFamily: AppFont.regular, fontSize: 8, color: DC.pageTextMuted, letterSpacing: 0.3 },
+  barValue:    { fontFamily: AppFont.bold, fontSize: 16, color: DC.pageText, letterSpacing: -0.5 },
+  barLabel:    { fontFamily: AppFont.regular, fontSize: 8, color: DC.pageTextMuted },
+  barCenter:   { width: 160, alignItems: 'center', gap: 4 },
+  barTrack:    { width: '100%', height: 20, position: 'relative', alignItems: 'center', justifyContent: 'center', flexDirection: 'row' },
+  barFill:     { display: 'none' as any },
+  barDot:      { position: 'absolute', width: DC.barDotSize, height: DC.barDotSize, borderRadius: DC.barDotSize / 2, zIndex: 2 },
+  barLeft:     { position: 'absolute', left: 0, height: 2, overflow: 'hidden' },
+  barRight:    { position: 'absolute', right: 0, height: 2, overflow: 'hidden' },
+  barRemaining:{ fontFamily: AppFont.regular, fontSize: 9, color: DC.pageTextMuted, fontStyle: 'italic' },
 
   // ── Modal ─────────────────────────────────────────────────────────────────
-  error:   { fontFamily: Fonts.mono, fontSize: 12, color: Colors.expense, marginBottom: 8 },
-  label:   { fontFamily: Fonts.monoBold, fontSize: 11, color: Colors.muted, marginBottom: 6, marginTop: 14, letterSpacing: 0.4, textTransform: 'uppercase' },
-  input:   { fontFamily: Fonts.monoBold, fontSize: 15, color: Colors.text, backgroundColor: Colors.white, borderRadius: Radius.lg, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1, borderColor: Colors.borderMid },
+  error:   { fontFamily: AppFont.regular, fontSize: 12, color: Colors.expense, marginBottom: 8 },
+  label:   { fontFamily: AppFont.bold, fontSize: 11, color: DC.pageTextMuted, marginBottom: 6, marginTop: 14, letterSpacing: 0.4, textTransform: 'uppercase' },
+  input:   { fontFamily: AppFont.regular, fontSize: 15, color: DC.pageText, backgroundColor: Colors.white, borderRadius: Radius.lg, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1, borderColor: Colors.borderMid },
 
   typeRow:           { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  typeBtn:           { paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, borderWidth: 1, borderColor: Colors.borderMid, backgroundColor: Colors.surface },
-  typeBtnActive:     { backgroundColor: ACCENT, borderColor: ACCENT },
-  typeBtnText:       { fontFamily: Fonts.mono,     fontSize: 12, color: Colors.muted },
-  typeBtnTextActive: { fontFamily: Fonts.monoBold, fontSize: 12, color: ACCENT_TEXT },
+  typeBtn:           { paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, borderWidth: DC.btnBorderWidth, backgroundColor: DC.btnBg },
+  typeBtnActive:     { backgroundColor: DC.btnBg, borderWidth: DC.btnBorderWidth },
+  typeBtnText:       { fontFamily: AppFont.regular, fontSize: 12, color: DC.btnText },
+  typeBtnTextActive: { fontFamily: AppFont.semiBold, fontSize: 12, color: DC.btnText },
 
-  saveBtn:     { backgroundColor: ACCENT, borderRadius: Radius.pill, paddingVertical: 14, alignItems: 'center', marginTop: 20 },
-  saveBtnText: { fontFamily: Fonts.monoBold, fontSize: 14, color: ACCENT_TEXT },
+  saveBtn:     { backgroundColor: DC.btnBg, borderRadius: Radius.pill, paddingVertical: 14, alignItems: 'center', marginTop: 20, borderWidth: DC.btnBorderWidth },
+  saveBtnText: { fontFamily: AppFont.semiBold, fontSize: 14, color: DC.btnText },
 
   // ── Footer ───────────────────────────────────────────────────────────────
-  footer: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.faint, textAlign: 'center', marginTop: 32, paddingHorizontal: Spacing.page },
+  footer: { fontFamily: AppFont.regular, fontSize: 10, color: Colors.faint, textAlign: 'center', marginTop: 32, paddingHorizontal: DC.pagePadding },
+  resetBtn: { alignSelf: 'center', marginTop: 8, marginBottom: 16, paddingHorizontal: 20, paddingVertical: 8, borderRadius: Radius.pill, borderWidth: DC.btnBorderWidth, backgroundColor: DC.btnBg },
+  resetBtnText: { fontFamily: AppFont.regular, fontSize: 11, color: DC.btnText },
 
   // ── Date filter ──────────────────────────────────────────────────────────
-  dateFilterRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.page, marginTop: 20, marginBottom: 8 },
+  dateFilterRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingHorizontal: DC.pagePadding, marginTop: 20, marginBottom: 8 },
   dateNav:           { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  modeSelectorBtn:   { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: Colors.white, borderWidth: 1, borderColor: Colors.borderMid },
-  modeSelectorText:  { fontFamily: Fonts.mono, fontSize: 11, color: Colors.text },
+  filterDot:        { width: 8, height: 8, borderRadius: 4, backgroundColor: DC.btnText },
+  modeSelectorBtn:   { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: DC.btnBg, borderWidth: DC.btnBorderWidth },
+  modeSelectorText:  { fontFamily: AppFont.regular, fontSize: 11, color: DC.btnText },
   dateNavArrow:      { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.surface },
-  dateLabelBtn:      { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: Colors.white, borderWidth: 1, borderColor: Colors.borderMid },
-  dateLabelText:     { fontFamily: Fonts.mono, fontSize: 11, color: Colors.text },
-  dateModalLabel:    { fontFamily: Fonts.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.6, textTransform: 'uppercase', marginTop: 16, marginBottom: 8 },
+  dateNavArrowText:  { fontFamily: AppFont.regular, fontSize: 18, color: DC.accent1, lineHeight: 22 },
+  dateLabelBtn:      { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 20, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: DC.cardBg, borderWidth: 1, borderColor: DC.cardBorder, minWidth: 160, justifyContent: 'space-between' },
+  dateLabelText:     { fontFamily: AppFont.regular, fontSize: 11, color: DC.pageText },
+  dateModalLabel:    { fontFamily: AppFont.bold, fontSize: 10, color: DC.pageTextMuted, letterSpacing: 0.6, textTransform: 'uppercase', marginTop: 16, marginBottom: 8 },
   modeChips:         { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  modeChip:          { paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border },
-  modeChipActive:    { backgroundColor: ACCENT, borderColor: ACCENT },
-  modeChipText:      { fontFamily: Fonts.mono,     fontSize: 12, color: Colors.muted },
-  modeChipTextActive:{ fontFamily: Fonts.monoBold, fontSize: 12, color: ACCENT_TEXT },
-  presetChip:        { paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.borderMid },
-  presetChipText:    { fontFamily: Fonts.mono, fontSize: 12, color: Colors.text },
-  cutoffInput:       { fontFamily: Fonts.monoBold, fontSize: 15, color: Colors.text, backgroundColor: Colors.surface, borderRadius: Radius.lg, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1, borderColor: Colors.borderMid, marginTop: 4, width: 80 },
+  modeChip:          { paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: DC.btnBg, borderWidth: DC.btnBorderWidth },
+  modeChipActive:    { backgroundColor: DC.badgeActiveBg, borderWidth: DC.btnBorderWidth },
+  modeChipText:      { fontFamily: AppFont.regular, fontSize: 12, color: DC.btnText },
+  modeChipTextActive:{ fontFamily: AppFont.semiBold, fontSize: 12, color: DC.badgeActiveText },
+  presetChip:        { paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: DC.btnBg, borderWidth: DC.btnBorderWidth },
+  presetChipText:    { fontFamily: AppFont.regular, fontSize: 12, color: DC.btnText },
+  cutoffInput:       { fontFamily: AppFont.regular, fontSize: 15, color: DC.pageText, backgroundColor: Colors.surface, borderRadius: Radius.lg, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1, borderColor: Colors.borderMid, marginTop: 4, width: 80 },
 
   // ── Month/Year Picker ────────────────────────────────────────────────────
-  pickerWrapper:         { marginBottom: 16 },
+  pickerWrapper:         { marginBottom: DC.cardGap },
   pickerButton:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 12, borderRadius: Radius.lg, backgroundColor: Colors.white, borderWidth: 1, borderColor: Colors.borderMid },
-  pickerButtonText:      { fontFamily: Fonts.monoBold, fontSize: 15, color: Colors.text },
+  pickerButtonText:      { fontFamily: AppFont.semiBold, fontSize: 15, color: DC.pageText },
   pickerDropdown:        { maxHeight: 200, borderWidth: 1, borderColor: Colors.borderMid, borderRadius: Radius.lg, marginTop: 4, backgroundColor: Colors.white },
   pickerOption:          { paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.border },
   pickerOptionActive:    { backgroundColor: Colors.surface },
-  pickerOptionText:      { fontFamily: Fonts.mono, fontSize: 14, color: Colors.text },
-  pickerOptionTextActive:{ fontFamily: Fonts.monoBold, fontSize: 14, color: Colors.text },
+  pickerOptionText:      { fontFamily: AppFont.regular, fontSize: 14, color: DC.pageText },
+  pickerOptionTextActive:{ fontFamily: AppFont.semiBold, fontSize: 14, color: DC.pageText },
 });
+
+
+
+

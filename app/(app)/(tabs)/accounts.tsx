@@ -23,11 +23,17 @@ const INIT_CROP = Math.min(SW, SH) * 0.7;
 const ACCENT      = '#B6E1DE'; // prev: #96D7D4
 const ACCENT_TEXT = '#101514';
 
-export default function AccountsScreen() {
+export default function AccountsScreen({ isActive }: { isActive?: boolean }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { userId } = useUser();
   const { setBlur, registerAdd, unregisterAdd } = useContext(BlurContext);
+
+  useEffect(() => {
+    if (isActive && userId) {
+      queryClient.invalidateQueries({ queryKey: ['accounts', userId] });
+    }
+  }, [isActive, userId]);
   const [addModal, setAddModal] = useState(false);
   const [editAccount, setEditAccount] = useState<Account | null>(null);
   const [menuModal, setMenuModal] = useState(false);

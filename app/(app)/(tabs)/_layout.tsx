@@ -12,13 +12,20 @@ import CategoriesScreen from './categories';
 import DashboardScreen from './dashboard';
 import NotificationsScreen from '../notifications';
 import RemindersScreen from './reminders';
+import SpaceDetailScreen from '../space-detail';
+import RecordingDetailScreen from '../recording-detail';
 import { Colors, Fonts, Radius, Spacing } from '@/components/ui/theme';
+import BottomNav from '@/components/ui/BottomNav';
+import { AppFont } from '../../../src/lib/fonts';
+import { DC } from '../../../src/lib/design';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../../src/lib/supabase';
 import { useUser } from '../../../src/hooks/useUser';
 import TourTarget from '@/components/TourTarget';
 import AppTourOverlay from '@/components/AppTourOverlay';
 import { TourContext, APP_TOUR_STEPS } from '../../../src/lib/TourContext';
+import { NavContext } from '../../../src/lib/NavContext';
+import { consumePendingTabGlobal } from '../../../src/lib/NavContext';
 import type { RefObject } from 'react';
 import type { View as RNView } from 'react-native';
 
@@ -30,8 +37,8 @@ const HEADER_BG        = Colors.headerBg;
 const HEADER_TEXT      = '#B6E1DE'; // teal text on dark header bg
 const HEADER_TEXT_DIM  = '#B6E1DE99';
 const HEADER_BTN_BG    = '#B6E1DE22';
-const NAV_ACCENT       = '#282C2A'; // active nav icon/label
-const NAV_INACTIVE     = '#9CA3AF'; // inactive nav icon
+const NAV_ACCENT       = DC.navActive; // active nav icon/label
+const NAV_INACTIVE     = DC.navInactive; // inactive nav icon
 const BUBBLE_ACTIVE_BG = '#EEF2FB'; // bubble active item bg
 
 const { width } = Dimensions.get('window');
@@ -45,7 +52,7 @@ const MAIN_TABS = [
 ];
 
 const TAB_META: Record<string, { title: string; subtitle: string }> = {
-  spaces:        { title: 'spaces',     subtitle: 'track your budgets & savings'    },
+  spaces:        { title: 'Spaces',     subtitle: 'track your budgets & savings'    },
   accounts:      { title: 'accounts',   subtitle: 'your saved payment methods'      },
   dashboard:     { title: 'activities', subtitle: 'all your recordings in one place' },
   receipts:      { title: 'receipts',   subtitle: 'your paper trail, digitized'     },
@@ -84,15 +91,15 @@ const MemoContacts       = memo(ContactsScreen);
 const MemoNotifications  = memo(NotificationsScreen);
 const MemoReminders      = memo(RemindersScreen);
 
-const SCREENS: Record<string, React.ReactNode> = {
-  spaces:               <MemoSpaces />,
-  accounts:             <MemoAccounts />,
-  dashboard:            <MemoDashboard />,
-  categories:           <MemoCategories />,
-  'bill-split':         <MemoBillSplit />,
-  receipts:             <MemoReceipts />,
-  contacts:             <MemoContacts />,
-  reminders:            <MemoReminders />,
+const SCREENS: Record<string, (isActive: boolean) => React.ReactNode> = {
+  spaces:               (isActive) => <MemoSpaces isActive={isActive} />,
+  accounts:             (isActive) => <MemoAccounts isActive={isActive} />,
+  dashboard:            (isActive) => <MemoDashboard isActive={isActive} />,
+  categories:           (isActive) => <MemoCategories isActive={isActive} />,
+  'bill-split':         (isActive) => <MemoBillSplit isActive={isActive} />,
+  receipts:             (isActive) => <MemoReceipts isActive={isActive} />,
+  contacts:             (isActive) => <MemoContacts isActive={isActive} />,
+  reminders:            (isActive) => <MemoReminders isActive={isActive} />,
 };
 
 const CURRENCIES = [
@@ -322,6 +329,8 @@ function ProfileScreen() {
   );
 }
 const MemoProfile = ProfileScreen;
+const MemoSpaceDetail     = memo(SpaceDetailScreen);
+const MemoRecordingDetail = memo(RecordingDetailScreen);
 
 const NAV_TOUR_IDS: Record<string, string> = {
   spaces: 'tour-nav-spaces',
@@ -377,6 +386,39 @@ export default function TabsLayout() {
   // ── Unread notification badge ──────────────────────────────────────────────────
   const { userId } = useUser();
   const [unreadCount, setUnreadCount] = useState(0);
+  const [pendingTab, setPendingTab] = useState<string | null>(null);
+  const [activeSpaceId,   setActiveSpaceId]   = useState<string | null>(null);
+  const [activeSpaceName, setActiveSpaceName] = useState<string | null>(null);
+  const spaceSlideAnim = useRef(new Animated.Value(width)).current;
+
+  const openSpace = useCallback((spaceId: string, name: string) => {
+    setActiveSpaceId(spaceId);
+    setActiveSpaceName(name);
+    spaceSlideAnim.setValue(width);
+    Animated.timing(spaceSlideAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start();
+  }, []);
+
+  const closeSpace = useCallback(() => {
+    Animated.timing(spaceSlideAnim, { toValue: width, duration: 260, useNativeDriver: true }).start(() => {
+      setActiveSpaceId(null);
+      setActiveSpaceName(null);
+    });
+  }, []);
+
+  const [activeRecordingId, setActiveRecordingId] = useState<string | null>(null);
+  const recordingSlideAnim = useRef(new Animated.Value(width)).current;
+
+  const openRecording = useCallback((recordingId: string) => {
+    setActiveRecordingId(recordingId);
+    recordingSlideAnim.setValue(width);
+    Animated.timing(recordingSlideAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start();
+  }, []);
+
+  const closeRecording = useCallback(() => {
+    Animated.timing(recordingSlideAnim, { toValue: width, duration: 260, useNativeDriver: true }).start(() => {
+      setActiveRecordingId(null);
+    });
+  }, []);
 
   const fetchUnread = useCallback(async () => {
     if (!userId) return;
@@ -412,25 +454,51 @@ export default function TabsLayout() {
 
   // Notification slide anim — no longer needed (notifications-page is in SLIDE_KEYS)
 
+  // Per-tab navigation stack cache (Instagram-style)
+  const tabStacks = useRef<Record<string, { spaceId: string | null; spaceName: string | null; recordingId: string | null }>>({});
+
   const switchTab = useCallback((key: string) => {
     if (key === activeTabRef.current) return;
     const prev = activeTabRef.current;
+
+    // Save current panel state for the outgoing tab
+    tabStacks.current[prev] = {
+      spaceId: activeSpaceId,
+      spaceName: activeSpaceName,
+      recordingId: activeRecordingId,
+    };
+
+    // Instantly hide panels without animation (no closeSpace/closeRecording)
+    setActiveSpaceId(null);
+    setActiveSpaceName(null);
+    setActiveRecordingId(null);
+    spaceSlideAnim.setValue(width);
+    recordingSlideAnim.setValue(width);
+
     activeTabRef.current = key;
 
     const incoming = slideAnims[key];
     const outgoing = slideAnims[prev];
-    incoming?.setValue(width);
 
-    Animated.parallel([
-      Animated.timing(incoming, { toValue: 0, duration: 320, useNativeDriver: true }),
-      Animated.timing(outgoing, { toValue: -width, duration: 320, useNativeDriver: true }),
-    ]).start(() => { outgoing?.setValue(width); });
+    // Instant swap — no animation between different tabs
+    outgoing?.setValue(width);
+    incoming?.setValue(0);
 
-    Animated.timing(titleAnim, { toValue: 0, duration: 180, useNativeDriver: true }).start(() => {
-      setActiveTab(key);
-      Animated.timing(titleAnim, { toValue: 1, duration: 280, useNativeDriver: true }).start();
-    });
-  }, []);
+    // Restore saved panel state for the incoming tab
+    const saved = tabStacks.current[key];
+    if (saved?.spaceId) {
+      setActiveSpaceId(saved.spaceId);
+      setActiveSpaceName(saved.spaceName);
+      spaceSlideAnim.setValue(0);
+      if (saved.recordingId) {
+        setActiveRecordingId(saved.recordingId);
+        recordingSlideAnim.setValue(0);
+      }
+    }
+
+    setActiveTab(key);
+    titleAnim.setValue(1);
+  }, [activeSpaceId, activeSpaceName, activeRecordingId]);
 
   const openOthers = useCallback(() => {
     setOthersOpen(true);
@@ -447,13 +515,12 @@ export default function TabsLayout() {
     ]).start(() => setOthersOpen(false));
   }, []);
 
-  const handleNavPress = (key: string) => {
+  const handleNavPress = useCallback((key: string) => {
     if (key === 'others') { othersOpen ? closeOthers() : openOthers(); return; }
     if (othersOpen) closeOthers();
     if (key === 'notifications-tab') {
       setUnreadCount(0);
       switchTab('notifications-page');
-      // Mark all new/saw as saw so badge stays cleared
       supabase.from('notifications')
         .update({ status: 'saw', is_read: true, read: true })
         .eq('user_id', userId)
@@ -462,7 +529,21 @@ export default function TabsLayout() {
       return;
     }
     switchTab(key);
-  };
+  }, [othersOpen, closeOthers, openOthers, switchTab, userId]);
+
+  // Consume any pending tab set before this layout mounted (e.g. from detail screen nav)
+  useEffect(() => {
+    const pending = consumePendingTabGlobal();
+    if (pending) handleNavPress(pending);
+  }, []);
+
+  // When a detail screen sets a pendingTab, switch to it after router.back()
+  useEffect(() => {
+    if (pendingTab) {
+      handleNavPress(pendingTab);
+      setPendingTab(null);
+    }
+  }, [pendingTab, handleNavPress]);
 
   const handleOthersItem = (item: typeof OTHERS_ITEMS[0]) => {
     closeOthers();
@@ -521,17 +602,15 @@ export default function TabsLayout() {
   return (
     <TourContext.Provider value={{ register: registerTourTarget, unregister: unregisterTourTarget }}>
     <BlurContext.Provider value={{ setBlur, registerAdd, unregisterAdd, activeTab, __hasProvider: true }}>
+    <NavContext.Provider value={{ activeTab, switchTab, handleNavPress, unreadCount, pendingTab, setPendingTab, openSpace, closeSpace, activeSpaceId, activeSpaceName, openRecording, closeRecording, activeRecordingId }}>
     <View style={s.container}>
 
       {/* ── Shared flat header ── */}
-      <View style={[s.waveBg, { paddingTop: insets.top + 10 }]}>
-        <View style={s.appLabel}>
-          <Text style={s.appLabelText}>L</Text>
-        </View>
-        <Animated.View style={[s.waveTitleRow, { opacity: titleAnim }]}>
-          <Text style={s.pageTitle}>{TAB_META[activeTab]?.title ?? activeTab}</Text>
+      <View style={[s.waveBg, { paddingTop: insets.top + 20 }]}>
+        <Text style={s.appLabelText}>LEDGR</Text>
+        <Animated.View style={{ opacity: titleAnim }}>
+          <Text style={s.pageTitle}>{activeSpaceId ? (activeSpaceName ?? '') : (TAB_META[activeTab]?.title ?? activeTab)}</Text>
         </Animated.View>
-        <View style={{ width: 36 }} />
       </View>
 
       <View style={s.content}>
@@ -542,10 +621,35 @@ export default function TabsLayout() {
             style={[s.screen, { transform: [{ translateX: slideAnims[key] }], zIndex: activeTab === key ? 10 : 0 }]}
             pointerEvents={activeTab === key ? 'auto' : 'none'}
           >
-            {key === 'profile' ? <MemoProfile /> : key === 'notifications-page' ? <MemoNotifications isActive={activeTab === 'notifications-page'} /> : SCREENS[key]}
+            {key === 'profile' ? <MemoProfile /> : key === 'notifications-page' ? <MemoNotifications isActive={activeTab === 'notifications-page'} /> : SCREENS[key]?.(activeTab === key)}
           </Animated.View>
         ))}
       </View>
+
+      {/* Space detail panel — slides in over content, under header+nav */}
+      {activeSpaceId && (
+        <Animated.View
+          style={[s.screen, s.panel, { transform: [{ translateX: spaceSlideAnim }], zIndex: 20 }]}
+        >
+          <MemoSpaceDetail
+            spaceId={activeSpaceId}
+            name={activeSpaceName ?? ''}
+            onClose={closeSpace}
+          />
+        </Animated.View>
+      )}
+
+      {/* Recording detail panel — slides in over space detail */}
+      {activeRecordingId && (
+        <Animated.View
+          style={[s.screen, s.panel, { transform: [{ translateX: recordingSlideAnim }], zIndex: 30 }]}
+        >
+          <MemoRecordingDetail
+            recordingId={activeRecordingId}
+            onClose={closeRecording}
+          />
+        </Animated.View>
+      )}
 
       {/* Others bubble */}
       {othersOpen && (
@@ -572,33 +676,8 @@ export default function TabsLayout() {
       )}
 
       {/* Bottom nav bar */}
-      <View style={[s.navBar, { paddingBottom: insets.bottom || 8 }]}>
-        {MAIN_TABS.map(tab => {
-          const isActive = tab.key === 'others' ? isOthersActive : tab.key === 'notifications-tab' ? isNotifTabActive : activeTab === tab.key;
-          const showBadge = (tab.key === 'notifications-tab' && unreadCount > 0);
-          const tourId = NAV_TOUR_IDS[tab.key];
-          const navContent = (
-            <TouchableOpacity style={s.navItem} onPress={() => handleNavPress(tab.key)} activeOpacity={0.7}>
-              <View style={[s.navIconWrap, isActive && s.navIconWrapActive]}>
-                <Ionicons name={tab.icon as any} size={22} color={isActive ? NAV_ACCENT : NAV_INACTIVE} />
-                {showBadge && (
-                  <View style={s.navBadge}>
-                    <Text style={s.navBadgeText}>{unreadCount > 9 ? '9+' : String(unreadCount)}</Text>
-                  </View>
-                )}
-              </View>
-              <Text style={[s.navLabel, isActive && s.navLabelActive]}>{tab.label}</Text>
-            </TouchableOpacity>
-          );
-          return tourId ? (
-            <TourTarget key={tab.key} id={tourId} style={{ flex: 1 }}>
-              {navContent}
-            </TourTarget>
-          ) : (
-            <View key={tab.key} style={{ flex: 1 }}>{navContent}</View>
-          );
-        })}
-      </View>
+      {/* Bottom nav — position absolute so it overlays transparentModal screens */}
+      <BottomNav />
 
       <AppTourOverlay
         visible={tourVisible}
@@ -618,6 +697,7 @@ export default function TabsLayout() {
       )}
 
     </View>
+    </NavContext.Provider>
     </BlurContext.Provider>
     </TourContext.Provider>
   );
@@ -667,34 +747,18 @@ const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.white },
   content:   { flex: 1, position: 'relative' },
   screen:    { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: Colors.white },
+  panel:     { bottom: 0 },
 
   // ── Shared header
-  waveBg:       { backgroundColor: HEADER_BG, paddingHorizontal: Spacing.page, paddingTop: 28, paddingBottom: 16, zIndex: 10, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#333' },
-  appLabel:     { width: 36, height: 36, borderRadius: 18, backgroundColor: '#B6E1DE22', alignItems: 'center', justifyContent: 'center' },
-  appLabelText: { fontFamily: 'MuseoModerno_Black', fontSize: 18, color: HEADER_TEXT },
-  pageTitle:    { flex: 1, fontFamily: 'CalSans', fontSize: 20, color: HEADER_TEXT, letterSpacing: -0.3, textAlign: 'center' },
+  waveBg:       { backgroundColor: Colors.white, paddingHorizontal: DC.pagePadding, paddingBottom: 14, zIndex: 10, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: DC.cardBorder },
+  appLabelText: { fontFamily: AppFont.brandLight, fontSize: 11, color: DC.pageTextMuted, letterSpacing: 2, marginBottom: -4 },
+  pageTitle:    { fontFamily: AppFont.bold, fontSize: 24, color: DC.accent1, letterSpacing: -0.5, textAlign: 'center' },
   pageSubtitle: { display: 'none' as any },
-  waveTitleRow: { flex: 1, flexDirection: 'row', alignItems: 'center' },
+  waveTitleRow: { alignItems: 'center' },
   wave:         { display: 'none' as any },
-  addBtn:       { width: 36, height: 36, borderRadius: 18, backgroundColor: HEADER_BTN_BG, alignItems: 'center', justifyContent: 'center' },
+  addBtn:       { display: 'none' as any },
 
-  navBar: {
-    flexDirection: 'row',
-    backgroundColor: Colors.white,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-    height: 64,
-    paddingBottom: 8,
-    paddingTop: 8,
-    paddingHorizontal: 0,
-  },
-  navItem: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 3 },
-  navIconWrap: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
-  navIconWrapActive: {},
-  navLabel:       { fontFamily: 'ChillaxRegular', fontSize: 10, color: NAV_INACTIVE, letterSpacing: 0.4 },
-  navLabelActive: { fontFamily: 'ChillaxMedium',  fontSize: 10, color: NAV_ACCENT },
-  navBadge: { position: 'absolute', top: -2, right: -4, minWidth: 16, height: 16, borderRadius: 8, backgroundColor: '#ed6a6a', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
-  navBadgeText: { fontFamily: 'ChillaxMedium', fontSize: 9, color: '#fff', lineHeight: 14 },
+  navBadgeText: { fontFamily: AppFont.semiBold, fontSize: 9, color: '#fff', lineHeight: 14 },
 
   // Bubble
   bubbleWrap: {
@@ -794,4 +858,5 @@ const p = StyleSheet.create({
   deleteConfirmBtn:  { flex: 1, backgroundColor: PROFILE_DANGER, borderRadius: Radius.pill, paddingVertical: 12, alignItems: 'center' },
   deleteConfirmText: { fontFamily: Fonts.monoBold, fontSize: 13, color: '#fff' },
 });
+
 

@@ -19,7 +19,7 @@ export default function TagRequestsScreen() {
   const [loading, setLoading] = useState(true);
   const [responding, setResponding] = useState<string | null>(null);
 
-  // Space picker state
+  // Space picker state (for expense_tag accept)
   const [spacePicker, setSpacePicker] = useState<{ notif: any } | null>(null);
   const [spaces, setSpaces] = useState<{ id: string; name: string }[]>([]);
   const [selectedSpaceId, setSelectedSpaceId] = useState<string | null>(null);
@@ -32,7 +32,7 @@ export default function TagRequestsScreen() {
       .from('notifications')
       .select('*')
       .eq('user_id', userId)
-      .eq('type', 'expense_tag')
+      .in('type', ['expense_tag', 'overpayment_request'])
       .in('status', ['new', 'saw'])
       .order('created_at', { ascending: false })
       .then(({ data }) => {
@@ -50,7 +50,7 @@ export default function TagRequestsScreen() {
         table: 'notifications',
       }, (payload) => {
         const n = payload.new as any;
-        if (n.user_id !== userId || n.type !== 'expense_tag') return;
+        if (n.user_id !== userId || !['expense_tag', 'overpayment_request'].includes(n.type)) return;
         setRequests(prev => [n, ...prev]);
       })
       .on('postgres_changes', {
@@ -59,7 +59,7 @@ export default function TagRequestsScreen() {
         table: 'notifications',
       }, (payload) => {
         const n = payload.new as any;
-        if (n.user_id !== userId || n.type !== 'expense_tag') return;
+        if (n.user_id !== userId || !['expense_tag', 'overpayment_request'].includes(n.type)) return;
         if (!['new', 'saw'].includes(n.status)) {
           setRequests(prev => prev.filter(r => r.id !== n.id));
         }
@@ -69,6 +69,7 @@ export default function TagRequestsScreen() {
     return () => { supabase.removeChannel(channel); };
   }, [userId]);
 
+  // ── expense_tag: open space picker ──────────────────────────────────────
   const openSpacePicker = async (notif: any) => {
     setSelectedSpaceId(null);
     setSpacesLoading(true);
@@ -89,6 +90,7 @@ export default function TagRequestsScreen() {
     setSpacesLoading(false);
   };
 
+  // ── expense_tag: confirm accept ──────────────────────────────────────────
   const confirmAccept = async () => {
     if (!spacePicker) return;
     const notif = spacePicker.notif;
@@ -100,7 +102,7 @@ export default function TagRequestsScreen() {
         user_id: userId,
         space_id: selectedSpaceId ?? null,
         name: d.recordingName ?? 'tagged expense',
-        type: 'payable',
+        type: 'debt',
         amount: d.amount,
         transaction_date: d.transactionDate ?? new Date().toISOString().split('T')[0],
         currency: d.currency ?? defaultCurrency,
@@ -114,20 +116,18 @@ export default function TagRequestsScreen() {
       }).select('id').single();
 
       await supabase.from('notifications').update({ status: 'opened' }).eq('id', notif.id);
-
       await supabase.from('notifications').insert({
         user_id: d.taggerUserId,
         type: 'tag_accepted',
         title: `${userName || 'Someone'} accepted your expense tag`,
-        body: `"${d.recordingName}" is now a due in their account.`,
-        message: `"${d.recordingName}" is now a due in their account.`,
+        body: `"${d.recordingName}" is now a debt in their account.`,
+        message: `"${d.recordingName}" is now a debt in their account.`,
         data: { sourceRecordingId: d.sourceRecordingId, acceptedRecordingId: rec?.id },
         status: 'new',
         is_read: false,
       });
 
       setRequests(prev => prev.filter(r => r.id !== notif.id));
-
       if (rec?.id) {
         router.push({ pathname: '/(app)/recording-detail', params: { recordingId: rec.id } } as any);
       }
@@ -138,6 +138,7 @@ export default function TagRequestsScreen() {
     }
   };
 
+  // ── expense_tag: decline ─────────────────────────────────────────────────
   const decline = async (notif: any) => {
     setResponding(notif.id);
     try {
@@ -160,6 +161,48 @@ export default function TagRequestsScreen() {
     }
   };
 
+  // ── overpayment_request: accept ──────────────────────────────────────────
+  const acceptOverpayment = async (notif: any) => {
+    setResponding(notif.id);
+    try {
+      const d = notif.data ?? {};
+      // Update B's expense and debt to full collected amount
+      if (d.debtRecordingId) {
+        await supabase.from('recordings')
+          .update({ amount: d.collectedAmount, paid_amount: d.collectedAmount, status: 'paid' })
+          .eq('id', d.debtRecordingId);
+        const { data: linkedExp } = await supabase.from('recordings')
+          .select('id')
+          .eq('linked_recording_id', d.debtRecordingId)
+          .eq('type', 'expense')
+          .maybeSingle();
+        if (linkedExp) {
+          await supabase.from('recordings').update({ amount: d.collectedAmount }).eq('id', linkedExp.id);
+        }
+      }
+      await supabase.from('notifications').update({ status: 'opened' }).eq('id', notif.id);
+      setRequests(prev => prev.filter(r => r.id !== notif.id));
+    } catch (e) {
+      console.warn('[tag-request] accept overpayment failed:', e);
+    } finally {
+      setResponding(null);
+    }
+  };
+
+  // ── overpayment_request: decline ─────────────────────────────────────────
+  const declineOverpayment = async (notif: any) => {
+    setResponding(notif.id);
+    try {
+      // B's expense stays capped at original amount — no change needed
+      await supabase.from('notifications').update({ status: 'opened' }).eq('id', notif.id);
+      setRequests(prev => prev.filter(r => r.id !== notif.id));
+    } catch (e) {
+      console.warn('[tag-request] decline overpayment failed:', e);
+    } finally {
+      setResponding(null);
+    }
+  };
+
   const fmt = (d: string) => {
     if (!d) return '';
     const [y, m, day] = d.split('-').map(Number);
@@ -171,7 +214,7 @@ export default function TagRequestsScreen() {
   if (requests.length === 0) return (
     <View style={s.empty}>
       <Ionicons name="checkmark-circle-outline" size={36} color={Colors.faint} />
-      <Text style={s.emptyText}>no pending tags</Text>
+      <Text style={s.emptyText}>no pending requests</Text>
     </View>
   );
 
@@ -181,39 +224,63 @@ export default function TagRequestsScreen() {
         {requests.map(notif => {
           const d = notif.data ?? {};
           const isResponding = responding === notif.id;
+          const isOverpayment = notif.type === 'overpayment_request';
+
           return (
             <View key={notif.id} style={s.card}>
               <View style={s.cardHeader}>
-                <View style={s.iconWrap}>
-                  <Ionicons name="person-add-outline" size={18} color={ACCENT_DARK} />
+                <View style={[s.iconWrap, isOverpayment && { backgroundColor: Colors.expense + '22' }]}>
+                  <Ionicons
+                    name={isOverpayment ? 'alert-circle-outline' : 'person-add-outline'}
+                    size={18}
+                    color={isOverpayment ? Colors.expense : ACCENT_DARK}
+                  />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={s.tagger}>{d.taggerName || 'someone'}</Text>
-                  <Text style={s.sub}>tagged you in an expense</Text>
+                  <Text style={s.sub}>
+                    {isOverpayment ? 'sent an overpayment' : 'tagged you in an expense'}
+                  </Text>
                 </View>
               </View>
+
               <View style={s.detail}>
                 <Text style={s.recName}>{d.recordingName ?? '—'}</Text>
-                <Text style={s.recMeta}>{fmt(d.transactionDate)}</Text>
-                <Text style={s.amount}>
-                  {d.currency ?? defaultCurrency} {Number(d.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                {!isOverpayment && <Text style={s.recMeta}>{fmt(d.transactionDate)}</Text>}
+                <Text style={[s.amount, isOverpayment && { color: Colors.expense }]}>
+                  {d.currency ?? defaultCurrency}{' '}
+                  {Number(isOverpayment ? d.collectedAmount : d.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                 </Text>
+                {isOverpayment && (
+                  <View style={{ gap: 2, marginTop: 4 }}>
+                    <Text style={s.recMeta}>
+                      original debt: {d.currency ?? defaultCurrency} {Number(d.originalAmount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    </Text>
+                    <Text style={[s.recMeta, { color: Colors.expense }]}>
+                      overpayment: {d.currency ?? defaultCurrency} {Number(d.overpaymentAmount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    </Text>
+                  </View>
+                )}
                 <Text style={s.note}>
-                  if you accept, this appears as a <Text style={{ fontFamily: Fonts.monoBold }}>loan (payable)</Text> in your account.
+                  {isOverpayment
+                    ? <>if you <Text style={{ fontFamily: Fonts.monoBold }}>accept</Text>, your expense updates to the full amount. if you <Text style={{ fontFamily: Fonts.monoBold }}>decline</Text>, your expense stays at the original debt.</>
+                    : <>if you accept, this appears as a <Text style={{ fontFamily: Fonts.monoBold }}>debt</Text> in your account.</>
+                  }
                 </Text>
               </View>
+
               <View style={s.actions}>
                 <TouchableOpacity
                   style={[s.declineBtn, isResponding && { opacity: 0.5 }]}
-                  onPress={() => decline(notif)}
+                  onPress={() => isOverpayment ? declineOverpayment(notif) : decline(notif)}
                   disabled={isResponding}
                   activeOpacity={0.8}
                 >
                   <Text style={s.declineBtnText}>decline</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[s.acceptBtn, isResponding && { opacity: 0.5 }]}
-                  onPress={() => openSpacePicker(notif)}
+                  style={[s.acceptBtn, isResponding && { opacity: 0.5 }, isOverpayment && { backgroundColor: Colors.expense }]}
+                  onPress={() => isOverpayment ? acceptOverpayment(notif) : openSpacePicker(notif)}
                   disabled={isResponding}
                   activeOpacity={0.8}
                 >
@@ -228,13 +295,13 @@ export default function TagRequestsScreen() {
         <View style={{ height: 40 }} />
       </ScrollView>
 
-      {/* Space picker modal */}
+      {/* Space picker modal — only for expense_tag */}
       <Modal visible={!!spacePicker} transparent animationType="fade" onRequestClose={() => setSpacePicker(null)}>
         <TouchableOpacity style={s.backdrop} activeOpacity={1} onPress={() => setSpacePicker(null)} />
         <View style={s.modalWrap} pointerEvents="box-none">
           <View style={s.modalCard}>
             <Text style={s.modalTitle}>add to a space</Text>
-            <Text style={s.modalSub}>choose which space to record this due under, or skip to save without one.</Text>
+            <Text style={s.modalSub}>choose which space to record this debt under, or skip to save without one.</Text>
             {spacesLoading ? (
               <ActivityIndicator color={ACCENT_DARK} style={{ marginVertical: 20 }} />
             ) : (
@@ -242,7 +309,7 @@ export default function TagRequestsScreen() {
                 {spaces.map(sp => (
                   <TouchableOpacity
                     key={sp.id}
-                    style={[s.spaceRow, selectedSpaceId === sp.id && s.spaceRowActive]}
+                    style={s.spaceRow}
                     onPress={() => setSelectedSpaceId(prev => prev === sp.id ? null : sp.id)}
                     activeOpacity={0.75}
                   >
@@ -297,15 +364,12 @@ const s = StyleSheet.create({
   declineBtnText: { fontFamily: Fonts.monoBold, fontSize: 13, color: Colors.muted },
   acceptBtn:      { flex: 2, paddingVertical: 12, borderRadius: Radius.pill, backgroundColor: ACCENT_DARK, alignItems: 'center' },
   acceptBtnText:  { fontFamily: Fonts.monoBold, fontSize: 13, color: Colors.white },
-
-  // Modal
   backdrop:     { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.4)' },
   modalWrap:    { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 },
   modalCard:    { width: '100%', backgroundColor: Colors.white, borderRadius: Radius.xl, padding: 24, gap: 12 },
   modalTitle:   { fontFamily: Fonts.monoBold, fontSize: 16, color: Colors.text },
   modalSub:     { fontFamily: Fonts.mono, fontSize: 12, color: Colors.muted, lineHeight: 18 },
   spaceRow:     { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  spaceRowActive: { },
   spaceName:    { fontFamily: Fonts.mono, fontSize: 14, color: Colors.text, flex: 1 },
   modalActions: { flexDirection: 'row', gap: 10, marginTop: 4 },
   skipBtn:      { flex: 1, paddingVertical: 12, borderRadius: Radius.pill, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.borderMid, alignItems: 'center' },

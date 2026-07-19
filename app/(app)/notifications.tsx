@@ -36,6 +36,7 @@ const TYPE_ICON: Record<string, string> = {
   tag_declined:            'close-circle-outline',
   tag_cancelled:           'close-circle-outline',
   tag_payment_update:      'cash-outline',
+  overpayment_request:     'alert-circle-outline',
   default:                 'notifications-outline',
 };
 
@@ -63,8 +64,8 @@ export default function NotificationsScreen({ isActive }: { isActive?: boolean }
       .from('notifications')
       .select('*', { count: 'exact', head: true })
       .eq('user_id', userId)
-      .eq('type', 'expense_tag')
-      .in('status', ['new', 'saw']);
+      .in('type', ['expense_tag', 'overpayment_request'])
+      .eq('status', 'new');
     setPendingCount(count ?? 0);
   }, [userId]);
 
@@ -148,7 +149,23 @@ export default function NotificationsScreen({ isActive }: { isActive?: boolean }
       setActiveTab('requests'); return;
     }
     if (n.type === 'tag_accepted' || n.type === 'tag_declined' || n.type === 'tag_payment_update') {
-      if (data.recordingId) router.push({ pathname: '/(app)/recording-detail', params: { recordingId: data.recordingId } } as any);
+      // If A receives overpayment response from B, record income if accepted
+      if (n.type === 'tag_payment_update' && data.overpaymentAmount && data.accepted === true) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user && data.sourceRecordingId) {
+          const { data: sourceRec } = await supabase.from('recordings').select('name, space_id').eq('id', data.sourceRecordingId).maybeSingle();
+          await supabase.from('recordings').insert({
+            user_id: user.id,
+            space_id: sourceRec?.space_id ?? null,
+            name: `${sourceRec?.name ?? 'recording'} · overpayment`,
+            type: 'income',
+            amount: data.overpaymentAmount,
+            transaction_date: new Date().toISOString().split('T')[0],
+            status: 'received',
+          });
+        }
+      }
+      if (data.sourceRecordingId) router.push({ pathname: '/(app)/recording-detail', params: { recordingId: data.sourceRecordingId } } as any);
       return;
     }
     if (n.type === 'split_bill_invite' && data.splitBillId) {
@@ -199,7 +216,7 @@ export default function NotificationsScreen({ isActive }: { isActive?: boolean }
             await supabase.from('notifications')
               .update({ status: 'saw', is_read: true, read: true })
               .eq('user_id', userId)
-              .eq('type', 'expense_tag')
+              .in('type', ['expense_tag', 'overpayment_request'])
               .eq('status', 'new');
           }}
           activeOpacity={0.75}

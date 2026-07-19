@@ -3,7 +3,7 @@ import {
   SafeAreaView, TextInput, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useUser } from '../../../src/hooks/useUser';
 import { supabase } from '../../../src/lib/supabase';
@@ -14,9 +14,17 @@ import BottomSheet from '@/components/ui/BottomSheet';
 const ACCENT      = Brand.color.accent;
 const ACCENT_DARK = Brand.color.accentDark;
 
-export default function ContactsScreen() {
+export default function ContactsScreen({ isActive }: { isActive?: boolean }) {
   const { userId } = useUser();
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (isActive && userId) {
+      queryClient.invalidateQueries({ queryKey: ['friends', userId] });
+      queryClient.invalidateQueries({ queryKey: ['friend-requests-incoming', userId] });
+      queryClient.invalidateQueries({ queryKey: ['contacts', userId] });
+    }
+  }, [isActive, userId]);
 
   const [search, setSearch] = useState('');
   const [deleteModal, setDeleteModal] = useState(false);

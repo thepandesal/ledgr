@@ -1,17 +1,16 @@
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Dimensions } from 'react-native';
-import LottieHero from '../components/LottieHero';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Dimensions, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { supabase } from '../src/lib/supabase';
 import { useState } from 'react';
 import { Colors } from '../components/ui/theme';
+import { AppFont } from '../src/lib/fonts';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 
 WebBrowser.maybeCompleteAuthSession();
 
 const { width, height } = Dimensions.get('window');
-const heroSize = (height || 800) * 0.9 * 0.48;
 
 export default function LoginScreen() {
   const [loading, setLoading] = useState<'google' | 'apple' | null>(null);
@@ -36,16 +35,19 @@ export default function LoginScreen() {
   };
 
   return (
-    <SafeAreaView style={s.container} edges={['bottom', 'top']}>
+    <SafeAreaView style={s.container} edges={['bottom']}>
       <View style={s.wrapper}>
 
         {/* Hero */}
-        <LottieHero size={heroSize} />
+        <Image
+          source={require('../assets/login-image.png')}
+          style={s.heroImage}
+          resizeMode="contain"
+        />
 
         {/* Content */}
         <View style={s.content}>
           <Text style={s.brand}>LEDGR</Text>
-          <Text style={s.tagline}>track your numbers.</Text>
           <View style={s.buttons}>
             <TouchableOpacity style={s.button} activeOpacity={0.8} onPress={() => signIn('google')} disabled={loading !== null}>
               {loading === 'google'
@@ -72,30 +74,32 @@ export default function LoginScreen() {
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#ffffff' },
+  container: { flex: 1, backgroundColor: '#ffffff', paddingTop: 0 },
+  heroImage: {
+    width: width,
+    height: height * 0.55,
+    alignSelf: 'center',
+    marginTop: -80,
+  },
   wrapper: {
-    height: height * 0.9,
-    marginVertical: height * 0.05,
+    flex: 1,
     justifyContent: 'center',
+    paddingBottom: 40,
   },
   content: {
     alignItems: 'center',
-    paddingHorizontal: 48,
-    marginTop: 8,
+    paddingHorizontal: 32,
+    marginTop: -20,
   },
-  brand:     { fontFamily: 'MuseoModerno_Black', fontSize: 72, color: Colors.cyan, letterSpacing: -1, marginBottom: 4 },
-  tagline:   { fontFamily: 'ChillaxMedium', fontSize: 14, color: Colors.text, marginBottom: 32 },
+  brand:     { fontFamily: 'MuseoModerno_Black', fontSize: 64, color: '#111111', letterSpacing: -1, marginBottom: 8 },
   buttons:   { width: '100%', gap: 12 },
   button: {
     borderRadius: 999,
-    paddingVertical: 14,
+    paddingVertical: 16,
     alignItems: 'center',
-    borderWidth: 3,
-    borderStyle: 'dotted',
-    borderColor: '#929090',
-    backgroundColor: '#ffffff',
+    backgroundColor: '#111111',
   },
-  buttonText: { fontFamily: 'CalSans', fontSize: 15, color: Colors.text, letterSpacing: 1.5 },
-  legal:      { textAlign: 'center', fontFamily: 'DMSans_400Regular', fontSize: 11, color: Colors.muted, marginTop: 16, lineHeight: 18 },
-  legalLink:  { color: Colors.cyan, fontFamily: 'DMSans_600SemiBold' },
+  buttonText: { fontFamily: AppFont.semiBold, fontSize: 15, color: '#ffffff', letterSpacing: 1.5 },
+  legal:      { textAlign: 'center', fontFamily: AppFont.regular, fontSize: 11, color: Colors.muted, marginTop: 24, lineHeight: 18 },
+  legalLink:  { color: Colors.cyan, fontFamily: AppFont.semiBold },
 });

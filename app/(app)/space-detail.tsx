@@ -1,4 +1,4 @@
-import {
+﻿import {
   View, Text, StyleSheet, TouchableOpacity, TextInput,
   SafeAreaView, Animated, Dimensions, ScrollView, ActivityIndicator, Platform,
 } from 'react-native';
@@ -13,9 +13,15 @@ import { supabase } from '../../src/lib/supabase';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import BottomSheet from '@/components/ui/BottomSheet';
 import ActivityTabs, { ACTIVITY_TABS, ActivityTab } from '@/components/ui/ActivityTabs';
+import PageHeader, { HeaderActionBtn } from '@/components/ui/PageHeader';
+import DateNavBar from '@/components/ui/DateNavBar';
 import { Colors, Fonts, Radius } from '@/components/ui/theme';
 import { Brand } from '../../src/lib/brand';
+import { AppFont } from '../../src/lib/fonts';
+import { DC } from '../../src/lib/design';
 import AddRecordingScreen from './add-recording';
+import BottomNav from '@/components/ui/BottomNav';
+import { useNav } from '../../src/lib/NavContext';
 
 // ── Module-level pending focus date ─────────────────────────────────────────
 export let pendingFocusDate: string | null = null;
@@ -84,32 +90,36 @@ function fmtAmount(n: number) {
   return n.toLocaleString('en-US', { minimumFractionDigits: 2 });
 }
 
+function toTitleCase(str: string) {
+  return str.replace(/\w\S*/g, txt => txt.charAt(0).toUpperCase() + txt.slice(1).toLowerCase());
+}
+
 function getTypeLabel(type: string, status: string, is_due?: boolean, paid_amount?: number, amount?: number) {
-  if (type === 'income')  return { label: 'income',  color: Brand.color.accentDark };
+  if (type === 'income')  return { label: 'Income',  color: DC.incomeColor };
   if (type === 'expense') {
     if (is_due) {
       const paid = Number(paid_amount ?? 0);
       const total = Number(amount ?? 0);
       const collected = total > 0 && paid >= total - 0.01;
       const partial   = paid > 0 && !collected;
-      if (collected) return { label: 'expense · collected',        color: Brand.color.accentDark };
-      if (partial)   return { label: 'expense · due · partial',    color: PEACH };
-      return               { label: 'expense · due',               color: PEACH };
+      if (collected) return { label: 'Expense · Collected',        color: DC.incomeColor };
+      if (partial)   return { label: 'Expense · Due · Partial',    color: DC.expenseColor };
+      return               { label: 'Expense · Due',               color: DC.expenseColor };
     }
-    return { label: 'expense', color: PEACH };
+    return { label: 'Expense', color: DC.expenseColor };
   }
   if (type === 'debt') {
-    if (status === 'paid')    return { label: 'debt · paid',           color: PEACH };
-    if (status === 'partial') return { label: 'debt · partially paid', color: PEACH };
-    return                           { label: 'debt',                  color: PEACH };
+    if (status === 'paid')    return { label: 'Debt · Paid',           color: DC.expenseColor };
+    if (status === 'partial') return { label: 'Debt · Partially Paid', color: DC.expenseColor };
+    return                           { label: 'Debt',                  color: DC.expenseColor };
   }
   if (type === 'due') {
-    if (status === 'paid')    return { label: 'due · collected',        color: Brand.color.accentDark };
-    if (status === 'partial') return { label: 'due · partially paid',   color: Brand.color.accentDark };
-    return                           { label: 'due',                    color: Brand.color.accentDark };
+    if (status === 'paid')    return { label: 'Due · Collected',        color: DC.incomeColor };
+    if (status === 'partial') return { label: 'Due · Partially Paid',   color: DC.incomeColor };
+    return                           { label: 'Due',                    color: DC.incomeColor };
   }
-  if (type === 'payment') return { label: 'payment', color: PEACH };
-  if (type === 'return')  return { label: 'return',  color: Brand.color.accentDark };
+  if (type === 'payment') return { label: 'Payment', color: DC.expenseColor };
+  if (type === 'return')  return { label: 'Return',  color: DC.incomeColor };
   return { label: type, color: Colors.muted };
 }
 
@@ -119,15 +129,18 @@ import { computeGhosts, getDueDateForCycle, isLoanComplete, type GhostRow } from
 import { isReminderDueToday } from '../../src/lib/reminderUtils';
 import type { RecordingReminder } from '../../src/types';
 
-export default function SpaceDetailScreen() {
-  const { spaceId, name } = useLocalSearchParams<{ spaceId: string; name: string }>();
-  const router = useRouter();
+export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName, onClose }: { spaceId?: string; name?: string; onClose?: () => void }) {
+  const params = useLocalSearchParams<{ spaceId: string; name: string }>();
+  const spaceId = propSpaceId ?? params.spaceId;
+  const name    = propName    ?? params.name;
+  const router  = useRouter();
   const queryClient = useQueryClient();
   const { userId, defaultCurrency } = useUser();
   const { convert } = useExchangeRates();
 
-  // Slide animation
-  const { slideAnim, handleBack } = useScreenAnim();
+  const { slideAnim, handleBack: handleBackAnim } = useScreenAnim();
+  const handleBack = onClose ?? handleBackAnim;
+  const { openRecording } = useNav();
 
   // Load default settings from spaces page
   const { data: spacesSettings } = useQuery({
@@ -188,6 +201,7 @@ export default function SpaceDetailScreen() {
   const [showReminderModal, setShowReminderModal] = useState(false);
   const [reminderTab, setReminderTab] = useState<'active' | 'completed' | 'paused'>('active');
   const [recordingSearch, setRecordingSearch] = useState('');
+  const [activeSection, setActiveSection] = useState<'recordings' | 'reminders'>('recordings');
 
   // ── Reminder add modal state (quick-add from space) ────────────────────────────────────────────────────────────
   const [rName, setRName]               = useState('');
@@ -1197,265 +1211,203 @@ export default function SpaceDetailScreen() {
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <Animated.View style={[{ flex: 1, backgroundColor: Colors.white }, { transform: [{ translateX: slideAnim }] }]}>
-      <SafeAreaView style={{ flex: 1 }}>
+      <SafeAreaView style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
 
         {/* Header */}
-        <View style={s.header}>
-          <TouchableOpacity onPress={handleBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={s.backBtn}>
-            <Ionicons name="arrow-back" size={20} color="#B6E1DE" />
-          </TouchableOpacity>
-          <Text style={s.title} numberOfLines={1}>{name}</Text>
-          {canViewOnly && (
-            <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: Radius.pill, backgroundColor: '#B6E1DE22' }}>
-              <Text style={{ fontFamily: Brand.font.mono, fontSize: 9, color: '#B6E1DE', letterSpacing: 0.5 }}>viewer</Text>
+        <PageHeader
+          title={String(name)}
+          onBack={handleBack}
+        />
+
+        {/* ── Sticky controls ── */}
+        <View style={s.stickyControls}>
+          {/* Section toggle: Recordings / Reminders */}
+          <View style={s.sectionToggleRow}>
+            <TouchableOpacity style={[s.sectionToggleBtn, activeSection === 'recordings' && s.sectionToggleBtnActive]} onPress={() => setActiveSection('recordings')} activeOpacity={0.8}>
+              <Text style={[s.sectionToggleText, activeSection === 'recordings' && s.sectionToggleTextActive]}>Recordings</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[s.sectionToggleBtn, activeSection === 'reminders' && s.sectionToggleBtnActive]} onPress={() => setActiveSection('reminders')} activeOpacity={0.8}>
+              <Text style={[s.sectionToggleText, activeSection === 'reminders' && s.sectionToggleTextActive]}>Reminders</Text>
+            </TouchableOpacity>
+          </View>
+
+          {activeSection === 'recordings' && (
+            <View style={{ gap: 10 }}>
+              <ActivityTabs selectedTabs={selectedTabs} onToggle={handleTabToggle} tabValue={tabValue} />
+              <View style={s.filterControlsRow}>
+                <TouchableOpacity style={s.filterBtn} onPress={() => setShowFilterModal(true)} activeOpacity={0.75}>
+                  <View style={s.filterDot} />
+                  <Text style={s.filterBtnText}>Filters</Text>
+                </TouchableOpacity>
+                <DateNavBar style={{ flex: 6.4 }}
+                  label={rangeLabel}
+                  onPrev={() => navigateRange(-1)}
+                  onNext={() => navigateRange(1)}
+                  onLabelPress={() => setShowLocalFilter(true)}
+                />
+                {canAddRecordings && (
+                  <TouchableOpacity style={s.actionsBtn} onPress={() => setShowAddChoice(true)} activeOpacity={0.8}>
+                    <Text style={s.actionsBtnText}>Actions</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+              <View style={s.searchBar}>
+                <Ionicons name="search-outline" size={13} color={Colors.faint} />
+                <TextInput style={s.searchInput} placeholder="Search Recordings.." placeholderTextColor={Colors.faint} value={recordingSearch} onChangeText={v => { setRecordingSearch(v); setDisplayCount(10); }} />
+                {recordingSearch.length > 0 && (
+                  <TouchableOpacity onPress={() => setRecordingSearch('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Ionicons name="close" size={13} color={Colors.faint} />
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
           )}
-          {myRole === 'co-owner' && (
-            <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: Radius.pill, backgroundColor: '#B6E1DE22' }}>
-              <Text style={{ fontFamily: Brand.font.mono, fontSize: 9, color: '#B6E1DE', letterSpacing: 0.5 }}>co-owner</Text>
+
+          {activeSection === 'reminders' && (
+            <View style={{ gap: 10 }}>
+              <View style={s.filterControlsRow}>
+                <DateNavBar style={{ flex: 1 }}
+                  label={rangeLabel}
+                  onPrev={() => navigateRange(-1)}
+                  onNext={() => navigateRange(1)}
+                  onLabelPress={() => setShowLocalFilter(true)}
+                />
+                <TouchableOpacity style={s.filterBtn} onPress={() => setShowFilterModal(true)} activeOpacity={0.75}>
+                  <View style={s.filterDot} />
+                  <Text style={s.filterBtnText}>Filters</Text>
+                </TouchableOpacity>
+                {canAddRecordings && (
+                  <TouchableOpacity style={s.addCircleBtn} onPress={() => { setEditReminderId(null); setRRecordingType('expense'); setRCategoryId(''); setRName(''); setRFrequency('monthly'); setRDayOfWeek(1); setRDayOfMonth(1); setRStartMonth(today.getMonth()); setRStartDay(today.getDate()); setRStartYear(today.getFullYear()); setShowReminderModal(true); }} activeOpacity={0.8}>
+                    <Ionicons name="add" size={18} color={DC.btnText} />
+                  </TouchableOpacity>
+                )}
+              </View>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                {(['active', 'completed', 'paused'] as const).map(tab => (
+                  <TouchableOpacity key={tab} style={[s.chip, reminderTab === tab && s.chipActive]} onPress={() => setReminderTab(tab)} activeOpacity={0.75}>
+                    <Text style={[s.chipText, reminderTab === tab && s.chipTextActive]}>{tab}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <View style={s.searchBar}>
+                <Ionicons name="search-outline" size={13} color={Colors.faint} />
+                <TextInput style={s.searchInput} placeholder="Search Reminders.." placeholderTextColor={Colors.faint} />
+              </View>
             </View>
-          )}
-          <TouchableOpacity
-            style={s.addBtn}
-            onPress={generateStatement}
-            activeOpacity={0.8}
-            disabled={statementLoading}
-          >
-            {statementLoading
-              ? <ActivityIndicator size="small" color="#B6E1DE" />
-              : <Ionicons name="document-text-outline" size={16} color="#B6E1DE" />}
-          </TouchableOpacity>
-          {spaceId !== 'all' && canAddRecordings && (
-            <TouchableOpacity
-              style={s.addBtn}
-              onPress={() => setShowAddChoice(true)}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="add" size={18} color="#B6E1DE" />
-            </TouchableOpacity>
-          )}
-          {isOwner && spaceId !== 'all' && (
-            <TouchableOpacity style={s.addBtn} onPress={() => setMembersModal(true)} activeOpacity={0.8}>
-              <Ionicons name="people-outline" size={16} color="#B6E1DE" />
-            </TouchableOpacity>
           )}
         </View>
 
         {/* Main scroll */}
-        <ScrollView 
-          contentContainerStyle={s.scroll} 
+        <ScrollView
+          contentContainerStyle={s.scroll}
           showsVerticalScrollIndicator={false}
           onScroll={handleScroll}
           scrollEventThrottle={16}
         >
+          {activeSection === 'recordings' && (
+            <View style={{ gap: 12 }}>
+              {/* Recordings list */}
+              <View>
+                {isLoading ? (
+                  <ActivityIndicator color={DC.accent1} style={{ marginTop: 24 }} />
+                ) : filtered.length === 0 ? (
+                  <View style={s.emptyWrap}><Text style={s.emptyText}>no recordings found for this period</Text></View>
+                ) : (
+                  paginatedGroups.map(group => (
+                    <View key={group.key} style={s.dateGroup}>
+                      <View style={s.dateHeaderRow}>
+                        <View style={s.dateHeaderLine} />
+                        <Text style={s.dateHeaderText}>{group.label}</Text>
+                        <View style={s.dateHeaderLine} />
+                      </View>
+                      <View style={{ gap: 10 }}>
+                        {group.items.map(item => {
+                          const tl = getTypeLabel(item.type, item.status, item.is_due, item.paid_amount, item.amount);
+                          return (
+                            <TouchableOpacity key={item.id} style={s.row} activeOpacity={0.85}
+                              onPress={() => openRecording(item.id)}
+                              onLongPress={() => { if (!canDeleteRecording(item.user_id)) return; setPendingDeleteId(item.id); setPendingDeleteName(item.name); setConfirmModal(true); }}
+                            >
+                              <View style={s.rowIconWrap}>
+                                <Ionicons name={(item.categories?.icon ?? 'ellipse-outline') as any} size={24} color={DC.pageText} />
+                              </View>
+                              <View style={s.rowMid}>
+                                <Text style={s.rowName} numberOfLines={1}>{toTitleCase(item.name)}</Text>
+                                <Text style={s.rowType}>{tl.label}</Text>
+                              </View>
+                              <View style={{ alignItems: 'flex-end' }}>
+                                <Text style={[s.rowAmount, { color: tl.color }]}>
+                                  {item.is_due ? Math.max(0, Number(item.amount) - Number(item.paid_amount ?? 0)).toLocaleString('en-US', { minimumFractionDigits: 2 }) : fmtAmount(Number(item.amount))}
+                                </Text>
+                                {item.is_due && Number(item.paid_amount ?? 0) > 0 && (
+                                  <Text style={{ fontFamily: AppFont.regular, fontSize: 10, color: DC.pageTextMuted }}>{Number(item.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+                                )}
+                              </View>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    </View>
+                  ))
+                )}
+              </View>
 
-          <ActivityTabs
-            selectedTabs={selectedTabs}
-            onToggle={handleTabToggle}
-            tabValue={tabValue}
-          />
-
-          {/* Filter controls row */}
-          <View style={s.filterControlsRow}>
-            {spaceId !== 'all' && (
-              <TouchableOpacity onPress={handleSortToggle} activeOpacity={0.75} style={s.filterBtn}>
-                <Ionicons name={sortBy === 'date' ? 'calendar-outline' : 'pricetag-outline'} size={13} color={Brand.color.accentDark} />
-                <Text style={[s.filterBtnText, { color: Brand.color.accentDark }]}>{sortBy}</Text>
-              </TouchableOpacity>
-            )}
-            <View style={s.dateNavRow}>
-              {localMode !== 'custom' && (
-                <TouchableOpacity style={s.dateNavArrow} onPress={() => navigateRange(-1)} activeOpacity={0.7}>
-                  <Ionicons name="chevron-back" size={14} color={Brand.color.accentDark} />
-                </TouchableOpacity>
-              )}
-              <TouchableOpacity style={s.filterBtn} onPress={() => setShowLocalFilter(true)} activeOpacity={0.75}>
-                <Ionicons name="calendar-outline" size={13} color={Brand.color.accentDark} />
-                <Text style={s.filterBtnText}>{rangeLabel}</Text>
-              </TouchableOpacity>
-              {localMode !== 'custom' && (
-                <TouchableOpacity style={s.dateNavArrow} onPress={() => navigateRange(1)} activeOpacity={0.7}>
-                  <Ionicons name="chevron-forward" size={14} color={Brand.color.accentDark} />
-                </TouchableOpacity>
-              )}
-            </View>
-            <TouchableOpacity style={s.filterBtn} onPress={handleCategoryFilter} activeOpacity={0.75}>
-              <Ionicons name="options-outline" size={13} color={!isAllCats ? Brand.color.accentDark : Colors.muted} />
-              <Text style={[s.filterBtnText, !isAllCats && { color: Brand.color.accentDark }]}>Filter</Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={s.divider} />
-
-          {/* Recordings section */}
-          <View style={s.sectionRow}>
-            <Text style={s.sectionHeader}>recordings ({filtered.length})</Text>
-          </View>
-
-          {/* Search */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: Colors.borderMid, borderRadius: Radius.pill, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 8, backgroundColor: Colors.surface }}>
-            <Ionicons name="search-outline" size={13} color={Colors.faint} />
-            <TextInput
-              style={{ flex: 1, fontFamily: Fonts.mono, fontSize: 13, color: Colors.text, padding: 0 }}
-              placeholder="search recordings..."
-              placeholderTextColor={Colors.faint}
-              value={recordingSearch}
-              onChangeText={v => { setRecordingSearch(v); setDisplayCount(10); }}
-            />
-            {recordingSearch.length > 0 && (
-              <TouchableOpacity onPress={() => setRecordingSearch('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Ionicons name="close" size={13} color={Colors.faint} />
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {isLoading ? (
-            <ActivityIndicator color={Brand.color.accentDark} style={{ marginTop: 24 }} />
-          ) : filtered.length === 0 ? (
-            <View style={s.emptyWrap}>
-              <Text style={s.emptyText}>no recordings found for this period</Text>
-            </View>
-          ) : (
-            paginatedGroups.map(group => (
-              <View key={group.key}>
-                <View style={s.dateHeaderRow}>
-                  <Text style={s.dateHeaderText}>{group.label}</Text>
-                </View>
-                {group.items.map(item => {
-                  const tl = getTypeLabel(item.type, item.status, item.is_due, item.paid_amount, item.amount);
-                  return (
-                    <TouchableOpacity
-                      key={item.id}
-                      style={s.row}
-                      activeOpacity={0.85}
-                      onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: item.id } } as any)}
-                      onLongPress={() => { if (!canDeleteRecording(item.user_id)) return; setPendingDeleteId(item.id); setPendingDeleteName(item.name); setConfirmModal(true); }}
-                    >
-                      <View style={s.rowIconWrap}>
-                        <Ionicons name={(item.categories?.icon ?? 'ellipse-outline') as any} size={18} color={Brand.color.accentDark} />
+              {/* Ghost rows */}
+              {ghosts.length > 0 && (
+                <View style={{ gap: 10 }}>
+                  <View style={s.dateHeaderRow}>
+                    <View style={s.dateHeaderLine} />
+                    <Text style={s.dateHeaderText}>scheduled</Text>
+                    <View style={s.dateHeaderLine} />
+                  </View>
+                  {ghosts.map(g => (
+                    <TouchableOpacity key={`${g.rec.id}-${g.cycleKey}`} style={[s.row, s.ghostRow, g.isOverdue && s.ghostRowOverdue]} activeOpacity={0.8} onPress={() => openGhostModal(g)}>
+                      <View style={[s.rowIconWrap, { backgroundColor: g.isOverdue ? '#F9731622' : Colors.surface }]}>
+                        <Ionicons name="repeat-outline" size={18} color={g.isOverdue ? '#F97316' : DC.pageText} />
                       </View>
                       <View style={s.rowMid}>
-                        <Text style={s.rowType}>{tl.label}</Text>
-                        <Text style={s.rowName} numberOfLines={1}>{item.name}</Text>
-                        {sortBy === 'category' && (
-                          <Text style={s.rowDate}>{smartDateLabel(item.transaction_date)}</Text>
-                        )}
+                        <Text style={s.rowName} numberOfLines={1}>{g.rec.name}</Text>
+                        <Text style={[s.rowType, g.isOverdue && { color: '#F97316' }]}>{g.isOverdue ? 'overdue' : 'scheduled'} · due {g.dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</Text>
                       </View>
-                      <View style={{ alignItems: 'flex-end' }}>
-                        <Text style={[s.rowAmount, { color: tl.color }]}>
-                          {item.is_due
-                            ? Math.max(0, Number(item.amount) - Number(item.paid_amount ?? 0)).toLocaleString('en-US', { minimumFractionDigits: 2 })
-                            : fmtAmount(Number(item.amount))}
-                        </Text>
-                        {item.is_due && Number(item.paid_amount ?? 0) > 0 && (
-                          <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted }}>
-                            {Number(item.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                          </Text>
-                        )}
-                      </View>
+                      <Text style={[s.rowAmount, { color: g.isOverdue ? '#F97316' : DC.pageTextMuted }]}>{g.rec.installment_amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
                     </TouchableOpacity>
-                  );
-                })}
-              </View>
-            ))
-          )}
-
-          {/* Reminders section — always visible */}
-          <View style={{ marginTop: 8 }}>
-            <View style={s.sectionRow}>
-              <Text style={s.sectionHeader}>reminders ({visibleReminders.length})</Text>
-            </View>
-            <View style={{ flexDirection: 'row', gap: 6, marginBottom: 8 }}>
-              {(['active', 'completed', 'paused'] as const).map(tab => (
-                <TouchableOpacity
-                  key={tab}
-                  style={[s.chip, reminderTab === tab && s.chipActive]}
-                  onPress={() => setReminderTab(tab)}
-                  activeOpacity={0.75}
-                >
-                  <Text style={[s.chipText, reminderTab === tab && s.chipTextActive]}>{tab}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            {visibleReminders.length === 0 ? (
-              <View style={s.emptyWrap}>
-                <Text style={s.emptyText}>no {reminderTab} reminders for this space</Text>
-              </View>
-            ) : (
-              visibleReminders.map(r => {
-                const isDue = isReminderDueToday(r, today);
-                const { filledCount, isDone } = getReminderMeta(r);
-                return (
-                  <TouchableOpacity
-                    key={`reminder-${r.id}`}
-                    style={[s.row, isDue && !isDone && s.ghostRow, isDue && !isDone && { borderColor: Brand.color.accent + '88', backgroundColor: Brand.color.accent + '0A' }]}
-                    activeOpacity={0.8}
-                    onPress={() => openReminderChoice(r)}
-                  >
-                    <View style={[s.rowIconWrap, isDone && { backgroundColor: Brand.color.accent + '22' }, isDue && !isDone && { backgroundColor: Brand.color.accent + '22' }]}>
-                      <Ionicons name={isDone ? 'checkmark-circle-outline' : 'alarm-outline'} size={18} color={isDone ? Brand.color.accentDark : isDue ? Brand.color.accentDark : Colors.muted} />
-                    </View>
-                    <View style={s.rowMid}>
-                      <Text style={[s.rowType, { color: isDone ? Brand.color.accentDark : isDue ? Brand.color.accentDark : Colors.muted }]}>
-                        {isDone
-                          ? `filled ${filledCount}x this period`
-                          : isDue ? 'due today · tap to fill'
-                          : r.status === 'paused' ? 'paused'
-                          : 'reminder'}
-                      </Text>
-                      <Text style={s.rowName} numberOfLines={1}>{r.name}</Text>
-                      {r.categories && (
-                        <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted }}>{r.categories.name}</Text>
-                      )}
-                    </View>
-                    <Ionicons name="chevron-forward" size={14} color={isDone ? Brand.color.accentDark : isDue ? Brand.color.accentDark : Colors.faint} />
-                  </TouchableOpacity>
-                );
-              })
-            )}
-          </View>
-
-          {/* Ghost rows from recurring records */}
-          {ghosts.length > 0 && (
-            <View style={{ marginTop: 8 }}>
-              <View style={s.dateHeaderRow}>
-                <Text style={s.dateHeaderText}>scheduled</Text>
-              </View>
-              {ghosts.map(g => (
-                <TouchableOpacity
-                  key={`${g.rec.id}-${g.cycleKey}`}
-                  style={[s.row, s.ghostRow, g.isOverdue && s.ghostRowOverdue]}
-                  activeOpacity={0.8}
-                  onPress={() => openGhostModal(g)}
-                >
-                  <View style={[s.rowIconWrap, { backgroundColor: g.isOverdue ? '#F9731622' : Colors.surface }]}>
-                    <Ionicons name="repeat-outline" size={18} color={g.isOverdue ? '#F97316' : Colors.muted} />
-                  </View>
-                  <View style={s.rowMid}>
-                    <Text style={[s.rowType, g.isOverdue && { color: '#F97316' }]}>
-                      {g.isOverdue ? 'overdue' : 'scheduled'} · {g.rec.type}
-                    </Text>
-                    <Text style={s.rowName} numberOfLines={1}>{g.rec.name}</Text>
-                    <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted }}>
-                      due {g.dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                    </Text>
-                  </View>
-                  <Text style={[s.rowAmount, { color: g.isOverdue ? '#F97316' : Colors.muted }]}>
-                    {g.rec.installment_amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-
-          {/* Load more indicator */}
-          {hasMore && (
-            <View style={s.loadMoreWrap}>
-              {isLoadingMore ? (
-                <ActivityIndicator color={Brand.color.accentDark} size="small" />
-              ) : (
-                <Text style={s.loadMoreText}>scroll for more</Text>
+                  ))}
+                </View>
               )}
+
+              {hasMore && (
+                <View style={s.loadMoreWrap}>
+                  {isLoadingMore ? <ActivityIndicator color={DC.accent1} size="small" /> : <Text style={s.loadMoreText}>scroll for more</Text>}
+                </View>
+              )}
+            </View>
+          )}
+
+          {activeSection === 'reminders' && (
+            <View style={{ gap: 12 }}>
+              {/* Reminder cards */}
+              <View style={{ gap: 10 }}>
+                {visibleReminders.length === 0 ? (
+                  <View style={s.emptyWrap}><Text style={s.emptyText}>no {reminderTab} reminders for this space</Text></View>
+                ) : (
+                  visibleReminders.map(r => {
+                    const isDue = isReminderDueToday(r, today);
+                    const { filledCount, isDone } = getReminderMeta(r);
+                    return (
+                      <TouchableOpacity key={`reminder-${r.id}`} style={s.row} activeOpacity={0.8} onPress={() => openReminderChoice(r)}>
+                        <View style={s.rowIconWrap}>
+                          <Ionicons name={isDone ? 'checkmark-circle-outline' : 'alarm-outline'} size={24} color={DC.pageText} />
+                        </View>
+                        <View style={s.rowMid}>
+                          <Text style={s.rowName} numberOfLines={1}>{toTitleCase(r.name)}</Text>
+                          <Text style={s.rowType}>{isDone ? `filled ${filledCount}x this period` : isDue ? 'due today' : r.status === 'paused' ? 'paused' : r.categories?.name ?? 'reminder'}</Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={14} color={DC.pageTextMuted} />
+                      </TouchableOpacity>
+                    );
+                  })
+                )}
+              </View>
             </View>
           )}
 
@@ -1467,119 +1419,120 @@ export default function SpaceDetailScreen() {
         <AddRecordingScreen inlineProps={{ spaceId: spaceId as string, spaceName: name as string, defaultDate: new Date().toISOString().split('T')[0], onClose: () => { setShowAddModal(false); queryClient.refetchQueries({ queryKey: ['recordings', spaceId] }); } }} />
       )}
 
-      {/* Add choice sheet */}
-      <BottomSheet visible={showAddChoice} onClose={() => setShowAddChoice(false)} title="add new">
-        <TouchableOpacity
-          style={s.choiceRow}
-          activeOpacity={0.8}
-          onPress={() => { setShowAddChoice(false); setShowAddModal(true); }}
-        >
-          <View style={[s.choiceIcon, { backgroundColor: Brand.color.accent + '22' }]}>
-            <Ionicons name="receipt-outline" size={20} color={Brand.color.accentDark} />
+      {/* Add / Actions choice sheet */}
+      <BottomSheet visible={showAddChoice} onClose={() => setShowAddChoice(false)} title="actions">
+        <TouchableOpacity style={s.choiceRow} activeOpacity={0.8} onPress={() => { setShowAddChoice(false); setShowAddModal(true); }}>
+          <View style={[s.choiceIcon, { backgroundColor: DC.accent1 + '22' }]}>
+            <Ionicons name="receipt-outline" size={20} color={DC.accent1} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={s.choiceTitle}>recording</Text>
-            <Text style={s.choiceSub}>log an expense, income, or loan</Text>
+            <Text style={s.choiceTitle}>Add Recording</Text>
+            <Text style={s.choiceSub}>Log an expense, income, or loan</Text>
           </View>
           <Ionicons name="chevron-forward" size={14} color={Colors.faint} />
         </TouchableOpacity>
-        <TouchableOpacity
-          style={s.choiceRow}
-          activeOpacity={0.8}
-          onPress={() => { setShowAddChoice(false); setEditReminderId(null); setRRecordingType('expense'); setRCategoryId(''); setRName(''); setRFrequency('monthly'); setRDayOfWeek(1); setRDayOfMonth(1); setRStartMonth(today.getMonth()); setRStartDay(today.getDate()); setRStartYear(today.getFullYear()); setShowReminderModal(true); }}
-        >
-          <View style={[s.choiceIcon, { backgroundColor: '#F9731622' }]}>
-            <Ionicons name="alarm-outline" size={20} color="#F97316" />
+        <TouchableOpacity style={s.choiceRow} activeOpacity={0.8} onPress={() => { setShowAddChoice(false); generateStatement(); }}>
+          <View style={[s.choiceIcon, { backgroundColor: DC.accent1 + '22' }]}>
+            {statementLoading
+              ? <ActivityIndicator size="small" color={DC.accent1} />
+              : <Ionicons name="document-text-outline" size={20} color={DC.accent1} />}
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={s.choiceTitle}>reminder</Text>
-            <Text style={s.choiceSub}>schedule a recurring recording</Text>
+            <Text style={s.choiceTitle}>Export Statement</Text>
+            <Text style={s.choiceSub}>Download a PDF statement for this period</Text>
           </View>
           <Ionicons name="chevron-forward" size={14} color={Colors.faint} />
         </TouchableOpacity>
+        {isOwner && spaceId !== 'all' && (
+          <TouchableOpacity style={s.choiceRow} activeOpacity={0.8} onPress={() => { setShowAddChoice(false); setMembersModal(true); }}>
+            <View style={[s.choiceIcon, { backgroundColor: DC.accent1 + '22' }]}>
+              <Ionicons name="people-outline" size={20} color={DC.accent1} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={s.choiceTitle}>Members</Text>
+              <Text style={s.choiceSub}>Manage space members and invites</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={14} color={Colors.faint} />
+          </TouchableOpacity>
+        )}
       </BottomSheet>
 
       {/* Quick-add reminder modal */}
       <BottomSheet visible={showReminderModal} onClose={() => setShowReminderModal(false)} title={editReminderId ? 'edit reminder' : 'new reminder'}>
-        <Text style={s.modalLabel}>name</Text>
+        {/* Name */}
+        <Text style={s.modalLabel}>Name</Text>
         <TextInput
-          style={[s.chip, { borderColor: Colors.borderMid, paddingHorizontal: 12, fontFamily: Fonts.mono, fontSize: 13, color: Colors.text }]}
-          placeholder="e.g. electricity bill"
+          style={s.input}
+          placeholder="e.g. Electricity Bill"
           placeholderTextColor={Colors.faint}
           value={rName}
           onChangeText={setRName}
           autoFocus
         />
-        <Text style={s.modalLabel}>recording type</Text>
-        <View style={s.chipRow}>
+
+        {/* Recording Type */}
+        <Text style={s.modalLabel}>Recording Type</Text>
+        <View style={s.dropdownRow}>
           {(['expense','income','debt','due'] as const).map(t => (
-            <TouchableOpacity key={t} style={[s.chip, rRecordingType === t && s.chipActive]} onPress={() => setRRecordingType(t)} activeOpacity={0.75}>
-              <Text style={[s.chipText, rRecordingType === t && s.chipTextActive]}>{t}</Text>
+            <TouchableOpacity key={t} style={[s.dropdownOption, rRecordingType === t && s.dropdownOptionActive]} onPress={() => setRRecordingType(t)} activeOpacity={0.75}>
+              <Text style={[s.dropdownOptionText, rRecordingType === t && s.dropdownOptionTextActive]}>{t.charAt(0).toUpperCase() + t.slice(1)}</Text>
             </TouchableOpacity>
           ))}
         </View>
-        <Text style={s.modalLabel}>category <Text style={{ fontFamily: Fonts.mono, fontSize: 10 }}>(optional)</Text></Text>
-        <View style={s.chipRow}>
-          <TouchableOpacity style={[s.chip, !rCategoryId && s.chipActive]} onPress={() => setRCategoryId('')} activeOpacity={0.75}>
-            <Text style={[s.chipText, !rCategoryId && s.chipTextActive]}>none</Text>
+
+        {/* Category */}
+        <Text style={s.modalLabel}>Category <Text style={{ fontFamily: AppFont.regular, fontSize: 11, color: DC.pageTextMuted }}>(optional)</Text></Text>
+        <View style={s.dropdownRow}>
+          <TouchableOpacity style={[s.dropdownOption, !rCategoryId && s.dropdownOptionActive]} onPress={() => setRCategoryId('')} activeOpacity={0.75}>
+            <Text style={[s.dropdownOptionText, !rCategoryId && s.dropdownOptionTextActive]}>None</Text>
           </TouchableOpacity>
           {(categories as any[]).map((c: any) => (
-            <TouchableOpacity key={c.id} style={[s.chip, rCategoryId === c.id && s.chipActive]} onPress={() => setRCategoryId(c.id)} activeOpacity={0.75}>
-              <Text style={[s.chipText, rCategoryId === c.id && s.chipTextActive]}>{c.name}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-        <Text style={s.modalLabel}>frequency</Text>
-        <View style={s.chipRow}>
-          {(['daily','weekly','monthly'] as const).map(f => (
-            <TouchableOpacity key={f} style={[s.chip, rFrequency === f && s.chipActive]} onPress={() => setRFrequency(f)} activeOpacity={0.75}>
-              <Text style={[s.chipText, rFrequency === f && s.chipTextActive]}>{f}</Text>
+            <TouchableOpacity key={c.id} style={[s.dropdownOption, rCategoryId === c.id && s.dropdownOptionActive]} onPress={() => setRCategoryId(c.id)} activeOpacity={0.75}>
+              <Text style={[s.dropdownOptionText, rCategoryId === c.id && s.dropdownOptionTextActive]}>{c.name}</Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        {/* weekly: day of week */}
+        {/* Frequency */}
+        <Text style={s.modalLabel}>Frequency</Text>
+        <View style={s.dropdownRow}>
+          {(['daily','weekly','monthly'] as const).map(f => (
+            <TouchableOpacity key={f} style={[s.dropdownOption, rFrequency === f && s.dropdownOptionActive]} onPress={() => setRFrequency(f)} activeOpacity={0.75}>
+              <Text style={[s.dropdownOptionText, rFrequency === f && s.dropdownOptionTextActive]}>{f.charAt(0).toUpperCase() + f.slice(1)}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Day of week (weekly) */}
         {rFrequency === 'weekly' && (
           <>
-            <Text style={s.modalLabel}>repeats on</Text>
-            <View style={s.chipRow}>
+            <Text style={s.modalLabel}>Repeats On</Text>
+            <View style={s.dropdownRow}>
               {SD_DAYS.map((d, i) => (
-                <TouchableOpacity key={d} style={[s.chip, rDayOfWeek === i && s.chipActive]} onPress={() => setRDayOfWeek(i)} activeOpacity={0.75}>
-                  <Text style={[s.chipText, rDayOfWeek === i && s.chipTextActive]}>{d}</Text>
+                <TouchableOpacity key={d} style={[s.dropdownOption, rDayOfWeek === i && s.dropdownOptionActive]} onPress={() => setRDayOfWeek(i)} activeOpacity={0.75}>
+                  <Text style={[s.dropdownOptionText, rDayOfWeek === i && s.dropdownOptionTextActive]}>{d}</Text>
                 </TouchableOpacity>
               ))}
             </View>
           </>
         )}
 
-        {/* monthly: day of month chips + custom */}
+        {/* Day of month (monthly) */}
         {rFrequency === 'monthly' && (
           <>
-            <Text style={s.modalLabel}>day of month</Text>
-            <View style={s.chipRow}>
-              {[1,5,10,15,20,25,28].map(d => (
-                <TouchableOpacity key={d} style={[s.chip, rDayOfMonth === d && s.chipActive]} onPress={() => setRDayOfMonth(d)} activeOpacity={0.75}>
-                  <Text style={[s.chipText, rDayOfMonth === d && s.chipTextActive]}>{d}</Text>
+            <Text style={s.modalLabel}>Day of Month</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingVertical: 4 }}>
+              {Array.from({ length: 31 }, (_, i) => i + 1).map(d => (
+                <TouchableOpacity key={d} style={[s.dropdownOption, rDayOfMonth === d && s.dropdownOptionActive]} onPress={() => setRDayOfMonth(d)} activeOpacity={0.75}>
+                  <Text style={[s.dropdownOptionText, rDayOfMonth === d && s.dropdownOptionTextActive]}>{d}</Text>
                 </TouchableOpacity>
               ))}
-              <TouchableOpacity style={[s.chip, ![1,5,10,15,20,25,28].includes(rDayOfMonth) && s.chipActive]} onPress={() => setRDayOfMonth(0)} activeOpacity={0.75}>
-                <Text style={[s.chipText, ![1,5,10,15,20,25,28].includes(rDayOfMonth) && s.chipTextActive]}>custom</Text>
-              </TouchableOpacity>
-            </View>
-            {![1,5,10,15,20,25,28].includes(rDayOfMonth) && (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingVertical: 4 }}>
-                {Array.from({ length: 31 }, (_, i) => i + 1).map(d => (
-                  <TouchableOpacity key={d} style={[s.chip, rDayOfMonth === d && s.chipActive]} onPress={() => setRDayOfMonth(d)} activeOpacity={0.75}>
-                    <Text style={[s.chipText, rDayOfMonth === d && s.chipTextActive]}>{d}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            )}
+            </ScrollView>
           </>
         )}
 
-        {/* start date dropdowns */}
-        <Text style={s.modalLabel}>{rFrequency === 'monthly' ? 'starts from' : 'start date'}</Text>
+        {/* Start date */}
+        <Text style={s.modalLabel}>{rFrequency === 'monthly' ? 'Starts From' : 'Start Date'}</Text>
         <View style={{ flexDirection: 'row', gap: 8, height: 130 }}>
           <ScrollView style={s.dropCol} showsVerticalScrollIndicator={false} nestedScrollEnabled>
             {SD_MONTHS.map((m, i) => (
@@ -1607,14 +1560,12 @@ export default function SpaceDetailScreen() {
         </View>
 
         <TouchableOpacity
-          style={[{ backgroundColor: Brand.color.accent, borderRadius: Radius.pill, paddingVertical: 14, alignItems: 'center' as const, marginTop: 20 }, (!rName.trim() || rSaving) && { opacity: 0.4 }]}
+          style={[s.saveBtn, (!rName.trim() || rSaving) && { opacity: 0.4 }]}
           onPress={handleSaveReminder}
           disabled={rSaving || !rName.trim()}
           activeOpacity={0.8}
         >
-          <Text style={{ fontFamily: Fonts.monoBold, fontSize: 14, color: Colors.text }}>
-            {rSaving ? 'saving...' : editReminderId ? 'save changes' : 'create reminder'}
-          </Text>
+          <Text style={s.saveBtnText}>{rSaving ? 'Saving...' : editReminderId ? 'Save Changes' : 'Create Reminder'}</Text>
         </TouchableOpacity>
       </BottomSheet>
 
@@ -2041,85 +1992,114 @@ export default function SpaceDetailScreen() {
 }
 
 const s = StyleSheet.create({
-  // Header
-  header:  { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 25, paddingTop: 16, paddingBottom: 16, gap: 10, backgroundColor: Colors.headerBg, borderBottomWidth: 1, borderBottomColor: Colors.borderMid },
-  backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: Brand.color.accent + '22', alignItems: 'center', justifyContent: 'center' },
-  title:   { flex: 1, fontFamily: Brand.font.display, fontSize: 20, color: Brand.color.accent, letterSpacing: -0.3, textAlign: 'center' },
-  addBtn:  { width: 36, height: 36, borderRadius: 18, backgroundColor: Brand.color.accent + '22', alignItems: 'center', justifyContent: 'center' },
+  stickyControls: { paddingHorizontal: DC.pagePadding, paddingTop: 12, paddingBottom: 10, backgroundColor: Colors.white, gap: 10 },
+  // Section toggle tabs
+  sectionToggleRow:        { flexDirection: 'row', gap: 8, marginBottom: 4 },
+  sectionToggleBtn:        { flex: 1, paddingVertical: 10, borderRadius: Radius.pill, borderWidth: 1, borderColor: DC.cardBorder, backgroundColor: Colors.white, alignItems: 'center' },
+  sectionToggleBtnActive:  { backgroundColor: '#111111', borderColor: '#111111' },
+  sectionToggleText:       { fontFamily: AppFont.semiBold, fontSize: 13, color: DC.pageTextMuted },
+  sectionToggleTextActive: { color: Colors.white },
+
+  // Filter dot
+  filterDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: DC.btnText },
+
+  // Actions button
+  actionsBtn:     { paddingHorizontal: 16, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: DC.btnBg, alignItems: 'center', borderWidth: DC.btnBorderWidth },
+  actionsBtnText: { fontFamily: AppFont.semiBold, fontSize: 12, color: DC.btnText },
+
+  // Add circle button (reminders)
+  addCircleBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: DC.btnBg, alignItems: 'center', justifyContent: 'center', borderWidth: DC.btnBorderWidth },
 
   // Scroll
-  scroll: { paddingHorizontal: 25, paddingBottom: 80 },
-  divider: { height: 8, backgroundColor: Colors.surface, marginHorizontal: -25, marginVertical: 8 },
+  scroll:  { paddingHorizontal: DC.pagePadding, paddingBottom: 80 },
+  divider: { height: 8, backgroundColor: Colors.surface, marginHorizontal: -DC.pagePadding, marginVertical: 8 },
 
-  // Section row (recordings only)
-  sectionRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 16, paddingBottom: 8 },
-  sectionHeader: { ...Brand.type.sectionHeader },
+  // Section
+  sectionRow:    { alignItems: 'center', paddingTop: 20, paddingBottom: 10 },
+  sectionHeader: { fontFamily: AppFont.bold, fontSize: 16, color: DC.pageText, textAlign: 'center' },
+
+  // Search bar
+  searchBar:   { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: DC.cardBorder, borderRadius: Radius.pill, paddingHorizontal: 14, paddingVertical: 12, backgroundColor: DC.cardBg },
+  searchInput: { flex: 1, fontFamily: AppFont.regular, fontSize: 13, color: DC.pageText, padding: 0 },
+
   // Filter controls row
-  filterControlsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingTop: 16, paddingBottom: 4 },
+  filterControlsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, width: '100%' },
   filterRow:    { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  dateNavRow:   { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  dateNavArrow: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.surface },
-  filterBtn:    { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: Colors.white, borderWidth: 1, borderColor: Colors.borderMid },
-  filterBtnText: { fontFamily: Fonts.mono, fontSize: 11, color: Colors.text },
-
-  // Tab circles — now in ActivityTabs component
+  dateNavRow:   { flexDirection: 'row', alignItems: 'center', gap: 4, flex: 1 },
+  dateNavArrow: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: DC.cardBg, borderWidth: 1, borderColor: DC.cardBorder },
+  dateNavArrowText: { fontFamily: AppFont.regular, fontSize: 18, color: DC.accent1, lineHeight: 22 },
+  filterBtn:    { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, height: 36, borderRadius: Radius.pill, backgroundColor: DC.btnBg, borderWidth: DC.btnBorderWidth },
+  filterBtnDate: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: DC.btnBg, borderWidth: DC.btnBorderWidth },
+  filterBtnText: { fontFamily: AppFont.regular, fontSize: 11, color: DC.btnText },
 
   // Empty
   emptyWrap: { alignItems: 'center', paddingVertical: 24 },
-  emptyText: { ...Brand.type.emptyText },
+  emptyText: { fontFamily: AppFont.regular, fontSize: 13, color: DC.pageTextMuted },
 
-  // Date groups
-  dateHeaderRow:  { marginTop: 12, marginBottom: 6, paddingTop: 12 },
-  dateHeaderText: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted, letterSpacing: 1.4, textTransform: 'uppercase' },
+  // Date header with lines
+  dateGroup:      { paddingVertical: 16, gap: 10 },
+  dateHeaderRow:  { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
+  dateHeaderLine: { flex: 1, height: 1, backgroundColor: DC.cardBorder },
+  dateHeaderText: { fontFamily: AppFont.regular, fontSize: 11, color: DC.pageTextMuted },
 
-  // Recording row
-  row:         { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  rowIconWrap: { width: 34, height: 34, borderRadius: 17, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.surface },
-  rowMid:      { flex: 1, gap: 2 },
-  rowType:     { fontFamily: Fonts.mono,     fontSize: 10, color: Colors.muted, letterSpacing: 0.4, textTransform: 'uppercase' },
-  rowName:     { ...Brand.type.cardTitle },
-  rowDate:     { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted },
-  rowAmount:   { fontFamily: Fonts.monoBold, fontSize: 14, letterSpacing: -0.3 },
+  // Recording / reminder row
+  row:         { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, paddingHorizontal: 14, borderRadius: 14, borderWidth: 1, borderColor: DC.cardBorder, backgroundColor: DC.cardBg },
+  rowIconWrap: { width: 44, height: 44, borderRadius: 12, justifyContent: 'center', alignItems: 'center', backgroundColor: DC.cardBg },
+  rowMid:      { flex: 1, gap: 3 },
+  rowType:     { fontFamily: AppFont.regular, fontSize: 11, color: DC.pageTextMuted, fontStyle: 'italic' },
+  rowName:     { fontFamily: AppFont.bold, fontSize: 14, color: DC.pageText },
+  rowDate:     { fontFamily: AppFont.regular, fontSize: 10, color: DC.pageTextMuted },
+  rowAmount:   { fontFamily: AppFont.bold, fontSize: 14, letterSpacing: -0.3, minWidth: 70, textAlign: 'right' },
 
   // Modal chips
   chipRow:        { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
-  chip:           { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: Colors.surface },
-  chipActive:     { backgroundColor: Brand.color.accent },
-  chipText:       { fontFamily: Fonts.mono,     fontSize: 12, color: Colors.muted },
-  chipTextActive: { fontFamily: Fonts.monoBold, fontSize: 12, color: Colors.white },
-  modalLabel:     { fontFamily: Fonts.mono, fontSize: 12, color: Colors.text, marginBottom: 10 },
-  sectionLabel:   { fontFamily: Fonts.monoBold, fontSize: 11, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8, marginTop: 4 },
-  clearBtn:       { alignSelf: 'flex-end', marginBottom: 12, paddingHorizontal: 14, paddingVertical: 7, borderRadius: Radius.pill, backgroundColor: Colors.surface },
-  clearBtnText:   { fontFamily: Fonts.monoBold, fontSize: 12, color: Brand.color.accentDark },
+  chip:           { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: DC.cardBg, borderWidth: 1, borderColor: DC.cardBorder },
+  chipActive:     { backgroundColor: DC.badgeActiveBg, borderColor: DC.badgeActiveBg },
+  chipText:       { fontFamily: AppFont.regular, fontSize: 12, color: DC.pageTextMuted },
+  chipTextActive: { fontFamily: AppFont.semiBold, fontSize: 12, color: DC.badgeActiveText },
+  modalLabel:     { fontFamily: AppFont.regular, fontSize: 12, color: DC.pageText, marginBottom: 10 },
+  sectionLabel:   { fontFamily: AppFont.bold, fontSize: 11, color: DC.pageTextMuted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8, marginTop: 4 },
+  clearBtn:       { alignSelf: 'flex-end', marginBottom: 12, paddingHorizontal: 14, paddingVertical: 7, borderRadius: Radius.pill, backgroundColor: DC.btnBg, borderWidth: DC.btnBorderWidth },
+  clearBtnText:   { fontFamily: AppFont.semiBold, fontSize: 12, color: DC.btnText },
 
   // Calendar
-  calWrap:         { width: '100%' },
-  calHint:         { fontFamily: Fonts.mono, fontSize: 11, color: Brand.color.accentDark, marginBottom: 10 },
-  pickerNav:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', paddingHorizontal: 4, marginBottom: 10 },
-  pickerMonthText: { fontFamily: Fonts.monoBold, fontSize: 15, color: Colors.text },
-  calDay:          { flex: 1, textAlign: 'center', fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted },
-  calCell:         { width: '14.28%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center', borderRadius: Radius.pill },
-  calCellRange:    { backgroundColor: Brand.color.accent + '55', borderRadius: 0 },
-  calCellEdge:     { backgroundColor: Brand.color.accent },
-  calCellToday:    { backgroundColor: Colors.surface },
-  calCellText:     { fontFamily: Fonts.mono,     fontSize: 13, color: Colors.text },
-  calCellTextActive: { fontFamily: Fonts.monoBold, color: Colors.text },
+  calWrap:           { width: '100%' },
+  calHint:           { fontFamily: AppFont.regular, fontSize: 11, color: DC.accent1, marginBottom: 10 },
+  pickerNav:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', paddingHorizontal: 4, marginBottom: 10 },
+  pickerMonthText:   { fontFamily: AppFont.bold, fontSize: 15, color: DC.pageText },
+  calDay:            { flex: 1, textAlign: 'center', fontFamily: AppFont.regular, fontSize: 10, color: DC.pageTextMuted },
+  calCell:           { width: '14.28%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center', borderRadius: Radius.pill },
+  calCellRange:      { backgroundColor: DC.accent1 + '33', borderRadius: 0 },
+  calCellEdge:       { backgroundColor: DC.accent1 },
+  calCellToday:      { backgroundColor: DC.cardBg },
+  calCellText:       { fontFamily: AppFont.regular, fontSize: 13, color: DC.pageText },
+  calCellTextActive: { fontFamily: AppFont.bold, color: Colors.white },
 
   // Load more
   loadMoreWrap: { alignItems: 'center', paddingVertical: 20 },
-  loadMoreText: { fontFamily: Fonts.mono, fontSize: 11, color: Colors.muted },
+  loadMoreText: { fontFamily: AppFont.regular, fontSize: 11, color: DC.pageTextMuted },
+
   // Ghost rows
-  ghostRow:        { borderStyle: 'dashed', borderWidth: 1, borderColor: Colors.borderMid, borderRadius: Radius.md, marginBottom: 4, backgroundColor: Colors.surface },
+  ghostRow:        { borderStyle: 'dashed', borderWidth: 1, borderColor: DC.cardBorder, borderRadius: DC.cardRadius, backgroundColor: DC.cardBg },
   ghostRowOverdue: { borderColor: '#F97316', backgroundColor: '#F9731608' },
+
   // Choice sheet
-  choiceRow:  { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  choiceIcon: { width: 40, height: 40, borderRadius: Radius.md, justifyContent: 'center', alignItems: 'center' },
-  choiceTitle:{ fontFamily: Fonts.monoBold, fontSize: 14, color: Colors.text },
-  choiceSub:  { fontFamily: Fonts.mono, fontSize: 11, color: Colors.muted, marginTop: 2 },
-  // Dropdown column pickers (reminder modal)
-  dropCol:       { flex: 1, borderWidth: 1, borderColor: Colors.borderMid, borderRadius: Radius.lg, backgroundColor: Colors.surface },
-  dropItem:      { paddingVertical: 9, paddingHorizontal: 10, alignItems: 'center' },
-  dropItemActive:{ backgroundColor: Brand.color.accent, borderRadius: Radius.md },
-  dropText:      { fontFamily: Fonts.mono,     fontSize: 13, color: Colors.muted },
-  dropTextActive:{ fontFamily: Fonts.monoBold, fontSize: 13, color: Colors.white },
+  choiceRow:   { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: DC.cardBorder },
+  choiceIcon:  { width: 40, height: 40, borderRadius: Radius.md, justifyContent: 'center', alignItems: 'center' },
+  choiceTitle: { fontFamily: AppFont.semiBold, fontSize: 14, color: DC.pageText },
+  choiceSub:   { fontFamily: AppFont.regular, fontSize: 11, color: DC.pageTextMuted, marginTop: 2 },
+
+  // Dropdown options
+  dropdownRow:              { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 4 },
+  dropdownOption:           { paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, borderWidth: 1, borderColor: DC.cardBorder, backgroundColor: DC.cardBg },
+  dropdownOptionActive:     { backgroundColor: DC.btnBg, borderWidth: DC.btnBorderWidth },
+  dropdownOptionText:       { fontFamily: AppFont.regular, fontSize: 12, color: DC.pageTextMuted },
+  dropdownOptionTextActive: { fontFamily: AppFont.semiBold, fontSize: 12, color: DC.btnText },
+  saveBtn:     { backgroundColor: DC.btnBg, borderRadius: Radius.pill, paddingVertical: 14, alignItems: 'center' as const, marginTop: 20, borderWidth: DC.btnBorderWidth },
+  saveBtnText: { fontFamily: AppFont.semiBold, fontSize: 14, color: DC.btnText },
+  dropItem:       { paddingVertical: 9, paddingHorizontal: 10, alignItems: 'center' },
+  dropItemActive: { backgroundColor: DC.btnBg, borderRadius: Radius.md },
+  dropText:       { fontFamily: AppFont.regular, fontSize: 13, color: DC.pageTextMuted },
+  dropTextActive: { fontFamily: AppFont.semiBold, fontSize: 13, color: DC.btnText },
 });
+

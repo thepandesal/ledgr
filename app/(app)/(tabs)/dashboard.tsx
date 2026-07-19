@@ -69,7 +69,7 @@ const MODAL_HEIGHT = '50%';
 
 import { smartDateLabel } from '../../../src/lib/smartDateLabel';
 
-export default function DashboardScreen() {
+export default function DashboardScreen({ isActive }: { isActive?: boolean }) {
   const router    = useRouter();
   const { userId, defaultCurrency } = useUser();
   const { convert, rateMap } = useExchangeRates();
@@ -78,6 +78,12 @@ export default function DashboardScreen() {
   const QA_CURRENCIES = ['PHP','USD','EUR','GBP','JPY','AUD','CAD','SGD','MYR','IDR','THB','VND','KRW','CNY','INR','HKD','NZD','CHF','BRL','MXN'];
   const { registerAdd, unregisterAdd } = useContext(BlurContext);
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (isActive && userId) {
+      queryClient.invalidateQueries({ queryKey: ['dashboard-activities', userId] });
+    }
+  }, [isActive, userId]);
 
   const [activePreset, setActivePreset] = useState<Preset>('this-month');
   const [selectedTabs, setSelectedTabs] = useState<Set<ActivityTab>>(new Set(['all']));

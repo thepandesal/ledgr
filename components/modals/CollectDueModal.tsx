@@ -9,6 +9,7 @@ interface Props {
   onClose: () => void;
   recordingName: string;
   recordingAmount: number;
+  recordingPaidAmount: number;
   amount: string;
   setAmount: (v: string) => void;
   date: string;
@@ -34,7 +35,7 @@ interface Props {
 }
 
 export default function CollectDueModal({
-  visible, onClose, recordingName, recordingAmount,
+  visible, onClose, recordingName, recordingAmount, recordingPaidAmount,
   amount, setAmount, date, setDate,
   complete, setComplete, loading, onConfirm,
   spaces, spaceId, setSpaceId, defaultSpaceId,
@@ -45,17 +46,38 @@ export default function CollectDueModal({
   const [showSpaceDropdown, setShowSpaceDropdown] = useState(false);
   const [showAccountDropdown, setShowAccountDropdown] = useState(false);
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+
+  const remaining = Math.max(0, recordingAmount - recordingPaidAmount);
   const parsedAmount = parseFloat(amount || '0') || 0;
-  const canConfirm = parsedAmount > 0 && complete !== null && !loading && (!chargeToSpace || !!chargeSpaceId);
+  const isFullByAmount = parsedAmount >= remaining - 0.01 && parsedAmount > 0;
+  const isOverpayment = parsedAmount > remaining + 0.02;
+  const overpaymentAmt = isOverpayment ? parsedAmount - remaining : 0;
+  const canConfirm = parsedAmount > 0 && !loading && (!chargeToSpace || !!chargeSpaceId);
   const usingSameSpace = spaceId === defaultSpaceId;
+
+  const handleAmountChange = (v: string) => {
+    setAmount(v);
+    const num = parseFloat(v || '0') || 0;
+    if (num >= remaining - 0.01 && num > 0) {
+      setComplete(true);
+    } else {
+      setComplete(null);
+    }
+  };
 
   return (
     <BottomSheet visible={visible} onClose={onClose} sub="expense" title="collect payment">
       <View style={{ gap: 14, width: '100%' }}>
-        <Text style={formStyles.hintMuted}>
-          {recordingName.toLowerCase()} · {recordingAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-        </Text>
 
+        {/* Header */}
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Text style={formStyles.hintMuted}>{recordingName.toLowerCase()}</Text>
+          <Text style={{ fontFamily: Fonts.monoBold, fontSize: 12, color: Colors.text }}>
+            remaining: {remaining.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+          </Text>
+        </View>
+
+        {/* Amount input */}
         <View style={{ gap: 4 }}>
           <Text style={formStyles.hintMuted}>how much have you collected?</Text>
           <TextInput
@@ -63,17 +85,50 @@ export default function CollectDueModal({
             placeholder="0.00"
             placeholderTextColor={Colors.faint}
             value={amount}
-            onChangeText={setAmount}
+            onChangeText={handleAmountChange}
             keyboardType="decimal-pad"
             autoFocus
           />
           {parsedAmount > 0 && (
-            <Text style={{ fontFamily: Fonts.monoBold, fontSize: 22, color: Colors.cyan }}>
-              {parsedAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-            </Text>
+            <View style={{ gap: 4 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={{ fontFamily: Fonts.monoBold, fontSize: 22, color: isOverpayment ? Colors.expense : Colors.cyan }}>
+                  {parsedAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                </Text>
+                <Text style={{ fontFamily: Fonts.mono, fontSize: 11, color: isFullByAmount && !isOverpayment ? Colors.income : isOverpayment ? Colors.expense : Colors.muted }}>
+                  {isOverpayment
+                    ? `${overpaymentAmt.toLocaleString('en-US', { minimumFractionDigits: 2 })} over`
+                    : isFullByAmount ? 'fully collected ✓'
+                    : `${(remaining - parsedAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })} left`}
+                </Text>
+              </View>
+              {isOverpayment && (
+                <Text style={{ fontFamily: Fonts.mono, fontSize: 11, color: Colors.expense, lineHeight: 16 }}>
+                  amount exceeds remaining balance — B will be notified to accept or decline the overpayment.
+                </Text>
+              )}
+            </View>
           )}
         </View>
 
+        {/* Force close — only when partial */}
+        {parsedAmount > 0 && !isFullByAmount && (
+          <TouchableOpacity
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, paddingHorizontal: 14, borderRadius: Radius.md, borderWidth: 1, borderColor: complete === true ? Colors.cyan : Colors.borderMid, backgroundColor: complete === true ? Colors.cyan + '22' : Colors.surface }}
+            onPress={() => setComplete(complete === true ? null : true)}
+            activeOpacity={0.75}
+          >
+            <View style={{ width: 18, height: 18, borderRadius: 9, borderWidth: 1.5, borderColor: complete === true ? Colors.cyan : Colors.borderMid, backgroundColor: complete === true ? Colors.cyan : Colors.white, alignItems: 'center', justifyContent: 'center' }}>
+              {complete === true && <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.white }} />}
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontFamily: Fonts.monoBold, fontSize: 12, color: complete === true ? Colors.cyan : Colors.text }}>mark as fully collected</Text>
+              <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted }}>closes the debt even if amount is less than total</Text>
+            </View>
+          </TouchableOpacity>
+        )}
+
+        {/* Date */}
         <View style={{ gap: 4 }}>
           <Text style={formStyles.hintMuted}>collection date</Text>
           <TextInput
@@ -117,23 +172,6 @@ export default function CollectDueModal({
           )}
         </View>
 
-        <View style={{ gap: 4 }}>
-          <Text style={formStyles.hintMuted}>is this the full collection?</Text>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            {([true, false] as const).map(val => (
-              <TouchableOpacity
-                key={String(val)}
-                style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 10, borderRadius: 999, borderWidth: 1, borderColor: complete === val ? Colors.cyan : Colors.borderMid, backgroundColor: complete === val ? Colors.cyan + '22' : Colors.white }}
-                onPress={() => setComplete(val)}
-              >
-                <Text style={{ fontFamily: Fonts.monoBold, fontSize: 11, color: complete === val ? Colors.cyan : Colors.muted }}>
-                  {val ? 'yes, fully collected' : 'no, partial'}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
         {/* Charge to space */}
         <TouchableOpacity
           style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, borderTopWidth: 1, borderTopColor: Colors.borderMid }}
@@ -150,7 +188,6 @@ export default function CollectDueModal({
         </TouchableOpacity>
         {chargeToSpace && (
           <View style={{ gap: 8 }}>
-            {/* Space dropdown */}
             <TouchableOpacity
               style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 11, paddingHorizontal: 14, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.borderMid, backgroundColor: Colors.surface }}
               onPress={() => { setShowSpaceDropdown(v => !v); setShowAccountDropdown(false); setShowCategoryDropdown(false); }}
@@ -173,7 +210,6 @@ export default function CollectDueModal({
                 ))}
               </ScrollView>
             )}
-            {/* Account dropdown */}
             <TouchableOpacity
               style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 11, paddingHorizontal: 14, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.borderMid, backgroundColor: Colors.surface }}
               onPress={() => { setShowAccountDropdown(v => !v); setShowSpaceDropdown(false); setShowCategoryDropdown(false); }}
@@ -203,7 +239,6 @@ export default function CollectDueModal({
                 ))}
               </ScrollView>
             )}
-            {/* Category dropdown */}
             <TouchableOpacity
               style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 11, paddingHorizontal: 14, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.borderMid, backgroundColor: Colors.surface }}
               onPress={() => { setShowCategoryDropdown(v => !v); setShowSpaceDropdown(false); setShowAccountDropdown(false); }}

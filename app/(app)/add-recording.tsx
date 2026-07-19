@@ -317,7 +317,6 @@ export default function AddRecordingScreen({ inlineProps }: {
             account_id: receiveToAccount?.id || null,
             status: 'pending',
             person_name: personName.trim() || null,
-            tagged_friend_user_id: selectedFriendUserId || null,
             linked_recording_id: expRec!.id,
             currency,
           }).select('id').single();
@@ -332,7 +331,7 @@ export default function AddRecordingScreen({ inlineProps }: {
               body: `"${recName.trim()}" — tap to accept or decline.`,
               message: `"${recName.trim()}" — tap to accept or decline.`,
               data: {
-                sourceRecordingId: recRec.id,
+                sourceRecordingId: expRec!.id,
                 taggerUserId: user!.id,
                 taggerName: profile || 'Someone',
                 friendId: selectedFriendUserId,
@@ -348,6 +347,8 @@ export default function AddRecordingScreen({ inlineProps }: {
           }
           setPendingFocusDate(date);
           handleClose();
+          // Navigate to the expense recording so user can see the pending tag
+          router.push({ pathname: '/(app)/recording-detail', params: { recordingId: expRec!.id } } as any);
           return;
         }
         const { data: newRec, error: err } = await supabase.from('recordings').insert({
@@ -471,6 +472,10 @@ export default function AddRecordingScreen({ inlineProps }: {
 
       setPendingFocusDate(date);
       handleClose();
+      // Navigate to recording if a friend was tagged so user sees pending status
+      if ((effectiveType === 'receivable' || isLoanType) && selectedFriendUserId && newRec?.id) {
+        router.push({ pathname: '/(app)/recording-detail', params: { recordingId: newRec.id } } as any);
+      }
     } catch (e: any) {
       setError(e.message);
       setLoading(false);
