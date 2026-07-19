@@ -1049,48 +1049,15 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
       });
       const html = buildStatementHtml(paymentsByParent);
       if (Platform.OS === 'web') {
-        await new Promise<void>((resolve, reject) => {
-          if ((window as any).html2canvas) { resolve(); return; }
-          const script = document.createElement('script');
-          script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
-          script.onload = () => resolve(); script.onerror = reject;
-          document.head.appendChild(script);
-        });
-        const iframe = document.createElement('iframe');
-        iframe.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;height:4000px;border:none;background:#fff';
-        document.body.appendChild(iframe);
-        iframe.contentDocument!.open();
-        iframe.contentDocument!.write(html);
-        iframe.contentDocument!.close();
-        await new Promise(r => setTimeout(r, 800));
-        const body = iframe.contentDocument!.body;
-        const fullCanvas = await (window as any).html2canvas(body, {
-          scale: 2, useCORS: true, allowTaint: true, backgroundColor: '#ffffff',
-          width: 794, windowWidth: 794, scrollY: 0, scrollX: 0,
-          height: body.scrollHeight, windowHeight: body.scrollHeight,
-        });
-        document.body.removeChild(iframe);
-        const totalH = fullCanvas.height;
-        const sliceH = PAGE_HEIGHT * 2;
-        const pageCount = Math.ceil(totalH / sliceH);
-        const slug = String(name).replace(/\s+/g, '-');
-        for (let i = 0; i < pageCount; i++) {
-          const sliceCanvas = document.createElement('canvas');
-          sliceCanvas.width = fullCanvas.width;
-          sliceCanvas.height = Math.min(sliceH, totalH - i * sliceH);
-          sliceCanvas.getContext('2d')!.drawImage(fullCanvas, 0, -i * sliceH);
-          await new Promise<void>(res => {
-            sliceCanvas.toBlob(blob => {
-              if (!blob) { res(); return; }
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement('a');
-              a.href = url;
-              a.download = pageCount > 1 ? `${slug}-statement-${i + 1}.png` : `${slug}-statement.png`;
-              document.body.appendChild(a); a.click();
-              document.body.removeChild(a); URL.revokeObjectURL(url);
-              res();
-            }, 'image/png');
-          });
+        const isMobile = typeof navigator !== 'undefined' && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        const Print = require('expo-print');
+        if (isMobile) {
+          // Mobile browser: open print dialog
+          await Print.printAsync({ html });
+        } else {
+          // Desktop browser: generate PDF and open in new tab (browser will prompt download)
+          const { uri } = await Print.printToFileAsync({ html, width: 794 });
+          window.open(uri, '_blank');
         }
         setStatementLoading(false);
       } else {
@@ -1235,18 +1202,17 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
             <View style={{ gap: 10 }}>
               <ActivityTabs selectedTabs={selectedTabs} onToggle={handleTabToggle} tabValue={tabValue} />
               <View style={s.filterControlsRow}>
-                <TouchableOpacity style={s.filterBtn} onPress={() => setShowFilterModal(true)} activeOpacity={0.75}>
-                  <View style={s.filterDot} />
+                <TouchableOpacity style={[s.filterBtn, { flex: 1, justifyContent: 'center' }]} onPress={() => setShowFilterModal(true)} activeOpacity={0.75}>
                   <Text style={s.filterBtnText}>Filters</Text>
                 </TouchableOpacity>
-                <DateNavBar style={{ flex: 6.4 }}
+                <DateNavBar style={{ flex: 2 }}
                   label={rangeLabel}
                   onPrev={() => navigateRange(-1)}
                   onNext={() => navigateRange(1)}
                   onLabelPress={() => setShowLocalFilter(true)}
                 />
                 {canAddRecordings && (
-                  <TouchableOpacity style={s.actionsBtn} onPress={() => setShowAddChoice(true)} activeOpacity={0.8}>
+                  <TouchableOpacity style={[s.actionsBtn, { flex: 1 }]} onPress={() => setShowAddChoice(true)} activeOpacity={0.8}>
                     <Text style={s.actionsBtnText}>Actions</Text>
                   </TouchableOpacity>
                 )}
@@ -1273,7 +1239,6 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
                   onLabelPress={() => setShowLocalFilter(true)}
                 />
                 <TouchableOpacity style={s.filterBtn} onPress={() => setShowFilterModal(true)} activeOpacity={0.75}>
-                  <View style={s.filterDot} />
                   <Text style={s.filterBtnText}>Filters</Text>
                 </TouchableOpacity>
                 {canAddRecordings && (
@@ -1284,7 +1249,7 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
               </View>
               <View style={{ flexDirection: 'row', gap: 8 }}>
                 {(['active', 'completed', 'paused'] as const).map(tab => (
-                  <TouchableOpacity key={tab} style={[s.chip, reminderTab === tab && s.chipActive]} onPress={() => setReminderTab(tab)} activeOpacity={0.75}>
+                  <TouchableOpacity key={tab} style={[s.chip, { flex: 1, justifyContent: 'center' }, reminderTab === tab && s.chipActive]} onPress={() => setReminderTab(tab)} activeOpacity={0.75}>
                     <Text style={[s.chipText, reminderTab === tab && s.chipTextActive]}>{tab}</Text>
                   </TouchableOpacity>
                 ))}
@@ -2004,7 +1969,7 @@ const s = StyleSheet.create({
   filterDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: DC.btnText },
 
   // Actions button
-  actionsBtn:     { paddingHorizontal: 16, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: DC.btnBg, alignItems: 'center', borderWidth: DC.btnBorderWidth },
+  actionsBtn:     { paddingHorizontal: 16, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: DC.btnBg, alignItems: 'center', justifyContent: 'center', borderWidth: DC.btnBorderWidth },
   actionsBtnText: { fontFamily: AppFont.semiBold, fontSize: 12, color: DC.btnText },
 
   // Add circle button (reminders)
@@ -2028,9 +1993,9 @@ const s = StyleSheet.create({
   dateNavRow:   { flexDirection: 'row', alignItems: 'center', gap: 4, flex: 1 },
   dateNavArrow: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: DC.cardBg, borderWidth: 1, borderColor: DC.cardBorder },
   dateNavArrowText: { fontFamily: AppFont.regular, fontSize: 18, color: DC.accent1, lineHeight: 22 },
-  filterBtn:    { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, height: 36, borderRadius: Radius.pill, backgroundColor: DC.btnBg, borderWidth: DC.btnBorderWidth },
+  filterBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: 12, height: 36, borderRadius: Radius.pill, backgroundColor: DC.btnBg, borderWidth: DC.btnBorderWidth },
   filterBtnDate: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: DC.btnBg, borderWidth: DC.btnBorderWidth },
-  filterBtnText: { fontFamily: AppFont.regular, fontSize: 11, color: DC.btnText },
+  filterBtnText: { fontFamily: AppFont.regular, fontSize: 13, color: DC.btnText },
 
   // Empty
   emptyWrap: { alignItems: 'center', paddingVertical: 24 },

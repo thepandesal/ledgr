@@ -119,7 +119,7 @@ export const getMonthlyReceiptCount = async (userId: string): Promise<number> =>
     .from('receipt_photos')
     .select('id, receipt_entries!inner(user_id)', { count: 'exact', head: true })
     .eq('receipt_entries.user_id', userId)
-    .gte('receipt_photos.created_at', start.toISOString());
+    .gte('created_at', start.toISOString());
   return count ?? 0;
 };
 

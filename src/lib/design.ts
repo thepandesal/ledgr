@@ -98,4 +98,50 @@ export const DC = {
   photoViewerNav:      'rgba(0,0,0,0.08)',  // arrow button background
   photoViewerDeleteBg: '#fff0e4',           // delete button background
   photoViewerDeleteText: '#111111',         // delete button text
+
+  // Standard modal design (used by all full-screen modals)
+  modalBg:          '#ffffff',              // modal background
+  modalPadding:     24,                     // horizontal padding inside modal
+  modalTitleSize:   22,                     // title font size
+  modalBrandSize:   11,                     // LEDGR brand font size
+  modalRowBorder:   '#d1d1d1',              // row divider color
+  modalRowPadding:  13,                     // row vertical padding
+  modalInputBg:     '#F8F8F8',              // value input pill background
+  modalInputRadius: 999,                    // value input pill border radius (pill shape)
+
+  // Text input
+  inputBg:          '#F8F8F8',              // input background
+  inputBorder:      '#d1d1d1',              // input border color
+  inputBorderWidth: 1,                      // input border width
+  inputRadius:      999,                    // input border radius (pill)
+  inputPaddingH:    16,                     // input horizontal padding
+  inputPaddingV:    12,                     // input vertical padding
+  inputFontSize:    14,                     // input font size
+  inputTextColor:   '#111111',              // input text color
+  inputPlaceholder: '#c0c0c0',              // placeholder text color
+
+  // Dropdown / selector pill
+  dropdownBg:       '#F8F8F8',              // dropdown background
+  dropdownRadius:   999,                    // dropdown border radius (pill)
+  dropdownPaddingH: 16,                     // dropdown horizontal padding
+  dropdownPaddingV: 10,                     // dropdown vertical padding
+  dropdownFontSize: 13,                     // dropdown font size
+  dropdownTextColor:'#111111',              // dropdown text color
+  dropdownMinWidth: 120,                    // minimum width of dropdown pill
+
+  // Toggle (Yes/No pill pair)
+  toggleActiveBg:   '#ebf7f6',              // active toggle background
+  toggleActiveText: '#4f9289',              // active toggle text
+  toggleInactiveBg: '#F8F8F8',              // inactive toggle background
+  toggleInactiveText:'#111111',             // inactive toggle text
+  toggleRadius:     999,                    // toggle border radius
+  togglePaddingH:   16,                     // toggle horizontal padding
+  togglePaddingV:   8,                      // toggle vertical padding
+  toggleFontSize:   13,                     // toggle font size
+
+  // Form row
+  rowLabelSize:     14,                     // row label font size
+  rowLabelColor:    '#111111',              // row label color
+  rowBorderColor:   '#d1d1d1',              // row bottom border color
+  rowPaddingV:      13,                     // row vertical padding
 } as const;

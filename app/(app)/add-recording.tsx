@@ -6,9 +6,10 @@
 
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  TextInput, ActivityIndicator, Switch, FlatList, Image, Alert,
-  Modal,
+  TextInput, ActivityIndicator, Image, Alert,
+  Modal, SafeAreaView,
 } from 'react-native';
+import { BlurView } from 'expo-blur';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
@@ -16,6 +17,8 @@ import { supabase } from '../../src/lib/supabase';
 import * as ImagePicker from 'expo-image-picker';
 import { compressImage, uploadReceiptPhoto } from '../../src/lib/receiptUpload';
 import { setPendingFocusDate } from './space-detail';
+import { DC } from '../../src/lib/design';
+import { AppFont } from '../../src/lib/fonts';
 
 import {
   BottomSheet,
@@ -35,7 +38,7 @@ import {
 import formStyles from '@/components/ui/formStyles';
 import { useUser } from '../../src/hooks/useUser';
 
-// ─── Constants ───────────────────────────────────────────────────────────────
+// --- Constants ---------------------------------------------------------------
 
 const TYPE_GROUPS = [
   {
@@ -66,9 +69,9 @@ const TYPE_GROUPS = [
   },
 ] as const;
 
-const TYPES = TYPE_GROUPS.flatMap(g => g.types);
+const TYPES: { key: string; label: string; color: string; icon: string }[] = (TYPE_GROUPS as unknown as any[]).flatMap((g: any) => g.types);
 
-// ─── Component ───────────────────────────────────────────────────────────────
+// --- Component ---------------------------------------------------------------
 
 export default function AddRecordingScreen({ inlineProps }: {
   inlineProps?: { spaceId: string; spaceName: string; defaultDate: string; onClose: () => void };
@@ -91,33 +94,54 @@ export default function AddRecordingScreen({ inlineProps }: {
     'THB','VND','KRW','CNY','INR','HKD','NZD','CHF','BRL','MXN',
   ];
 
-  // ── Form state ──────────────────────────────────────────────────────────
-  const [recName, setRecName]   = useState('');
-  const [type, setType]         = useState<string>('expense');
-  const [amount, setAmount]     = useState('');
-  const [date, setDate]         = useState(defaultDate ?? new Date().toISOString().split('T')[0]);
-  const [notes, setNotes]       = useState('');
-  const [personName, setPersonName] = useState('');
+  // ── Multi-item state ──────────────────────────────────────────────────
+  type RecItem = {
+    id: string; name: string; amount: string; category: any; account: any;
+    person: string; personUserId: string | null; isReceivable: boolean; photos: string[];
+  };
+  const newItem = (): RecItem => ({
+    id: Math.random().toString(36).slice(2),
+    name: "", amount: "", category: null, account: null,
+    person: "", personUserId: null, isReceivable: false, photos: [],
+  });
+  const [items, setItems] = useState<RecItem[]>([newItem()]);
+  const updateItem = (id: string, patch: Partial<RecItem>) =>
+    setItems(prev => prev.map(it => it.id === id ? { ...it, ...patch } : it));
+  const addItem    = () => setItems(prev => [...prev, newItem()]);
+  const removeItem = (id: string) => setItems(prev => prev.length > 1 ? prev.filter(it => it.id !== id) : prev);
+
+  // Legacy state for editId and shared fields
+  const [type, setType]         = useState<string>("expense");
+  const [date, setDate]         = useState(defaultDate ?? new Date().toISOString().split("T")[0]);
+  const [notes, setNotes]       = useState("");
   const [loading, setLoading]   = useState(false);
-  const [error, setError]       = useState('');
+  const [error, setError]       = useState("");
   const [spaceBudget, setSpaceBudget] = useState<number | null>(null);
   const [spaceSpent, setSpaceSpent] = useState<number>(0);
+  // Legacy single-item aliases for editId save path
+  const recName = items[0]?.name ?? "";
+  const amount  = items[0]?.amount ?? "";
+  const personName = items[0]?.person ?? "";
+  const selectedCategory = items[0]?.category;
+  const selectedAccount  = items[0]?.account;
+  const selectedFriendUserId = items[0]?.personUserId ?? null;
 
-  // ── Picker data ──────────────────────────────────────────────────────────
+  // -- Picker data ----------------------------------------------------------
   const [categories, setCategories]           = useState<any[]>([]);
   const [accounts, setAccounts]               = useState<any[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<any>(null);
-  const [selectedAccount, setSelectedAccount]   = useState<any>(null);
+
+
   const [personSuggestions, setPersonSuggestions] = useState<string[]>([]);
 
-  // ── Picker modals ────────────────────────────────────────────────────────
+  // -- Picker modals --------------------------------------------------------
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showAccountModal, setShowAccountModal]   = useState(false);
+  const [activePickerItemId, setActivePickerItemId] = useState<string>('');
 
-  // ── Receipt photos ────────────────────────────────────────────────────────
+  // -- Receipt photos --------------------------------------------------------
   const [receiptPhotos, setReceiptPhotos] = useState<string[]>([]);
 
-  // ── Receivable-specific ──────────────────────────────────────────────────
+  // -- Receivable-specific --------------------------------------------------
   const [decreasedFromAccount, setDecreasedFromAccount] = useState<any>(null);
   const [receiveToAccount, setReceiveToAccount]         = useState<any>(null);
   const [showDecreasedFromModal, setShowDecreasedFromModal] = useState(false);
@@ -126,7 +150,7 @@ export default function AddRecordingScreen({ inlineProps }: {
   const [showExpenseModal, setShowExpenseModal]         = useState(false);
   const [expenseList, setExpenseList]                   = useState<any[]>([]);
 
-  // ── Person picker ─────────────────────────────────────────────────────────
+  // -- Person picker ---------------------------------------------------------
   const [showPersonModal, setShowPersonModal] = useState(false);
   const [friendSuggestions, setFriendSuggestions] = useState<string[]>([]);
   const [friendIdMap, setFriendIdMap] = useState<Record<string, string>>({}); // name -> userId
@@ -134,30 +158,38 @@ export default function AddRecordingScreen({ inlineProps }: {
   const [personSearch, setPersonSearch] = useState('');
   const [showAllFriends, setShowAllFriends] = useState(false);
   const [showAllContacts, setShowAllContacts] = useState(false);
-  const [selectedFriendUserId, setSelectedFriendUserId] = useState<string | null>(null);
 
-  // ── Type dropdown ─────────────────────────────────────────────────────────
+
+  // -- Type dropdown ---------------------------------------------------------
   const [showTypeModal, setShowTypeModal] = useState(false);
 
-  // ── Sub-type toggles ────────────────────────────────────────────────────
+  // -- Sub-type toggles ----------------------------------------------------
   const [expenseIsReceivable, setExpenseIsReceivable] = useState(false);
   const [incomeIsLoan, setIncomeIsLoan]               = useState(false);
 
-  // ── Derived ──────────────────────────────────────────────────────────────
+  // -- Singular toggles -----------------------------------------------------
+  const [useSingularAccount, setUseSingularAccount] = useState(false);
+  const [singularAccount, setSingularAccount]       = useState<any>(null);
+  const [showSingularAccountModal, setShowSingularAccountModal] = useState(false);
+  const [useSingularPerson, setUseSingularPerson]   = useState(false);
+  const [singularPerson, setSingularPerson]         = useState('');
+  const [singularPersonUserId, setSingularPersonUserId] = useState<string | null>(null);
+
+  // -- Derived --------------------------------------------------------------
   const effectiveType = type === 'expense' && expenseIsReceivable ? 'expense_receivable'
                       : type === 'income'  && incomeIsLoan        ? 'payable'
                       : type;
   const isLoanType  = effectiveType === 'receivable' || effectiveType === 'payable';
   const isComboType = effectiveType === 'expense_receivable';
-  const selectedType = TYPES.find(t => t.key === type)!
+  const selectedType = (TYPES.find(t => t.key === type) ?? TYPES[0]) as { key: string; label: string; color: string; icon: string };
 
-  // ─── Lifecycle ─────────────────────────────────────────────────────────
+  // --- Lifecycle ---------------------------------------------------------
   useEffect(() => {
     loadData();
     if (receiptId) loadReceiptPhotos();
   }, []);
 
-  // ─── Data loading ───────────────────────────────────────────────────────
+  // --- Data loading -------------------------------------------------------
 
   const loadData = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -207,15 +239,15 @@ export default function AddRecordingScreen({ inlineProps }: {
         .select('*, categories:category_id(id,name,color,icon), account:account_id(id,account_name,bank,color)')
         .eq('id', editId).single();
       if (rec) {
-        setRecName(rec.name);
+        updateItem(items[0].id, { name: rec.name });
         setType(rec.type);
-        setAmount(String(rec.amount));
+        updateItem(items[0].id, { amount: String(rec.amount) });
         setDate(rec.transaction_date);
         setNotes(rec.notes ?? '');
-        setPersonName(rec.person_name ?? '');
+        updateItem(items[0].id, { person: rec.person_name ?? '' });
         if (rec.currency) setCurrency(rec.currency);
-        if (rec.categories) setSelectedCategory(Array.isArray(rec.categories) ? rec.categories[0] : rec.categories);
-        if (rec.account) setSelectedAccount(Array.isArray(rec.account) ? rec.account[0] : rec.account);
+        if (rec.categories) updateItem(items[0].id, { category: Array.isArray(rec.categories) ? rec.categories[0] : rec.categories });
+        if (rec.account) updateItem(items[0].id, { account: Array.isArray(rec.account) ? rec.account[0] : rec.account });
       }
     }
   };
@@ -233,24 +265,22 @@ export default function AddRecordingScreen({ inlineProps }: {
     }
   };
 
-  // ─── Receipt capture ────────────────────────────────────────────────────
+  // --- Receipt capture ----------------------------------------------------
 
-  const addFromCamera = async () => {
+  const addFromCamera = async (itemId: string) => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') { Alert.alert('Permission needed', 'Camera access required.'); return; }
     const result = await ImagePicker.launchCameraAsync({ quality: 1 });
     if (!result.canceled && result.assets[0]) {
-      setReceiptPhotos(prev => [...prev, result.assets[0].uri]);
+      updateItem(itemId, { photos: [...(items.find(i => i.id === itemId)?.photos ?? []), result.assets[0].uri] });
     }
   };
 
-  const addFromGallery = async () => {
+  const addFromGallery = async (itemId: string) => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') { Alert.alert('Permission needed', 'Photo library access required.'); return; }
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsMultipleSelection: true, quality: 1, base64: false });
     if (!result.canceled) {
-      // On web, blob: URIs get revoked after the picker closes.
-      // Convert to data: URLs immediately so they survive until save.
       const uris = await Promise.all(result.assets.map(async (a) => {
         if (typeof window !== 'undefined' && a.uri.startsWith('blob:')) {
           const blob = await fetch(a.uri).then(r => r.blob());
@@ -262,220 +292,105 @@ export default function AddRecordingScreen({ inlineProps }: {
         }
         return a.uri;
       }));
-      setReceiptPhotos(prev => [...prev, ...uris]);
+      const existing = items.find(i => i.id === itemId)?.photos ?? [];
+      updateItem(itemId, { photos: [...existing, ...uris] });
     }
   };
 
-  const removePhoto = (index: number) =>
-    setReceiptPhotos(prev => prev.filter((_, i) => i !== index));
+  const removePhoto = (itemId: string, index: number) =>
+    updateItem(itemId, { photos: (items.find(i => i.id === itemId)?.photos ?? []).filter((_, i) => i !== index) });
 
-  // ─── Save ───────────────────────────────────────────────────────────────
+  // --- Save ---------------------------------------------------------------
 
   const handleSave = async () => {
-    if (!recName.trim() || !amount) { setError('name and amount are required.'); return; }
-    setLoading(true);
-    setError('');
+    const invalid = items.find(it => !it.name.trim() || !it.amount);
+    if (invalid) { setError("name and amount are required for all items."); return; }
+    setLoading(true); setError("");
     try {
       const { data: { user } } = await supabase.auth.getUser();
-
+      const statusMap: Record<string, string> = {
+        expense: "paid", income: "received", savings: "saved",
+        payable: "unpaid", receivable: "pending", expense_receivable: "paid",
+      };
       if (editId) {
-        const { error: err } = await supabase.from('recordings').update({
-          name: recName.trim(), type, amount: parseFloat(amount),
+        const it = items[0];
+        const { error: err } = await supabase.from("recordings").update({
+          name: it.name.trim(), type, amount: parseFloat(it.amount),
           transaction_date: date, notes: notes.trim() || null,
-          category_id: selectedCategory?.id || null,
-          account_id: selectedAccount?.id || null,
-          currency,
-        }).eq('id', editId);
+          category_id: it.category?.id || null, account_id: it.account?.id || null, currency,
+        }).eq("id", editId);
         if (err) throw err;
       } else {
-        const statusMap: Record<string, string> = {
-          expense: 'paid', income: 'received', savings: 'saved',
-          payable: 'unpaid', receivable: 'pending', expense_receivable: 'paid',
-        };
-
-        if (isComboType) {
-          // Create expense first
-          const { data: expRec, error: expErr } = await supabase.from('recordings').insert({
-            space_id: spaceId, user_id: user!.id,
-            name: recName.trim(), type: 'expense',
-            amount: parseFloat(amount), transaction_date: date,
-            notes: notes.trim() || null,
-            category_id: selectedCategory?.id || null,
-            account_id: selectedAccount?.id || null,
-            status: 'paid', is_due: true,
-            person_name: personName.trim() || null,
-            tagged_friend_user_id: selectedFriendUserId || null,
-            currency,
-          }).select('id').single();
-          if (expErr) throw expErr;
-          const { data: recRec, error: recErr } = await supabase.from('recordings').insert({
-            space_id: spaceId, user_id: user!.id,
-            name: recName.trim(), type: 'receivable',
-            amount: parseFloat(amount), transaction_date: date,
-            notes: notes.trim() || null,
-            category_id: selectedCategory?.id || null,
-            account_id: receiveToAccount?.id || null,
-            status: 'pending',
-            person_name: personName.trim() || null,
-            linked_recording_id: expRec!.id,
-            currency,
-          }).select('id').single();
-          if (recErr) throw recErr;
-          // Send tag notification if a friend was selected
-          if (selectedFriendUserId && recRec?.id) {
-            const { data: profile } = await supabase.rpc('get_user_display_name', { user_id: user!.id });
-            await supabase.from('notifications').insert({
-              user_id: selectedFriendUserId,
-              type: 'expense_tag',
-              title: `${profile || 'Someone'} tagged you in an expense`,
-              body: `"${recName.trim()}" — tap to accept or decline.`,
-              message: `"${recName.trim()}" — tap to accept or decline.`,
-              data: {
-                sourceRecordingId: expRec!.id,
-                taggerUserId: user!.id,
-                taggerName: profile || 'Someone',
-                friendId: selectedFriendUserId,
-                amount: parseFloat(amount),
-                recordingName: recName.trim(),
-                transactionDate: date,
-                currency,
-                categoryId: selectedCategory?.id ?? null,
-              },
-              status: 'new',
-              is_read: false,
+        for (const it of items) {
+          const effectiveAccount = useSingularAccount ? singularAccount : it.account;
+          const effectivePerson  = useSingularPerson  ? singularPerson  : it.person;
+          const effectivePersonId = useSingularPerson ? singularPersonUserId : it.personUserId;
+          const effectiveType = type === "expense" && it.isReceivable ? "expense_receivable" : type;
+          const isComboItem = effectiveType === "expense_receivable";
+          const isLoanItem  = effectiveType === "receivable" || effectiveType === "payable";
+          if (isComboItem) {
+            const { data: expRec, error: expErr } = await supabase.from("recordings").insert({
+              space_id: spaceId, user_id: user!.id, name: it.name.trim(), type: "expense",
+              amount: parseFloat(it.amount), transaction_date: date, notes: notes.trim() || null,
+              category_id: it.category?.id || null, account_id: effectiveAccount?.id || null,
+              status: "paid", is_due: true, person_name: effectivePerson || null,
+              tagged_friend_user_id: effectivePersonId || null, currency,
+            }).select("id").single();
+            if (expErr) throw expErr;
+            await supabase.from("recordings").insert({
+              space_id: spaceId, user_id: user!.id, name: it.name.trim(), type: "receivable",
+              amount: parseFloat(it.amount), transaction_date: date, notes: notes.trim() || null,
+              category_id: it.category?.id || null, account_id: effectiveAccount?.id || null,
+              status: "pending", person_name: effectivePerson || null,
+              linked_recording_id: expRec!.id, currency,
             });
-          }
-          setPendingFocusDate(date);
-          handleClose();
-          // Navigate to the expense recording so user can see the pending tag
-          router.push({ pathname: '/(app)/recording-detail', params: { recordingId: expRec!.id } } as any);
-          return;
-        }
-        const { data: newRec, error: err } = await supabase.from('recordings').insert({
-          space_id: spaceId,
-          user_id: user!.id,
-          name: recName.trim(),
-          type: effectiveType,
-          amount: parseFloat(amount),
-          transaction_date: date,
-          notes: notes.trim() || null,
-          category_id: selectedCategory?.id || null,
-          account_id: effectiveType === 'receivable'
-            ? receiveToAccount?.id || null
-            : selectedAccount?.id || null,
-          status: statusMap[effectiveType] ?? 'paid',
-          person_name: isLoanType ? personName.trim() || null : null,
-          tagged_friend_user_id: isLoanType ? selectedFriendUserId || null : null,
-          linked_recording_id: effectiveType === 'receivable' && linkedExpense ? linkedExpense.id : null,
-          decreased_from_account_id: effectiveType === 'receivable' ? decreasedFromAccount?.id || null : null,
-          receive_to_account_id: effectiveType === 'receivable' ? receiveToAccount?.id || null : null,
-          currency,
-        }).select('id').single();
-        if (err) throw err;
-
-        // Send tag notification for plain receivable if a friend was selected
-        if (effectiveType === 'receivable' && selectedFriendUserId && newRec?.id) {
-          const { data: profile } = await supabase.rpc('get_user_display_name', { user_id: user!.id });
-          await supabase.from('notifications').insert({
-            user_id: selectedFriendUserId,
-            type: 'expense_tag',
-            title: `${profile || 'Someone'} tagged you in an expense`,
-            body: `"${recName.trim()}" — tap to accept or decline.`,
-            message: `"${recName.trim()}" — tap to accept or decline.`,
-            data: {
-              sourceRecordingId: newRec.id,
-              taggerUserId: user!.id,
-              taggerName: profile || 'Someone',
-              friendId: selectedFriendUserId,
-              amount: parseFloat(amount),
-              recordingName: recName.trim(),
-              transactionDate: date,
+          } else {
+            const { data: newRec, error: err } = await supabase.from("recordings").insert({
+              space_id: spaceId, user_id: user!.id, name: it.name.trim(), type: effectiveType,
+              amount: parseFloat(it.amount), transaction_date: date, notes: notes.trim() || null,
+              category_id: it.category?.id || null, account_id: effectiveAccount?.id || null,
+              status: statusMap[effectiveType] ?? "paid",
+              person_name: (isLoanItem || isComboItem) ? effectivePerson || null : null,
+              tagged_friend_user_id: (isLoanItem || isComboItem) ? effectivePersonId || null : null,
               currency,
-              categoryId: selectedCategory?.id ?? null,
-            },
-            status: 'new',
-            is_read: false,
-          });
-        }
-
-        if (effectiveType === 'receivable' && decreasedFromAccount && newRec) {
-          await supabase.from('recordings').insert({
-            space_id: spaceId, user_id: user!.id, name: recName.trim(),
-            type: 'expense', amount: parseFloat(amount), transaction_date: date,
-            notes: notes.trim() || null, category_id: selectedCategory?.id || null,
-            account_id: decreasedFromAccount.id, status: 'paid',
-            linked_recording_id: newRec.id,
-          });
-        }
-
-        // Handle receipt linkage after saving
-        if (newRec?.id) {
-          // Budget warning notifications
-        if (effectiveType === 'expense' && spaceId && spaceBudget && newRec?.id) {
-          const newSpent = spaceSpent + parseFloat(amount);
-          const pct = newSpent / spaceBudget;
-          const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
-          if (pct >= 1.0) {
-            const { data: existing } = await supabase.from('notifications').select('id')
-              .eq('user_id', user!.id).eq('type', 'budget_limit_reached')
-              .contains('data', { spaceId }).gte('created_at', monthStart.toISOString()).maybeSingle();
-            if (!existing) {
-              await supabase.from('notifications').insert({
-                user_id: user!.id, type: 'budget_limit_reached',
-                title: `you've hit your budget limit`,
-                body: `${spaceName} has exceeded its budget`,
-                message: `${spaceName} has exceeded its budget`,
-                data: { spaceId, spaceName }, is_read: false, status: 'new',
-              });
+            }).select("id").single();
+            if (err) throw err;
+            if (effectiveType === "expense" && spaceId && spaceBudget && newRec?.id) {
+              const newSpent = spaceSpent + parseFloat(it.amount);
+              const pct = newSpent / spaceBudget;
+              const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0,0,0,0);
+              if (pct >= 1.0) {
+                const { data: ex } = await supabase.from("notifications").select("id").eq("user_id", user!.id).eq("type","budget_limit_reached").contains("data",{spaceId}).gte("created_at",monthStart.toISOString()).maybeSingle();
+                if (!ex) await supabase.from("notifications").insert({ user_id: user!.id, type:"budget_limit_reached", title:"budget limit reached", body:`${spaceName} has exceeded its budget`, message:`${spaceName} has exceeded its budget`, data:{spaceId,spaceName}, is_read:false, status:"new" });
+              } else if (pct >= 0.8) {
+                const { data: ex } = await supabase.from("notifications").select("id").eq("user_id", user!.id).eq("type","budget_warning_80").contains("data",{spaceId}).gte("created_at",monthStart.toISOString()).maybeSingle();
+                if (!ex) await supabase.from("notifications").insert({ user_id: user!.id, type:"budget_warning_80", title:"80% budget used", body:`${spaceName} is almost at its limit`, message:`${spaceName} is almost at its limit`, data:{spaceId,spaceName}, is_read:false, status:"new" });
+              }
             }
-          } else if (pct >= 0.8) {
-            const { data: existing } = await supabase.from('notifications').select('id')
-              .eq('user_id', user!.id).eq('type', 'budget_warning_80')
-              .contains('data', { spaceId }).gte('created_at', monthStart.toISOString()).maybeSingle();
-            if (!existing) {
-              await supabase.from('notifications').insert({
-                user_id: user!.id, type: 'budget_warning_80',
-                title: `you've used 80% of your budget`,
-                body: `${spaceName} is almost at its limit`,
-                message: `${spaceName} is almost at its limit`,
-                data: { spaceId, spaceName }, is_read: false, status: 'new',
-              });
-            }
-          }
-        }
-
-        if (receiptId) {
-            // Launched from an existing receipt — link that entry to this new recording
-            await supabase.from('receipt_entries').update({ recording_id: newRec.id }).eq('id', receiptId);
-          } else if (receiptPhotos.length > 0) {
-            const { data: { user: u } } = await supabase.auth.getUser();
-            const note = recName.trim();
-            const { data: entry } = await supabase.from('receipt_entries')
-              .insert({ user_id: u!.id, note, recording_id: newRec.id })
-              .select().single();
-            if (entry?.id) {
-              for (const uri of receiptPhotos) {
-                const compressed = await compressImage(uri);
-                try {
-                  await uploadReceiptPhoto(compressed, entry.id);
-                } catch (uploadErr: any) {
-                  if (uploadErr?.message === 'RECEIPT_LIMIT_REACHED') {
-                    setError('monthly receipt limit reached — photos were not saved, but your recording was.');
+            if (newRec?.id && it.photos.length > 0) {
+              const { data: { user: u } } = await supabase.auth.getUser();
+              const { data: entry, error: entryErr } = await supabase.from("receipt_entries").insert({ user_id: u!.id, note: it.name.trim(), recording_id: newRec.id }).select().single();
+              if (entryErr) throw entryErr;
+              if (entry?.id) {
+                for (const uri of it.photos) {
+                  const compressed = await compressImage(uri);
+                  try {
+                    await uploadReceiptPhoto(compressed, entry.id);
+                  } catch (uploadErr: any) {
+                    if (uploadErr?.message === 'RECEIPT_LIMIT_REACHED') {
+                      setError('monthly receipt limit reached.');
+                      break;
+                    }
+                    throw uploadErr;
                   }
-                  break;
                 }
               }
             }
           }
         }
       }
-
       setPendingFocusDate(date);
       handleClose();
-      // Navigate to recording if a friend was tagged so user sees pending status
-      if ((effectiveType === 'receivable' || isLoanType) && selectedFriendUserId && newRec?.id) {
-        router.push({ pathname: '/(app)/recording-detail', params: { recordingId: newRec.id } } as any);
-      }
     } catch (e: any) {
       setError(e.message);
       setLoading(false);
@@ -495,311 +410,212 @@ export default function AddRecordingScreen({ inlineProps }: {
     setShowExpenseModal(true);
   };
 
-  // ─── Render ─────────────────────────────────────────────────────────────
+  // --- Render -------------------------------------------------------------
 
   return (
-    <Modal visible animationType="fade" transparent onRequestClose={handleClose}>
-      <TouchableOpacity style={s.backdrop} activeOpacity={1} onPress={handleClose} />
-      <View style={s.centeredWrap} pointerEvents="box-none">
-      <View style={s.card}>
+    <Modal visible animationType="slide" transparent statusBarTranslucent onRequestClose={handleClose}>
+      <BlurView intensity={60} tint="light" style={StyleSheet.absoluteFill} />
+      <View style={s.overlay}>
+      <SafeAreaView style={s.sheet}>
+        <View style={{ flex: 1, paddingHorizontal: DC.pagePadding, paddingTop: 16 }}>
           {/* Header */}
-          <View style={formStyles.header}>
-            <View>
-              {spaceName ? <Text style={formStyles.headerSub}>{spaceName.toLowerCase()}</Text> : null}
-              <Text style={formStyles.headerTitle}>{editId ? 'edit recording' : 'new recording'}</Text>
-            </View>
-            <TouchableOpacity onPress={handleClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Ionicons name="close" size={20} color="#929090" />
+
+          <View style={s.header}>
+            <Text style={s.headerTitle}>{editId ? 'Edit Recording' : 'New Recording'}</Text>
+            <TouchableOpacity onPress={handleClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+              <View style={s.headerClose}>
+                <Text style={s.headerCloseText}>✕</Text>
+              </View>
             </TouchableOpacity>
           </View>
+
+
+
+          <View style={s.frozenSection}>
+            <TouchableOpacity style={s.frozenRow} onPress={() => setShowTypeModal(true)} activeOpacity={0.8}>
+              <Text style={s.frozenLabel}>Type</Text>
+              <View style={s.frozenPill}>
+                <Text style={s.frozenPillText}>{selectedType.label.charAt(0).toUpperCase() + selectedType.label.slice(1)}</Text>
+                <Ionicons name="chevron-down" size={13} color={DC.pageText} />
+              </View>
+            </TouchableOpacity>
+ <View style={s.frozenRow}>
+ <Text style={s.frozenLabel}>Singular account?</Text>
+ <View style={[s.yesNoRow, { flex: 1 }]}>
+ <TouchableOpacity style={[s.yesNoBtn, useSingularAccount && s.yesNoBtnActive]} onPress={() => setUseSingularAccount(true)} activeOpacity={0.8}>
+ <Text style={[s.yesNoBtnText, useSingularAccount && s.yesNoBtnTextActive]}>Yes</Text>
+              </TouchableOpacity>
+ <TouchableOpacity style={[s.yesNoBtn, !useSingularAccount && s.yesNoBtnActive]} onPress={() => { setUseSingularAccount(false); setSingularAccount(null); }} activeOpacity={0.8}>
+ <Text style={[s.yesNoBtnText, !useSingularAccount && s.yesNoBtnTextActive]}>No</Text>
+              </TouchableOpacity>
+              </View>
+            </View>
+            {useSingularAccount && (
+              <TouchableOpacity style={s.frozenRow} onPress={() => setShowSingularAccountModal(true)} activeOpacity={0.8}>
+                <Text style={s.frozenLabel}>Account</Text>
+                <View style={s.frozenPill}>
+                  <Text style={s.frozenPillText}>{singularAccount ? singularAccount.account_name : 'Select'}</Text>
+                  <Ionicons name="chevron-down" size={13} color={DC.pageText} />
+                </View>
+              </TouchableOpacity>
+            )}
+            {(isLoanType || isComboType) && (
+              <TouchableOpacity style={s.frozenRow} onPress={() => { setActivePickerItemId('singular'); setShowPersonModal(true); }} activeOpacity={0.8}>
+                <Text style={s.frozenLabel}>{type === 'payable' ? 'Paying' : 'Owes You'}</Text>
+                <View style={s.frozenPill}>
+                  <Text style={s.frozenPillText}>{singularPerson || 'Select'}</Text>
+                  <Ionicons name="chevron-down" size={13} color={DC.pageText} />
+                </View>
+              </TouchableOpacity>
+            )}
+          </View>
+          <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: DC.cardBorder, marginTop: 14, marginBottom: 22, marginHorizontal: -DC.pagePadding }} />
+
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" contentContainerStyle={{ paddingBottom: 32, gap: 8 }} style={{ flex: 1 }}>
 
-      {/* ── Receipt reference carousel ── */}
-      {receiptPhotos.length > 0 && (
-        <FlatList
-          data={receiptPhotos}
-          keyExtractor={(_, i) => String(i)}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ gap: 8, marginBottom: 12 }}
-          renderItem={({ item }) => (
-            <Image source={{ uri: item }} style={s.receiptThumb} resizeMode="cover" />
-          )}
-        />
-      )}
+      {/* -- Receipt reference carousel -- */}
+      {/* Error */}
+      {error ? <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.expense, marginBottom: 8 }}>{error}</Text> : null}
 
-      {/* ── Error ── */}
-      {error ? <Text style={formStyles.errorText}>{error}</Text> : null}
-
-      {/* ── Core info block ── */}
-      <FormBlock>
-        <FormRow label="type">
-          <TouchableOpacity style={s.typeDropRow} onPress={() => setShowTypeModal(true)} activeOpacity={0.8}>
-            <View style={[s.catDot, { backgroundColor: selectedType.color + '22' }]}>
-              <Ionicons name={selectedType.icon as any} size={11} color={selectedType.color} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontFamily: Fonts.mono, fontSize: 9, color: Colors.muted, textTransform: 'uppercase', letterSpacing: 0.6 }}>
-                {TYPE_GROUPS.find(g => g.types.some((t: any) => t.key === type))?.label}
-              </Text>
-              <Text style={{ fontFamily: Fonts.monoBold, fontSize: 13, color: Colors.text }}>{selectedType.label}</Text>
-            </View>
-            <Ionicons name="chevron-down" size={13} color={Colors.faint} />
-          </TouchableOpacity>
-        </FormRow>
-        {type === 'expense' && (
-          <FormRow label="receivable?">
-            <Switch value={expenseIsReceivable} onValueChange={setExpenseIsReceivable} trackColor={{ true: Colors.cyan, false: Colors.borderMid }} thumbColor={Colors.white} />
-          </FormRow>
-        )}
-        {type === 'income' && (
-          <FormRow label="is a loan?">
-            <Switch value={incomeIsLoan} onValueChange={setIncomeIsLoan} trackColor={{ true: Colors.cyan, false: Colors.borderMid }} thumbColor={Colors.white} />
-          </FormRow>
-        )}
-        <FormRow label="name">
-          <TextInput
-            style={s.inlineInput}
-            placeholder="e.g. grocery run"
-            placeholderTextColor={Colors.faint}
-            value={recName}
-            onChangeText={setRecName}
-            autoFocus
-          />
-        </FormRow>
-        <FormRow label="amount">
-          <View style={s.amountRow}>
-            <Text style={[s.amountSign, { color: selectedType.color }]}>
-              {selectedType.key === 'expense' ? '-' : selectedType.key === 'payable' ? '⋯' : '+'}
-            </Text>
-            <TextInput
-              style={s.inlineInput}
-              placeholder="0.00"
-              placeholderTextColor={Colors.faint}
-              value={amount}
-              onChangeText={setAmount}
-              keyboardType="decimal-pad"
-            />
-            <TouchableOpacity onPress={() => setShowCurrencyModal(true)} style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: Radius.pill, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.borderMid }}>
-              <Text style={{ fontFamily: Fonts.monoBold, fontSize: 11, color: Colors.text }}>{currency}</Text>
-            </TouchableOpacity>
-          </View>
-        </FormRow>
-        <FormRow label="date" stacked>
-          <MonthPicker date={date} onChange={setDate} />
-        </FormRow>
-      </FormBlock>
-
-      {/* ── Category + Account block ── */}
-      <FormBlock>
-        <FormRow label="category">
-          <TouchableOpacity style={s.typeDropRow} onPress={() => setShowCategoryModal(true)} activeOpacity={0.8}>
-            {selectedCategory ? (
-              <>
-                <View style={[s.catDot, { backgroundColor: selectedCategory.color }]}>
-                  <Ionicons name={selectedCategory.icon} size={11} color={Colors.text} />
-                </View>
-                <Text style={{ fontFamily: Fonts.mono, fontSize: 13, color: Colors.text, flex: 1 }}>{selectedCategory.name}</Text>
-                <TouchableOpacity onPress={() => setSelectedCategory(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                  <Ionicons name="close" size={13} color={Colors.muted} />
-                </TouchableOpacity>
-              </>
-            ) : (
-              <Text style={{ fontFamily: Fonts.mono, fontSize: 13, color: Colors.faint, flex: 1 }}>optional</Text>
+      {/* Item cards */}
+      {items.map((item, idx) => (
+        <View key={item.id} style={s.itemCard}>
+          {/* Card header with remove button */}
+          <View style={s.itemCardHeader}>
+            <Text style={s.itemCardNum}>Item {idx + 1}</Text>
+            {items.length > 1 && (
+              <TouchableOpacity onPress={() => removeItem(item.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Ionicons name="close-circle" size={18} color={DC.pageTextMuted} />
+              </TouchableOpacity>
             )}
-            <Ionicons name="chevron-down" size={13} color={Colors.faint} />
+          </View>
+
+          {/* Name */}
+          <View style={s.itemRow}>
+            <Text style={s.itemLabel}>Name</Text>
+            <TextInput
+              style={s.itemInput}
+              placeholder="e.g. grocery run"
+              placeholderTextColor={Colors.faint}
+              value={item.name}
+              onChangeText={v => updateItem(item.id, { name: v })}
+            />
+          </View>
+
+          {/* Amount */}
+          <View style={s.itemRow}>
+            <Text style={s.itemLabel}>Amount</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flex: 1, minWidth: 0 }}>
+              <TouchableOpacity onPress={() => setShowCurrencyModal(true)} style={s.currencyPill}>
+                <Text style={s.currencyPillText}>{currency}</Text>
+              </TouchableOpacity>
+              <TextInput
+                style={[s.itemInput, { textAlign: "right", flex: 1, minWidth: 0 }]}
+                placeholder="0.00"
+                placeholderTextColor={DC.inputPlaceholder}
+                value={item.amount}
+                onChangeText={v => updateItem(item.id, { amount: v })}
+                keyboardType="decimal-pad"
+              />
+            </View>
+          </View>
+
+          {/* Category */}
+          <TouchableOpacity style={s.itemRow} onPress={() => { setActivePickerItemId(item.id); setShowCategoryModal(true); }} activeOpacity={0.8}>
+            <Text style={s.itemLabel}>Category</Text>
+            <View style={s.itemPill}>
+              <Text style={s.itemPillText}>{item.category ? item.category.name : "Select"}</Text>
+              <Ionicons name="chevron-down" size={13} color={DC.pageText} />
+            </View>
           </TouchableOpacity>
-        </FormRow>
-        {type !== 'receivable' && (
-          <FormRow label="account">
-            <TouchableOpacity style={s.typeDropRow} onPress={() => setShowAccountModal(true)} activeOpacity={0.8}>
-              {selectedAccount ? (
-                <>
-                  <View style={[s.catDot, { backgroundColor: selectedAccount.color ?? Colors.borderMid }]} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontFamily: Fonts.mono, fontSize: 13, color: Colors.text }}>{selectedAccount.account_name}</Text>
-                    <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted }}>{selectedAccount.bank}</Text>
-                  </View>
-                  <TouchableOpacity onPress={() => setSelectedAccount(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Ionicons name="close" size={13} color={Colors.muted} />
-                  </TouchableOpacity>
-                </>
-              ) : (
-                <Text style={{ fontFamily: Fonts.mono, fontSize: 13, color: Colors.faint, flex: 1 }}>optional</Text>
-              )}
-              <Ionicons name="chevron-down" size={13} color={Colors.faint} />
-            </TouchableOpacity>
-          </FormRow>
-        )}
-      </FormBlock>
 
-      {/* ── Loan-type person field ── */}
-      {isLoanType && (
-        <FormBlock>
-          <FormRow label={type === 'payable' ? 'paying' : 'owes you'}>
-            <TouchableOpacity style={s.typeDropRow} onPress={() => setShowPersonModal(true)} activeOpacity={0.8}>
-              {personName ? (
-                <>
-                  <Ionicons name="person-outline" size={13} color={Colors.cyan} />
-                  <Text style={{ fontFamily: Fonts.mono, fontSize: 13, color: Colors.text, flex: 1 }}>{personName}</Text>
-                  <TouchableOpacity onPress={() => { setPersonName(''); setSelectedFriendUserId(null); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Ionicons name="close" size={13} color={Colors.muted} />
-                  </TouchableOpacity>
-                </>
-              ) : (
-                <Text style={{ fontFamily: Fonts.mono, fontSize: 13, color: Colors.faint, flex: 1 }}>select person</Text>
-              )}
-              <Ionicons name="chevron-down" size={13} color={Colors.faint} />
+          {/* Account — hidden if singular account */}
+          {!useSingularAccount && (
+            <TouchableOpacity style={s.itemRow} onPress={() => { setActivePickerItemId(item.id); setShowAccountModal(true); }} activeOpacity={0.8}>
+              <Text style={s.itemLabel}>Account</Text>
+              <View style={s.itemPill}>
+                <Text style={s.itemPillText}>{item.account ? item.account.account_name : "Select"}</Text>
+                <Ionicons name="chevron-down" size={13} color={DC.pageText} />
+              </View>
             </TouchableOpacity>
-          </FormRow>
-        </FormBlock>
-      )}
+          )}
 
-      {/* ── Combo type extra fields ── */}
-      {isComboType && (
-        <FormBlock>
-          <FormRow label="owes you">
-            <TouchableOpacity style={s.typeDropRow} onPress={() => setShowPersonModal(true)} activeOpacity={0.8}>
-              {personName ? (
-                <>
-                  <Ionicons name="person-outline" size={13} color={Colors.cyan} />
-                  <Text style={{ fontFamily: Fonts.mono, fontSize: 13, color: Colors.text, flex: 1 }}>{personName}</Text>
-                  <TouchableOpacity onPress={() => { setPersonName(''); setSelectedFriendUserId(null); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Ionicons name="close" size={13} color={Colors.muted} />
-                  </TouchableOpacity>
-                </>
-              ) : (
-                <Text style={{ fontFamily: Fonts.mono, fontSize: 13, color: Colors.faint, flex: 1 }}>select person</Text>
-              )}
-              <Ionicons name="chevron-down" size={13} color={Colors.faint} />
+          {/* Receivable per item + Owes You */}
+          {type === "expense" && (
+            <View style={s.itemRow}>
+              <Text style={s.itemLabel}>Receivable?</Text>
+              <View style={[s.yesNoRow, { flex: 1 }]}>
+                <TouchableOpacity style={[s.yesNoBtn, item.isReceivable && s.yesNoBtnActive]} onPress={() => updateItem(item.id, { isReceivable: true })} activeOpacity={0.8}>
+                  <Text style={[s.yesNoBtnText, item.isReceivable && s.yesNoBtnTextActive]}>Yes</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[s.yesNoBtn, !item.isReceivable && s.yesNoBtnActive]} onPress={() => updateItem(item.id, { isReceivable: false })} activeOpacity={0.8}>
+                  <Text style={[s.yesNoBtnText, !item.isReceivable && s.yesNoBtnTextActive]}>No</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+          {type === "expense" && item.isReceivable && (
+            <TouchableOpacity style={s.itemRow} onPress={() => { setActivePickerItemId(item.id); setShowPersonModal(true); }} activeOpacity={0.8}>
+              <Text style={s.itemLabel}>Owes You</Text>
+              <View style={s.itemPill}>
+                <Text style={s.itemPillText}>{item.person || 'Select'}</Text>
+                <Ionicons name="chevron-down" size={13} color={DC.pageText} />
+              </View>
             </TouchableOpacity>
-          </FormRow>
-        </FormBlock>
-      )}
-
-      {/* ── Receivable extra fields ── */}
-      {type === 'receivable' && (
-        <FormBlock>
-          <FormRow label="linked">
-            <TouchableOpacity style={s.typeDropRow} onPress={openExpensePicker} activeOpacity={0.8}>
-              {linkedExpense ? (
-                <>
-                  <Ionicons name="receipt-outline" size={13} color={Colors.expense} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontFamily: Fonts.mono, fontSize: 13, color: Colors.text }}>{linkedExpense.name}</Text>
-                    <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted }}>{Number(linkedExpense.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })} · {linkedExpense.transaction_date}</Text>
-                  </View>
-                  <TouchableOpacity onPress={() => setLinkedExpense(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Ionicons name="close" size={13} color={Colors.muted} />
-                  </TouchableOpacity>
-                </>
-              ) : (
-                <Text style={{ fontFamily: Fonts.mono, fontSize: 13, color: Colors.faint, flex: 1 }}>link an expense (optional)</Text>
-              )}
-              <Ionicons name="chevron-down" size={13} color={Colors.faint} />
+          )}
+          {/* Person - loan/combo types */}
+          {(isLoanType || isComboType) && !useSingularPerson && (
+            <TouchableOpacity style={s.itemRow} onPress={() => { setActivePickerItemId(item.id); setShowPersonModal(true); }} activeOpacity={0.8}>
+              <Text style={s.itemLabel}>{type === "payable" ? "Paying" : "Owes You"}</Text>
+              <View style={s.itemPill}>
+                <Text style={s.itemPillText}>{item.person || "Select"}</Text>
+                <Ionicons name="chevron-down" size={13} color={DC.pageText} />
+              </View>
             </TouchableOpacity>
-          </FormRow>
-          <FormRow label="lent from">
-            <TouchableOpacity style={s.typeDropRow} onPress={() => setShowDecreasedFromModal(true)} activeOpacity={0.8}>
-              {decreasedFromAccount ? (
-                <>
-                  <View style={[s.catDot, { backgroundColor: decreasedFromAccount.color ?? Colors.borderMid }]} />
-                  <Text style={{ fontFamily: Fonts.mono, fontSize: 13, color: Colors.text, flex: 1 }}>{decreasedFromAccount.account_name}</Text>
-                  <TouchableOpacity onPress={() => setDecreasedFromAccount(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Ionicons name="close" size={13} color={Colors.muted} />
-                  </TouchableOpacity>
-                </>
-              ) : (
-                <Text style={{ fontFamily: Fonts.mono, fontSize: 13, color: Colors.faint, flex: 1 }}>optional</Text>
-              )}
-              <Ionicons name="chevron-down" size={13} color={Colors.faint} />
-            </TouchableOpacity>
-          </FormRow>
-        </FormBlock>
-      )}
-
-      {/* ── Notes ── */}
-      <FormBlock>
-        <FormRow label="notes" stacked>
-          <TextInput
-            style={[s.inlineInput, { minHeight: 36 }]}
-            placeholder="optional"
-            placeholderTextColor={Colors.faint}
-            value={notes}
-            onChangeText={setNotes}
-            multiline
-          />
-        </FormRow>
-      </FormBlock>
-
-      {/* ── Receipt ── */}
-      <View style={s.receiptRow}>
-        <Text style={s.receiptLabel}>receipt</Text>
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          <TouchableOpacity style={s.photoBtn} onPress={addFromCamera}>
-            <Ionicons name="camera-outline" size={14} color={Colors.cyan} />
-            <Text style={s.photoBtnText}>camera</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={s.photoBtn} onPress={addFromGallery}>
-            <Ionicons name="images-outline" size={14} color={Colors.muted} />
-            <Text style={[s.photoBtnText, { color: Colors.muted }]}>gallery</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-      {receiptPhotos.length > 0 && (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 8 }} contentContainerStyle={{ gap: 8 }}>
-          {receiptPhotos.map((uri, i) => (
-            <View key={i} style={s.photoThumbWrap}>
-              <Image source={{ uri }} style={s.receiptThumb} resizeMode="cover" />
-              <TouchableOpacity style={s.photoRemoveBtn} onPress={() => removePhoto(i)}>
-                <Ionicons name="close-circle" size={18} color={Colors.text} />
+          )}
+          {/* Receipts */}
+          <View style={[s.itemRow, { borderBottomWidth: 0 }]}>
+            <Text style={s.itemLabel}>Receipts</Text>
+            <View style={[s.yesNoRow, { flex: 1 }]}>
+              <TouchableOpacity style={s.yesNoBtn} onPress={() => addFromCamera(item.id)} activeOpacity={0.8}>
+                <Text style={s.yesNoBtnText}>Camera</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.yesNoBtn} onPress={() => addFromGallery(item.id)} activeOpacity={0.8}>
+                <Text style={s.yesNoBtnText}>Gallery</Text>
               </TouchableOpacity>
             </View>
-          ))}
-        </ScrollView>
-      )}
-
-      {/* ── Budget indicator ── */}
-      {type === 'expense' && spaceBudget && (
-        (() => {
-          const enteredAmt = parseFloat(amount || '0') || 0;
-          const remaining = spaceBudget - spaceSpent - enteredAmt;
-          const pct = Math.min((spaceSpent + enteredAmt) / spaceBudget, 1);
-          const overBudget = remaining < 0;
-          const barColor = overBudget ? Colors.expense : pct >= 0.8 ? Colors.pending : Colors.income;
-          const fmt = (n: number) => {
-            const abs = Math.abs(n);
-            if (abs >= 1_000_000) return (abs / 1_000_000).toFixed(1) + 'M';
-            if (abs >= 1_000) return (abs / 1_000).toFixed(1) + 'k';
-            return Math.round(abs).toString();
-          };
-          return (
-            <View style={s.budgetWrap}>
-              <View style={s.budgetLabelRow}>
-                <Text style={s.budgetLabel}>budget remaining</Text>
-                <Text style={[s.budgetValue, overBudget && { color: Colors.expense }]}>
-                  {overBudget ? `-${fmt(remaining)}` : fmt(remaining)}
-                </Text>
-              </View>
-              <View style={s.budgetTrack}>
-                <View style={[s.budgetFill, { width: `${pct * 100}%` as any, backgroundColor: barColor }]} />
-              </View>
-              {overBudget && <Text style={s.budgetOver}>this will exceed your budget</Text>}
+          </View>
+          {item.photos.length > 0 && (
+            <View style={{ paddingHorizontal: 14, paddingBottom: 12 }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+                {item.photos.map((uri, i) => (
+                  <View key={i} style={s.photoThumbWrap}>
+                    <Image source={{ uri }} style={s.receiptThumb} resizeMode="cover" />
+                    <TouchableOpacity style={s.photoRemoveBtn} onPress={() => removePhoto(item.id, i)}>
+                      <Ionicons name="close-circle" size={18} color={Colors.text} />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </ScrollView>
             </View>
-          );
-        })()
-      )}
+          )}
+        </View>
+      ))}
+      {/* + Add new */}
+      <TouchableOpacity style={s.addNewBtn} onPress={addItem} activeOpacity={0.8}>
+        <Text style={s.addNewBtnText}>+ Add new</Text>
+      </TouchableOpacity>
 
-      {/* ── Save button ── */}
+      {/* Save button */}
       <TouchableOpacity
-        style={[s.saveBtn, (!recName.trim() || !amount) && s.saveBtnDisabled]}
+        style={[s.saveBtn, items.some(it => !it.name.trim() || !it.amount) && s.saveBtnDisabled]}
         onPress={handleSave}
-        disabled={loading || !recName.trim() || !amount}
+        disabled={loading || items.some(it => !it.name.trim() || !it.amount)}
         activeOpacity={0.8}
       >
-        {loading ? <ActivityIndicator color={Colors.white} /> : <Text style={s.saveBtnText}>save recording</Text>}
+        {loading ? <ActivityIndicator color={Colors.white} /> : <Text style={s.saveBtnText}>Save {items.length > 1 ? `${items.length} Recordings` : "Recording"}</Text>}
       </TouchableOpacity>
-      {/* ── Currency picker modal ── */}
+
       <BottomSheet visible={showCurrencyModal} onClose={() => setShowCurrencyModal(false)} title="currency" height="50%">
         <ScrollView showsVerticalScrollIndicator={false}>
           {CURRENCIES.map(c => (
@@ -845,11 +661,16 @@ export default function AddRecordingScreen({ inlineProps }: {
         </ScrollView>
       </BottomSheet>
 
-      {/* ── Category picker modal ── */}
+      {/* Category picker modal */}
       <BottomSheet visible={showCategoryModal} onClose={() => setShowCategoryModal(false)} sub="recording" title="category">
         <SearchableList
-          items={categories} selected={selectedCategory}
-          onSelect={c => { setSelectedCategory(c); setShowCategoryModal(false); }}
+          items={categories}
+          selected={activePickerItemId === "singular" ? null : items.find(i => i.id === activePickerItemId)?.category}
+          onSelect={c => {
+            if (activePickerItemId === "singular") { /* no-op for singular */ }
+            else updateItem(activePickerItemId, { category: c });
+            setShowCategoryModal(false);
+          }}
           keyExtractor={c => c.id} labelExtractor={c => c.name}
           renderLeft={(c) => (
             <View style={[s.catDot, { backgroundColor: c.color }]}>
@@ -860,60 +681,71 @@ export default function AddRecordingScreen({ inlineProps }: {
         />
         <FormActions onCancel={() => setShowCategoryModal(false)} onConfirm={() => setShowCategoryModal(false)} cancelLabel="cancel" confirmLabel="done" />
       </BottomSheet>
-
-      {/* ── Account picker modal ── */}
+      {/* Account picker modal - per item */}
       <BottomSheet visible={showAccountModal} onClose={() => setShowAccountModal(false)} sub="recording" title="account">
         <SearchableList
-          items={accounts} selected={selectedAccount}
-          onSelect={a => { setSelectedAccount(a); setShowAccountModal(false); }}
+          items={accounts}
+          selected={items.find(i => i.id === activePickerItemId)?.account}
+          onSelect={a => { updateItem(activePickerItemId, { account: a }); setShowAccountModal(false); }}
           keyExtractor={a => a.id} labelExtractor={a => a.account_name}
-          subLabelExtractor={a => `${a.bank} · ${a.account_number}`}
+          subLabelExtractor={a => `${a.bank}`}
           renderLeft={(a) => <View style={[s.catDot, { backgroundColor: a.color ?? Colors.borderMid }]} />}
           emptyText="no accounts found"
         />
         <FormActions onCancel={() => setShowAccountModal(false)} onConfirm={() => setShowAccountModal(false)} cancelLabel="cancel" confirmLabel="done" />
       </BottomSheet>
+      {/* Singular account picker modal */}
+      <BottomSheet visible={showSingularAccountModal} onClose={() => setShowSingularAccountModal(false)} sub="recording" title="account">
+        <SearchableList
+          items={accounts} selected={singularAccount}
+          onSelect={a => { setSingularAccount(a); setShowSingularAccountModal(false); }}
+          keyExtractor={a => a.id} labelExtractor={a => a.account_name}
+          subLabelExtractor={a => `${a.bank}`}
+          renderLeft={(a) => <View style={[s.catDot, { backgroundColor: a.color ?? Colors.borderMid }]} />}
+          emptyText="no accounts found"
+        />
+        <FormActions onCancel={() => setShowSingularAccountModal(false)} onConfirm={() => setShowSingularAccountModal(false)} cancelLabel="cancel" confirmLabel="done" />
+      </BottomSheet>
 
-      {/* ── Decreased from modal ── */}
       <BottomSheet visible={showDecreasedFromModal} onClose={() => setShowDecreasedFromModal(false)} sub="receivable" title="decreased from">
         <SearchableList
           items={accounts} selected={decreasedFromAccount}
           onSelect={a => { setDecreasedFromAccount(a); setShowDecreasedFromModal(false); }}
           keyExtractor={a => a.id} labelExtractor={a => a.account_name}
-          subLabelExtractor={a => `${a.bank} · ${a.account_number}`}
+          subLabelExtractor={a => `${a.bank} � ${a.account_number}`}
           renderLeft={(a) => <View style={[s.catDot, { backgroundColor: a.color ?? Colors.borderMid }]} />}
           emptyText="no accounts found"
         />
         <FormActions onCancel={() => setShowDecreasedFromModal(false)} onConfirm={() => setShowDecreasedFromModal(false)} cancelLabel="cancel" confirmLabel="done" />
       </BottomSheet>
 
-      {/* ── Receive to modal ── */}
+      {/* -- Receive to modal -- */}
       <BottomSheet visible={showReceiveToModal} onClose={() => setShowReceiveToModal(false)} sub="receivable" title="expecting to receive in">
         <SearchableList
           items={accounts} selected={receiveToAccount}
           onSelect={a => { setReceiveToAccount(a); setShowReceiveToModal(false); }}
           keyExtractor={a => a.id} labelExtractor={a => a.account_name}
-          subLabelExtractor={a => `${a.bank} · ${a.account_number}`}
+          subLabelExtractor={a => `${a.bank} � ${a.account_number}`}
           renderLeft={(a) => <View style={[s.catDot, { backgroundColor: a.color ?? Colors.borderMid }]} />}
           emptyText="no accounts found"
         />
         <FormActions onCancel={() => setShowReceiveToModal(false)} onConfirm={() => setShowReceiveToModal(false)} cancelLabel="cancel" confirmLabel="done" />
       </BottomSheet>
 
-      {/* ── Expense picker modal ── */}
+      {/* -- Expense picker modal -- */}
       <BottomSheet visible={showExpenseModal} onClose={() => setShowExpenseModal(false)} sub="receivable" title="link to expense">
         <SearchableList
           items={expenseList}
           selected={linkedExpense}
           onSelect={e => {
             setLinkedExpense(e);
-            if (!recName.trim()) setRecName(e.name);
-            if (!amount) setAmount(String(e.amount));
+            if (!items[0].name.trim()) updateItem(items[0].id, { name: e.name });
+            if (!items[0].amount) updateItem(items[0].id, { amount: String(e.amount) });
             setShowExpenseModal(false);
           }}
           keyExtractor={e => e.id}
           labelExtractor={e => e.name}
-          subLabelExtractor={e => `${Number(e.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })} · ${e.transaction_date}`}
+          subLabelExtractor={e => `${Number(e.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })} � ${e.transaction_date}`}
           renderLeft={() => <Ionicons name="receipt-outline" size={14} color={Colors.expense} />}
           emptyText="no expenses found"
         />
@@ -923,11 +755,11 @@ export default function AddRecordingScreen({ inlineProps }: {
       </ScrollView>
       </View>
 
-      {/* ── All modals outside ScrollView ── */}
+      {/* -- All modals outside ScrollView -- */}
       {/* Person picker modal */}
-      <BottomSheet visible={showPersonModal} onClose={() => { setShowPersonModal(false); setPersonSearch(''); setShowAllFriends(false); setShowAllContacts(false); }} title="select person">
+      <BottomSheet visible={showPersonModal} onClose={() => { setShowPersonModal(false); setPersonSearch(""); setShowAllFriends(false); setShowAllContacts(false); }} title="select person">
         <TextInput
-          style={{ fontFamily: Fonts.mono, fontSize: 14, color: Colors.text, backgroundColor: Colors.surface, borderRadius: Radius.lg, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1, borderColor: Colors.borderMid, marginBottom: 16 }}
+          style={{ fontFamily: AppFont.regular, fontSize: 14, color: Colors.text, backgroundColor: Colors.surface, borderRadius: Radius.lg, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1, borderColor: Colors.borderMid, marginBottom: 16 }}
           placeholder="search..."
           placeholderTextColor={Colors.faint}
           value={personSearch}
@@ -940,111 +772,127 @@ export default function AddRecordingScreen({ inlineProps }: {
           const filteredContacts = contactSuggestions.filter(n => n.toLowerCase().includes(query));
           const visibleFriends = showAllFriends ? filteredFriends : filteredFriends.slice(0, 3);
           const visibleContacts = showAllContacts ? filteredContacts : filteredContacts.slice(0, 3);
+          const selectPerson = (name: string, userId: string | null) => {
+            if (activePickerItemId === "singular") {
+              setSingularPerson(name); setSingularPersonUserId(userId);
+            } else {
+              updateItem(activePickerItemId, { person: name, personUserId: userId });
+            }
+            setShowPersonModal(false); setPersonSearch(""); setShowAllFriends(false); setShowAllContacts(false);
+          };
           return (
             <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 320 }}>
               {filteredFriends.length > 0 && (
                 <>
-                  <Text style={{ fontFamily: Fonts.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8 }}>friends</Text>
+                  <Text style={{ fontFamily: AppFont.bold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 8 }}>friends</Text>
                   {visibleFriends.map(n => (
-                    <TouchableOpacity key={n} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border }} onPress={() => { setPersonName(n); setSelectedFriendUserId(friendIdMap[n] ?? null); setShowPersonModal(false); setPersonSearch(''); setShowAllFriends(false); setShowAllContacts(false); }} activeOpacity={0.75}>
-                      <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.cyan + '33', alignItems: 'center', justifyContent: 'center' }}>
+                    <TouchableOpacity key={n} style={{ flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border }} onPress={() => selectPerson(n, friendIdMap[n] ?? null)} activeOpacity={0.75}>
+                      <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.cyan + "33", alignItems: "center", justifyContent: "center" }}>
                         <Ionicons name="people-outline" size={14} color={Colors.cyan} />
                       </View>
-                      <Text style={{ fontFamily: Fonts.mono, fontSize: 14, color: Colors.text, flex: 1 }}>{n}</Text>
+                      <Text style={{ fontFamily: AppFont.regular, fontSize: 14, color: Colors.text, flex: 1 }}>{n}</Text>
                     </TouchableOpacity>
                   ))}
                   {filteredFriends.length > 3 && !showAllFriends && (
                     <TouchableOpacity onPress={() => setShowAllFriends(true)} style={{ paddingVertical: 10 }}>
-                      <Text style={{ fontFamily: Fonts.monoBold, fontSize: 12, color: Colors.cyan }}>show {filteredFriends.length - 3} more</Text>
+                      <Text style={{ fontFamily: AppFont.bold, fontSize: 12, color: Colors.cyan }}>show {filteredFriends.length - 3} more</Text>
                     </TouchableOpacity>
                   )}
                 </>
               )}
               {filteredContacts.length > 0 && (
                 <>
-                  <Text style={{ fontFamily: Fonts.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginTop: filteredFriends.length > 0 ? 16 : 0, marginBottom: 8 }}>manual contacts</Text>
+                  <Text style={{ fontFamily: AppFont.bold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: "uppercase", marginTop: filteredFriends.length > 0 ? 16 : 0, marginBottom: 8 }}>contacts</Text>
                   {visibleContacts.map(n => (
-                    <TouchableOpacity key={n} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border }} onPress={() => { setPersonName(n); setSelectedFriendUserId(null); setShowPersonModal(false); setPersonSearch(''); setShowAllFriends(false); setShowAllContacts(false); }} activeOpacity={0.75}>
-                      <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.borderMid }}>
+                    <TouchableOpacity key={n} style={{ flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border }} onPress={() => selectPerson(n, null)} activeOpacity={0.75}>
+                      <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.surface, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: Colors.borderMid }}>
                         <Ionicons name="person-outline" size={14} color={Colors.muted} />
                       </View>
-                      <Text style={{ fontFamily: Fonts.mono, fontSize: 14, color: Colors.text, flex: 1 }}>{n}</Text>
+                      <Text style={{ fontFamily: AppFont.regular, fontSize: 14, color: Colors.text, flex: 1 }}>{n}</Text>
                     </TouchableOpacity>
                   ))}
                   {filteredContacts.length > 3 && !showAllContacts && (
                     <TouchableOpacity onPress={() => setShowAllContacts(true)} style={{ paddingVertical: 10 }}>
-                      <Text style={{ fontFamily: Fonts.monoBold, fontSize: 12, color: Colors.cyan }}>show {filteredContacts.length - 3} more</Text>
+                      <Text style={{ fontFamily: AppFont.bold, fontSize: 12, color: Colors.cyan }}>show {filteredContacts.length - 3} more</Text>
                     </TouchableOpacity>
                   )}
                 </>
               )}
               {filteredFriends.length === 0 && filteredContacts.length === 0 && (
-                <Text style={{ fontFamily: Fonts.mono, fontSize: 13, color: Colors.muted, textAlign: 'center', paddingVertical: 24 }}>
-                  {personSearch ? 'no results found' : 'no contacts yet — add friends or contacts first'}
+                <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.muted, textAlign: "center", paddingVertical: 24 }}>
+                  {personSearch ? "no results found" : "no contacts yet"}
                 </Text>
               )}
             </ScrollView>
           );
         })()}
-        <FormActions onCancel={() => { setShowPersonModal(false); setPersonSearch(''); setShowAllFriends(false); setShowAllContacts(false); }} onConfirm={() => { setShowPersonModal(false); setPersonSearch(''); }} cancelLabel="cancel" confirmLabel="done" />
+        <FormActions onCancel={() => { setShowPersonModal(false); setPersonSearch(""); setShowAllFriends(false); setShowAllContacts(false); }} onConfirm={() => { setShowPersonModal(false); setPersonSearch(""); }} cancelLabel="cancel" confirmLabel="done" />
       </BottomSheet>
+
+
+      </SafeAreaView>
       </View>
     </Modal>
   );
 }
 
-// ─── Styles ──────────────────────────────────────────────────────────────────
+// --- Styles ------------------------------------------------------------------
+
 
 const s = StyleSheet.create({
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-  },
-  centeredWrap: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    pointerEvents: 'box-none',
-  },
-  card: {
-    width: '100%',
-    maxWidth: 480,
-    maxHeight: '85%',
-    backgroundColor: '#ffffff',
-    borderRadius: 24,
-    padding: 24,
-    paddingBottom: 0,
-  },
-  photoThumbWrap:  { position: 'relative', marginRight: 8 },
-  photoRemoveBtn:  { position: 'absolute', top: -6, right: -6, backgroundColor: Colors.white, borderRadius: 99 },
-  receiptThumb:    { width: 64, height: 64, borderRadius: Radius.md },
-  typeDropRow:     { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  infoBlockSpaced: { marginTop: 0 },
-  inlineInput:     { flex: 1, fontFamily: Fonts.mono, fontSize: 16, color: Colors.text, padding: 0 },
-  amountRow:       { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 },
-  amountSign:      { fontFamily: Fonts.monoBold, fontSize: 16 },
-  catDot:          { width: 22, height: 22, borderRadius: 11, justifyContent: 'center', alignItems: 'center' },
-  chipRow:         { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  chip:            { paddingHorizontal: 12, paddingVertical: 7, borderRadius: Radius.pill, borderWidth: 1, borderColor: Colors.borderMid, backgroundColor: Colors.surface },
-  chipActive:      { backgroundColor: Colors.cyan, borderColor: Colors.cyan },
-  chipText:        { fontFamily: Fonts.mono, fontSize: 11, color: Colors.muted },
-  chipTextActive:  { color: Colors.white, fontFamily: Fonts.monoBold },
-  receiptRow:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 14 },
-  receiptLabel:    { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted, textTransform: 'uppercase', letterSpacing: 0.6 },
-  photoBtn:        { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: Radius.pill, borderWidth: 1, borderColor: Colors.borderMid, backgroundColor: Colors.surface },
-  photoBtnText:    { fontFamily: Fonts.mono, fontSize: 11, color: Colors.cyan },
-  saveBtn:         { backgroundColor: Colors.cyan, borderRadius: Radius.pill, paddingVertical: 14, alignItems: 'center', marginTop: 16 },
-  saveBtnDisabled: { opacity: 0.4 },
-  saveBtnText:     { fontFamily: Fonts.monoBold, fontSize: 13, color: Colors.text },
-  budgetWrap:      { gap: 6, padding: 14, backgroundColor: Colors.surface, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.border, marginTop: 10 },
-  budgetLabelRow:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  budgetLabel:     { fontFamily: 'ChillaxRegular', fontSize: 11, color: Colors.muted, letterSpacing: 0.3 },
-  budgetValue:     { fontFamily: Fonts.monoBold, fontSize: 11, color: Colors.text, letterSpacing: 0.2 },
-  budgetTrack:     { height: 6, backgroundColor: Colors.border, borderRadius: Radius.pill, overflow: 'hidden' },
-  budgetFill:      { height: '100%', borderRadius: Radius.pill },
-  budgetOver:      { fontFamily: Fonts.mono, fontSize: 10, color: Colors.expense, letterSpacing: 0.2 },
-  suggestionChip:     { paddingHorizontal: 12, paddingVertical: 6, borderRadius: Radius.pill, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.borderMid },
-  suggestionChipText: { fontFamily: Fonts.mono, fontSize: 12, color: Colors.text },
-});
+  // ── Layout ──────────────────────────────────────────────────────────────
+  overlay:         { flex: 1 },
+  sheet:           { flex: 1, backgroundColor: 'rgba(255,255,255,0.82)' },
 
+  // ── Header ──────────────────────────────────────────────────────────────
+  header:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: DC.modalRowPadding, paddingTop: DC.modalRowPadding / 2 },
+  headerTitle:     { fontFamily: AppFont.bold, fontSize: DC.modalTitleSize - 2, color: DC.accent1, letterSpacing: -0.5 },
+  headerClose:     { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.06)', alignItems: 'center', justifyContent: 'center' },
+  headerCloseText: { fontFamily: AppFont.bold, fontSize: 14, color: DC.pageText },
+
+  // ── Frozen section rows ─────────────────────────────────────────────────
+  frozenSection:   { marginBottom: 0 },
+  frozenRow:       { flexDirection: 'row', alignItems: 'center', paddingVertical: DC.modalRowPadding / 2, gap: DC.modalPadding / 2 },
+  frozenLabel:     { fontFamily: AppFont.semiBold, fontSize: DC.dropdownFontSize, color: DC.pageTextMuted, width: 90 },
+  frozenPill:      { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: DC.modalInputBg, borderRadius: DC.modalInputRadius, borderWidth: DC.cardBorderWidth, borderColor: DC.cardBorder, paddingHorizontal: DC.dropdownPaddingH, paddingVertical: DC.dropdownPaddingV },
+  frozenPillText:  { fontFamily: AppFont.medium, fontSize: DC.dropdownFontSize, color: DC.dropdownTextColor },
+
+  yesNoRow:           { flexDirection: 'row', gap: DC.modalPadding / 4 },
+  yesNoBtn:           { flex: 1, alignItems: 'center', paddingVertical: DC.togglePaddingV + 2, borderRadius: DC.toggleRadius, borderWidth: DC.cardBorderWidth, borderColor: DC.cardBorder, backgroundColor: DC.toggleInactiveBg },
+  yesNoBtnActive:     { backgroundColor: DC.toggleActiveBg, borderColor: DC.toggleActiveBg },
+  yesNoBtnText:       { fontFamily: AppFont.medium, fontSize: DC.toggleFontSize, color: DC.toggleInactiveText },
+  yesNoBtnTextActive: { fontFamily: AppFont.semiBold, fontSize: DC.toggleFontSize, color: DC.toggleActiveText },
+
+  // ── Item cards ──────────────────────────────────────────────────────────
+  itemCard:        { borderWidth: DC.cardBorderWidth, borderColor: DC.cardBorder, borderRadius: DC.cardRadius / 2, marginBottom: DC.cardGap / 2, overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.6)', paddingTop: DC.modalRowPadding / 2, paddingBottom: DC.modalRowPadding / 2 },
+  itemCardHeader:  { display: 'none' as any },
+  itemCardNum:     { display: 'none' as any },
+  itemRow:         { flexDirection: 'row', alignItems: 'center', paddingHorizontal: DC.modalPadding / 2, paddingVertical: DC.modalRowPadding / 2, gap: DC.modalPadding / 2 },
+  itemLabel:       { fontFamily: AppFont.semiBold, fontSize: DC.rowLabelSize - 1, color: DC.pageTextMuted, width: 80 },
+  itemInput:       { flex: 1, minWidth: 0, fontFamily: AppFont.regular, fontSize: DC.inputFontSize - 1, color: DC.inputTextColor, textAlign: 'right', backgroundColor: DC.inputBg, borderRadius: DC.inputRadius, borderWidth: DC.inputBorderWidth, borderColor: DC.inputBorder, paddingHorizontal: DC.inputPaddingH, paddingVertical: DC.inputPaddingV / 2 },
+  itemPill:        { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: DC.dropdownBg, borderRadius: DC.dropdownRadius, borderWidth: DC.cardBorderWidth, borderColor: DC.cardBorder, paddingHorizontal: DC.dropdownPaddingH, paddingVertical: DC.dropdownPaddingV },
+  itemPillText:    { fontFamily: AppFont.medium, fontSize: DC.dropdownFontSize, color: DC.dropdownTextColor },
+  currencyPill:    { backgroundColor: DC.dropdownBg, borderRadius: DC.dropdownRadius, borderWidth: DC.cardBorderWidth, borderColor: DC.cardBorder, paddingHorizontal: DC.dropdownPaddingH - 4, paddingVertical: DC.dropdownPaddingV },
+  currencyPillText:{ fontFamily: AppFont.semiBold, fontSize: DC.dropdownFontSize - 1, color: DC.dropdownTextColor },
+
+  addNewBtn:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: DC.modalPadding / 4, backgroundColor: DC.btnBg, borderRadius: DC.dropdownRadius, borderWidth: DC.btnBorderWidth, paddingVertical: DC.modalRowPadding, paddingHorizontal: DC.modalPadding * 2, marginBottom: DC.cardGap / 2, alignSelf: 'center' as const },
+  addNewBtnText:   { fontFamily: AppFont.medium, fontSize: DC.rowLabelSize, color: DC.btnText },
+
+  photoThumbWrap:  { position: 'relative', marginRight: DC.cardGap / 2 },
+  photoRemoveBtn:  { position: 'absolute', top: -6, right: -6, backgroundColor: DC.pageBg, borderRadius: 99 },
+  receiptThumb:    { width: 64, height: 64, borderRadius: DC.cardRadius / 4 },
+
+  catDot:          { width: 22, height: 22, borderRadius: 11, justifyContent: 'center', alignItems: 'center' },
+  chipRow:         { flexDirection: 'row', flexWrap: 'wrap', gap: DC.cardGap / 2 },
+  chip:            { paddingHorizontal: DC.dropdownPaddingH - 4, paddingVertical: DC.dropdownPaddingV - 3, borderRadius: DC.dropdownRadius, borderWidth: DC.cardBorderWidth, borderColor: DC.cardBorder, backgroundColor: DC.cardBg },
+  chipActive:      { backgroundColor: DC.accent1, borderColor: DC.accent1 },
+  chipText:        { fontFamily: Fonts.mono, fontSize: 11, color: DC.pageTextMuted },
+  chipTextActive:  { color: DC.pageBg, fontFamily: Fonts.monoBold },
+  photoBtn:        { flexDirection: 'row', alignItems: 'center', gap: DC.modalPadding / 4, paddingHorizontal: DC.dropdownPaddingH, paddingVertical: DC.dropdownPaddingV, borderRadius: DC.cardRadius / 4, backgroundColor: DC.btnBg, borderWidth: DC.btnBorderWidth },
+  photoBtnText:    { fontFamily: AppFont.medium, fontSize: DC.dropdownFontSize, color: DC.btnText },
+  saveBtn:         { backgroundColor: DC.accent1, borderRadius: DC.cardRadius / 4, paddingVertical: DC.inputPaddingV + 4, alignItems: 'center' as const, marginTop: DC.cardGap / 2 },
+  saveBtnDisabled: { opacity: 0.35 },
+  saveBtnText:     { fontFamily: AppFont.semiBold, fontSize: DC.inputFontSize + 1, color: DC.pageBg },
+  suggestionChip:     { paddingHorizontal: DC.dropdownPaddingH - 4, paddingVertical: DC.dropdownPaddingV - 2, borderRadius: DC.dropdownRadius, backgroundColor: DC.cardBg, borderWidth: DC.cardBorderWidth, borderColor: DC.cardBorder },
+  suggestionChipText: { fontFamily: Fonts.mono, fontSize: DC.dropdownFontSize - 1, color: DC.pageText },
+});

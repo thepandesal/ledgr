@@ -957,43 +957,22 @@ export default function SplitBillDetailScreen() {
           await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: 'Save split bill' });
         }
       } else if (typeof document !== 'undefined') {
-        await new Promise<void>((resolve, reject) => {
-          if ((window as any).html2canvas) { resolve(); return; }
-          const script = document.createElement('script');
-          script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
-          script.onload = () => resolve(); script.onerror = reject;
-          document.head.appendChild(script);
-        });
-        const iframe = document.createElement('iframe');
-        iframe.style.cssText = 'position:fixed;left:-9999px;top:0;width:520px;height:4000px;border:none;background:#fff';
-        document.body.appendChild(iframe);
-        iframe.contentDocument!.open();
-        iframe.contentDocument!.write(html);
-        iframe.contentDocument!.close();
-        await new Promise(r => setTimeout(r, 1800));
-        const body = iframe.contentDocument!.body;
-        const canvas = await (window as any).html2canvas(body, {
-          scale: 2, useCORS: true, allowTaint: true, backgroundColor: '#ffffff',
-          width: 520, windowWidth: 520,
-          scrollY: 0, scrollX: 0,
-          height: body.scrollHeight, windowHeight: body.scrollHeight,
-        });
-        document.body.removeChild(iframe);
-        canvas.toBlob(async (blob: Blob | null) => {
-          if (!blob) return;
-          const fileName = `${String(name).replace(/\s+/g, '-')}-split.png`;
-          if (typeof navigator !== 'undefined' && (navigator as any).share && (navigator as any).canShare) {
-            const file = new File([blob], fileName, { type: 'image/png' });
-            if ((navigator as any).canShare({ files: [file] })) {
-              try { await (navigator as any).share({ files: [file], title: fileName }); return; } catch (_) {}
-            }
-          }
-          const url = URL.createObjectURL(blob);
+        const isMobile = typeof navigator !== 'undefined' && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        const Print = require('expo-print');
+        if (isMobile) {
+          await Print.printAsync({ html });
+        } else {
+          const { uri } = await Print.printToFileAsync({ html, width: 520 });
+          const res = await fetch(uri);
+          const blob = await res.blob();
+          const blobUrl = URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
           const a = document.createElement('a');
-          a.href = url; a.download = fileName;
+          a.href = blobUrl;
+          a.download = `${String(name).replace(/\s+/g, '-')}-split.pdf`;
           document.body.appendChild(a); a.click();
-          document.body.removeChild(a); URL.revokeObjectURL(url);
-        }, 'image/png');
+          document.body.removeChild(a);
+          setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+        }
       }
     } catch (e) { console.error('saveAsImage error:', e); }
     setSaveImgLoading(false);
@@ -3128,8 +3107,8 @@ export default function SplitBillDetailScreen() {
           onPress={saveAsImage}
           disabled={saveImgLoading || !shareLink}
         >
-          <Ionicons name="image-outline" size={15} color={Colors.text} />
-          <Text style={[s.doneBtnText, { color: Colors.text }]}>{saveImgLoading ? 'generating...' : 'save as image'}</Text>
+          <Ionicons name="document-outline" size={15} color={Colors.text} />
+          <Text style={[s.doneBtnText, { color: Colors.text }]}>{saveImgLoading ? 'generating...' : 'export as pdf'}</Text>
         </TouchableOpacity>
       </BottomSheet>
 

@@ -545,13 +545,12 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
 
         {/* Date filter row */}
         <View style={s.dateFilterRow}>
-          <TouchableOpacity style={[s.modeSelectorBtn, { flex: 1.8 }]} onPress={openDateModal} activeOpacity={0.8}>
-            <View style={s.filterDot} />
+          <TouchableOpacity style={[s.modeSelectorBtn, { flex: 1, justifyContent: 'center' }]} onPress={openDateModal} activeOpacity={0.8}>
             <Text style={s.modeSelectorText}>Filters</Text>
           </TouchableOpacity>
-          <DateNavBar style={{ flex: 6.4 }} label={dateLabel} onPrev={() => { const next = dateOffset - 1; setDateOffset(next); saveSetting({ spaces_date_offset: next }); }} onNext={() => { const next = dateOffset + 1; setDateOffset(next); saveSetting({ spaces_date_offset: next }); }} onLabelPress={openMonthYearModal} />
+          <DateNavBar style={{ flex: 2 }} label={dateLabel} onPrev={() => { const next = dateOffset - 1; setDateOffset(next); saveSetting({ spaces_date_offset: next }); }} onNext={() => { const next = dateOffset + 1; setDateOffset(next); saveSetting({ spaces_date_offset: next }); }} onLabelPress={openMonthYearModal} />
           <TourTarget id="tour-new-space">
-            <TouchableOpacity style={[s.modeSelectorBtn, { flex: 1.8 }]} onPress={openCreate} activeOpacity={0.8}>
+            <TouchableOpacity style={[s.modeSelectorBtn, { flex: 1, justifyContent: 'center' }]} onPress={openCreate} activeOpacity={0.8}>
               <Text style={s.modeSelectorText}>New Space</Text>
             </TouchableOpacity>
           </TourTarget>
@@ -973,31 +972,31 @@ const s = StyleSheet.create({
   emptyText: { fontFamily: AppFont.regular, fontSize: 13, color: DC.pageTextMuted },
 
   // ── Section ──────────────────────────────────────────────────────────────
-  sectionHeader: { fontFamily: AppFont.bold, fontSize: 15, color: DC.pageText, marginBottom: 8, marginTop: Brand.spacing.section, paddingHorizontal: DC.pagePadding, textAlign: 'center' },
+  sectionHeader: { fontFamily: AppFont.bold, fontSize: 17, color: DC.pageText, marginBottom: 10, marginTop: Brand.spacing.section, paddingHorizontal: DC.pagePadding, textAlign: 'center' },
   list: { marginBottom: 8, paddingHorizontal: DC.pagePadding },
 
   // ── Card ─────────────────────────────────────────────────────────────────
-  card:        { paddingVertical: 14, paddingHorizontal: 16, borderRadius: DC.cardRadius, borderWidth: DC.cardBorderWidth, borderColor: DC.cardBorder, marginBottom: DC.cardGap, backgroundColor: DC.cardBg, overflow: 'hidden' },
+  card:        { paddingVertical: 18, paddingHorizontal: 18, borderRadius: DC.cardRadius, borderWidth: DC.cardBorderWidth, borderColor: DC.cardBorder, marginBottom: DC.cardGap, backgroundColor: DC.cardBg, overflow: 'hidden' },
   cardOver:    { borderColor: DC.overBudgetColor, borderWidth: 1.5 },
-  cardHeader:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, paddingBottom: 10, marginHorizontal: -16, paddingHorizontal: 16, borderBottomWidth: 1.5, borderBottomColor: DC.cardBorder },
-  cardName:    { fontFamily: AppFont.bold, fontSize: 14, color: DC.pageText },
+  cardHeader:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, paddingBottom: 12, marginHorizontal: -18, paddingHorizontal: 18, borderBottomWidth: 1.5, borderBottomColor: DC.cardBorder },
+  cardName:    { fontFamily: AppFont.bold, fontSize: 16, color: DC.pageText },
   barRow:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 16 },
-  barSide:     { alignItems: 'center', justifyContent: 'center', width: 60, gap: 3 },
-  barCurrency: { fontFamily: AppFont.regular, fontSize: 8, color: DC.pageTextMuted, letterSpacing: 0.3 },
-  barValue:    { fontFamily: AppFont.bold, fontSize: 16, color: DC.pageText, letterSpacing: -0.5 },
-  barLabel:    { fontFamily: AppFont.regular, fontSize: 8, color: DC.pageTextMuted },
+  barSide:     { alignItems: 'center', justifyContent: 'center', width: 64, gap: 3 },
+  barCurrency: { fontFamily: AppFont.regular, fontSize: 10, color: DC.pageTextMuted, letterSpacing: 0.3 },
+  barValue:    { fontFamily: AppFont.bold, fontSize: 18, color: DC.pageText, letterSpacing: -0.5 },
+  barLabel:    { fontFamily: AppFont.regular, fontSize: 10, color: DC.pageTextMuted },
   barCenter:   { width: 160, alignItems: 'center', gap: 4 },
   barTrack:    { width: '100%', height: 20, position: 'relative', alignItems: 'center', justifyContent: 'center', flexDirection: 'row' },
   barFill:     { display: 'none' as any },
   barDot:      { position: 'absolute', width: DC.barDotSize, height: DC.barDotSize, borderRadius: DC.barDotSize / 2, zIndex: 2 },
   barLeft:     { position: 'absolute', left: 0, height: 2, overflow: 'hidden' },
   barRight:    { position: 'absolute', right: 0, height: 2, overflow: 'hidden' },
-  barRemaining:{ fontFamily: AppFont.regular, fontSize: 9, color: DC.pageTextMuted, fontStyle: 'italic' },
+  barRemaining:{ fontFamily: AppFont.regular, fontSize: 11, color: DC.pageTextMuted, fontStyle: 'italic' },
 
   // ── Modal ─────────────────────────────────────────────────────────────────
   error:   { fontFamily: AppFont.regular, fontSize: 12, color: Colors.expense, marginBottom: 8 },
-  label:   { fontFamily: AppFont.bold, fontSize: 11, color: DC.pageTextMuted, marginBottom: 6, marginTop: 14, letterSpacing: 0.4, textTransform: 'uppercase' },
-  input:   { fontFamily: AppFont.regular, fontSize: 15, color: DC.pageText, backgroundColor: Colors.white, borderRadius: Radius.lg, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1, borderColor: Colors.borderMid },
+  label:   { fontFamily: AppFont.bold, fontSize: 12, color: DC.pageTextMuted, marginBottom: 6, marginTop: 14, letterSpacing: 0.4, textTransform: 'uppercase' },
+  input:   { fontFamily: AppFont.regular, fontSize: 16, color: DC.pageText, backgroundColor: Colors.white, borderRadius: Radius.lg, paddingHorizontal: 14, paddingVertical: 14, borderWidth: 1, borderColor: Colors.borderMid },
 
   typeRow:           { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   typeBtn:           { paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, borderWidth: DC.btnBorderWidth, backgroundColor: DC.btnBg },
@@ -1005,8 +1004,8 @@ const s = StyleSheet.create({
   typeBtnText:       { fontFamily: AppFont.regular, fontSize: 12, color: DC.btnText },
   typeBtnTextActive: { fontFamily: AppFont.semiBold, fontSize: 12, color: DC.btnText },
 
-  saveBtn:     { backgroundColor: DC.btnBg, borderRadius: Radius.pill, paddingVertical: 14, alignItems: 'center', marginTop: 20, borderWidth: DC.btnBorderWidth },
-  saveBtnText: { fontFamily: AppFont.semiBold, fontSize: 14, color: DC.btnText },
+  saveBtn:     { backgroundColor: DC.btnBg, borderRadius: Radius.pill, paddingVertical: 16, alignItems: 'center', marginTop: 20, borderWidth: DC.btnBorderWidth },
+  saveBtnText: { fontFamily: AppFont.semiBold, fontSize: 15, color: DC.btnText },
 
   // ── Footer ───────────────────────────────────────────────────────────────
   footer: { fontFamily: AppFont.regular, fontSize: 10, color: Colors.faint, textAlign: 'center', marginTop: 32, paddingHorizontal: DC.pagePadding },
@@ -1017,20 +1016,20 @@ const s = StyleSheet.create({
   dateFilterRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingHorizontal: DC.pagePadding, marginTop: 20, marginBottom: 8 },
   dateNav:           { flexDirection: 'row', alignItems: 'center', gap: 4 },
   filterDot:        { width: 8, height: 8, borderRadius: 4, backgroundColor: DC.btnText },
-  modeSelectorBtn:   { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: DC.btnBg, borderWidth: DC.btnBorderWidth },
-  modeSelectorText:  { fontFamily: AppFont.regular, fontSize: 11, color: DC.btnText },
+  modeSelectorBtn:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 10, borderRadius: Radius.pill, backgroundColor: DC.btnBg, borderWidth: DC.btnBorderWidth },
+  modeSelectorText:  { fontFamily: AppFont.regular, fontSize: 13, color: DC.btnText },
   dateNavArrow:      { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.surface },
   dateNavArrowText:  { fontFamily: AppFont.regular, fontSize: 18, color: DC.accent1, lineHeight: 22 },
   dateLabelBtn:      { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 20, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: DC.cardBg, borderWidth: 1, borderColor: DC.cardBorder, minWidth: 160, justifyContent: 'space-between' },
   dateLabelText:     { fontFamily: AppFont.regular, fontSize: 11, color: DC.pageText },
-  dateModalLabel:    { fontFamily: AppFont.bold, fontSize: 10, color: DC.pageTextMuted, letterSpacing: 0.6, textTransform: 'uppercase', marginTop: 16, marginBottom: 8 },
+  dateModalLabel:    { fontFamily: AppFont.bold, fontSize: 12, color: DC.pageTextMuted, letterSpacing: 0.6, textTransform: 'uppercase', marginTop: 16, marginBottom: 8 },
   modeChips:         { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  modeChip:          { paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: DC.btnBg, borderWidth: DC.btnBorderWidth },
+  modeChip:          { paddingHorizontal: 16, paddingVertical: 10, borderRadius: Radius.pill, backgroundColor: DC.btnBg, borderWidth: DC.btnBorderWidth },
   modeChipActive:    { backgroundColor: DC.badgeActiveBg, borderWidth: DC.btnBorderWidth },
-  modeChipText:      { fontFamily: AppFont.regular, fontSize: 12, color: DC.btnText },
-  modeChipTextActive:{ fontFamily: AppFont.semiBold, fontSize: 12, color: DC.badgeActiveText },
-  presetChip:        { paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: DC.btnBg, borderWidth: DC.btnBorderWidth },
-  presetChipText:    { fontFamily: AppFont.regular, fontSize: 12, color: DC.btnText },
+  modeChipText:      { fontFamily: AppFont.regular, fontSize: 13, color: DC.btnText },
+  modeChipTextActive:{ fontFamily: AppFont.semiBold, fontSize: 13, color: DC.badgeActiveText },
+  presetChip:        { paddingHorizontal: 16, paddingVertical: 10, borderRadius: Radius.pill, backgroundColor: DC.btnBg, borderWidth: DC.btnBorderWidth },
+  presetChipText:    { fontFamily: AppFont.regular, fontSize: 13, color: DC.btnText },
   cutoffInput:       { fontFamily: AppFont.regular, fontSize: 15, color: DC.pageText, backgroundColor: Colors.surface, borderRadius: Radius.lg, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1, borderColor: Colors.borderMid, marginTop: 4, width: 80 },
 
   // ── Month/Year Picker ────────────────────────────────────────────────────

@@ -2131,7 +2131,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                 {linkedPayments.map((p: any, i: number) => (
                   <TouchableOpacity key={p.id} style={[rd.recRow, p.is_write_off && { opacity: 0.6 }]} onPress={() => !p.is_write_off && openRecording(p.id)}>
                     <View style={[rd.recIconWrap, p.is_write_off && { backgroundColor: DC.cardBg }]}>
-                      <Ionicons name={p.is_write_off ? 'close-circle-outline' : 'cash-outline'} size={14} color={p.is_write_off ? DC.pageTextMuted : DC.accent1} />
+                      <Ionicons name={p.is_write_off ? 'close-circle-outline' : 'cash-outline'} size={14} color={DC.pageText} />
                     </View>
                     <View style={rd.recMid}>
                       <Text style={[rd.recName, p.is_write_off && { color: Colors.muted }]}>{Number(p.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
@@ -2180,7 +2180,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
               <View style={{ paddingHorizontal: DC.pagePadding }}>
                 {splitBillPayments.map((p: any) => (
                   <View key={p.id} style={rd.recRow}>
-                    <View style={rd.recIconWrap}><Ionicons name="person-outline" size={14} color={DC.accent1} /></View>
+                    <View style={rd.recIconWrap}><Ionicons name="person-outline" size={14} color={DC.pageText} /></View>
                     <View style={rd.recMid}>
                       <Text style={rd.recName}>{p.person_name}</Text>
                       <Text style={rd.recDate}>{new Date(p.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</Text>
@@ -2214,7 +2214,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                     activeOpacity={chargedFromSplitBill ? 0.7 : 1}
                   >
                     <View style={rd.recIconWrap}>
-                      <Ionicons name={p.status === 'cancelled' ? 'close-circle-outline' : 'people-outline'} size={14} color={p.status === 'cancelled' ? DC.pageTextMuted : DC.accent1} />
+                      <Ionicons name={p.status === 'cancelled' ? 'close-circle-outline' : 'people-outline'} size={14} color={DC.pageText} />
                     </View>
                     <View style={rd.recMid}>
                       <Text style={[rd.recName, p.status === 'cancelled' && { textDecorationLine: 'line-through', color: Colors.muted }]}>
@@ -2992,9 +2992,9 @@ const rd = StyleSheet.create({
 
   // INFORMATION section header
   infoSectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: DC.pagePadding, paddingTop: 20, paddingBottom: 12 },
-  infoSectionTitle:  { fontFamily: AppFont.bold, fontSize: 12, color: DC.pageText, letterSpacing: 1, textTransform: 'uppercase' as const },
-  pillBtn:           { paddingHorizontal: 14, paddingVertical: 6, borderRadius: Radius.pill, backgroundColor: DC.accent1 + '33' },
-  pillBtnText:       { fontFamily: AppFont.semiBold, fontSize: 11, color: DC.accent1 },
+  infoSectionTitle:  { fontFamily: AppFont.bold, fontSize: 13, color: DC.pageText, letterSpacing: 1, textTransform: 'uppercase' as const },
+  pillBtn:           { paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: DC.btnBg, borderWidth: DC.btnBorderWidth },
+  pillBtnText:       { fontFamily: AppFont.regular, fontSize: 13, color: DC.btnText },
 
   // Dotted info rows
   infoRowDotted: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10 },
@@ -3035,7 +3035,7 @@ const rd = StyleSheet.create({
 
   // List rows
   recRow:     { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13 },
-  recIconWrap:{ width: 34, height: 34, borderRadius: 12, backgroundColor: DC.cardBg, justifyContent: 'center', alignItems: 'center' },
+  recIconWrap:{ width: 34, height: 34, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
   recMid:     { flex: 1, gap: 2 },
   recName:    { fontFamily: AppFont.semiBold, fontSize: 13, color: DC.pageText },
   recDate:    { fontFamily: AppFont.regular, fontSize: 10, color: DC.pageTextMuted },

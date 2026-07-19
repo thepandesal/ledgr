@@ -22,7 +22,7 @@ export default function DateNavBar({ label, onPrev, onNext, onLabelPress, style 
 }
 
 const s = StyleSheet.create({
-  btn:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingHorizontal: 16, height: 36, borderRadius: Radius.pill, backgroundColor: DC.btnBg, borderWidth: DC.btnBorderWidth, alignSelf: 'stretch' },
+  btn:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingHorizontal: 16, paddingVertical: 10, borderRadius: Radius.pill, backgroundColor: DC.btnBg, borderWidth: DC.btnBorderWidth },
   arrow: { fontFamily: AppFont.regular, fontSize: 14, color: DC.btnText, lineHeight: 14, includeFontPadding: false },
-  label: { flex: 1, fontFamily: AppFont.regular, fontSize: 11, color: DC.btnText, textAlign: 'center', lineHeight: 14, includeFontPadding: false },
+  label: { flex: 1, fontFamily: AppFont.regular, fontSize: 13, color: DC.btnText, textAlign: 'center', lineHeight: 14, includeFontPadding: false },
 });
