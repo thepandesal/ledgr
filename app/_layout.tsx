@@ -72,7 +72,11 @@ export default function RootLayout() {
     if (!document.getElementById(id)) {
       const style = document.createElement('style');
       style.id = id;
-      style.textContent = 'html { scrollbar-gutter: stable; overflow-y: scroll; }';
+      // scrollbar-gutter is not supported in Safari — use overflow-y only
+      const isChrome = typeof navigator !== 'undefined' && /Chrome/.test(navigator.userAgent) && !/Edg/.test(navigator.userAgent);
+      style.textContent = isChrome
+        ? 'html { scrollbar-gutter: stable; overflow-y: scroll; }'
+        : 'html { overflow-y: scroll; }';
       document.head.appendChild(style);
     }
   }, []);
@@ -94,7 +98,7 @@ export default function RootLayout() {
   useEffect(() => {
     if (!fontsLoaded && !fontError) return;
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (__DEV__) console.log('[auth] event:', String(event).replace(/[\r\n]/g, ' '));
+      if (typeof __DEV__ !== 'undefined' && __DEV__) console.log('[auth] event:', String(event).replace(/[\r\n]/g, ' '));
       const path = typeof window !== 'undefined' && typeof window.location !== 'undefined' ? window.location.pathname : '';
       if (path.startsWith('/split/')) { setReady(true); return; }
       if (!session || event === 'SIGNED_OUT') {
@@ -111,10 +115,10 @@ export default function RootLayout() {
         setIsAuthenticated(true);
         setReady(true);
         router.replace('/onboarding');
-      } else if (event === 'SIGNED_IN') {
+      } else if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') {
         setIsAuthenticated(true);
         setReady(true);
-        if (!path || path === '/' || path === '/index') {
+        if ((event === 'SIGNED_IN') && (!path || path === '/' || path === '/index')) {
           router.replace('/(app)/(tabs)');
         }
       } else {

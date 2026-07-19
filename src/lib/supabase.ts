@@ -10,7 +10,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     storage: Platform.OS !== 'web' ? AsyncStorage : undefined,
     persistSession: true,
     autoRefreshToken: true,
-    detectSessionInUrl: false,
+    detectSessionInUrl: true,  // needed for web redirect OAuth flow (Safari)
     flowType: 'pkce',
   },
   realtime: {
