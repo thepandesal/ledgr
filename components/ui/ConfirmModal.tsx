@@ -18,7 +18,9 @@
 
 import { View, Text, StyleSheet, TouchableOpacity, Modal } from 'react-native';
 import { BlurView } from 'expo-blur';
-import { Colors, Fonts, Radius, Shadow } from './theme';
+import { Colors } from './theme';
+import { DC } from '../../src/lib/design';
+import { AppFont } from '../../src/lib/fonts';
 
 interface Action {
   label: string;
@@ -81,38 +83,37 @@ export default function ConfirmModal({ visible, onClose, title, message, childre
 const styles = StyleSheet.create({
   overlay: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   box: {
-    backgroundColor: Colors.white,
-    borderRadius: Radius.xl,
-    padding: 20,
+    backgroundColor: DC.modalBg,
+    borderRadius: DC.cardRadius,
+    padding: DC.modalPadding,
     width: 300,
     gap: 12,
     alignItems: 'center',
-    ...Shadow.card,
   },
   title: {
-    fontFamily: Fonts.heading,
-    fontSize: 16,
-    color: Colors.text,
+    fontFamily: AppFont.bold,
+    fontSize: DC.modalTitleSize - 6,
+    color: DC.pageText,
     alignSelf: 'flex-start',
   },
   message: {
-    fontFamily: Fonts.mono,
-    fontSize: 12,
-    color: Colors.muted,
+    fontFamily: AppFont.regular,
+    fontSize: DC.dropdownFontSize - 1,
+    color: DC.pageTextMuted,
     textAlign: 'center',
     lineHeight: 18,
   },
   actions: { flexDirection: 'row', gap: 10, width: '100%' },
   btn: {
     flex: 1,
-    backgroundColor: Colors.text,
-    borderRadius: Radius.pill,
-    paddingVertical: 11,
+    backgroundColor: DC.pageText,
+    borderRadius: DC.dropdownRadius,
+    paddingVertical: DC.modalRowPadding - 2,
     alignItems: 'center',
   },
   btnDestructive: { backgroundColor: Colors.danger },
-  btnMuted: { backgroundColor: Colors.input },
+  btnMuted: { backgroundColor: DC.cardBg },
   btnDisabled: { opacity: 0.4 },
-  btnText: { fontFamily: Fonts.monoBold, fontSize: 13, color: Colors.white },
-  btnTextMuted: { color: '#8a8a8a' },
+  btnText: { fontFamily: AppFont.semiBold, fontSize: DC.dropdownFontSize, color: DC.pageBg },
+  btnTextMuted: { color: DC.pageTextMuted },
 });

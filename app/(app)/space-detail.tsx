@@ -605,6 +605,7 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
   };
 
   const dateFiltered = recordings.filter(r => {
+    if (r.status === 'voided') return false;
     const [y, m, d] = r.transaction_date.split('-').map(Number);
     const date = new Date(y, m - 1, d);
     if (date < range.from) return false;

@@ -139,6 +139,17 @@ export const DC = {
   togglePaddingV:   8,                      // toggle vertical padding
   toggleFontSize:   13,                     // toggle font size
 
+  // Chips (sub-modal filter/selector chips)
+  chipBg:           '#F8F8F8',
+  chipBorder:       '#d1d1d1',
+  chipActiveBg:     '#ebf7f6',
+  chipActiveText:   '#4f9289',
+  chipInactiveText: '#555555',
+  chipRadius:       999,
+  chipPaddingH:     14,
+  chipPaddingV:     8,
+  chipFontSize:     13,
+
   // Form row
   rowLabelSize:     14,                     // row label font size
   rowLabelColor:    '#111111',              // row label color

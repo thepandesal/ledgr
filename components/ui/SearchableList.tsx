@@ -1,24 +1,9 @@
-/**
- * SearchableList.tsx
- * A scrollable list with a search input, used inside BottomSheet for
- * category, account, and receipt pickers.
- *
- * Usage:
- *   <SearchableList
- *     items={categories}
- *     selected={selectedCategory}
- *     onSelect={c => { setSelectedCategory(c); setModal(false); }}
- *     keyExtractor={c => c.id}
- *     labelExtractor={c => c.name}
- *     renderLeft={c => <CategoryDot color={c.color} icon={c.icon} />}
- *     renderRight={c => <SubText>{c.bank}</SubText>}
- *   />
- */
-
 import { View, Text, StyleSheet, TextInput, ScrollView, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
-import { Colors, Fonts, Radius } from './theme';
+import { Colors, Radius } from './theme';
+import { DC } from '../../src/lib/design';
+import { AppFont } from '../../src/lib/fonts';
 
 interface Props<T> {
   items: T[];
@@ -27,6 +12,7 @@ interface Props<T> {
   keyExtractor: (item: T) => string;
   labelExtractor: (item: T) => string;
   subLabelExtractor?: (item: T) => string;
+  subLabel2Extractor?: (item: T) => string;
   renderLeft?: (item: T, selected: boolean) => React.ReactNode;
   emptyText?: string;
   searchPlaceholder?: string;
@@ -39,6 +25,7 @@ export default function SearchableList<T>({
   keyExtractor,
   labelExtractor,
   subLabelExtractor,
+  subLabel2Extractor,
   renderLeft,
   emptyText = 'nothing found',
   searchPlaceholder = 'search...',
@@ -46,9 +33,7 @@ export default function SearchableList<T>({
   const [query, setQuery] = useState('');
 
   const filtered = query.trim()
-    ? items.filter(i =>
-        labelExtractor(i).toLowerCase().includes(query.toLowerCase())
-      )
+    ? items.filter(i => labelExtractor(i).toLowerCase().includes(query.toLowerCase()))
     : items;
 
   const selectedKey = selected ? keyExtractor(selected) : null;
@@ -76,19 +61,28 @@ export default function SearchableList<T>({
                 onPress={() => onSelect(item)}
                 activeOpacity={0.8}
               >
-                {renderLeft ? renderLeft(item, isSelected) : null}
+                {renderLeft ? (
+                  <View style={styles.iconCard}>
+                    {renderLeft(item, isSelected)}
+                  </View>
+                ) : null}
                 <View style={styles.itemText}>
-                  <Text style={[styles.label, isSelected && styles.labelActive]}>
+                  <Text style={[styles.label, isSelected && styles.labelActive]} numberOfLines={1}>
                     {labelExtractor(item)}
                   </Text>
                   {subLabelExtractor && (
-                    <Text style={[styles.sub, isSelected && styles.subActive]}>
+                    <Text style={[styles.sub, isSelected && styles.subActive]} numberOfLines={1}>
                       {subLabelExtractor(item)}
+                    </Text>
+                  )}
+                  {subLabel2Extractor && (
+                    <Text style={[styles.sub, isSelected && styles.subActive]} numberOfLines={1}>
+                      {subLabel2Extractor(item)}
                     </Text>
                   )}
                 </View>
                 {isSelected && (
-                  <Ionicons name="checkmark" size={14} color={Colors.white} />
+                  <Ionicons name="checkmark" size={14} color={DC.chipActiveText} />
                 )}
               </TouchableOpacity>
             );
@@ -101,22 +95,20 @@ export default function SearchableList<T>({
 
 const styles = StyleSheet.create({
   search: {
-    backgroundColor: Colors.input,
-    borderRadius: Radius.md,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontFamily: Fonts.mono,
-    fontSize: 16,
-    color: Colors.text,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    backgroundColor: DC.inputBg,
+    borderRadius: DC.inputRadius,
+    paddingHorizontal: DC.inputPaddingH,
+    paddingVertical: DC.inputPaddingV,
+    fontFamily: AppFont.regular,
+    fontSize: DC.inputFontSize,
+    color: DC.inputTextColor,
+    borderWidth: DC.inputBorderWidth,
+    borderColor: DC.inputBorder,
     marginBottom: 8,
   },
-  list: {
-    maxHeight: 220,
-  },
+  list: { maxHeight: 280 },
   empty: {
-    fontFamily: Fonts.mono,
+    fontFamily: AppFont.regular,
     fontSize: 12,
     color: Colors.faint,
     textAlign: 'center',
@@ -125,34 +117,45 @@ const styles = StyleSheet.create({
   item: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
     paddingVertical: 10,
-    paddingHorizontal: 4,
-    borderRadius: Radius.md,
+    paddingHorizontal: 10,
+    borderRadius: DC.cardRadius / 2,
+    marginBottom: 4,
+    borderWidth: DC.cardBorderWidth,
+    borderColor: DC.cardBorder,
+    backgroundColor: DC.cardBg,
   },
   itemActive: {
-    backgroundColor: Colors.text,
-    paddingHorizontal: 10,
+    backgroundColor: DC.chipActiveBg,
+    borderColor: DC.chipActiveBg,
   },
-  itemText: {
-    flex: 1,
+  iconCard: {
+    width: 40,
+    height: 40,
+    borderRadius: DC.cardRadius / 4,
+    backgroundColor: DC.pageBg,
+    borderWidth: DC.cardBorderWidth,
+    borderColor: DC.cardBorder,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
+  itemText: { flex: 1 },
   label: {
-    fontFamily: Fonts.mono,
-    fontSize: 13,
-    color: Colors.text,
+    fontFamily: AppFont.semiBold,
+    fontSize: DC.chipFontSize,
+    color: DC.pageText,
   },
   labelActive: {
-    fontFamily: Fonts.monoBold,
-    color: Colors.white,
+    color: DC.chipActiveText,
   },
   sub: {
-    fontFamily: Fonts.mono,
-    fontSize: 10,
-    color: Colors.muted,
+    fontFamily: AppFont.regular,
+    fontSize: 11,
+    color: DC.pageTextMuted,
     marginTop: 1,
   },
   subActive: {
-    color: 'rgba(255,255,255,0.7)',
+    color: DC.chipActiveText,
   },
 });

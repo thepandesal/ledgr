@@ -14,19 +14,20 @@
  */
 
 import { StyleSheet } from 'react-native';
+import { DC } from '../../src/lib/design';
+import { AppFont } from '../../src/lib/fonts';
+import { Colors } from './theme';
 
 const formStyles = StyleSheet.create({
 
-  // ─── Sheet container ────────────────────────────────────────────────────────
   sheet: {
-    backgroundColor: '#ffffff',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 24,
+    backgroundColor: DC.modalBg,
+    borderTopLeftRadius: DC.cardRadius,
+    borderTopRightRadius: DC.cardRadius,
+    padding: DC.modalPadding,
     paddingBottom: 0,
   },
 
-  // ─── Header ─────────────────────────────────────────────────────────────────
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -34,107 +35,100 @@ const formStyles = StyleSheet.create({
     marginBottom: 16,
   },
   headerSub: {
-    fontFamily: 'ChillaxMedium',
-    fontSize: 11,
-    color: '#929090',
+    fontFamily: AppFont.medium,
+    fontSize: DC.modalBrandSize,
+    color: DC.pageTextMuted,
   },
   headerTitle: {
-    fontFamily: 'CalSans',
-    fontSize: 26,
-    color: '#425252',
-    lineHeight: 30,
+    fontFamily: AppFont.bold,
+    fontSize: DC.modalTitleSize,
+    color: DC.pageText,
+    lineHeight: DC.modalTitleSize + 6,
   },
 
-  // ─── Text inputs ─────────────────────────────────────────────────────────────
-  /** Standard standalone input (full width) */
   input: {
-    backgroundColor: '#ffffff',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontFamily: 'RobotoMono_400Regular',
-    fontSize: 16,
-    color: '#425252',
-    borderWidth: 1,
-    borderColor: '#e8e8e8',
+    backgroundColor: DC.inputBg,
+    borderRadius: DC.inputRadius,
+    paddingHorizontal: DC.inputPaddingH,
+    paddingVertical: DC.inputPaddingV,
+    fontFamily: AppFont.regular,
+    fontSize: DC.inputFontSize,
+    color: DC.inputTextColor,
+    borderWidth: DC.inputBorderWidth,
+    borderColor: DC.inputBorder,
   },
-  /** Input inside a card / infoBlock row */
   inlineInput: {
     flex: 1,
-    fontFamily: 'RobotoMono_400Regular',
-    fontSize: 16,
-    color: '#425252',
+    fontFamily: AppFont.regular,
+    fontSize: DC.inputFontSize,
+    color: DC.inputTextColor,
     padding: 0,
   },
 
-  // ─── Section label (above a group of inputs) ─────────────────────────────────
   sectionLabel: {
-    fontFamily: 'RobotoMono_400Regular',
+    fontFamily: AppFont.regular,
     fontSize: 10,
-    color: '#929090',
+    color: DC.pageTextMuted,
     textTransform: 'uppercase',
     marginBottom: 8,
     marginTop: 16,
   },
 
-  // ─── Grouped input block (infoBlock style) ────────────────────────────────────
   block: {
-    backgroundColor: '#fafafa',
-    borderRadius: 14,
-    paddingHorizontal: 14,
+    backgroundColor: DC.cardBg,
+    borderRadius: DC.cardRadius / 2,
+    paddingHorizontal: DC.modalPadding / 2,
     paddingVertical: 4,
-    borderWidth: 1,
-    borderColor: '#f0f0f0',
+    borderWidth: DC.cardBorderWidth,
+    borderColor: DC.cardBorder,
   },
   blockDivider: {
     height: 1,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: DC.cardBorder,
   },
   blockRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
+    paddingVertical: DC.modalRowPadding / 2,
     gap: 10,
   },
   blockLabel: {
-    fontFamily: 'RobotoMono_400Regular',
+    fontFamily: AppFont.regular,
     fontSize: 11,
-    color: '#929090',
+    color: DC.pageTextMuted,
     width: 60,
     flexShrink: 0,
   },
 
-  // ─── Card (item-level container) ─────────────────────────────────────────────
   card: {
-    backgroundColor: '#fafafa',
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#f0f0f0',
+    backgroundColor: DC.cardBg,
+    borderRadius: DC.cardRadius / 2,
+    padding: DC.modalPadding / 2,
+    marginBottom: DC.cardGap / 2,
+    borderWidth: DC.cardBorderWidth,
+    borderColor: DC.cardBorder,
   },
 
-  // ─── Person / tag chips ───────────────────────────────────────────────────────
   chip: {
     paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: '#e8e8e8',
-    backgroundColor: '#ffffff',
+    paddingHorizontal: DC.dropdownPaddingH,
+    borderRadius: DC.dropdownRadius,
+    borderWidth: DC.cardBorderWidth,
+    borderColor: DC.cardBorder,
+    backgroundColor: DC.modalBg,
   },
   chipActive: {
-    backgroundColor: '#B6E1DE',
-    borderColor: '#B6E1DE',
+    backgroundColor: DC.accent,
+    borderColor: DC.accent,
   },
   chipText: {
-    fontFamily: 'RobotoMono_400Regular',
+    fontFamily: AppFont.regular,
     fontSize: 12,
-    color: '#929090',
+    color: DC.pageTextMuted,
   },
   chipTextActive: {
-    color: '#ffffff',
-    fontFamily: 'RobotoMono_700Bold',
+    color: DC.accentText,
+    fontFamily: AppFont.semiBold,
   },
   chipsRow: {
     flexDirection: 'row',
@@ -142,145 +136,139 @@ const formStyles = StyleSheet.create({
     gap: 6,
   },
 
-  // ─── Selector button (picker trigger) ────────────────────────────────────────
   selector: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#fafafa',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderWidth: 1,
-    borderColor: '#f0f0f0',
+    backgroundColor: DC.dropdownBg,
+    borderRadius: DC.dropdownRadius,
+    paddingHorizontal: DC.dropdownPaddingH,
+    paddingVertical: DC.dropdownPaddingV,
+    borderWidth: DC.cardBorderWidth,
+    borderColor: DC.cardBorder,
   },
   selectorPlaceholder: {
-    fontFamily: 'RobotoMono_400Regular',
-    fontSize: 16,
-    color: '#c0c0c0',
+    fontFamily: AppFont.regular,
+    fontSize: DC.dropdownFontSize,
+    color: DC.inputPlaceholder,
   },
   selectorValue: {
-    fontFamily: 'RobotoMono_400Regular',
-    fontSize: 16,
-    color: '#425252',
+    fontFamily: AppFont.regular,
+    fontSize: DC.dropdownFontSize,
+    color: DC.dropdownTextColor,
   },
   selectorSub: {
-    fontFamily: 'RobotoMono_400Regular',
+    fontFamily: AppFont.regular,
     fontSize: 10,
-    color: '#929090',
+    color: DC.pageTextMuted,
     marginTop: 1,
   },
 
-  // ─── Action buttons ───────────────────────────────────────────────────────────
   actions: {
     flexDirection: 'row',
     gap: 10,
-    paddingVertical: 16,
+    paddingVertical: DC.modalRowPadding,
   },
   cancelBtn: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 999,
-    paddingVertical: 13,
+    backgroundColor: DC.cardBg,
+    borderRadius: DC.dropdownRadius,
+    paddingVertical: DC.modalRowPadding - 3,
     alignItems: 'center',
   },
   cancelBtnText: {
-    fontFamily: 'RobotoMono_700Bold',
-    fontSize: 13,
-    color: '#8a8a8a',
+    fontFamily: AppFont.semiBold,
+    fontSize: DC.dropdownFontSize,
+    color: DC.pageTextMuted,
   },
   primaryBtn: {
     flex: 1,
-    backgroundColor: '#425252',
-    borderRadius: 999,
-    paddingVertical: 13,
+    backgroundColor: DC.accent1,
+    borderRadius: DC.dropdownRadius,
+    paddingVertical: DC.modalRowPadding - 3,
     alignItems: 'center',
   },
   primaryBtnText: {
-    fontFamily: 'RobotoMono_700Bold',
-    fontSize: 13,
-    color: '#ffffff',
+    fontFamily: AppFont.semiBold,
+    fontSize: DC.dropdownFontSize,
+    color: DC.pageBg,
   },
   dangerBtn: {
     flex: 1,
-    backgroundColor: '#ed6a6a',
-    borderRadius: 999,
-    paddingVertical: 13,
+    backgroundColor: Colors.danger,
+    borderRadius: DC.dropdownRadius,
+    paddingVertical: DC.modalRowPadding - 3,
     alignItems: 'center',
   },
 
-  // ─── List items inside picker modals ─────────────────────────────────────────
   listItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    paddingVertical: 12,
+    paddingVertical: DC.modalRowPadding,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: DC.cardBorder,
   },
   listItemActive: {
-    backgroundColor: '#425252',
-    borderRadius: 10,
+    backgroundColor: DC.accent1,
+    borderRadius: DC.cardRadius / 4,
     paddingHorizontal: 10,
   },
   listItemText: {
-    fontFamily: 'RobotoMono_400Regular',
-    fontSize: 13,
-    color: '#425252',
+    fontFamily: AppFont.regular,
+    fontSize: DC.dropdownFontSize,
+    color: DC.pageText,
     flex: 1,
   },
   listItemTextActive: {
-    fontFamily: 'RobotoMono_700Bold',
-    color: '#ffffff',
+    fontFamily: AppFont.semiBold,
+    color: DC.pageBg,
   },
   listItemSub: {
-    fontFamily: 'RobotoMono_400Regular',
+    fontFamily: AppFont.regular,
     fontSize: 10,
-    color: '#929090',
+    color: DC.pageTextMuted,
   },
   listItemSubActive: {
     color: 'rgba(255,255,255,0.7)',
   },
   listEmpty: {
-    fontFamily: 'RobotoMono_400Regular',
+    fontFamily: AppFont.regular,
     fontSize: 12,
-    color: '#c0c0c0',
+    color: DC.inputPlaceholder,
     textAlign: 'center',
     paddingVertical: 16,
   },
 
-  // ─── Search input (inside picker modals) ─────────────────────────────────────
   searchInput: {
-    backgroundColor: '#f5f5f5',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontFamily: 'RobotoMono_400Regular',
-    fontSize: 16,
-    color: '#425252',
-    borderWidth: 1,
-    borderColor: '#f0f0f0',
+    backgroundColor: DC.inputBg,
+    borderRadius: DC.inputRadius,
+    paddingHorizontal: DC.inputPaddingH,
+    paddingVertical: DC.inputPaddingV,
+    fontFamily: AppFont.regular,
+    fontSize: DC.inputFontSize,
+    color: DC.inputTextColor,
+    borderWidth: DC.inputBorderWidth,
+    borderColor: DC.inputBorder,
     marginBottom: 8,
   },
 
-  // ─── Hint text ────────────────────────────────────────────────────────────────
   hint: {
-    fontFamily: 'RobotoMono_400Regular',
+    fontFamily: AppFont.regular,
     fontSize: 10,
-    color: '#2A7A6F',
+    color: DC.accentDark,
     marginTop: 4,
   },
   hintMuted: {
-    fontFamily: 'RobotoMono_400Regular',
+    fontFamily: AppFont.regular,
     fontSize: 10,
-    color: '#929090',
+    color: DC.pageTextMuted,
   },
 
-  // ─── Error text ───────────────────────────────────────────────────────────────
   errorText: {
-    fontFamily: 'RobotoMono_400Regular',
+    fontFamily: AppFont.regular,
     fontSize: 11,
-    color: '#ed6a6a',
+    color: Colors.danger,
     marginBottom: 8,
   },
 });

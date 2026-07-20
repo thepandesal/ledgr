@@ -19,16 +19,6 @@ export default function LoginScreen() {
   const signIn = async (provider: 'google' | 'apple') => {
     setLoading(provider);
     const redirectTo = Linking.createURL('spaces');
-    if (typeof window !== 'undefined') {
-      // Web: use redirect flow — popup is blocked by COOP headers from OAuth providers
-      await supabase.auth.signInWithOAuth({
-        provider,
-        options: { redirectTo, skipBrowserRedirect: false },
-      });
-      setLoading(null);
-      return;
-    }
-    // Native: use in-app browser session
     const { data } = await supabase.auth.signInWithOAuth({
       provider,
       options: { redirectTo, skipBrowserRedirect: true },

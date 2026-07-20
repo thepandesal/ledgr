@@ -624,7 +624,7 @@ export default function AddRecordingScreen({ inlineProps }: {
               style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.border }}
               onPress={() => { setCurrency(c); setShowCurrencyModal(false); }}
             >
-              <Text style={{ fontFamily: currency === c ? Fonts.monoBold : Fonts.mono, fontSize: 14, color: Colors.text }}>{c}</Text>
+              <Text style={{ fontFamily: currency === c ? AppFont.semiBold : AppFont.regular, fontSize: DC.chipFontSize, color: DC.pageText }}>{c}</Text>
               {currency === c && <Ionicons name="checkmark" size={16} color={Colors.cyan} />}
             </TouchableOpacity>
           ))}
@@ -635,27 +635,19 @@ export default function AddRecordingScreen({ inlineProps }: {
         <ScrollView showsVerticalScrollIndicator={false}>
           {TYPE_GROUPS.map(group => (
             <View key={group.label} style={{ marginBottom: 16 }}>
-              <Text style={{ fontFamily: Fonts.monoBold, fontSize: 9, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8 }}>{group.label}</Text>
-              {group.types.map((t: any) => (
-                <TouchableOpacity
-                  key={t.key}
-                  style={[
-                    { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 14, borderRadius: Radius.lg, marginBottom: 6, borderWidth: 1 },
-                    type === t.key
-                      ? { backgroundColor: t.color + '22', borderColor: t.color }
-                      : { backgroundColor: Colors.surface, borderColor: Colors.border },
-                  ]}
-                  onPress={() => { setType(t.key); setExpenseIsReceivable(false); setIncomeIsLoan(false); setShowTypeModal(false); }}
-                >
-                  <View style={[s.catDot, { backgroundColor: t.color + '33' }]}>
-                    <Ionicons name={t.icon as any} size={13} color={t.color} />
-                  </View>
-                  <Text style={{ fontFamily: type === t.key ? Fonts.monoBold : Fonts.mono, fontSize: 13, color: type === t.key ? t.color : Colors.text }}>
-                    {t.label}
-                  </Text>
-                  {type === t.key && <Ionicons name="checkmark" size={14} color={t.color} style={{ marginLeft: 'auto' }} />}
-                </TouchableOpacity>
-              ))}
+              <Text style={{ fontFamily: AppFont.bold, fontSize: 10, color: DC.pageTextMuted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8 }}>{group.label}</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                {group.types.map((t: any) => (
+                  <TouchableOpacity
+                    key={t.key}
+                    style={[s.chip, type === t.key && s.chipActive]}
+                    onPress={() => { setType(t.key); setExpenseIsReceivable(false); setIncomeIsLoan(false); setShowTypeModal(false); }}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={[s.chipText, type === t.key && s.chipTextActive]}>{t.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
           ))}
         </ScrollView>
@@ -688,8 +680,9 @@ export default function AddRecordingScreen({ inlineProps }: {
           selected={items.find(i => i.id === activePickerItemId)?.account}
           onSelect={a => { updateItem(activePickerItemId, { account: a }); setShowAccountModal(false); }}
           keyExtractor={a => a.id} labelExtractor={a => a.account_name}
-          subLabelExtractor={a => `${a.bank}`}
-          renderLeft={(a) => <View style={[s.catDot, { backgroundColor: a.color ?? Colors.borderMid }]} />}
+          subLabelExtractor={a => a.bank}
+          subLabel2Extractor={a => a.holder_name}
+          renderLeft={(a) => <View style={[s.catDot, { backgroundColor: a.color ?? DC.cardBorder }]} />}
           emptyText="no accounts found"
         />
         <FormActions onCancel={() => setShowAccountModal(false)} onConfirm={() => setShowAccountModal(false)} cancelLabel="cancel" confirmLabel="done" />
@@ -700,8 +693,9 @@ export default function AddRecordingScreen({ inlineProps }: {
           items={accounts} selected={singularAccount}
           onSelect={a => { setSingularAccount(a); setShowSingularAccountModal(false); }}
           keyExtractor={a => a.id} labelExtractor={a => a.account_name}
-          subLabelExtractor={a => `${a.bank}`}
-          renderLeft={(a) => <View style={[s.catDot, { backgroundColor: a.color ?? Colors.borderMid }]} />}
+          subLabelExtractor={a => a.bank}
+          subLabel2Extractor={a => a.holder_name}
+          renderLeft={(a) => <View style={[s.catDot, { backgroundColor: a.color ?? DC.cardBorder }]} />}
           emptyText="no accounts found"
         />
         <FormActions onCancel={() => setShowSingularAccountModal(false)} onConfirm={() => setShowSingularAccountModal(false)} cancelLabel="cancel" confirmLabel="done" />
@@ -870,10 +864,10 @@ const s = StyleSheet.create({
   itemRow:         { flexDirection: 'row', alignItems: 'center', paddingHorizontal: DC.modalPadding / 2, paddingVertical: DC.modalRowPadding / 2, gap: DC.modalPadding / 2 },
   itemLabel:       { fontFamily: AppFont.semiBold, fontSize: DC.rowLabelSize - 1, color: DC.pageTextMuted, width: 80 },
   itemInput:       { flex: 1, minWidth: 0, fontFamily: AppFont.regular, fontSize: DC.inputFontSize - 1, color: DC.inputTextColor, textAlign: 'right', backgroundColor: DC.inputBg, borderRadius: DC.inputRadius, borderWidth: DC.inputBorderWidth, borderColor: DC.inputBorder, paddingHorizontal: DC.inputPaddingH, paddingVertical: DC.inputPaddingV / 2 },
-  itemPill:        { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: DC.dropdownBg, borderRadius: DC.dropdownRadius, borderWidth: DC.cardBorderWidth, borderColor: DC.cardBorder, paddingHorizontal: DC.dropdownPaddingH, paddingVertical: DC.dropdownPaddingV },
-  itemPillText:    { fontFamily: AppFont.medium, fontSize: DC.dropdownFontSize, color: DC.dropdownTextColor },
-  currencyPill:    { backgroundColor: DC.dropdownBg, borderRadius: DC.dropdownRadius, borderWidth: DC.cardBorderWidth, borderColor: DC.cardBorder, paddingHorizontal: DC.dropdownPaddingH - 4, paddingVertical: DC.dropdownPaddingV },
-  currencyPillText:{ fontFamily: AppFont.semiBold, fontSize: DC.dropdownFontSize - 1, color: DC.dropdownTextColor },
+  itemPill:        { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: DC.chipBg, borderRadius: DC.chipRadius, borderWidth: DC.cardBorderWidth, borderColor: DC.chipBorder, paddingHorizontal: DC.chipPaddingH, paddingVertical: DC.chipPaddingV },
+  itemPillText:    { fontFamily: AppFont.regular, fontSize: DC.chipFontSize, color: DC.chipInactiveText },
+  currencyPill:    { backgroundColor: DC.chipBg, borderRadius: DC.chipRadius, borderWidth: DC.cardBorderWidth, borderColor: DC.chipBorder, paddingHorizontal: DC.chipPaddingH - 4, paddingVertical: DC.chipPaddingV },
+  currencyPillText:{ fontFamily: AppFont.semiBold, fontSize: DC.chipFontSize - 1, color: DC.chipInactiveText },
 
   addNewBtn:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: DC.modalPadding / 4, backgroundColor: DC.btnBg, borderRadius: DC.dropdownRadius, borderWidth: DC.btnBorderWidth, paddingVertical: DC.modalRowPadding, paddingHorizontal: DC.modalPadding * 2, marginBottom: DC.cardGap / 2, alignSelf: 'center' as const },
   addNewBtnText:   { fontFamily: AppFont.medium, fontSize: DC.rowLabelSize, color: DC.btnText },
@@ -884,15 +878,15 @@ const s = StyleSheet.create({
 
   catDot:          { width: 22, height: 22, borderRadius: 11, justifyContent: 'center', alignItems: 'center' },
   chipRow:         { flexDirection: 'row', flexWrap: 'wrap', gap: DC.cardGap / 2 },
-  chip:            { paddingHorizontal: DC.dropdownPaddingH - 4, paddingVertical: DC.dropdownPaddingV - 3, borderRadius: DC.dropdownRadius, borderWidth: DC.cardBorderWidth, borderColor: DC.cardBorder, backgroundColor: DC.cardBg },
-  chipActive:      { backgroundColor: DC.accent1, borderColor: DC.accent1 },
-  chipText:        { fontFamily: Fonts.mono, fontSize: 11, color: DC.pageTextMuted },
-  chipTextActive:  { color: DC.pageBg, fontFamily: Fonts.monoBold },
+  chip:            { paddingHorizontal: DC.chipPaddingH, paddingVertical: DC.chipPaddingV, borderRadius: DC.chipRadius, borderWidth: DC.cardBorderWidth, borderColor: DC.chipBorder, backgroundColor: DC.chipBg },
+  chipActive:      { backgroundColor: DC.chipActiveBg, borderColor: DC.chipActiveBg },
+  chipText:        { fontFamily: AppFont.regular, fontSize: DC.chipFontSize, color: DC.chipInactiveText },
+  chipTextActive:  { fontFamily: AppFont.semiBold, fontSize: DC.chipFontSize, color: DC.chipActiveText },
   photoBtn:        { flexDirection: 'row', alignItems: 'center', gap: DC.modalPadding / 4, paddingHorizontal: DC.dropdownPaddingH, paddingVertical: DC.dropdownPaddingV, borderRadius: DC.cardRadius / 4, backgroundColor: DC.btnBg, borderWidth: DC.btnBorderWidth },
   photoBtnText:    { fontFamily: AppFont.medium, fontSize: DC.dropdownFontSize, color: DC.btnText },
   saveBtn:         { backgroundColor: DC.accent1, borderRadius: DC.cardRadius / 4, paddingVertical: DC.inputPaddingV + 4, alignItems: 'center' as const, marginTop: DC.cardGap / 2 },
   saveBtnDisabled: { opacity: 0.35 },
   saveBtnText:     { fontFamily: AppFont.semiBold, fontSize: DC.inputFontSize + 1, color: DC.pageBg },
   suggestionChip:     { paddingHorizontal: DC.dropdownPaddingH - 4, paddingVertical: DC.dropdownPaddingV - 2, borderRadius: DC.dropdownRadius, backgroundColor: DC.cardBg, borderWidth: DC.cardBorderWidth, borderColor: DC.cardBorder },
-  suggestionChipText: { fontFamily: Fonts.mono, fontSize: DC.dropdownFontSize - 1, color: DC.pageText },
+  suggestionChipText: { fontFamily: AppFont.regular, fontSize: DC.dropdownFontSize - 1, color: DC.pageText },
 });

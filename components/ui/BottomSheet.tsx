@@ -6,6 +6,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useContext, useEffect, useRef, useState } from 'react';
 import formStyles from './formStyles';
 import { BlurContext } from '../../src/lib/BlurContext';
+import { DC } from '../../src/lib/design';
+import { AppFont } from '../../src/lib/fonts';
 
 interface Props {
   visible: boolean;
@@ -91,9 +93,9 @@ const s = StyleSheet.create({
     width: '100%',
     maxWidth: 480,
     maxHeight: '80%',
-    backgroundColor: '#ffffff',
-    borderRadius: 24,
-    padding: 24,
+    backgroundColor: DC.modalBg,
+    borderRadius: DC.cardRadius,
+    padding: DC.modalPadding,
     paddingBottom: 0,
   },
   content: {

@@ -5,8 +5,8 @@ import { DC } from '../../src/lib/design';
 
 export const ACTIVITY_TABS = [
   { key: 'all',         label: 'All',      types: ['income','expense','debt','due','payment','return'] },
-  { key: 'money-in',   label: 'Money In', types: ['income','return'] },
-  { key: 'money-out',  label: 'Money Out',types: ['expense','payment'] },
+  { key: 'money-in',   label: 'Money In', types: ['income','due','return'] },
+  { key: 'money-out',  label: 'Money Out',types: ['expense','debt','payment'] },
   { key: 'loans',      label: 'Debt',     types: ['debt','payment'] },
   { key: 'receivables',label: 'Due',      types: ['due','expense'] },
 ] as const;

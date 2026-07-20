@@ -20,7 +20,6 @@ import DateNavBar from '@/components/ui/DateNavBar';
 import { Brand } from '../../../src/lib/brand';
 import { BlurContext } from '../../../src/lib/BlurContext';
 import TourTarget from '@/components/TourTarget';
-import DraggableGrid from '@/components/ui/DraggableGrid';
 
 interface SpaceData {
   id: string; name: string; color: string; icon: string;
@@ -28,9 +27,9 @@ interface SpaceData {
   space_type?: string; savings_target_date?: string | null; is_active?: boolean;
 }
 
-const ACCENT      = '#B6E1DE'; // light mint � backgrounds only
+const ACCENT      = '#B6E1DE'; // light mint ï¿½ backgrounds only
 const ACCENT_TEXT = '#101514'; // dark text ON accent bg
-const ACCENT_DARK = Brand.color.accentDark; // dark teal � text/icons on white bg
+const ACCENT_DARK = Brand.color.accentDark; // dark teal ï¿½ text/icons on white bg
 
 const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmtCompact = (n: number) => {
@@ -155,7 +154,7 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
           .eq('status', 'active'),
       ]);
 
-      // split_bill payments no longer carry space/date info without the join � skip them
+      // split_bill payments no longer carry space/date info without the join ï¿½ skip them
       const splitBillPaymentMap: Record<string, { spaceId: string; date: string }> = {};
 
       const spentMap: Record<string, number> = {};
@@ -184,7 +183,7 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
         }
       });
       
-      // Add split bill payments to savedMap � filtered by parent recording's transaction_date
+      // Add split bill payments to savedMap ï¿½ filtered by parent recording's transaction_date
       Object.entries(splitBillPaymentMap).forEach(([paymentId, { spaceId, date }]) => {
         if (date < fromStr || date > toStr) return;
         const p = (splitBillRecs ?? []).find((x: any) => x.id === paymentId);
@@ -308,13 +307,13 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
     return (
       <TouchableOpacity
         key={space.id}
-        style={[s.gridCard]}
+        style={[s.gridCard, { width: cardSize, height: cardSize }]}
         activeOpacity={0.85}
-        onPress={() => !sortMode && openSpace(space.id, space.name)}
-        onLongPress={() => { if (!sortMode) { setSelectedSpace(space); setMenuModal(true); setBlur(true); } }}
+        onPress={() => openSpace(space.id, space.name)}
+        onLongPress={() => { setSelectedSpace(space); setMenuModal(true); setBlur(true); }}
         delayLongPress={300}
       >
-        <Text style={[s.gridCardName, over && { borderBottomColor: DC.overBudgetColor }]} numberOfLines={1}>{space.name}</Text>
+        <Text style={[s.gridCardName, over && { borderBottomColor: DC.overBudgetColor }]} numberOfLines={1}>{space.name.replace(/\w\S*/g, t => t.charAt(0).toUpperCase() + t.slice(1).toLowerCase())}</Text>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', width: '100%' }}>
           <View style={s.gridAmountRow}>
             <Text style={[s.gridSpent, over && { color: DC.overBudgetColor }]}>{fmtCompact(value)}</Text>
@@ -339,13 +338,13 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
     return (
       <TouchableOpacity
         key={space.id}
-        style={[s.gridCard]}
+        style={[s.gridCard, { width: cardSize, height: cardSize }]}
         activeOpacity={0.85}
-        onPress={() => !sortMode && openSpace(space.id, space.name)}
-        onLongPress={() => { if (!sortMode) { setSelectedSpace(space); setMenuModal(true); setBlur(true); } }}
+        onPress={() => openSpace(space.id, space.name)}
+        onLongPress={() => { setSelectedSpace(space); setMenuModal(true); setBlur(true); }}
         delayLongPress={300}
       >
-        <Text style={s.gridCardName} numberOfLines={1}>{space.name}</Text>
+        <Text style={s.gridCardName} numberOfLines={1}>{space.name.replace(/\w\S*/g, t => t.charAt(0).toUpperCase() + t.slice(1).toLowerCase())}</Text>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', width: '100%' }}>
           <View style={s.gridAmountRow}>
             <Text style={[s.gridSpent, { color: DC.accent1 }]}>{fmtCompact(allTime)}</Text>
@@ -367,6 +366,10 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
   // Memoize date calculations to prevent infinite loops
   const dateLabel = useMemo(() => getLabel(dateMode, dateOffset, weekStart), [dateMode, dateOffset, weekStart, useCutoff, cutoffDay]);
   const dateRange = useMemo(() => getDateRange(dateMode, dateOffset, weekStart, useCutoff, cutoffDay), [dateMode, dateOffset, weekStart, useCutoff, cutoffDay]);
+  const GRID_GAP = 10;
+  const COLS = 3;
+  const cardSize = (W - DC.pagePadding * 2 - GRID_GAP * (COLS - 1)) / COLS;
+
   const expenseActive   = spaces.filter(sp => (sp.space_type ?? 'expense') === 'expense' && sp.is_active !== false);
   const savingsActive   = spaces.filter(sp => sp.space_type === 'savings'  && sp.is_active !== false);
   const expenseInactive = spaces.filter(sp => (sp.space_type ?? 'expense') === 'expense' && sp.is_active === false);
@@ -468,41 +471,14 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
     setRefreshing(false);
   };
 
-  const [isDraggingAny, setIsDraggingAny] = useState(false);
 
   const scrollViewRef = useRef<any>(null);
 
-  const handleDragEnd = async (reordered: SpaceData[]) => {
-    // Optimistically update cache immediately so UI reflects new order instantly
-    queryClient.setQueryData(['spaces', userId, dateMode, dateOffset, weekStart, useCutoff, cutoffDay], (old: SpaceData[] | undefined) => {
-      if (!old) return old;
-      const reorderedIds = reordered.map(s => s.id);
-      const others = old.filter(s => !reorderedIds.includes(s.id));
-      return [
-        ...reordered.map((s, idx) => ({ ...s, sort_order: idx + 1 })),
-        ...others,
-      ];
-    });
-    // Save in background � no await blocking the UI
-    Promise.all(
-      reordered.map((space, idx) =>
-        supabase.from('spaces').update({ sort_order: idx + 1 }).eq('id', space.id)
-      )
-    );
-  };
 
-  const handleResetOrder = async () => {
-    setResetConfirmVisible(false);
-    await supabase.rpc('reset_space_sort_order', { p_user_id: userId });
-    queryClient.invalidateQueries({ queryKey: ['spaces', userId] });
-  };
-
-  const [sortMode, setSortMode] = useState(false);
-  const [resetConfirmVisible, setResetConfirmVisible] = useState(false);
 
   return (
     <SafeAreaView style={s.root}>
-      <ScrollView ref={scrollViewRef} scrollEnabled={!sortMode && !isDraggingAny} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
+      <ScrollView ref={scrollViewRef} scrollEnabled={true} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
         {/* Pending space invites */}
         {pendingInvites.length > 0 && (
           <View style={{ paddingHorizontal: DC.pagePadding, paddingTop: 16, gap: 8 }}>
@@ -512,7 +488,7 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
                 <View style={{ gap: 2 }}>
                   <Text style={{ fontFamily: AppFont.medium, fontSize: 13, color: Colors.text }}>{invite.spaceName}</Text>
                   <Text style={{ fontFamily: AppFont.regular, fontSize: 10, color: Colors.muted }}>
-                    from {invite.ownerName} � role: {invite.role}
+                    from {invite.ownerName} ï¿½ role: {invite.role}
                   </Text>
                 </View>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -554,7 +530,7 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
         {/* -- Empty -- */}
         {spaces.length === 0 ? (
           <View style={s.emptyWrap}>
-            <Text style={s.emptyText}>no spaces yet � tap + to create one</Text>
+            <Text style={s.emptyText}>no spaces yet ï¿½ tap + to create one</Text>
           </View>
         ) : (
           <View style={s.slideOuter}>
@@ -568,42 +544,14 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
                 {expenseActive.length > 0 && (
                   <>
                     <Text style={s.sectionHeader}>Expense tracker</Text>
-                    <DraggableGrid
-                      data={expenseActive}
-                      onDragEnd={handleDragEnd}
-                      paddingHorizontal={DC.pagePadding}
-                      sortMode={sortMode}
-
-                      renderItem={(space) => renderExpenseCard(space)}
-                    />
+                    <View style={s.grid}>{expenseActive.map(space => renderExpenseCard(space))}</View>
                   </>
                 )}
                 {savingsActive.length > 0 && (
                   <>
                     <Text style={s.sectionHeader}>Savings Tracker</Text>
-                    <DraggableGrid
-                      data={savingsActive}
-                      onDragEnd={handleDragEnd}
-                      paddingHorizontal={DC.pagePadding}
-                      sortMode={sortMode}
-
-                      renderItem={(space) => renderSavingsCard(space)}
-                    />
+                    <View style={s.grid}>{savingsActive.map(space => renderSavingsCard(space))}</View>
                   </>
-                )}
-                {(expenseActive.length > 0 || savingsActive.length > 0) && (
-                  <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 8, marginTop: 8, marginBottom: 16 }}>
-                    <TouchableOpacity style={[s.resetBtn, sortMode && s.resetBtnActive]} onPress={() => setSortMode(v => !v)} activeOpacity={0.7}>
-                      <Text style={[s.resetBtnText, sortMode && s.resetBtnTextActive]}>{sortMode ? 'Done' : 'Edit Order'}</Text>
-                    </TouchableOpacity>
-
-
-                    {sortMode && (
-                      <TouchableOpacity style={s.resetBtn} onPress={() => { setSortMode(false); setResetConfirmVisible(true); }} activeOpacity={0.7}>
-                        <Text style={s.resetBtnText}>Reset</Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
                 )}
               </View>
 
@@ -651,7 +599,7 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
                 return (
                   <TouchableOpacity
                     key={space.id}
-                    style={[s.gridCard, isExpense && over && s.cardOver]}
+                    style={[s.gridCard, { width: cardSize, height: cardSize }, isExpense && over && s.cardOver]}
                     activeOpacity={0.85}
                     onPress={() => openSpace(space.id, space.name)}
                   >
@@ -727,16 +675,6 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
       </BottomSheet>
 
       <ConfirmModal
-        visible={resetConfirmVisible}
-        onClose={() => setResetConfirmVisible(false)}
-        title="reset order?"
-        actions={[
-          { label: 'cancel', onPress: () => setResetConfirmVisible(false), muted: true },
-          { label: 'reset', onPress: handleResetOrder, destructive: true },
-        ]}
-      />
-
-      <ConfirmModal
         visible={menuModal}
         onClose={() => { setMenuModal(false); setBlur(false); }}
         title={selectedSpace?.name?.toLowerCase() ?? 'space'}
@@ -798,7 +736,7 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
           </TouchableOpacity>
         </View>
 
-        {/* Cutoff � only visible in monthly mode */}
+        {/* Cutoff ï¿½ only visible in monthly mode */}
         {dateMode === 'monthly' && (
           <>
             <Text style={s.dateModalLabel}>use cutoff date?</Text>
@@ -820,7 +758,7 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
             </View>
             {useCutoff && (
               <>
-                <Text style={s.dateModalLabel}>cutoff day <Text style={{ textTransform: 'none', fontFamily: AppFont.regular }}>(1�31)</Text></Text>
+                <Text style={s.dateModalLabel}>cutoff day <Text style={{ textTransform: 'none', fontFamily: AppFont.regular }}>(1ï¿½31)</Text></Text>
                 <TextInput
                   style={s.cutoffInput}
                   value={String(cutoffDay)}
@@ -843,7 +781,7 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
           </>
         )}
 
-        {/* Week start selector � only visible in weekly mode */}
+        {/* Week start selector ï¿½ only visible in weekly mode */}
         {dateMode === 'weekly' && (
           <>
             <Text style={s.dateModalLabel}>week starts on</Text>
@@ -973,11 +911,11 @@ const s = StyleSheet.create({
   list: { marginBottom: 8, paddingHorizontal: DC.pagePadding },
 
   // -- Grid cards ------------------------------------------------------------
-  grid:          { flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingHorizontal: DC.pagePadding, marginBottom: 8 },
-  gridCard:      { width: 100, height: 100, marginBottom: 10, paddingVertical: 0, paddingHorizontal: 0, borderRadius: 18, borderWidth: DC.cardBorderWidth, borderColor: DC.cardBorder, backgroundColor: DC.cardBg, alignItems: 'center', justifyContent: 'space-between', overflow: 'hidden' },
+  grid:          { flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingHorizontal: DC.pagePadding, marginBottom: 8, justifyContent: 'flex-start' },
+  gridCard:      { marginBottom: 10, paddingVertical: 0, paddingHorizontal: 0, borderRadius: 18, borderWidth: DC.cardBorderWidth, borderColor: DC.cardBorder, backgroundColor: DC.cardBg, alignItems: 'center', justifyContent: 'space-between', overflow: 'hidden' },
   cardOver:      { borderColor: DC.overBudgetColor, borderWidth: 2.5 },
   cardDragging:  { opacity: 0.85, shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.18, shadowRadius: 10, elevation: 8 },
-  gridCardName:  { fontFamily: AppFont.bold, fontSize: 11, color: DC.pageText, paddingVertical: 8, paddingHorizontal: 6, borderBottomWidth: 1, borderBottomColor: DC.cardBorder, width: '100%', textAlign: 'center' },
+  gridCardName:  { fontFamily: AppFont.regular, fontSize: 11, color: DC.pageText, paddingVertical: 8, paddingHorizontal: 6, borderBottomWidth: 1, borderBottomColor: DC.cardBorder, width: '100%', textAlign: 'center' },
   gridAmountRow: { flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', justifyContent: 'center', paddingHorizontal: 4 },
   gridSpent:     { fontFamily: AppFont.bold, fontSize: 13, color: DC.pageText, letterSpacing: -0.3 },
   gridSep:       { fontFamily: AppFont.regular, fontSize: 13, color: DC.pageTextMuted },
