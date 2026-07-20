@@ -2,8 +2,8 @@
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
   SafeAreaView, TextInput, ActivityIndicator, useWindowDimensions, Animated, RefreshControl, Platform,
 } from 'react-native';
-import DraggableFlatList, { RenderItemParams, ScaleDecorator } from 'react-native-draggable-flatlist';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import AutoDragSortableView from 'react-native-drag-sort';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useNav } from '../../../src/lib/NavContext';
@@ -59,48 +59,6 @@ const DashLine = ({ color, style }: { color: string; style?: any }) => (
   </View>
 );
 
-// ── Web drag-and-drop grid ───────────────────────────────────────────────
-function WebDraggableGrid({ data, onReorder, renderCard }: {
-  data: SpaceData[];
-  onReorder: (reordered: SpaceData[]) => void;
-  renderCard: (space: SpaceData) => React.ReactNode;
-}) {
-  const dragIndex = useRef<number | null>(null);
-  const [dragOver, setDragOver] = useState<number | null>(null);
-
-  const handleDragStart = (i: number) => { dragIndex.current = i; };
-  const handleDragOver = (e: any, i: number) => { e.preventDefault(); setDragOver(i); };
-  const handleDrop = (e: any, i: number) => {
-    e.preventDefault();
-    if (dragIndex.current === null || dragIndex.current === i) { setDragOver(null); return; }
-    const next = [...data];
-    const [moved] = next.splice(dragIndex.current, 1);
-    next.splice(i, 0, moved);
-    dragIndex.current = null;
-    setDragOver(null);
-    onReorder(next);
-  };
-  const handleDragEnd = () => { dragIndex.current = null; setDragOver(null); };
-
-  return (
-    <View style={s.grid}>
-      {data.map((space, i) => (
-        <div
-          key={space.id}
-          draggable
-          onDragStart={() => handleDragStart(i)}
-          onDragOver={(e) => handleDragOver(e, i)}
-          onDrop={(e) => handleDrop(e, i)}
-          onDragEnd={handleDragEnd}
-          style={{ opacity: dragOver === i ? 0.5 : 1, cursor: 'grab' }}
-        >
-          {renderCard(space)}
-        </div>
-      ))}
-    </View>
-  );
-}
-
 export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
   const router = useRouter();
   const { openSpace } = useNav();
@@ -132,6 +90,10 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
   const [activeTab, setActiveTab] = useState<'active' | 'inactive'>('active');
   const slideAnim = useRef(new Animated.Value(0)).current;
   const { width: W } = useWindowDimensions();
+  const CARD_SIZE = 100;
+  const CARD_GAP  = 10;
+  const GRID_PADDING = DC.pagePadding;
+  const NUM_COLS = 3;
 
   // ── Date filter state ────────────────────────────────────────────────────
   const [dateMode, setDateMode]       = useState<DateMode>('monthly');
@@ -334,56 +296,32 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
     queryClient.invalidateQueries({ queryKey: ['spaces', userId] });
   };
 
-  // ── Shared card content (used by both native and web renderers) ──
-  const expenseCardContent = (space: SpaceData, dragging = false) => {
+  // ── Card renderer for AutoDragSortableView ──
+  const renderSpaceCard = (space: SpaceData) => {
+    const isExpense = (space.space_type ?? 'expense') === 'expense';
     const value     = space.spent ?? 0;
-    const budget    = space.budget ? convert(space.budget, space.budget_currency ?? 'PHP', defaultCurrency) : 0;
-    const over      = budget > 0 && value > budget;
-    const remaining = budget - value;
-    return (
-      <TouchableOpacity
-        style={[s.gridCard, over && s.cardOver, dragging && s.cardDragging]}
-        activeOpacity={0.85}
-        onPress={() => openSpace(space.id, space.name)}
-      >
-        <Text style={s.gridCardName} numberOfLines={1}>{space.name}</Text>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', width: '100%' }}>
-          <View style={s.gridAmountRow}>
-            <Text style={[s.gridSpent, over && { color: DC.overBudgetColor }]}>{fmtCompact(value)}</Text>
-            {budget > 0 && <Text style={s.gridSep}> / </Text>}
-            {budget > 0 && <Text style={s.gridBudget}>{fmtCompact(budget)}</Text>}
-          </View>
-          {budget > 0 && (
-            <Text style={[s.gridStatus, over && { color: DC.overBudgetColor }]}>
-              {over ? `Over ${fmtCompact(Math.abs(remaining))}` : `${fmtCompact(remaining)} left`}
-            </Text>
-          )}
-        </View>
-      </TouchableOpacity>
-    );
-  };
-
-  const savingsCardContent = (space: SpaceData, dragging = false) => {
     const allTime   = space.savedAllTime ?? 0;
     const budget    = space.budget ? convert(space.budget, space.budget_currency ?? 'PHP', defaultCurrency) : 0;
-    const remaining = Math.max(budget - allTime, 0);
-    const reached   = budget > 0 && allTime >= budget;
+    const over      = isExpense && budget > 0 && value > budget;
+    const remaining = isExpense ? budget - value : Math.max(budget - allTime, 0);
+    const reached   = !isExpense && budget > 0 && allTime >= budget;
+    const displayVal = isExpense ? value : allTime;
     return (
       <TouchableOpacity
-        style={[s.gridCard, dragging && s.cardDragging]}
+        style={[s.gridCard, over && s.cardOver]}
         activeOpacity={0.85}
         onPress={() => openSpace(space.id, space.name)}
       >
         <Text style={s.gridCardName} numberOfLines={1}>{space.name}</Text>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', width: '100%' }}>
           <View style={s.gridAmountRow}>
-            <Text style={[s.gridSpent, { color: DC.accent1 }]}>{fmtCompact(allTime)}</Text>
+            <Text style={[s.gridSpent, over && { color: DC.overBudgetColor }, !isExpense && { color: DC.accent1 }]}>{fmtCompact(displayVal)}</Text>
             {budget > 0 && <Text style={s.gridSep}> / </Text>}
             {budget > 0 && <Text style={s.gridBudget}>{fmtCompact(budget)}</Text>}
           </View>
           {budget > 0 && (
-            <Text style={[s.gridStatus, reached && { color: DC.accent1 }]}>
-              {reached ? 'Goal reached!' : `${fmtCompact(remaining)} left`}
+            <Text style={[s.gridStatus, over && { color: DC.overBudgetColor }, reached && { color: DC.accent1 }]}>
+              {over ? `Over ${fmtCompact(Math.abs(remaining))}` : reached ? 'Goal reached!' : `${fmtCompact(remaining)} left`}
             </Text>
           )}
         </View>
@@ -391,49 +329,24 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
     );
   };
 
-  // ── Native drag renderers ──
-  const renderExpenseCard = ({ item: space, drag, isActive }: RenderItemParams<SpaceData>) => (
-    <ScaleDecorator activeScale={1.08}>
-      <TouchableOpacity style={[s.gridCard, (space.budget && space.spent && space.spent > space.budget) ? s.cardOver : undefined, isActive && s.cardDragging]} activeOpacity={0.85} onPress={() => openSpace(space.id, space.name)} onLongPress={drag} delayLongPress={300}>
-        {expenseCardContent(space, isActive)}
-      </TouchableOpacity>
-    </ScaleDecorator>
+  // ── Grid renderer ──
+  const renderGrid = (data: SpaceData[]) => (
+    <AutoDragSortableView
+      dataSource={data}
+      parentWidth={W - GRID_PADDING * 2}
+      childrenWidth={CARD_SIZE}
+      childrenHeight={CARD_SIZE}
+      marginChildrenTop={CARD_GAP}
+      marginChildrenBottom={0}
+      marginChildrenLeft={CARD_GAP / 2}
+      marginChildrenRight={CARD_GAP / 2}
+      keyExtractor={(item) => item.id}
+      renderItem={(item) => renderSpaceCard(item)}
+      onDataChange={(newData) => handleDragEnd(newData)}
+      style={s.grid}
+      isDragFreely={false}
+    />
   );
-
-  const renderSavingsCard = ({ item: space, drag, isActive }: RenderItemParams<SpaceData>) => (
-    <ScaleDecorator activeScale={1.08}>
-      <TouchableOpacity style={[s.gridCard, isActive && s.cardDragging]} activeOpacity={0.85} onPress={() => openSpace(space.id, space.name)} onLongPress={drag} delayLongPress={300}>
-        {savingsCardContent(space, isActive)}
-      </TouchableOpacity>
-    </ScaleDecorator>
-  );
-
-  // ── Grid renderer (web vs native) ──
-  const renderGrid = (data: SpaceData[], type: 'expense' | 'savings') => {
-    const cardFn = type === 'expense' ? expenseCardContent : savingsCardContent;
-    const nativeRender = type === 'expense' ? renderExpenseCard : renderSavingsCard;
-    if (Platform.OS === 'web') {
-      return (
-        <WebDraggableGrid
-          data={data}
-          onReorder={handleDragEnd}
-          renderCard={(space) => cardFn(space)}
-        />
-      );
-    }
-    return (
-      <DraggableFlatList
-        data={data}
-        keyExtractor={item => item.id}
-        numColumns={3}
-        renderItem={nativeRender}
-        onDragEnd={({ data: reordered }) => handleDragEnd(reordered)}
-        containerStyle={s.grid}
-        scrollEnabled={false}
-        activationDistance={5}
-      />
-    );
-  };
 
   const firstName = userName?.split(' ')[0] || 'there';
   
@@ -637,13 +550,13 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
                 {expenseActive.length > 0 && (
                   <>
                     <Text style={s.sectionHeader}>Expense tracker</Text>
-                    {renderGrid(expenseActive, 'expense')}
+                    {renderGrid(expenseActive)}
                   </>
                 )}
                 {savingsActive.length > 0 && (
                   <>
                     <Text style={s.sectionHeader}>Savings Tracker</Text>
-                    {renderGrid(savingsActive, 'savings')}
+                    {renderGrid(savingsActive)}
                   </>
                 )}
                 {(expenseActive.length > 0 || savingsActive.length > 0) && (
@@ -661,13 +574,13 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
                 {expenseInactive.length > 0 && (
                   <>
                     <Text style={s.sectionHeader}>Expense tracker</Text>
-                    {renderGrid(expenseInactive, 'expense')}
+                    {renderGrid(expenseInactive)}
                   </>
                 )}
                 {savingsInactive.length > 0 && (
                   <>
                     <Text style={s.sectionHeader}>Savings Tracker</Text>
-                    {renderGrid(savingsInactive, 'savings')}
+                    {renderGrid(savingsInactive)}
                   </>
                 )}
               </View>
