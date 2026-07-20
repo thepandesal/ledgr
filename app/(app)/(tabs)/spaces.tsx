@@ -2,7 +2,6 @@
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
   SafeAreaView, TextInput, ActivityIndicator, useWindowDimensions, Animated, RefreshControl, Platform,
 } from 'react-native';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import AutoDragSortableView from 'react-native-drag-sort';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -482,7 +481,6 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
   };
 
   return (
-    <GestureHandlerRootView style={s.root}>
     <SafeAreaView style={s.root}>
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
         {/* Pending space invites */}
@@ -902,7 +900,6 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
         </TouchableOpacity>
       </BottomSheet>
     </SafeAreaView>
-    </GestureHandlerRootView>
   );
 }
 
