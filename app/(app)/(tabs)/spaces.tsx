@@ -1,8 +1,9 @@
 ﻿import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  SafeAreaView, TextInput, ActivityIndicator, useWindowDimensions, Animated, RefreshControl, Platform,
+  SafeAreaView, TextInput, ActivityIndicator, useWindowDimensions, Animated, RefreshControl,
 } from 'react-native';
-import { AutoDragSortableView } from 'react-native-drag-sort';
+import DraggableFlatList, { RenderItemParams, ScaleDecorator } from 'react-native-draggable-flatlist';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useNav } from '../../../src/lib/NavContext';
@@ -89,10 +90,6 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
   const [activeTab, setActiveTab] = useState<'active' | 'inactive'>('active');
   const slideAnim = useRef(new Animated.Value(0)).current;
   const { width: W } = useWindowDimensions();
-  const CARD_SIZE = 100;
-  const CARD_GAP  = 10;
-  const GRID_PADDING = DC.pagePadding;
-  const NUM_COLS = 3;
 
   // ── Date filter state ────────────────────────────────────────────────────
   const [dateMode, setDateMode]       = useState<DateMode>('monthly');
@@ -295,57 +292,69 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
     queryClient.invalidateQueries({ queryKey: ['spaces', userId] });
   };
 
-  // ── Card renderer for AutoDragSortableView ──
-  const renderSpaceCard = (space: SpaceData) => {
-    const isExpense = (space.space_type ?? 'expense') === 'expense';
+  const renderExpenseCard = ({ item: space, drag, isActive }: RenderItemParams<SpaceData>) => {
     const value     = space.spent ?? 0;
-    const allTime   = space.savedAllTime ?? 0;
     const budget    = space.budget ? convert(space.budget, space.budget_currency ?? 'PHP', defaultCurrency) : 0;
-    const over      = isExpense && budget > 0 && value > budget;
-    const remaining = isExpense ? budget - value : Math.max(budget - allTime, 0);
-    const reached   = !isExpense && budget > 0 && allTime >= budget;
-    const displayVal = isExpense ? value : allTime;
+    const over      = budget > 0 && value > budget;
+    const remaining = budget - value;
     return (
-      <TouchableOpacity
-        style={[s.gridCard, over && s.cardOver]}
-        activeOpacity={0.85}
-        onPress={() => openSpace(space.id, space.name)}
-      >
-        <Text style={s.gridCardName} numberOfLines={1}>{space.name}</Text>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', width: '100%' }}>
-          <View style={s.gridAmountRow}>
-            <Text style={[s.gridSpent, over && { color: DC.overBudgetColor }, !isExpense && { color: DC.accent1 }]}>{fmtCompact(displayVal)}</Text>
-            {budget > 0 && <Text style={s.gridSep}> / </Text>}
-            {budget > 0 && <Text style={s.gridBudget}>{fmtCompact(budget)}</Text>}
+      <ScaleDecorator activeScale={1.08}>
+        <TouchableOpacity
+          style={[s.gridCard, over && s.cardOver, isActive && s.cardDragging]}
+          activeOpacity={0.85}
+          onPress={() => openSpace(space.id, space.name)}
+          onLongPress={drag}
+          delayLongPress={300}
+        >
+          <Text style={s.gridCardName} numberOfLines={1}>{space.name}</Text>
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', width: '100%' }}>
+            <View style={s.gridAmountRow}>
+              <Text style={[s.gridSpent, over && { color: DC.overBudgetColor }]}>{fmtCompact(value)}</Text>
+              {budget > 0 && <Text style={s.gridSep}> / </Text>}
+              {budget > 0 && <Text style={s.gridBudget}>{fmtCompact(budget)}</Text>}
+            </View>
+            {budget > 0 && (
+              <Text style={[s.gridStatus, over && { color: DC.overBudgetColor }]}>
+                {over ? `Over ${fmtCompact(Math.abs(remaining))}` : `${fmtCompact(remaining)} left`}
+              </Text>
+            )}
           </View>
-          {budget > 0 && (
-            <Text style={[s.gridStatus, over && { color: DC.overBudgetColor }, reached && { color: DC.accent1 }]}>
-              {over ? `Over ${fmtCompact(Math.abs(remaining))}` : reached ? 'Goal reached!' : `${fmtCompact(remaining)} left`}
-            </Text>
-          )}
-        </View>
-      </TouchableOpacity>
+        </TouchableOpacity>
+      </ScaleDecorator>
     );
   };
 
-  // ── Grid renderer ──
-  const renderGrid = (data: SpaceData[]) => (
-    <AutoDragSortableView
-      dataSource={data}
-      parentWidth={W - GRID_PADDING * 2}
-      childrenWidth={CARD_SIZE}
-      childrenHeight={CARD_SIZE}
-      marginChildrenTop={CARD_GAP}
-      marginChildrenBottom={0}
-      marginChildrenLeft={CARD_GAP / 2}
-      marginChildrenRight={CARD_GAP / 2}
-      keyExtractor={(item) => item.id}
-      renderItem={(item) => renderSpaceCard(item)}
-      onDataChange={(newData) => handleDragEnd(newData)}
-      style={s.grid}
-      isDragFreely={false}
-    />
-  );
+  const renderSavingsCard = ({ item: space, drag, isActive }: RenderItemParams<SpaceData>) => {
+    const allTime   = space.savedAllTime ?? 0;
+    const budget    = space.budget ? convert(space.budget, space.budget_currency ?? 'PHP', defaultCurrency) : 0;
+    const remaining = Math.max(budget - allTime, 0);
+    const reached   = budget > 0 && allTime >= budget;
+    return (
+      <ScaleDecorator activeScale={1.08}>
+        <TouchableOpacity
+          style={[s.gridCard, isActive && s.cardDragging]}
+          activeOpacity={0.85}
+          onPress={() => openSpace(space.id, space.name)}
+          onLongPress={drag}
+          delayLongPress={300}
+        >
+          <Text style={s.gridCardName} numberOfLines={1}>{space.name}</Text>
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', width: '100%' }}>
+            <View style={s.gridAmountRow}>
+              <Text style={[s.gridSpent, { color: DC.accent1 }]}>{fmtCompact(allTime)}</Text>
+              {budget > 0 && <Text style={s.gridSep}> / </Text>}
+              {budget > 0 && <Text style={s.gridBudget}>{fmtCompact(budget)}</Text>}
+            </View>
+            {budget > 0 && (
+              <Text style={[s.gridStatus, reached && { color: DC.accent1 }]}>
+                {reached ? 'Goal reached!' : `${fmtCompact(remaining)} left`}
+              </Text>
+            )}
+          </View>
+        </TouchableOpacity>
+      </ScaleDecorator>
+    );
+  };
 
   const firstName = userName?.split(' ')[0] || 'there';
   
@@ -481,6 +490,7 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
   };
 
   return (
+    <GestureHandlerRootView style={s.root}>
     <SafeAreaView style={s.root}>
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
         {/* Pending space invites */}
@@ -548,13 +558,31 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
                 {expenseActive.length > 0 && (
                   <>
                     <Text style={s.sectionHeader}>Expense tracker</Text>
-                    {renderGrid(expenseActive)}
+                    <DraggableFlatList
+                      data={expenseActive}
+                      keyExtractor={item => item.id}
+                      numColumns={3}
+                      renderItem={renderExpenseCard}
+                      onDragEnd={({ data }) => handleDragEnd(data)}
+                      containerStyle={s.grid}
+                      scrollEnabled={false}
+                      activationDistance={5}
+                    />
                   </>
                 )}
                 {savingsActive.length > 0 && (
                   <>
                     <Text style={s.sectionHeader}>Savings Tracker</Text>
-                    {renderGrid(savingsActive)}
+                    <DraggableFlatList
+                      data={savingsActive}
+                      keyExtractor={item => item.id}
+                      numColumns={3}
+                      renderItem={renderSavingsCard}
+                      onDragEnd={({ data }) => handleDragEnd(data)}
+                      containerStyle={s.grid}
+                      scrollEnabled={false}
+                      activationDistance={5}
+                    />
                   </>
                 )}
                 {(expenseActive.length > 0 || savingsActive.length > 0) && (
@@ -572,13 +600,31 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
                 {expenseInactive.length > 0 && (
                   <>
                     <Text style={s.sectionHeader}>Expense tracker</Text>
-                    {renderGrid(expenseInactive)}
+                    <DraggableFlatList
+                      data={expenseInactive}
+                      keyExtractor={item => item.id}
+                      numColumns={3}
+                      renderItem={renderExpenseCard}
+                      onDragEnd={({ data }) => handleDragEnd(data)}
+                      containerStyle={s.grid}
+                      scrollEnabled={false}
+                      activationDistance={5}
+                    />
                   </>
                 )}
                 {savingsInactive.length > 0 && (
                   <>
                     <Text style={s.sectionHeader}>Savings Tracker</Text>
-                    {renderGrid(savingsInactive)}
+                    <DraggableFlatList
+                      data={savingsInactive}
+                      keyExtractor={item => item.id}
+                      numColumns={3}
+                      renderItem={renderSavingsCard}
+                      onDragEnd={({ data }) => handleDragEnd(data)}
+                      containerStyle={s.grid}
+                      scrollEnabled={false}
+                      activationDistance={5}
+                    />
                   </>
                 )}
               </View>
@@ -900,6 +946,7 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
         </TouchableOpacity>
       </BottomSheet>
     </SafeAreaView>
+    </GestureHandlerRootView>
   );
 }
 
