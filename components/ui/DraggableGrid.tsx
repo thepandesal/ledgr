@@ -68,8 +68,8 @@ export default function DraggableGrid<T extends { id: string }>({
   const pan = useRef(new Animated.ValueXY()).current;
 
   const panResponder = useRef(PanResponder.create({
-    onStartShouldSetPanResponder:        () => sortModeRef.current,
-    onMoveShouldSetPanResponder:          () => sortModeRef.current,
+    onStartShouldSetPanResponder:        () => false,
+    onMoveShouldSetPanResponder:          () => sortModeRef.current && isDraggingRef.current,
     onStartShouldSetPanResponderCapture:  () => false,
     onMoveShouldSetPanResponderCapture:   () => sortModeRef.current && isDraggingRef.current,
     onPanResponderGrant: () => {

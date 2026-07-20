@@ -502,7 +502,7 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
 
   return (
     <SafeAreaView style={s.root}>
-      <ScrollView ref={scrollViewRef} scrollEnabled={!isDraggingAny} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
+      <ScrollView ref={scrollViewRef} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
         {/* Pending space invites */}
         {pendingInvites.length > 0 && (
           <View style={{ paddingHorizontal: DC.pagePadding, paddingTop: 16, gap: 8 }}>
@@ -573,7 +573,7 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
                       onDragEnd={handleDragEnd}
                       paddingHorizontal={DC.pagePadding}
                       sortMode={sortMode}
-                      onDragStateChange={setIsDraggingAny}
+
                       renderItem={(space) => renderExpenseCard(space)}
                     />
                   </>
@@ -586,7 +586,7 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
                       onDragEnd={handleDragEnd}
                       paddingHorizontal={DC.pagePadding}
                       sortMode={sortMode}
-                      onDragStateChange={setIsDraggingAny}
+
                       renderItem={(space) => renderSavingsCard(space)}
                     />
                   </>
