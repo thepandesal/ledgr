@@ -19,7 +19,7 @@
     },
     "ios": {
       "bundleIdentifier": "art.ledgr.app",
-      "buildNumber": "71",
+      "buildNumber": "72",
       "supportsTablet": false,
       "entitlements": {
         "aps-environment": "production"
