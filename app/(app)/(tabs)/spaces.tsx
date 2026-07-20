@@ -34,9 +34,16 @@ const ACCENT_DARK = Brand.color.accentDark; // dark teal � text/icons on white
 
 const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmtCompact = (n: number) => {
-  if (n >= 1_000_000_000) return Math.round(n / 1_000_000_000) + 'B';
-  if (n >= 1_000_000)     return Math.round(n / 1_000_000) + 'M';
-  if (n >= 1_000)         return (n / 1_000).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 1 }) + 'K';
+  if (n >= 1_000_000_000) return (n / 1_000_000_000).toFixed(0) + 'B';
+  if (n >= 100_000_000)   return (n / 1_000_000).toFixed(0) + 'M';
+  if (n >= 1_000_000)     return (n / 1_000_000).toFixed(1) + 'M';
+  if (n >= 100_000)       return (n / 1_000).toFixed(0) + 'K';
+  if (n >= 1_000)         return (n / 1_000).toFixed(1) + 'K';
+  return Math.round(n).toString();
+};
+const fmtStatus = (n: number) => {
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
+  if (n >= 1_000)     return (n / 1_000).toFixed(1) + 'K';
   return Math.round(n).toString();
 };
 
@@ -66,12 +73,14 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
   const { convert, rateMap } = useExchangeRates();
   const insets = useSafeAreaInsets();
 
+  const prevIsActive = useRef(false);
   useEffect(() => {
-    if (isActive && userId) {
+    if (isActive && !prevIsActive.current && userId) {
       queryClient.invalidateQueries({ queryKey: ['spaces', userId] });
       queryClient.invalidateQueries({ queryKey: ['shared-spaces', userId] });
       queryClient.invalidateQueries({ queryKey: ['pending-space-invites', userId] });
     }
+    prevIsActive.current = isActive ?? false;
   }, [isActive, userId]);
   const [createModal, setCreateModal] = useState(false);
   const [spaceName, setSpaceName] = useState('');
@@ -118,13 +127,13 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
   const [cutoffDay, setCutoffDay]         = useState(25);
 
   const switchTab = (tab: 'active' | 'inactive') => {
-    Animated.timing(slideAnim, {
-      toValue: tab === 'inactive' ? -W : 0,
-      duration: 260,
-      useNativeDriver: true,
-    }).start();
+    const toValue = tab === 'inactive' ? -W : 0;
+    Animated.timing(slideAnim, { toValue, duration: 260, useNativeDriver: true }).start();
     setActiveTab(tab);
   };
+
+
+
 
   const { data: spaces = [] } = useQuery<SpaceData[]>({
     queryKey: ['spaces', userId, dateMode, dateOffset, weekStart, useCutoff, cutoffDay],
@@ -299,13 +308,13 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
     return (
       <TouchableOpacity
         key={space.id}
-        style={[s.gridCard, over && s.cardOver]}
+        style={[s.gridCard]}
         activeOpacity={0.85}
         onPress={() => !sortMode && openSpace(space.id, space.name)}
         onLongPress={() => { if (!sortMode) { setSelectedSpace(space); setMenuModal(true); setBlur(true); } }}
         delayLongPress={300}
       >
-        <Text style={s.gridCardName} numberOfLines={1}>{space.name}</Text>
+        <Text style={[s.gridCardName, over && { borderBottomColor: DC.overBudgetColor }]} numberOfLines={1}>{space.name}</Text>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', width: '100%' }}>
           <View style={s.gridAmountRow}>
             <Text style={[s.gridSpent, over && { color: DC.overBudgetColor }]}>{fmtCompact(value)}</Text>
@@ -314,7 +323,7 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
           </View>
           {budget > 0 && (
             <Text style={[s.gridStatus, over && { color: DC.overBudgetColor }]}>
-              {over ? `Over ${fmtCompact(Math.abs(remaining))}` : `${fmtCompact(remaining)} left`}
+              {over ? `Over ${fmtStatus(Math.abs(remaining))}` : `${fmtStatus(remaining)} left`}
             </Text>
           )}
         </View>
@@ -345,7 +354,7 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
           </View>
           {budget > 0 && (
             <Text style={[s.gridStatus, reached && { color: DC.accent1 }]}>
-              {reached ? 'Goal reached!' : `${fmtCompact(remaining)} left`}
+              {reached ? 'Goal reached!' : `${fmtStatus(remaining)} left`}
             </Text>
           )}
         </View>
@@ -564,7 +573,7 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
                       onDragEnd={handleDragEnd}
                       paddingHorizontal={DC.pagePadding}
                       sortMode={sortMode}
-                      scrollRef={scrollViewRef}
+
                       renderItem={(space) => renderExpenseCard(space)}
                     />
                   </>
@@ -577,7 +586,7 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
                       onDragEnd={handleDragEnd}
                       paddingHorizontal={DC.pagePadding}
                       sortMode={sortMode}
-                      scrollRef={scrollViewRef}
+
                       renderItem={(space) => renderSavingsCard(space)}
                     />
                   </>
@@ -648,7 +657,7 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
                   >
                     <Text style={s.gridCardName}>{space.name}</Text>
                     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', width: '100%' }}>
-                      <Text style={{ fontFamily: AppFont.regular, fontSize: 9, color: Colors.muted, marginBottom: 2 }}>{space.role} � {space.ownerName}</Text>
+
                       <View style={s.gridAmountRow}>
                         <Text style={[s.gridSpent, isExpense && over && { color: DC.overBudgetColor }]}>{fmtCompact(isExpense ? value : allTime)}</Text>
                         {budget > 0 && <Text style={s.gridSep}> / </Text>}
@@ -656,7 +665,7 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
                       </View>
                       {budget > 0 && (
                         <Text style={[s.gridStatus, isExpense && over && { color: DC.overBudgetColor }]}>
-                          {isExpense && over ? `Over ${fmtCompact(Math.abs(remaining))}` : `${fmtCompact(Math.abs(remaining))} left`}
+                          {isExpense && over ? `Over ${fmtStatus(Math.abs(remaining))}` : `${fmtStatus(Math.abs(remaining))} left`}
                         </Text>
                       )}
                     </View>
@@ -969,7 +978,7 @@ const s = StyleSheet.create({
   cardOver:      { borderColor: DC.overBudgetColor, borderWidth: 2.5 },
   cardDragging:  { opacity: 0.85, shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.18, shadowRadius: 10, elevation: 8 },
   gridCardName:  { fontFamily: AppFont.bold, fontSize: 11, color: DC.pageText, paddingVertical: 8, paddingHorizontal: 6, borderBottomWidth: 1, borderBottomColor: DC.cardBorder, width: '100%', textAlign: 'center' },
-  gridAmountRow: { flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', justifyContent: 'center', marginTop: 6, paddingHorizontal: 4 },
+  gridAmountRow: { flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', justifyContent: 'center', paddingHorizontal: 4 },
   gridSpent:     { fontFamily: AppFont.bold, fontSize: 13, color: DC.pageText, letterSpacing: -0.3 },
   gridSep:       { fontFamily: AppFont.regular, fontSize: 13, color: DC.pageTextMuted },
   gridBudget:    { fontFamily: AppFont.bold, fontSize: 13, color: DC.pageTextMuted, letterSpacing: -0.3 },

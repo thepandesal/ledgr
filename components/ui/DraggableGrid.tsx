@@ -256,8 +256,8 @@ function CardWrapper({ isDragging, sortMode, gridPos, pan, panHandlers, onPressI
         zIndex: 2,
         transform: [{ translateX: animX }, { translateY: animY }, { scale }],
         borderRadius: 18,
-        borderWidth: sortMode ? 1.5 : 0,
-        borderColor: '#B6E1DE',
+        borderWidth: 0,
+        borderColor: 'transparent',
       }}
     >
       {children}
