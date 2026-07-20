@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Dimensions, Image } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Dimensions, Image, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { supabase } from '../src/lib/supabase';
@@ -18,6 +18,14 @@ export default function LoginScreen() {
 
   const signIn = async (provider: 'google' | 'apple') => {
     setLoading(provider);
+    if (Platform.OS === 'web') {
+      await supabase.auth.signInWithOAuth({
+        provider,
+        options: { redirectTo: window.location.origin },
+      });
+      setLoading(null);
+      return;
+    }
     const redirectTo = Linking.createURL('spaces');
     const { data } = await supabase.auth.signInWithOAuth({
       provider,
