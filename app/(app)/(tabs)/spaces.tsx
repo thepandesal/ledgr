@@ -2,7 +2,7 @@
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
   SafeAreaView, TextInput, ActivityIndicator, useWindowDimensions, Animated, RefreshControl, Platform,
 } from 'react-native';
-import AutoDragSortableView from 'react-native-drag-sort';
+import { AutoDragSortableView } from 'react-native-drag-sort';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useNav } from '../../../src/lib/NavContext';
