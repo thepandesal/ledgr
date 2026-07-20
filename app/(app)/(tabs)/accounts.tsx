@@ -13,8 +13,10 @@ import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import BottomSheet from '@/components/ui/BottomSheet';
 import ConfirmModal from '@/components/ui/ConfirmModal';
-import { Colors, Fonts, Radius, Spacing } from '@/components/ui/theme';
+import { Colors, Radius } from '@/components/ui/theme';
 import { BlurContext } from '../../../src/lib/BlurContext';
+import { DC } from '../../../src/lib/design';
+import { AppFont } from '../../../src/lib/fonts';
 
 const { width: SW, height: SH } = Dimensions.get('window');
 const DEFAULT_BANKS = ['BDO', 'BPI', 'Metrobank', 'UnionBank', 'Security Bank', 'PNB', 'Landbank', 'RCBC', 'Chinabank', 'EastWest', 'GCash', 'Maya', 'Seabank', 'GoTyme', 'Tonik'];
@@ -28,6 +30,8 @@ export default function AccountsScreen({ isActive }: { isActive?: boolean }) {
   const queryClient = useQueryClient();
   const { userId } = useUser();
   const { setBlur, registerAdd, unregisterAdd } = useContext(BlurContext);
+  const [search, setSearch] = useState('');
+  const [activeTab, setActiveTab] = useState<'active' | 'inactive'>('active');
 
   useEffect(() => {
     if (isActive && userId) {
@@ -38,8 +42,7 @@ export default function AccountsScreen({ isActive }: { isActive?: boolean }) {
   const [editAccount, setEditAccount] = useState<Account | null>(null);
   const [menuModal, setMenuModal] = useState(false);
   const [selected, setSelected] = useState<Account | null>(null);
-  const [cropUri, setCropUri] = useState<string | null>(null);
-  const [onCropDone, setOnCropDone] = useState<((b64: string) => void) | null>(null);
+
 
   const { data: accounts = [] } = useQuery<Account[]>({
     queryKey: ['accounts', userId],
@@ -59,6 +62,15 @@ export default function AccountsScreen({ isActive }: { isActive?: boolean }) {
     return () => unregisterAdd('accounts');
   }, []);
 
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const copyAccount = (account: Account) => {
+    const text = `${account.bank}\n${account.holder_name}\n${account.account_number}`;
+    if (typeof navigator !== 'undefined' && navigator.clipboard) navigator.clipboard.writeText(text);
+    setCopiedId(account.id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
   const handleDelete = async () => {
     setMenuModal(false);
     await supabase.from('accounts').delete().eq('id', selected!.id);
@@ -73,53 +85,85 @@ export default function AccountsScreen({ isActive }: { isActive?: boolean }) {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#ffffff' }}>
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
 
+        {/* Active / Inactive toggle */}
+        <View style={s.toggle}>
+          <TouchableOpacity style={[s.toggleBtn, activeTab === 'active' && s.toggleBtnActive]} onPress={() => setActiveTab('active')} activeOpacity={0.8}>
+            <Text style={[s.toggleText, activeTab === 'active' && s.toggleTextActive]}>Active</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[s.toggleBtn, activeTab === 'inactive' && s.toggleBtnActive]} onPress={() => setActiveTab('inactive')} activeOpacity={0.8}>
+            <Text style={[s.toggleText, activeTab === 'inactive' && s.toggleTextActive]}>Inactive</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={s.addCircle} onPress={openAdd} activeOpacity={0.8}><Text style={s.addCircleText}>+</Text></TouchableOpacity>
+        </View>
+
+        {/* Search */}
+        <View style={s.searchBar}>
+          <Ionicons name="search-outline" size={14} color={DC.pageTextMuted} />
+          <TextInput
+            style={s.searchInput}
+            placeholder="Search Accounts.."
+            placeholderTextColor={DC.pageTextMuted}
+            value={search}
+            onChangeText={setSearch}
+          />
+        </View>
+
+        {/* List */}
         {accounts.length === 0 ? (
           <View style={s.emptyBox}>
-            <Ionicons name="card-outline" size={32} color={Colors.faint} />
+            <Ionicons name="card-outline" size={40} color={Colors.faint} />
             <Text style={s.emptyText}>no accounts saved yet</Text>
           </View>
         ) : (
           <View style={s.list}>
-            {accounts.map(account => (
-              <TouchableOpacity
-                key={account.id}
-                style={s.card}
-                activeOpacity={0.85}
-                onPress={() => router.push({ pathname: '/(app)/account-detail', params: { accountId: account.id, accountName: account.account_name, bankName: account.bank } } as any)}
-                onLongPress={() => { setSelected(account); setMenuModal(true); }}
-              >
-                <View style={s.cardLeft}>
-                  <Text style={s.cardBank}>{account.bank}</Text>
-                  <Text style={s.cardHolder}>{account.holder_name}</Text>
-                  <View style={s.cardNumberRow}>
-                    <Text style={s.cardNumber}>{account.account_number}</Text>
-                    <TouchableOpacity
-                      onPress={() => {
-                        if (typeof navigator !== 'undefined' && navigator.clipboard) {
-                          navigator.clipboard.writeText(account.account_number);
-                        }
-                        Alert.alert('Copied', account.account_number);
-                      }}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    >
-                      <Ionicons name="copy-outline" size={13} color={Colors.muted} />
-                    </TouchableOpacity>
-                  </View>
-                  <Text style={s.cardName} numberOfLines={1}>{account.account_name}</Text>
-                </View>
-                <View style={s.cardRight}>
+            {accounts
+              .filter(a => !search.trim() || a.account_name.toLowerCase().includes(search.toLowerCase()) || a.bank.toLowerCase().includes(search.toLowerCase()))
+              .map(account => (
+              <View key={account.id} style={s.card}>
+                {/* Left: QR or icon */}
+                <TouchableOpacity
+                  style={s.cardIconWrap}
+                  onPress={() => router.push({ pathname: '/(app)/account-detail', params: { accountId: account.id, accountName: account.account_name, bankName: account.bank } } as any)}
+                  activeOpacity={0.8}
+                >
                   {account.qr_code
                     ? <Image source={{ uri: account.qr_code }} style={s.qrThumb} resizeMode="cover" />
-                    : <View style={s.qrEmpty}><Ionicons name="qr-code-outline" size={20} color={Colors.faint} /></View>
+                    : <Ionicons name="card-outline" size={22} color={DC.pageText} />
                   }
-                  <TouchableOpacity onPress={() => { setSelected(account); setMenuModal(true); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ marginTop: 6 }}>
-                    <Ionicons name="ellipsis-horizontal" size={15} color={Colors.muted} />
+                </TouchableOpacity>
+
+                {/* Middle: info */}
+                <TouchableOpacity
+                  style={s.cardMid}
+                  onPress={() => router.push({ pathname: '/(app)/account-detail', params: { accountId: account.id, accountName: account.account_name, bankName: account.bank } } as any)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={s.cardBank}>{account.bank}</Text>
+                  <Text style={s.cardAccountName}>{account.account_name}</Text>
+                  <Text style={s.cardHolder}>{account.holder_name}</Text>
+                  <Text style={s.cardNumber}>{account.account_number}</Text>
+                </TouchableOpacity>
+
+                {/* Right: action buttons */}
+                <View style={s.cardActions}>
+                  <TouchableOpacity style={s.circleBtn} onPress={() => { setSelected(account); openEdit(account); }} activeOpacity={0.8}>
+                    <Ionicons name="pencil-outline" size={14} color={DC.pageBg} />
+                  </TouchableOpacity>
+                  <TouchableOpacity style={s.circleBtn} onPress={() => copyAccount(account)} activeOpacity={0.8}>
+                    <Ionicons name="copy-outline" size={14} color="#ffffff" />
                   </TouchableOpacity>
                 </View>
-              </TouchableOpacity>
+
+                {/* Copied toast */}
+                {copiedId === account.id && (
+                  <View style={s.toast}>
+                    <Text style={s.toastText}>copied to clipboard</Text>
+                  </View>
+                )}
+              </View>
             ))}
           </View>
         )}
@@ -133,18 +177,7 @@ export default function AccountsScreen({ isActive }: { isActive?: boolean }) {
         initial={editAccount}
         onClose={closeModal}
         onSaved={() => { closeModal(); queryClient.invalidateQueries({ queryKey: ['accounts', userId] }); }}
-        onRequestCrop={(uri, cb) => { setCropUri(uri); setOnCropDone(() => cb); }}
       />
-
-      <Modal visible={!!cropUri} transparent={false} animationType="slide" onRequestClose={() => setCropUri(null)}>
-        {cropUri && (
-          <InlineCropModal
-            uri={cropUri}
-            onCrop={(b64) => { onCropDone?.(b64); setCropUri(null); setOnCropDone(null); }}
-            onCancel={() => { setCropUri(null); setOnCropDone(null); }}
-          />
-        )}
-      </Modal>
 
       <ConfirmModal
         visible={menuModal}
@@ -280,12 +313,12 @@ function InlineCropModal({ uri, onCrop, onCancel }: { uri: string; onCrop: (b64:
       {/* header */}
       <View style={{ position: 'absolute', top: 52, left: 0, right: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24 }}>
         <TouchableOpacity onPress={onCancel} style={cs.headerBtn}><Ionicons name="close" size={24} color="#fff" /></TouchableOpacity>
-        <Text style={{ fontFamily: Fonts.mono, fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>drag to move · corner to resize</Text>
+        <Text style={{ fontFamily: AppFont.regular, fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>drag to move · corner to resize</Text>
         <TouchableOpacity onPress={doCrop} style={cs.headerBtn}><Ionicons name="checkmark" size={24} color="#0ccfcf" /></TouchableOpacity>
       </View>
       <TouchableOpacity style={{ position: 'absolute', bottom: 48, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#0ccfcf', borderRadius: 999, paddingVertical: 14, paddingHorizontal: 32 }} onPress={doCrop}>
         <Ionicons name="checkmark-circle" size={20} color="#000" />
-        <Text style={{ fontFamily: Fonts.monoBold, fontSize: 14, color: '#000' }}>save crop</Text>
+        <Text style={{ fontFamily: AppFont.semiBold, fontSize: 14, color: '#000' }}>save crop</Text>
       </TouchableOpacity>
     </View>
   );
@@ -297,10 +330,11 @@ const cs = StyleSheet.create({
 
 // ─── AccountForm ─────────────────────────────────────────────────────────────
 
-function AccountForm({ visible, userId, initial, onClose, onSaved, onRequestCrop }: {
+function AccountForm({ visible, userId, initial, onClose, onSaved }: {
   visible: boolean; userId: string; initial?: Account | null; onClose: () => void; onSaved: () => void;
-  onRequestCrop: (uri: string, cb: (b64: string) => void) => void;
 }) {
+  const [cropUri, setCropUri] = useState<string | null>(null);
+  const [onCropDone, setOnCropDone] = useState<((b64: string) => void) | null>(null);
   const [bankInput, setBankInput] = useState(initial?.bank ?? '');
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [holderName, setHolderName] = useState(initial?.holder_name ?? '');
@@ -330,7 +364,7 @@ function AccountForm({ visible, userId, initial, onClose, onSaved, onRequestCrop
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') { Alert.alert('Permission needed', 'Please allow photo access.'); return; }
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: false, quality: 1 });
-    if (!result.canceled && result.assets[0]) onRequestCrop(result.assets[0].uri, (b64) => setQrCode(b64));
+    if (!result.canceled && result.assets[0]) { setCropUri(result.assets[0].uri); setOnCropDone(() => (b64: string) => setQrCode(b64)); }
   };
 
   const handleSubmit = async () => {
@@ -344,6 +378,16 @@ function AccountForm({ visible, userId, initial, onClose, onSaved, onRequestCrop
       onSaved();
     } catch (e: any) { setError(e.message); setLoading(false); }
   };
+
+  if (cropUri) return (
+    <Modal visible transparent={false} animationType="slide" onRequestClose={() => setCropUri(null)}>
+      <InlineCropModal
+        uri={cropUri}
+        onCrop={(b64) => { onCropDone?.(b64); setCropUri(null); setOnCropDone(null); }}
+        onCancel={() => { setCropUri(null); setOnCropDone(null); }}
+      />
+    </Modal>
+  );
 
   return (
     <>
@@ -372,7 +416,7 @@ function AccountForm({ visible, userId, initial, onClose, onSaved, onRequestCrop
           <Text style={f.label}>account holder</Text>
           <TextInput style={f.input} placeholder="e.g. juan dela cruz" placeholderTextColor={Colors.faint} value={holderName} onChangeText={setHolderName} />
 
-          <Text style={f.label}>qr code <Text style={{ fontFamily: Fonts.mono, color: Colors.muted, textTransform: 'none' }}>(optional)</Text></Text>
+          <Text style={f.label}>qr code <Text style={{ fontFamily: AppFont.regular, color: Colors.muted, textTransform: 'none' }}>(optional)</Text></Text>
           <TouchableOpacity style={f.qrBtn} onPress={pickQR} activeOpacity={0.8}>
             {qrCode ? (
               <View style={{ alignItems: 'center', padding: 16 }}>
@@ -384,7 +428,7 @@ function AccountForm({ visible, userId, initial, onClose, onSaved, onRequestCrop
             ) : (
               <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 20, gap: 6 }}>
                 <Ionicons name="qr-code-outline" size={26} color={Colors.faint} />
-                <Text style={{ fontFamily: Fonts.mono, fontSize: 11, color: Colors.muted }}>tap to upload & crop</Text>
+                <Text style={{ fontFamily: AppFont.regular, fontSize: 11, color: Colors.muted }}>tap to upload & crop</Text>
               </View>
             )}
           </TouchableOpacity>
@@ -399,32 +443,43 @@ function AccountForm({ visible, userId, initial, onClose, onSaved, onRequestCrop
 }
 
 const s = StyleSheet.create({
-  scroll:     { paddingTop: 20, paddingBottom: 60 },
-  list:       { marginBottom: 16 },
-  card:          { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingVertical: 16, paddingHorizontal: Spacing.page, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  cardLeft:      { flex: 1, gap: 3 },
-  cardBank:      { fontFamily: Fonts.monoBold, fontSize: 13, color: Colors.text, letterSpacing: 0.2 },
-  cardHolder:    { fontFamily: Fonts.mono, fontSize: 11, color: Colors.muted },
-  cardNumberRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  cardNumber:    { fontFamily: Fonts.monoBold, fontSize: 12, color: Colors.text, letterSpacing: 1 },
-  cardName:      { fontFamily: Fonts.mono, fontSize: 10, color: Colors.faint },
-  cardRight:     { alignItems: 'center', gap: 4 },
-  qrThumb:       { width: 56, height: 56, borderRadius: Radius.sm },
-  qrEmpty:       { width: 56, height: 56, borderRadius: Radius.sm, backgroundColor: Colors.input, justifyContent: 'center', alignItems: 'center' },
-  emptyBox:   { alignItems: 'center', gap: 8, paddingVertical: 48, paddingHorizontal: Spacing.page },
-  emptyText:  { fontFamily: Fonts.mono, fontSize: 13, color: Colors.muted },
-  footer:     { fontFamily: Fonts.mono, fontSize: 10, color: Colors.faint, textAlign: 'center', marginTop: 24, paddingHorizontal: Spacing.page },
+  scroll:          { paddingHorizontal: DC.pagePadding, paddingTop: 16, paddingBottom: 80, backgroundColor: '#ffffff' },
+  toggle:          { flexDirection: 'row', backgroundColor: DC.cardBg, borderRadius: 999, padding: 4, marginBottom: 16 },
+  toggleBtn:       { flex: 1, paddingVertical: 10, borderRadius: 999, alignItems: 'center' },
+  toggleBtnActive: { backgroundColor: DC.pageText },
+  toggleText:      { fontFamily: AppFont.regular, fontSize: 13, color: DC.pageTextMuted },
+  toggleTextActive:{ fontFamily: AppFont.semiBold, fontSize: 13, color: DC.pageBg },
+  searchBar:       { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: DC.cardBorderWidth, borderColor: DC.cardBorder, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 11, backgroundColor: '#ffffff', marginBottom: 16 },
+  searchInput:     { flex: 1, fontFamily: AppFont.regular, fontSize: 13, color: DC.pageText, padding: 0 },
+  list:            { gap: 10, marginBottom: 20 },
+  card:            { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: DC.cardRadius / 2, borderWidth: DC.cardBorderWidth, borderColor: DC.cardBorder, backgroundColor: '#ffffff', position: 'relative' },
+  cardIconWrap:    { width: 44, height: 44, justifyContent: 'center', alignItems: 'center' },
+  qrThumb:         { width: 44, height: 44, borderRadius: 10 },
+  cardMid:         { flex: 1, gap: 2 },
+  cardBank:        { fontFamily: AppFont.bold, fontSize: 13, color: DC.pageText },
+  cardAccountName: { fontFamily: AppFont.regular, fontSize: 11, color: DC.pageTextMuted, fontStyle: 'italic' },
+  cardHolder:      { fontFamily: AppFont.regular, fontSize: 11, color: DC.pageTextMuted },
+  cardNumber:      { fontFamily: AppFont.regular, fontSize: 11, color: DC.pageText },
+  cardActions:     { flexDirection: 'row', gap: 8 },
+  circleBtn:       { width: 32, height: 32, borderRadius: 16, backgroundColor: DC.pageText, justifyContent: 'center', alignItems: 'center' },
+  addCircle:       { width: 36, height: 36, borderRadius: 18, backgroundColor: DC.pageText, justifyContent: 'center', alignItems: 'center', marginLeft: 4 },
+  addCircleText:   { fontFamily: AppFont.bold, fontSize: 20, color: '#ffffff', lineHeight: 24 },
+  emptyBox:        { alignItems: 'center', gap: 12, paddingVertical: 64 },
+  emptyText:       { fontFamily: AppFont.regular, fontSize: 13, color: DC.pageTextMuted },
+  footer:          { fontFamily: AppFont.regular, fontSize: 10, color: Colors.faint, textAlign: 'center', marginTop: 8 },
+  toast:           { position: 'absolute', bottom: -28, left: 0, right: 0, alignItems: 'center' },
+  toastText:       { fontFamily: AppFont.regular, fontSize: 11, color: DC.pageBg, backgroundColor: DC.pageText, paddingHorizontal: 12, paddingVertical: 4, borderRadius: 999 },
 });
 
 const f = StyleSheet.create({
-  error:         { fontFamily: Fonts.mono, fontSize: 12, color: Colors.expense, marginBottom: 8 },
-  label:         { fontFamily: Fonts.monoBold, fontSize: 11, color: Colors.muted, marginBottom: 6, marginTop: 14, letterSpacing: 0.4, textTransform: 'uppercase' },
-  input:         { fontFamily: Fonts.monoBold, fontSize: 15, color: Colors.text, backgroundColor: Colors.white, borderRadius: Radius.lg, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1, borderColor: Colors.borderMid },
-  suggestionBox: { backgroundColor: Colors.white, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.border, marginTop: 4, overflow: 'hidden' },
-  suggestion:    { paddingVertical: 10, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  suggestionText:{ fontFamily: Fonts.mono, fontSize: 13, color: Colors.text },
-  qrBtn:         { borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface, overflow: 'hidden', marginBottom: 4 },
-  qrPreview:     { width: 160, height: 160, borderRadius: Radius.md },
-  saveBtn:       { backgroundColor: ACCENT, borderRadius: Radius.pill, paddingVertical: 14, alignItems: 'center', marginTop: 20, marginBottom: 8 },
-  saveBtnText:   { fontFamily: Fonts.monoBold, fontSize: 14, color: ACCENT_TEXT },
+  error:         { fontFamily: AppFont.regular, fontSize: 12, color: Colors.expense, marginBottom: 8 },
+  label:         { fontFamily: AppFont.semiBold, fontSize: 11, color: DC.pageTextMuted, marginBottom: 6, marginTop: 14, letterSpacing: 0.4, textTransform: 'uppercase' },
+  input:         { fontFamily: AppFont.regular, fontSize: 15, color: DC.pageText, backgroundColor: DC.inputBg, borderRadius: DC.inputRadius, paddingHorizontal: DC.inputPaddingH, paddingVertical: DC.inputPaddingV, borderWidth: DC.inputBorderWidth, borderColor: DC.inputBorder },
+  suggestionBox: { backgroundColor: DC.pageBg, borderRadius: DC.cardRadius / 2, borderWidth: DC.cardBorderWidth, borderColor: DC.cardBorder, marginTop: 4, overflow: 'hidden' },
+  suggestion:    { paddingVertical: 10, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: DC.cardBorder },
+  suggestionText:{ fontFamily: AppFont.regular, fontSize: 13, color: DC.pageText },
+  qrBtn:         { borderRadius: DC.cardRadius / 2, borderWidth: DC.cardBorderWidth, borderColor: DC.cardBorder, backgroundColor: DC.cardBg, overflow: 'hidden', marginBottom: 4 },
+  qrPreview:     { width: 160, height: 160, borderRadius: 8 },
+  saveBtn:       { backgroundColor: DC.pageText, borderRadius: 999, paddingVertical: 14, alignItems: 'center', marginTop: 20, marginBottom: 8 },
+  saveBtnText:   { fontFamily: AppFont.semiBold, fontSize: 14, color: DC.pageBg },
 });

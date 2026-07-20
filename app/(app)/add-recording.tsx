@@ -682,7 +682,7 @@ export default function AddRecordingScreen({ inlineProps }: {
           keyExtractor={a => a.id} labelExtractor={a => a.account_name}
           subLabelExtractor={a => a.bank}
           subLabel2Extractor={a => a.holder_name}
-          renderLeft={(a) => <View style={[s.catDot, { backgroundColor: a.color ?? DC.cardBorder }]} />}
+          renderLeft={(a) => <Ionicons name="card-outline" size={22} color={DC.pageText} />}
           emptyText="no accounts found"
         />
         <FormActions onCancel={() => setShowAccountModal(false)} onConfirm={() => setShowAccountModal(false)} cancelLabel="cancel" confirmLabel="done" />
@@ -695,7 +695,7 @@ export default function AddRecordingScreen({ inlineProps }: {
           keyExtractor={a => a.id} labelExtractor={a => a.account_name}
           subLabelExtractor={a => a.bank}
           subLabel2Extractor={a => a.holder_name}
-          renderLeft={(a) => <View style={[s.catDot, { backgroundColor: a.color ?? DC.cardBorder }]} />}
+          renderLeft={(a) => <Ionicons name="card-outline" size={22} color={DC.pageText} />}
           emptyText="no accounts found"
         />
         <FormActions onCancel={() => setShowSingularAccountModal(false)} onConfirm={() => setShowSingularAccountModal(false)} cancelLabel="cancel" confirmLabel="done" />
