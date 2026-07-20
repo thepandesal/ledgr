@@ -1,6 +1,6 @@
 ﻿import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  SafeAreaView, TextInput, ActivityIndicator, useWindowDimensions, Animated, RefreshControl,
+  SafeAreaView, TextInput, ActivityIndicator, useWindowDimensions, Animated, RefreshControl, Platform,
 } from 'react-native';
 import DraggableFlatList, { RenderItemParams, ScaleDecorator } from 'react-native-draggable-flatlist';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -58,6 +58,48 @@ const DashLine = ({ color, style }: { color: string; style?: any }) => (
     ))}
   </View>
 );
+
+// ── Web drag-and-drop grid ───────────────────────────────────────────────
+function WebDraggableGrid({ data, onReorder, renderCard }: {
+  data: SpaceData[];
+  onReorder: (reordered: SpaceData[]) => void;
+  renderCard: (space: SpaceData) => React.ReactNode;
+}) {
+  const dragIndex = useRef<number | null>(null);
+  const [dragOver, setDragOver] = useState<number | null>(null);
+
+  const handleDragStart = (i: number) => { dragIndex.current = i; };
+  const handleDragOver = (e: any, i: number) => { e.preventDefault(); setDragOver(i); };
+  const handleDrop = (e: any, i: number) => {
+    e.preventDefault();
+    if (dragIndex.current === null || dragIndex.current === i) { setDragOver(null); return; }
+    const next = [...data];
+    const [moved] = next.splice(dragIndex.current, 1);
+    next.splice(i, 0, moved);
+    dragIndex.current = null;
+    setDragOver(null);
+    onReorder(next);
+  };
+  const handleDragEnd = () => { dragIndex.current = null; setDragOver(null); };
+
+  return (
+    <View style={s.grid}>
+      {data.map((space, i) => (
+        <div
+          key={space.id}
+          draggable
+          onDragStart={() => handleDragStart(i)}
+          onDragOver={(e) => handleDragOver(e, i)}
+          onDrop={(e) => handleDrop(e, i)}
+          onDragEnd={handleDragEnd}
+          style={{ opacity: dragOver === i ? 0.5 : 1, cursor: 'grab' }}
+        >
+          {renderCard(space)}
+        </div>
+      ))}
+    </View>
+  );
+}
 
 export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
   const router = useRouter();
@@ -292,67 +334,104 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
     queryClient.invalidateQueries({ queryKey: ['spaces', userId] });
   };
 
-  const renderExpenseCard = ({ item: space, drag, isActive }: RenderItemParams<SpaceData>) => {
+  // ── Shared card content (used by both native and web renderers) ──
+  const expenseCardContent = (space: SpaceData, dragging = false) => {
     const value     = space.spent ?? 0;
     const budget    = space.budget ? convert(space.budget, space.budget_currency ?? 'PHP', defaultCurrency) : 0;
     const over      = budget > 0 && value > budget;
     const remaining = budget - value;
     return (
-      <ScaleDecorator activeScale={1.08}>
-        <TouchableOpacity
-          style={[s.gridCard, over && s.cardOver, isActive && s.cardDragging]}
-          activeOpacity={0.85}
-          onPress={() => openSpace(space.id, space.name)}
-          onLongPress={drag}
-          delayLongPress={300}
-        >
-          <Text style={s.gridCardName} numberOfLines={1}>{space.name}</Text>
-          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', width: '100%' }}>
-            <View style={s.gridAmountRow}>
-              <Text style={[s.gridSpent, over && { color: DC.overBudgetColor }]}>{fmtCompact(value)}</Text>
-              {budget > 0 && <Text style={s.gridSep}> / </Text>}
-              {budget > 0 && <Text style={s.gridBudget}>{fmtCompact(budget)}</Text>}
-            </View>
-            {budget > 0 && (
-              <Text style={[s.gridStatus, over && { color: DC.overBudgetColor }]}>
-                {over ? `Over ${fmtCompact(Math.abs(remaining))}` : `${fmtCompact(remaining)} left`}
-              </Text>
-            )}
+      <TouchableOpacity
+        style={[s.gridCard, over && s.cardOver, dragging && s.cardDragging]}
+        activeOpacity={0.85}
+        onPress={() => openSpace(space.id, space.name)}
+      >
+        <Text style={s.gridCardName} numberOfLines={1}>{space.name}</Text>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', width: '100%' }}>
+          <View style={s.gridAmountRow}>
+            <Text style={[s.gridSpent, over && { color: DC.overBudgetColor }]}>{fmtCompact(value)}</Text>
+            {budget > 0 && <Text style={s.gridSep}> / </Text>}
+            {budget > 0 && <Text style={s.gridBudget}>{fmtCompact(budget)}</Text>}
           </View>
-        </TouchableOpacity>
-      </ScaleDecorator>
+          {budget > 0 && (
+            <Text style={[s.gridStatus, over && { color: DC.overBudgetColor }]}>
+              {over ? `Over ${fmtCompact(Math.abs(remaining))}` : `${fmtCompact(remaining)} left`}
+            </Text>
+          )}
+        </View>
+      </TouchableOpacity>
     );
   };
 
-  const renderSavingsCard = ({ item: space, drag, isActive }: RenderItemParams<SpaceData>) => {
+  const savingsCardContent = (space: SpaceData, dragging = false) => {
     const allTime   = space.savedAllTime ?? 0;
     const budget    = space.budget ? convert(space.budget, space.budget_currency ?? 'PHP', defaultCurrency) : 0;
     const remaining = Math.max(budget - allTime, 0);
     const reached   = budget > 0 && allTime >= budget;
     return (
-      <ScaleDecorator activeScale={1.08}>
-        <TouchableOpacity
-          style={[s.gridCard, isActive && s.cardDragging]}
-          activeOpacity={0.85}
-          onPress={() => openSpace(space.id, space.name)}
-          onLongPress={drag}
-          delayLongPress={300}
-        >
-          <Text style={s.gridCardName} numberOfLines={1}>{space.name}</Text>
-          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', width: '100%' }}>
-            <View style={s.gridAmountRow}>
-              <Text style={[s.gridSpent, { color: DC.accent1 }]}>{fmtCompact(allTime)}</Text>
-              {budget > 0 && <Text style={s.gridSep}> / </Text>}
-              {budget > 0 && <Text style={s.gridBudget}>{fmtCompact(budget)}</Text>}
-            </View>
-            {budget > 0 && (
-              <Text style={[s.gridStatus, reached && { color: DC.accent1 }]}>
-                {reached ? 'Goal reached!' : `${fmtCompact(remaining)} left`}
-              </Text>
-            )}
+      <TouchableOpacity
+        style={[s.gridCard, dragging && s.cardDragging]}
+        activeOpacity={0.85}
+        onPress={() => openSpace(space.id, space.name)}
+      >
+        <Text style={s.gridCardName} numberOfLines={1}>{space.name}</Text>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', width: '100%' }}>
+          <View style={s.gridAmountRow}>
+            <Text style={[s.gridSpent, { color: DC.accent1 }]}>{fmtCompact(allTime)}</Text>
+            {budget > 0 && <Text style={s.gridSep}> / </Text>}
+            {budget > 0 && <Text style={s.gridBudget}>{fmtCompact(budget)}</Text>}
           </View>
-        </TouchableOpacity>
-      </ScaleDecorator>
+          {budget > 0 && (
+            <Text style={[s.gridStatus, reached && { color: DC.accent1 }]}>
+              {reached ? 'Goal reached!' : `${fmtCompact(remaining)} left`}
+            </Text>
+          )}
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  // ── Native drag renderers ──
+  const renderExpenseCard = ({ item: space, drag, isActive }: RenderItemParams<SpaceData>) => (
+    <ScaleDecorator activeScale={1.08}>
+      <TouchableOpacity style={[s.gridCard, (space.budget && space.spent && space.spent > space.budget) ? s.cardOver : undefined, isActive && s.cardDragging]} activeOpacity={0.85} onPress={() => openSpace(space.id, space.name)} onLongPress={drag} delayLongPress={300}>
+        {expenseCardContent(space, isActive)}
+      </TouchableOpacity>
+    </ScaleDecorator>
+  );
+
+  const renderSavingsCard = ({ item: space, drag, isActive }: RenderItemParams<SpaceData>) => (
+    <ScaleDecorator activeScale={1.08}>
+      <TouchableOpacity style={[s.gridCard, isActive && s.cardDragging]} activeOpacity={0.85} onPress={() => openSpace(space.id, space.name)} onLongPress={drag} delayLongPress={300}>
+        {savingsCardContent(space, isActive)}
+      </TouchableOpacity>
+    </ScaleDecorator>
+  );
+
+  // ── Grid renderer (web vs native) ──
+  const renderGrid = (data: SpaceData[], type: 'expense' | 'savings') => {
+    const cardFn = type === 'expense' ? expenseCardContent : savingsCardContent;
+    const nativeRender = type === 'expense' ? renderExpenseCard : renderSavingsCard;
+    if (Platform.OS === 'web') {
+      return (
+        <WebDraggableGrid
+          data={data}
+          onReorder={handleDragEnd}
+          renderCard={(space) => cardFn(space)}
+        />
+      );
+    }
+    return (
+      <DraggableFlatList
+        data={data}
+        keyExtractor={item => item.id}
+        numColumns={3}
+        renderItem={nativeRender}
+        onDragEnd={({ data: reordered }) => handleDragEnd(reordered)}
+        containerStyle={s.grid}
+        scrollEnabled={false}
+        activationDistance={5}
+      />
     );
   };
 
@@ -558,31 +637,13 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
                 {expenseActive.length > 0 && (
                   <>
                     <Text style={s.sectionHeader}>Expense tracker</Text>
-                    <DraggableFlatList
-                      data={expenseActive}
-                      keyExtractor={item => item.id}
-                      numColumns={3}
-                      renderItem={renderExpenseCard}
-                      onDragEnd={({ data }) => handleDragEnd(data)}
-                      containerStyle={s.grid}
-                      scrollEnabled={false}
-                      activationDistance={5}
-                    />
+                    {renderGrid(expenseActive, 'expense')}
                   </>
                 )}
                 {savingsActive.length > 0 && (
                   <>
                     <Text style={s.sectionHeader}>Savings Tracker</Text>
-                    <DraggableFlatList
-                      data={savingsActive}
-                      keyExtractor={item => item.id}
-                      numColumns={3}
-                      renderItem={renderSavingsCard}
-                      onDragEnd={({ data }) => handleDragEnd(data)}
-                      containerStyle={s.grid}
-                      scrollEnabled={false}
-                      activationDistance={5}
-                    />
+                    {renderGrid(savingsActive, 'savings')}
                   </>
                 )}
                 {(expenseActive.length > 0 || savingsActive.length > 0) && (
@@ -600,31 +661,13 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
                 {expenseInactive.length > 0 && (
                   <>
                     <Text style={s.sectionHeader}>Expense tracker</Text>
-                    <DraggableFlatList
-                      data={expenseInactive}
-                      keyExtractor={item => item.id}
-                      numColumns={3}
-                      renderItem={renderExpenseCard}
-                      onDragEnd={({ data }) => handleDragEnd(data)}
-                      containerStyle={s.grid}
-                      scrollEnabled={false}
-                      activationDistance={5}
-                    />
+                    {renderGrid(expenseInactive, 'expense')}
                   </>
                 )}
                 {savingsInactive.length > 0 && (
                   <>
                     <Text style={s.sectionHeader}>Savings Tracker</Text>
-                    <DraggableFlatList
-                      data={savingsInactive}
-                      keyExtractor={item => item.id}
-                      numColumns={3}
-                      renderItem={renderSavingsCard}
-                      onDragEnd={({ data }) => handleDragEnd(data)}
-                      containerStyle={s.grid}
-                      scrollEnabled={false}
-                      activationDistance={5}
-                    />
+                    {renderGrid(savingsInactive, 'savings')}
                   </>
                 )}
               </View>
