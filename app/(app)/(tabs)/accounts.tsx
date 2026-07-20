@@ -33,11 +33,7 @@ export default function AccountsScreen({ isActive }: { isActive?: boolean }) {
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState<'active' | 'inactive'>('active');
 
-  useEffect(() => {
-    if (isActive && userId) {
-      queryClient.invalidateQueries({ queryKey: ['accounts', userId] });
-    }
-  }, [isActive, userId]);
+
   const [addModal, setAddModal] = useState(false);
   const [editAccount, setEditAccount] = useState<Account | null>(null);
   const [menuModal, setMenuModal] = useState(false);
