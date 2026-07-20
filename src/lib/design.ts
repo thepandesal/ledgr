@@ -46,8 +46,8 @@ export const DC = {
   barTrackHeight:   20,
 
   // Status colors
-  overBudgetColor:  '#A72F2F',
-  overBudgetBorder: '#A72F2F',
+  overBudgetColor:  '#FF5757',
+  overBudgetBorder: '#FF5757',
   expenseColor:     '#a83333',  // expense amount color
   incomeColor:      '#5dc4bb',  // same as accent1
 

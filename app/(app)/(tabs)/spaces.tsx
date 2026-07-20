@@ -2,6 +2,8 @@
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
   SafeAreaView, TextInput, ActivityIndicator, useWindowDimensions, Animated, RefreshControl,
 } from 'react-native';
+import DraggableFlatList, { RenderItemParams, ScaleDecorator } from 'react-native-draggable-flatlist';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useNav } from '../../../src/lib/NavContext';
@@ -33,10 +35,10 @@ const ACCENT_DARK = Brand.color.accentDark; // dark teal — text/icons on white
 
 const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmtCompact = (n: number) => {
-  if (n >= 1_000_000_000) return (n / 1_000_000_000).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 2 }) + 'B';
-  if (n >= 1_000_000)     return (n / 1_000_000).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 2 }) + 'M';
-  if (n >= 1_000)         return (n / 1_000).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + 'K';
-  return fmt(n);
+  if (n >= 1_000_000_000) return Math.round(n / 1_000_000_000) + 'B';
+  if (n >= 1_000_000)     return Math.round(n / 1_000_000) + 'M';
+  if (n >= 1_000)         return (n / 1_000).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 1 }) + 'K';
+  return Math.round(n).toString();
 };
 
 import { getDateRange, getDateLabel, parseLocalDate, type DateMode, type WeekStart } from '../../../src/lib/dateUtils';
@@ -290,84 +292,67 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
     queryClient.invalidateQueries({ queryKey: ['spaces', userId] });
   };
 
-  const renderExpenseCard = (space: SpaceData) => {
+  const renderExpenseCard = ({ item: space, drag, isActive }: RenderItemParams<SpaceData>) => {
     const value     = space.spent ?? 0;
     const budget    = space.budget ? convert(space.budget, space.budget_currency ?? 'PHP', defaultCurrency) : 0;
     const over      = budget > 0 && value > budget;
     const remaining = budget - value;
-    const pct       = budget > 0 ? Math.min(value / budget, 1) : 0;
-    const dotColor  = over ? DC.overBudgetColor : DC.accent1;
     return (
-      <TouchableOpacity key={space.id} style={[s.card, over && s.cardOver]} activeOpacity={0.85} onPress={() => openSpace(space.id, space.name)}>
-        <View style={s.cardHeader}>
-          <Text style={s.cardName}>{space.name}</Text>
-          <TouchableOpacity onPress={() => { setSelectedSpace(space); setMenuModal(true); setBlur(true); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="ellipsis-horizontal" size={14} color={Colors.muted} />
-          </TouchableOpacity>
-        </View>
-        <View style={s.barRow}>
-          <View style={s.barSide}>
-            <Text style={s.barCurrency}>{defaultCurrency}</Text>
-            <Text style={[s.barValue, over && { color: DC.overBudgetColor }]}>{fmtCompact(value)}</Text>
-            <Text style={s.barLabel}>Money Out</Text>
-          </View>
-          <View style={s.barCenter}>
-            <View style={s.barTrack}>
-              <DashLine color="#CCCCCC" style={[s.barLeft, { width: `${pct * 100}%` as any }]} />
-              <View style={[s.barDot, { left: `${pct * 100}%` as any, backgroundColor: dotColor }]} />
-              <DashLine color="#3d3f3e" style={[s.barRight, { width: `${(1 - pct) * 100}%` as any, right: 0 }]} />
+      <ScaleDecorator activeScale={1.08}>
+        <TouchableOpacity
+          style={[s.gridCard, over && s.cardOver, isActive && s.cardDragging]}
+          activeOpacity={0.85}
+          onPress={() => openSpace(space.id, space.name)}
+          onLongPress={drag}
+          delayLongPress={300}
+        >
+          <Text style={s.gridCardName} numberOfLines={1}>{space.name}</Text>
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', width: '100%' }}>
+            <View style={s.gridAmountRow}>
+              <Text style={[s.gridSpent, over && { color: DC.overBudgetColor }]}>{fmtCompact(value)}</Text>
+              {budget > 0 && <Text style={s.gridSep}> / </Text>}
+              {budget > 0 && <Text style={s.gridBudget}>{fmtCompact(budget)}</Text>}
             </View>
-            {budget > 0 && <Text style={s.barRemaining}>{fmt(Math.abs(remaining))} {over ? 'Over' : 'Left'}</Text>}
+            {budget > 0 && (
+              <Text style={[s.gridStatus, over && { color: DC.overBudgetColor }]}>
+                {over ? `Over ${fmtCompact(Math.abs(remaining))}` : `${fmtCompact(remaining)} left`}
+              </Text>
+            )}
           </View>
-          {budget > 0 ? (
-            <View style={s.barSide}>
-              <Text style={s.barCurrency}>{defaultCurrency}</Text>
-              <Text style={s.barValue}>{fmtCompact(budget)}</Text>
-              <Text style={s.barLabel}>Budget</Text>
-            </View>
-          ) : <View style={s.barSide} />}
-        </View>
-      </TouchableOpacity>
+        </TouchableOpacity>
+      </ScaleDecorator>
     );
   };
 
-  const renderSavingsCard = (space: SpaceData) => {
+  const renderSavingsCard = ({ item: space, drag, isActive }: RenderItemParams<SpaceData>) => {
     const allTime   = space.savedAllTime ?? 0;
     const budget    = space.budget ? convert(space.budget, space.budget_currency ?? 'PHP', defaultCurrency) : 0;
     const remaining = Math.max(budget - allTime, 0);
-    const pct       = budget > 0 ? Math.min(allTime / budget, 1) : 0;
-    const dotColor  = pct >= 1 ? DC.accent1 : DC.accent1;
+    const reached   = budget > 0 && allTime >= budget;
     return (
-      <TouchableOpacity key={space.id} style={s.card} activeOpacity={0.85} onPress={() => openSpace(space.id, space.name)}>
-        <View style={s.cardHeader}>
-          <Text style={s.cardName}>{space.name}</Text>
-          <TouchableOpacity onPress={() => { setSelectedSpace(space); setMenuModal(true); setBlur(true); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="ellipsis-horizontal" size={14} color={Colors.muted} />
-          </TouchableOpacity>
-        </View>
-        <View style={s.barRow}>
-          <View style={s.barSide}>
-            <Text style={s.barCurrency}>{defaultCurrency}</Text>
-            <Text style={[s.barValue, { color: DC.accent1 }]}>{fmtCompact(allTime)}</Text>
-            <Text style={s.barLabel}>Money In</Text>
-          </View>
-          <View style={s.barCenter}>
-            <View style={s.barTrack}>
-              <DashLine color="#CCCCCC" style={[s.barLeft, { width: `${pct * 100}%` as any }]} />
-              <View style={[s.barDot, { left: `${pct * 100}%` as any, backgroundColor: dotColor }]} />
-              <DashLine color="#3d3f3e" style={[s.barRight, { width: `${(1 - pct) * 100}%` as any, right: 0 }]} />
+      <ScaleDecorator activeScale={1.08}>
+        <TouchableOpacity
+          style={[s.gridCard, isActive && s.cardDragging]}
+          activeOpacity={0.85}
+          onPress={() => openSpace(space.id, space.name)}
+          onLongPress={drag}
+          delayLongPress={300}
+        >
+          <Text style={s.gridCardName} numberOfLines={1}>{space.name}</Text>
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', width: '100%' }}>
+            <View style={s.gridAmountRow}>
+              <Text style={[s.gridSpent, { color: DC.accent1 }]}>{fmtCompact(allTime)}</Text>
+              {budget > 0 && <Text style={s.gridSep}> / </Text>}
+              {budget > 0 && <Text style={s.gridBudget}>{fmtCompact(budget)}</Text>}
             </View>
-            {budget > 0 && <Text style={s.barRemaining}>{fmt(remaining)} Left</Text>}
+            {budget > 0 && (
+              <Text style={[s.gridStatus, reached && { color: DC.accent1 }]}>
+                {reached ? 'Goal reached!' : `${fmtCompact(remaining)} left`}
+              </Text>
+            )}
           </View>
-          {budget > 0 ? (
-            <View style={s.barSide}>
-              <Text style={s.barCurrency}>{defaultCurrency}</Text>
-              <Text style={s.barValue}>{fmtCompact(budget)}</Text>
-              <Text style={s.barLabel}>Goal</Text>
-            </View>
-          ) : <View style={s.barSide} />}
-        </View>
-      </TouchableOpacity>
+        </TouchableOpacity>
+      </ScaleDecorator>
     );
   };
 
@@ -376,12 +361,10 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
   // Memoize date calculations to prevent infinite loops
   const dateLabel = useMemo(() => getLabel(dateMode, dateOffset, weekStart), [dateMode, dateOffset, weekStart, useCutoff, cutoffDay]);
   const dateRange = useMemo(() => getDateRange(dateMode, dateOffset, weekStart, useCutoff, cutoffDay), [dateMode, dateOffset, weekStart, useCutoff, cutoffDay]);
-  const expenseActive   = spaces.filter(sp => (sp.space_type ?? 'expense') === 'expense' && sp.is_active !== false).sort((a, b) => a.name.localeCompare(b.name));
-  const savingsActive   = spaces.filter(sp => sp.space_type === 'savings'  && sp.is_active !== false).sort((a, b) => a.name.localeCompare(b.name));
-  const expenseInactive = spaces.filter(sp => (sp.space_type ?? 'expense') === 'expense' && sp.is_active === false).sort((a, b) => a.name.localeCompare(b.name));
-  const savingsInactive = spaces.filter(sp => sp.space_type === 'savings'  && sp.is_active === false).sort((a, b) => a.name.localeCompare(b.name));
-  const expenseSpaces   = activeTab === 'active' ? expenseActive : expenseInactive;
-  const savingsSpaces   = activeTab === 'active' ? savingsActive : savingsInactive;
+  const expenseActive   = spaces.filter(sp => (sp.space_type ?? 'expense') === 'expense' && sp.is_active !== false);
+  const savingsActive   = spaces.filter(sp => sp.space_type === 'savings'  && sp.is_active !== false);
+  const expenseInactive = spaces.filter(sp => (sp.space_type ?? 'expense') === 'expense' && sp.is_active === false);
+  const savingsInactive = spaces.filter(sp => sp.space_type === 'savings'  && sp.is_active === false);
   const motivation = MOTIVATIONS[new Date().getDay() % MOTIVATIONS.length];
 
   // ── Pending space invites (as invitee) ─────────────────────────────────────────────
@@ -482,18 +465,19 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
   // ── Drag to reorder ──────────────────────────────────────────────────────
   const [resetConfirmVisible, setResetConfirmVisible] = useState(false);
 
-  const handleDragEnd = async (data: SpaceData[]) => {
-    // Optimistically update query cache
+  const handleDragEnd = async (reordered: SpaceData[]) => {
+    // Merge reordered list back into full spaces array preserving other types
+    const otherSpaces = spaces.filter(s => !reordered.find(r => r.id === s.id));
+    const merged = [...reordered, ...otherSpaces];
     queryClient.setQueryData(['spaces', userId, dateMode, dateOffset, weekStart, useCutoff, cutoffDay], (old: SpaceData[] | undefined) => {
       if (!old) return old;
       return old.map(s => {
-        const idx = data.findIndex(d => d.id === s.id);
+        const idx = reordered.findIndex(d => d.id === s.id);
         return idx >= 0 ? { ...s, sort_order: idx + 1 } : s;
       });
     });
-    // Persist to DB
     await Promise.all(
-      data.map((space, idx) =>
+      reordered.map((space, idx) =>
         supabase.from('spaces').update({ sort_order: idx + 1 }).eq('id', space.id)
       )
     );
@@ -506,6 +490,7 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
   };
 
   return (
+    <GestureHandlerRootView style={s.root}>
     <SafeAreaView style={s.root}>
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
         {/* Pending space invites */}
@@ -572,14 +557,32 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
                 )}
                 {expenseActive.length > 0 && (
                   <>
-                    <Text style={s.sectionHeader}>Expense Tracker</Text>
-                    <View style={s.list}>{expenseActive.map(space => renderExpenseCard(space))}</View>
+                    <Text style={s.sectionHeader}>Expense tracker</Text>
+                    <DraggableFlatList
+                      data={expenseActive}
+                      keyExtractor={item => item.id}
+                      numColumns={3}
+                      renderItem={renderExpenseCard}
+                      onDragEnd={({ data }) => handleDragEnd(data)}
+                      containerStyle={s.grid}
+                      scrollEnabled={false}
+                      activationDistance={5}
+                    />
                   </>
                 )}
                 {savingsActive.length > 0 && (
                   <>
                     <Text style={s.sectionHeader}>Savings Tracker</Text>
-                    <View style={s.list}>{savingsActive.map(space => renderSavingsCard(space))}</View>
+                    <DraggableFlatList
+                      data={savingsActive}
+                      keyExtractor={item => item.id}
+                      numColumns={3}
+                      renderItem={renderSavingsCard}
+                      onDragEnd={({ data }) => handleDragEnd(data)}
+                      containerStyle={s.grid}
+                      scrollEnabled={false}
+                      activationDistance={5}
+                    />
                   </>
                 )}
                 {(expenseActive.length > 0 || savingsActive.length > 0) && (
@@ -596,14 +599,32 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
                 )}
                 {expenseInactive.length > 0 && (
                   <>
-                    <Text style={s.sectionHeader}>Expense Tracker</Text>
-                    <View style={s.list}>{expenseInactive.map(space => renderExpenseCard(space))}</View>
+                    <Text style={s.sectionHeader}>Expense tracker</Text>
+                    <DraggableFlatList
+                      data={expenseInactive}
+                      keyExtractor={item => item.id}
+                      numColumns={3}
+                      renderItem={renderExpenseCard}
+                      onDragEnd={({ data }) => handleDragEnd(data)}
+                      containerStyle={s.grid}
+                      scrollEnabled={false}
+                      activationDistance={5}
+                    />
                   </>
                 )}
                 {savingsInactive.length > 0 && (
                   <>
                     <Text style={s.sectionHeader}>Savings Tracker</Text>
-                    <View style={s.list}>{savingsInactive.map(space => renderSavingsCard(space))}</View>
+                    <DraggableFlatList
+                      data={savingsInactive}
+                      keyExtractor={item => item.id}
+                      numColumns={3}
+                      renderItem={renderSavingsCard}
+                      onDragEnd={({ data }) => handleDragEnd(data)}
+                      containerStyle={s.grid}
+                      scrollEnabled={false}
+                      activationDistance={5}
+                    />
                   </>
                 )}
               </View>
@@ -618,7 +639,7 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
         {sharedSpaces.length > 0 && (
           <>
             <Text style={[s.sectionHeader, { marginTop: 24 }]}>Shared Spaces</Text>
-            <View style={s.list}>
+            <View style={s.grid}>
               {sharedSpaces.map((space: any) => {
                 const isExpense = (space.space_type ?? 'expense') === 'expense';
                 const value   = space.spent ?? 0;
@@ -633,37 +654,22 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
                 return (
                   <TouchableOpacity
                     key={space.id}
-                    style={[s.card, isExpense && over && s.cardOver]}
+                    style={[s.gridCard, isExpense && over && s.cardOver]}
                     activeOpacity={0.85}
                     onPress={() => openSpace(space.id, space.name)}
                   >
-                    <View style={s.cardHeader}>
-                      <View>
-                        <Text style={s.cardName}>{space.name}</Text>
-                        <Text style={{ fontFamily: AppFont.regular, fontSize: 9, color: Colors.muted }}>{space.role} · {space.ownerName}</Text>
-                      </View>
-                      <Ionicons name="people-outline" size={14} color={Colors.muted} />
-                    </View>
-                    <View style={s.barRow}>
-                      <View style={s.barSide}>
-                        <Text style={s.barCurrency}>{defaultCurrency}</Text>
-                        <Text style={[s.barValue, isExpense && over && { color: Colors.expense }]}>{fmtCompact(isExpense ? value : allTime)}</Text>
-                        <Text style={s.barLabel}>{isExpense ? 'Money Out' : 'Money In'}</Text>
-                      </View>
-                      <View style={s.barCenter}>
-                        <View style={s.barTrack}>
-                          <DashLine color="#CCCCCC" style={[s.barLeft, { width: `${(isExpense ? (budget > 0 ? Math.min(value/budget,1) : 0) : savingsPct) * 100}%` as any }]} />
-                          <View style={[s.barDot, { left: `${(isExpense ? (budget > 0 ? Math.min(value/budget,1) : 0) : savingsPct) * 100}%` as any, backgroundColor: isExpense ? (over ? Colors.expense : DC.dotDefault) : (savingsPct >= 1 ? ACCENT_DARK : DC.dotDefault) }]} />
-                          <DashLine color="#3d3f3e" style={[s.barRight, { width: `${(1 - (isExpense ? (budget > 0 ? Math.min(value/budget,1) : 0) : savingsPct)) * 100}%` as any, right: 0 }]} />
-                        </View>
-                        {budget > 0 && <Text style={s.barRemaining}>{fmt(Math.abs(remaining))} {isExpense && over ? 'Over' : 'Left'}</Text>}
+                    <Text style={s.gridCardName}>{space.name}</Text>
+                    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', width: '100%' }}>
+                      <Text style={{ fontFamily: AppFont.regular, fontSize: 9, color: Colors.muted, marginBottom: 2 }}>{space.role} · {space.ownerName}</Text>
+                      <View style={s.gridAmountRow}>
+                        <Text style={[s.gridSpent, isExpense && over && { color: DC.overBudgetColor }]}>{fmtCompact(isExpense ? value : allTime)}</Text>
+                        {budget > 0 && <Text style={s.gridSep}> / </Text>}
+                        {budget > 0 && <Text style={s.gridBudget}>{fmtCompact(budget)}</Text>}
                       </View>
                       {budget > 0 && (
-                        <View style={s.barSide}>
-                          <Text style={s.barCurrency}>{defaultCurrency}</Text>
-                          <Text style={s.barValue}>{fmtCompact(budget)}</Text>
-                          <Text style={s.barLabel}>{isExpense ? 'Budget' : 'Goal'}</Text>
-                        </View>
+                        <Text style={[s.gridStatus, isExpense && over && { color: DC.overBudgetColor }]}>
+                          {isExpense && over ? `Over ${fmtCompact(Math.abs(remaining))}` : `${fmtCompact(Math.abs(remaining))} left`}
+                        </Text>
                       )}
                     </View>
                   </TouchableOpacity>
@@ -940,18 +946,13 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
         </TouchableOpacity>
       </BottomSheet>
     </SafeAreaView>
+    </GestureHandlerRootView>
   );
 }
 
 const s = StyleSheet.create({
   root:   { flex: 1, backgroundColor: Colors.white },
-  scroll: { paddingBottom: 60 },
-
-  // ── Page header ──────────────────────────────────────────────────────────────
-  pageHeader:      { alignItems: 'center', paddingTop: 16, paddingBottom: 12 },
-  pageHeaderBrand: { fontFamily: 'MuseoModerno_Regular', fontSize: 13, color: DC.pageText, letterSpacing: 2 },
-  pageHeaderTitle: { fontFamily: AppFont.bold, fontSize: 28, color: DC.pageText, letterSpacing: -0.5 },
-  divider:         { height: 1, backgroundColor: Colors.border, marginBottom: 4 },
+  scroll: { paddingBottom: 100 },
 
   // ── Header ──────────────────────────────────────────────────────────────
   slideOuter: { overflow: 'hidden' },
@@ -975,23 +976,33 @@ const s = StyleSheet.create({
   sectionHeader: { fontFamily: AppFont.bold, fontSize: 17, color: DC.pageText, marginBottom: 10, marginTop: Brand.spacing.section, paddingHorizontal: DC.pagePadding, textAlign: 'center' },
   list: { marginBottom: 8, paddingHorizontal: DC.pagePadding },
 
-  // ── Card ─────────────────────────────────────────────────────────────────
-  card:        { paddingVertical: 18, paddingHorizontal: 18, borderRadius: DC.cardRadius, borderWidth: DC.cardBorderWidth, borderColor: DC.cardBorder, marginBottom: DC.cardGap, backgroundColor: DC.cardBg, overflow: 'hidden' },
-  cardOver:    { borderColor: DC.overBudgetColor, borderWidth: 1.5 },
-  cardHeader:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, paddingBottom: 12, marginHorizontal: -18, paddingHorizontal: 18, borderBottomWidth: 1.5, borderBottomColor: DC.cardBorder },
-  cardName:    { fontFamily: AppFont.bold, fontSize: 16, color: DC.pageText },
-  barRow:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 16 },
-  barSide:     { alignItems: 'center', justifyContent: 'center', width: 64, gap: 3 },
-  barCurrency: { fontFamily: AppFont.regular, fontSize: 10, color: DC.pageTextMuted, letterSpacing: 0.3 },
-  barValue:    { fontFamily: AppFont.bold, fontSize: 18, color: DC.pageText, letterSpacing: -0.5 },
-  barLabel:    { fontFamily: AppFont.regular, fontSize: 10, color: DC.pageTextMuted },
-  barCenter:   { width: 160, alignItems: 'center', gap: 4 },
-  barTrack:    { width: '100%', height: 20, position: 'relative', alignItems: 'center', justifyContent: 'center', flexDirection: 'row' },
-  barFill:     { display: 'none' as any },
-  barDot:      { position: 'absolute', width: DC.barDotSize, height: DC.barDotSize, borderRadius: DC.barDotSize / 2, zIndex: 2 },
-  barLeft:     { position: 'absolute', left: 0, height: 2, overflow: 'hidden' },
-  barRight:    { position: 'absolute', right: 0, height: 2, overflow: 'hidden' },
-  barRemaining:{ fontFamily: AppFont.regular, fontSize: 11, color: DC.pageTextMuted, fontStyle: 'italic' },
+  // ── Grid cards ────────────────────────────────────────────────────────────
+  grid:          { paddingHorizontal: DC.pagePadding, marginBottom: 8 },
+  gridCard:      { width: 100, height: 100, marginRight: 10, marginBottom: 10, paddingVertical: 0, paddingHorizontal: 0, borderRadius: 18, borderWidth: DC.cardBorderWidth, borderColor: DC.cardBorder, backgroundColor: DC.cardBg, alignItems: 'center', justifyContent: 'space-between', overflow: 'hidden' },
+  cardOver:      { borderColor: DC.overBudgetColor, borderWidth: 2.5 },
+  cardDragging:  { opacity: 0.85, shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.18, shadowRadius: 10, elevation: 8 },
+  gridCardName:  { fontFamily: AppFont.bold, fontSize: 11, color: DC.pageText, paddingVertical: 8, paddingHorizontal: 6, borderBottomWidth: 1, borderBottomColor: DC.cardBorder, width: '100%', textAlign: 'center' },
+  gridAmountRow: { flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', justifyContent: 'center', marginTop: 6, paddingHorizontal: 4 },
+  gridSpent:     { fontFamily: AppFont.bold, fontSize: 13, color: DC.pageText, letterSpacing: -0.3 },
+  gridSep:       { fontFamily: AppFont.regular, fontSize: 13, color: DC.pageTextMuted },
+  gridBudget:    { fontFamily: AppFont.bold, fontSize: 13, color: DC.pageTextMuted, letterSpacing: -0.3 },
+  gridStatus:    { fontFamily: AppFont.regular, fontSize: 9, color: DC.pageTextMuted, marginTop: 2, fontStyle: 'italic', textAlign: 'center', paddingHorizontal: 4 },
+  // legacy (kept for shared spaces inline usage)
+  card:          { paddingVertical: 18, paddingHorizontal: 18, borderRadius: DC.cardRadius, borderWidth: DC.cardBorderWidth, borderColor: DC.cardBorder, marginBottom: DC.cardGap, backgroundColor: DC.cardBg, overflow: 'hidden' },
+  cardHeader:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, paddingBottom: 12, marginHorizontal: -18, paddingHorizontal: 18, borderBottomWidth: 1.5, borderBottomColor: DC.cardBorder },
+  cardName:      { fontFamily: AppFont.bold, fontSize: 16, color: DC.pageText },
+  barRow:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 16 },
+  barSide:       { alignItems: 'center', justifyContent: 'center', width: 64, gap: 3 },
+  barCurrency:   { fontFamily: AppFont.regular, fontSize: 10, color: DC.pageTextMuted, letterSpacing: 0.3 },
+  barValue:      { fontFamily: AppFont.bold, fontSize: 18, color: DC.pageText, letterSpacing: -0.5 },
+  barLabel:      { fontFamily: AppFont.regular, fontSize: 10, color: DC.pageTextMuted },
+  barCenter:     { width: 160, alignItems: 'center', gap: 4 },
+  barTrack:      { width: '100%', height: 20, position: 'relative', alignItems: 'center', justifyContent: 'center', flexDirection: 'row' },
+  barFill:       { display: 'none' as any },
+  barDot:        { position: 'absolute', width: DC.barDotSize, height: DC.barDotSize, borderRadius: DC.barDotSize / 2, zIndex: 2 },
+  barLeft:       { position: 'absolute', left: 0, height: 2, overflow: 'hidden' },
+  barRight:      { position: 'absolute', right: 0, height: 2, overflow: 'hidden' },
+  barRemaining:  { fontFamily: AppFont.regular, fontSize: 11, color: DC.pageTextMuted, fontStyle: 'italic' },
 
   // ── Modal ─────────────────────────────────────────────────────────────────
   error:   { fontFamily: AppFont.regular, fontSize: 12, color: Colors.expense, marginBottom: 8 },
