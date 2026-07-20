@@ -97,20 +97,31 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (!fontsLoaded && !fontError) return;
+    let initialEventReceived = false;
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (typeof __DEV__ !== 'undefined' && __DEV__) console.log('[auth] event:', String(event).replace(/[\r\n]/g, ' '));
       const path = typeof window !== 'undefined' && typeof window.location !== 'undefined' ? window.location.pathname : '';
       if (path.startsWith('/split/')) { setReady(true); return; }
-      if (!session || event === 'SIGNED_OUT') {
-        setIsAuthenticated(false);
-        setReady(true);
-        if (event === 'SIGNED_OUT') {
+
+      if (event === 'SIGNED_OUT') {
+        // Only redirect if we already had a session (explicit sign out), not on initial load
+        if (initialEventReceived) {
+          setIsAuthenticated(false);
+          setReady(true);
           if (typeof window !== 'undefined') {
             window.location.href = '/';
           } else {
             router.replace('/');
           }
         }
+        return;
+      }
+
+      initialEventReceived = true;
+
+      if (!session) {
+        setIsAuthenticated(false);
+        setReady(true);
       } else if (!session.user.user_metadata?.full_name) {
         setIsAuthenticated(true);
         setReady(true);
