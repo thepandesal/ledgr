@@ -25,34 +25,33 @@ export default function DraggableGrid<T extends { id: string }>({
     y: Math.floor(idx / cols) * STEP,
   });
 
-  // items is the source of truth for order
-  const [items, setItems]             = useState(data);
-  const [draggingId, setDraggingId]   = useState<string | null>(null);
-  const [hoverIdx, setHoverIdx]       = useState(0);
+  const [items, setItems]           = useState(data);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [hoverIdx, setHoverIdx]     = useState(0);
 
-  const itemsRef      = useRef(items);
-  const colsRef       = useRef(cols);
-  const onDragEndRef  = useRef(onDragEnd);
-  const draggingIdRef = useRef<string | null>(null);
-  const hoverIdxRef   = useRef(0);
-  const dragOriginRef = useRef({ x: 0, y: 0 });
-  const dragFromIdx   = useRef(0);
-  const sortModeRef   = useRef(sortMode);
-  const isDraggingRef = useRef(false);
-
+  const itemsRef         = useRef(items);
+  const colsRef          = useRef(cols);
+  const onDragEndRef     = useRef(onDragEnd);
+  const draggingIdRef    = useRef<string | null>(null);
+  const hoverIdxRef      = useRef(0);
+  const dragOriginRef    = useRef({ x: 0, y: 0 });
+  const sortModeRef      = useRef(sortMode);
+  const touchedCardRef   = useRef<string | null>(null); // which card finger is on
   const onDragStateChangeRef = useRef(onDragStateChange);
+
   onDragStateChangeRef.current = onDragStateChange;
   itemsRef.current     = items;
   colsRef.current      = cols;
   onDragEndRef.current = onDragEnd;
   sortModeRef.current  = sortMode;
 
+  const pan = useRef(new Animated.ValueXY()).current;
+
   React.useEffect(() => { setItems(data); setDraggingId(null); }, [data]);
 
   const rows = Math.ceil(items.length / cols);
   const containerHeight = rows * CARD_SIZE + (rows - 1) * GAP;
 
-  // Build display list: move dragging item to hoverIdx slot
   const getDisplayItems = (): T[] => {
     if (draggingId === null) return items;
     const fromIdx = items.findIndex(i => i.id === draggingId);
@@ -64,16 +63,26 @@ export default function DraggableGrid<T extends { id: string }>({
   };
 
   const displayItems = getDisplayItems();
+  const ghostPos = draggingId !== null ? getPos(hoverIdx) : null;
 
-  const pan = useRef(new Animated.ValueXY()).current;
-
+  // Single pan responder on the container — only activates if finger is on a card
   const panResponder = useRef(PanResponder.create({
-    onStartShouldSetPanResponder:        () => sortModeRef.current,
-    onMoveShouldSetPanResponder:          () => sortModeRef.current,
-    onStartShouldSetPanResponderCapture:  () => false,
-    onMoveShouldSetPanResponderCapture:   () => sortModeRef.current && isDraggingRef.current,
+    // Only claim gesture if finger went down on a card
+    onStartShouldSetPanResponder:       () => false,
+    onMoveShouldSetPanResponder:        () => sortModeRef.current && touchedCardRef.current !== null,
+    onStartShouldSetPanResponderCapture:() => false,
+    onMoveShouldSetPanResponderCapture: () => sortModeRef.current && touchedCardRef.current !== null,
     onPanResponderGrant: () => {
+      const id = touchedCardRef.current;
+      if (!id) return;
       pan.setValue({ x: 0, y: 0 });
+      const idx = itemsRef.current.findIndex(i => i.id === id);
+      const pos = getPos(idx);
+      dragOriginRef.current = pos;
+      hoverIdxRef.current   = idx;
+      draggingIdRef.current = id;
+      setDraggingId(id);
+      setHoverIdx(idx);
       onDragStateChangeRef.current?.(true);
     },
     onPanResponderMove: (_, g) => {
@@ -94,11 +103,10 @@ export default function DraggableGrid<T extends { id: string }>({
     },
     onPanResponderRelease: () => {
       onDragStateChangeRef.current?.(false);
-      isDraggingRef.current = false;
+      touchedCardRef.current = null;
       const id = draggingIdRef.current;
       const to = hoverIdxRef.current;
       draggingIdRef.current = null;
-      // Spring pan to the ghost slot before resetting
       const origin = dragOriginRef.current;
       const targetX = (to % colsRef.current) * STEP;
       const targetY = Math.floor(to / colsRef.current) * STEP;
@@ -124,17 +132,17 @@ export default function DraggableGrid<T extends { id: string }>({
     onPanResponderTerminate: () => {
       pan.setValue({ x: 0, y: 0 });
       onDragStateChangeRef.current?.(false);
-      isDraggingRef.current = false;
-      draggingIdRef.current = null;
+      touchedCardRef.current = null;
+      draggingIdRef.current  = null;
       setDraggingId(null);
     },
   })).current;
 
-  // Ghost sits at the slot where the card will land = getPos(hoverIdx)
-  const ghostPos = draggingId !== null ? getPos(hoverIdx) : null;
-
   return (
-    <View style={{ height: containerHeight, marginHorizontal: paddingHorizontal, marginBottom: 8 }}>
+    <View
+      style={{ height: containerHeight, marginHorizontal: paddingHorizontal, marginBottom: 8 }}
+      {...panResponder.panHandlers}
+    >
       {ghostPos && (
         <View style={{
           position: 'absolute',
@@ -151,13 +159,10 @@ export default function DraggableGrid<T extends { id: string }>({
         }} />
       )}
       {items.map((item) => {
-        const isDragging   = item.id === draggingId;
-        // Position in the live-reordered display list
-        const displayIdx   = displayItems.findIndex(d => d.id === item.id);
-        // Dragging card: stays at its original slot, pan moves it
-        // Others: spring to their display slot
-        const fromIdx      = items.findIndex(i => i.id === item.id);
-        const gridPos      = isDragging ? getPos(fromIdx) : getPos(displayIdx);
+        const isDragging = item.id === draggingId;
+        const displayIdx = displayItems.findIndex(d => d.id === item.id);
+        const fromIdx    = items.findIndex(i => i.id === item.id);
+        const gridPos    = isDragging ? getPos(fromIdx) : getPos(displayIdx);
 
         return (
           <CardWrapper
@@ -166,18 +171,11 @@ export default function DraggableGrid<T extends { id: string }>({
             sortMode={sortMode}
             gridPos={gridPos}
             pan={isDragging ? pan : null}
-            panHandlers={panResponder.panHandlers}
-            onPressIn={() => {
-              if (!sortModeRef.current) return;
-              const idx = itemsRef.current.findIndex(i => i.id === item.id);
-              const pos = getPos(idx);
-              dragOriginRef.current = pos;
-              hoverIdxRef.current   = idx;
-              dragFromIdx.current   = idx;
-              draggingIdRef.current = item.id;
-              isDraggingRef.current = true;
-              setDraggingId(item.id);
-              setHoverIdx(idx);
+            onTouchStart={() => {
+              if (sortModeRef.current) touchedCardRef.current = item.id;
+            }}
+            onTouchEnd={() => {
+              touchedCardRef.current = null;
             }}
           >
             {renderItem(item)}
@@ -193,17 +191,16 @@ interface WrapperProps {
   sortMode: boolean;
   gridPos: { x: number; y: number };
   pan: Animated.ValueXY | null;
-  panHandlers: any;
-  onPressIn: () => void;
+  onTouchStart: () => void;
+  onTouchEnd: () => void;
   children: React.ReactNode;
 }
 
-function CardWrapper({ isDragging, sortMode, gridPos, pan, panHandlers, onPressIn, children }: WrapperProps) {
-  const scale        = useRef(new Animated.Value(1)).current;
-  const animX        = useRef(new Animated.Value(gridPos.x)).current;
-  const animY        = useRef(new Animated.Value(gridPos.y)).current;
-  // Freeze the drag origin — never update while dragging
-  const frozenPos    = useRef(gridPos);
+function CardWrapper({ isDragging, sortMode, gridPos, pan, onTouchStart, onTouchEnd, children }: WrapperProps) {
+  const scale     = useRef(new Animated.Value(1)).current;
+  const animX     = useRef(new Animated.Value(gridPos.x)).current;
+  const animY     = useRef(new Animated.Value(gridPos.y)).current;
+  const frozenPos = useRef(gridPos);
   if (!isDragging) frozenPos.current = gridPos;
 
   React.useEffect(() => {
@@ -225,8 +222,8 @@ function CardWrapper({ isDragging, sortMode, gridPos, pan, panHandlers, onPressI
   if (isDragging && pan) {
     return (
       <Animated.View
-        {...panHandlers}
-        onTouchStart={onPressIn}
+        onTouchStart={onTouchStart}
+        onTouchEnd={onTouchEnd}
         style={{
           position: 'absolute',
           left: frozenPos.current.x,
@@ -251,8 +248,8 @@ function CardWrapper({ isDragging, sortMode, gridPos, pan, panHandlers, onPressI
 
   return (
     <Animated.View
-      {...panHandlers}
-      onTouchStart={onPressIn}
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
       style={{
         position: 'absolute',
         width: CARD_SIZE,
@@ -260,8 +257,6 @@ function CardWrapper({ isDragging, sortMode, gridPos, pan, panHandlers, onPressI
         zIndex: 2,
         transform: [{ translateX: animX }, { translateY: animY }, { scale }],
         borderRadius: 18,
-        borderWidth: 0,
-        borderColor: 'transparent',
       }}
     >
       {children}
