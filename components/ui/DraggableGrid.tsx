@@ -38,6 +38,7 @@ export default function DraggableGrid<T extends { id: string }>({
   const dragOriginRef = useRef({ x: 0, y: 0 });
   const dragFromIdx   = useRef(0);
   const sortModeRef   = useRef(sortMode);
+  const isDraggingRef = useRef(false);
 
   const onDragStateChangeRef = useRef(onDragStateChange);
   onDragStateChangeRef.current = onDragStateChange;
@@ -67,10 +68,10 @@ export default function DraggableGrid<T extends { id: string }>({
   const pan = useRef(new Animated.ValueXY()).current;
 
   const panResponder = useRef(PanResponder.create({
-    onStartShouldSetPanResponder:        () => sortModeRef.current,
-    onMoveShouldSetPanResponder:          () => sortModeRef.current,
+    onStartShouldSetPanResponder:        () => false,
+    onMoveShouldSetPanResponder:          () => sortModeRef.current && isDraggingRef.current,
     onStartShouldSetPanResponderCapture:  () => false,
-    onMoveShouldSetPanResponderCapture:   () => sortModeRef.current,
+    onMoveShouldSetPanResponderCapture:   () => sortModeRef.current && isDraggingRef.current,
     onPanResponderGrant: () => {
       pan.setValue({ x: 0, y: 0 });
       onDragStateChangeRef.current?.(true);
@@ -93,6 +94,7 @@ export default function DraggableGrid<T extends { id: string }>({
     },
     onPanResponderRelease: () => {
       onDragStateChangeRef.current?.(false);
+      isDraggingRef.current = false;
       const id = draggingIdRef.current;
       const to = hoverIdxRef.current;
       draggingIdRef.current = null;
@@ -122,6 +124,7 @@ export default function DraggableGrid<T extends { id: string }>({
     onPanResponderTerminate: () => {
       pan.setValue({ x: 0, y: 0 });
       onDragStateChangeRef.current?.(false);
+      isDraggingRef.current = false;
       draggingIdRef.current = null;
       setDraggingId(null);
     },
@@ -172,6 +175,7 @@ export default function DraggableGrid<T extends { id: string }>({
               hoverIdxRef.current   = idx;
               dragFromIdx.current   = idx;
               draggingIdRef.current = item.id;
+              isDraggingRef.current = true;
               setDraggingId(item.id);
               setHoverIdx(idx);
             }}
