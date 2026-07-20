@@ -907,7 +907,7 @@ const s = StyleSheet.create({
   emptyText: { fontFamily: AppFont.regular, fontSize: 13, color: DC.pageTextMuted },
 
   // -- Section --------------------------------------------------------------
-  sectionHeader: { fontFamily: AppFont.bold, fontSize: 17, color: DC.pageText, marginBottom: 10, marginTop: Brand.spacing.section, paddingHorizontal: DC.pagePadding, textAlign: 'center' },
+  sectionHeader: { fontFamily: AppFont.bold, fontSize: 11, color: DC.pageTextMuted, marginBottom: 10, marginTop: Brand.spacing.section, paddingHorizontal: DC.pagePadding, textAlign: 'left', textTransform: 'uppercase', letterSpacing: 0.6 },
   list: { marginBottom: 8, paddingHorizontal: DC.pagePadding },
 
   // -- Grid cards ------------------------------------------------------------
