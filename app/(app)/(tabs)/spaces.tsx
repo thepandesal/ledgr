@@ -502,7 +502,7 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
 
   return (
     <SafeAreaView style={s.root}>
-      <ScrollView ref={scrollViewRef} scrollEnabled={!sortMode && !isDraggingAny} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
+      <ScrollView ref={scrollViewRef} scrollEnabled={!isDraggingAny} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
         {/* Pending space invites */}
         {pendingInvites.length > 0 && (
           <View style={{ paddingHorizontal: DC.pagePadding, paddingTop: 16, gap: 8 }}>
@@ -561,6 +561,7 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
             <Animated.View style={[s.slidePair, { width: W * 2, transform: [{ translateX: slideAnim }] }]}>
 
               {/* -- Panel 1: Active -- */}
+              {/* -- Panel 1: Active -- */}
               <View style={{ width: W }}>
                 {expenseActive.length === 0 && savingsActive.length === 0 && (
                   <View style={s.emptyWrap}><Text style={s.emptyText}>no active spaces</Text></View>
@@ -573,7 +574,7 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
                       onDragEnd={handleDragEnd}
                       paddingHorizontal={DC.pagePadding}
                       sortMode={sortMode}
-
+                      onDragStateChange={setIsDraggingAny}
                       renderItem={(space) => renderExpenseCard(space)}
                     />
                   </>
@@ -586,7 +587,7 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
                       onDragEnd={handleDragEnd}
                       paddingHorizontal={DC.pagePadding}
                       sortMode={sortMode}
-
+                      onDragStateChange={setIsDraggingAny}
                       renderItem={(space) => renderSavingsCard(space)}
                     />
                   </>
@@ -596,8 +597,6 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
                     <TouchableOpacity style={[s.resetBtn, sortMode && s.resetBtnActive]} onPress={() => setSortMode(v => !v)} activeOpacity={0.7}>
                       <Text style={[s.resetBtnText, sortMode && s.resetBtnTextActive]}>{sortMode ? 'Done' : 'Edit Order'}</Text>
                     </TouchableOpacity>
-
-
                     {sortMode && (
                       <TouchableOpacity style={s.resetBtn} onPress={() => { setSortMode(false); setResetConfirmVisible(true); }} activeOpacity={0.7}>
                         <Text style={s.resetBtnText}>Reset</Text>
@@ -606,7 +605,6 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
                   </View>
                 )}
               </View>
-
               {/* -- Panel 2: Inactive -- */}
               <View style={{ width: W }}>
                 {expenseInactive.length === 0 && savingsInactive.length === 0 && (
@@ -621,6 +619,8 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
                 {savingsInactive.length > 0 && (
                   <>
                     <Text style={s.sectionHeader}>Savings Tracker</Text>
+
+
                     <View style={s.grid}>{savingsInactive.map(space => renderSavingsCard(space))}</View>
                   </>
                 )}
