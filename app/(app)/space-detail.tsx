@@ -1382,7 +1382,7 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
       </SafeAreaView>
 
       {showAddModal && (
-        <AddRecordingScreen inlineProps={{ spaceId: spaceId as string, spaceName: name as string, defaultDate: new Date().toISOString().split('T')[0], onClose: () => { setShowAddModal(false); queryClient.refetchQueries({ queryKey: ['recordings', spaceId] }); } }} />
+        <AddRecordingScreen inlineProps={{ spaceId: spaceId as string, spaceName: name as string, defaultDate: new Date().toISOString().split('T')[0], onClose: () => { setShowAddModal(false); queryClient.invalidateQueries({ queryKey: ['recordings', spaceId] }); } }} />
       )}
 
       {/* Add / Actions choice sheet */}

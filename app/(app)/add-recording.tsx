@@ -307,7 +307,9 @@ export default function AddRecordingScreen({ inlineProps }: {
     if (invalid) { setError("name and amount are required for all items."); return; }
     setLoading(true); setError("");
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { session } } = await supabase.auth.getSession();
+      const user = session?.user;
+      if (!user) { setError('not logged in'); setLoading(false); return; }
       const statusMap: Record<string, string> = {
         expense: "paid", income: "received", savings: "saved",
         payable: "unpaid", receivable: "pending", expense_receivable: "paid",
@@ -368,8 +370,7 @@ export default function AddRecordingScreen({ inlineProps }: {
               }
             }
             if (newRec?.id && it.photos.length > 0) {
-              const { data: { user: u } } = await supabase.auth.getUser();
-              const { data: entry, error: entryErr } = await supabase.from("receipt_entries").insert({ user_id: u!.id, note: it.name.trim(), recording_id: newRec.id }).select().single();
+              const { data: entry, error: entryErr } = await supabase.from("receipt_entries").insert({ user_id: user.id, note: it.name.trim(), recording_id: newRec.id }).select().single();
               if (entryErr) throw entryErr;
               if (entry?.id) {
                 for (const uri of it.photos) {
