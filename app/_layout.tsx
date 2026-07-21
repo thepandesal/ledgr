@@ -129,7 +129,10 @@ export default function RootLayout() {
       } else if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') {
         setIsAuthenticated(true);
         setReady(true);
-        if ((event === 'SIGNED_IN') && (!path || path === '/' || path === '/index')) {
+        const isAuthPage = !path || path === '/' || path === '/index';
+        if (event === 'SIGNED_IN' && isAuthPage) {
+          router.replace('/(app)/(tabs)');
+        } else if (event === 'INITIAL_SESSION' && isAuthPage) {
           router.replace('/(app)/(tabs)');
         }
       } else {
