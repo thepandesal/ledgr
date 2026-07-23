@@ -41,35 +41,24 @@ export const Colors = {
 } as const;
 
 export const Fonts = {
-  // Display — page titles, space names
-  display: 'CalSans',
-
-  // Section headers — Chillax
-  heading: 'ChillaxMedium',
-  headingRegular: 'ChillaxRegular',
-  headingBold: 'ChillaxBold',
-  headingSemibold: 'ChillaxSemibold',
-  headingLight: 'ChillaxLight',
-
-  // Museo Moderno
-  museoBlack: 'MuseoModerno_Black',
-  museoMedium: 'MuseoModerno_Medium',
-  museoRegular: 'MuseoModerno_Regular',
-
-  // CalSans
-  calSans: 'CalSans',
-  glacial: 'GlacialIndifference',
-  glacialBold: 'GlacialIndifferenceBold',
-
-  // Body / data / labels
-  mono: 'RobotoMono_400Regular',
-  monoBold: 'RobotoMono_700Bold',
-
-  // General UI (login, onboarding, categories, spaces setup)
-  sans: 'DMSans_400Regular',
-  sansMedium: 'DMSans_500Medium',
-  sansSemiBold: 'DMSans_600SemiBold',
-  sansBold: 'DMSans_700Bold',
+  display:         'Poppins-Bold',
+  heading:         'Poppins-SemiBold',
+  headingRegular:  'Poppins-Regular',
+  headingBold:     'Poppins-Bold',
+  headingSemibold: 'Poppins-SemiBold',
+  headingLight:    'Poppins-Regular',
+  museoBlack:      'MuseoModerno_Black',
+  museoMedium:     'MuseoModerno_Medium',
+  museoRegular:    'MuseoModerno_Regular',
+  calSans:         'Poppins-Bold',
+  glacial:         'Poppins-Regular',
+  glacialBold:     'Poppins-Bold',
+  mono:            'Poppins-Regular',
+  monoBold:        'Poppins-Bold',
+  sans:            'Poppins-Regular',
+  sansMedium:      'Poppins-Medium',
+  sansSemiBold:    'Poppins-SemiBold',
+  sansBold:        'Poppins-Bold',
 } as const;
 
 export const Radius = {

@@ -8,9 +8,10 @@ interface Props {
   title: string;
   onBack?: () => void;
   right?: React.ReactNode;
+  titleColor?: string;
 }
 
-export default function PageHeader({ title, onBack, right }: Props) {
+export default function PageHeader({ title, onBack, right, titleColor }: Props) {
   return (
     <View style={s.header}>
       <View style={s.side}>
@@ -22,7 +23,7 @@ export default function PageHeader({ title, onBack, right }: Props) {
       </View>
       <View style={s.center}>
         <Text style={s.brand}>LEDGR</Text>
-        <Text style={s.title} numberOfLines={1}>{title}</Text>
+        <Text style={[s.title, titleColor ? { color: titleColor } : undefined]} numberOfLines={1}>{title}</Text>
       </View>
       <View style={s.side}>
         {right}

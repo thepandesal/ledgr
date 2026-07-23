@@ -25,6 +25,35 @@ interface NavContextType {
   openRecording: (recordingId: string) => void;
   closeRecording: () => void;
   activeRecordingId: string | null;
+  // Split bill detail panel
+  openSplitBill: (splitBillId: string, name: string) => void;
+  closeSplitBill: () => void;
+  activeSplitBillId: string | null;
+  activeSplitBillName: string | null;
+  // Top Spending panel
+  openTopSpending: () => void;
+  closeTopSpending: () => void;
+  // Recordings panel
+  openRecordingsPanel: (opts?: { categoryId?: string; categoryName?: string; spaceId?: string; spaceName?: string }) => void;
+  closeRecordingsPanel: () => void;
+  // Spaces panel
+  openSpacesPanel: () => void;
+  closeSpacesPanel: () => void;
+  // Loans panel
+  openLoansPanel: () => void;
+  closeLoansPanel: () => void;
+  // Receivables panel
+  openReceivablesPanel: () => void;
+  closeReceivablesPanel: () => void;
+  // Reminders panel
+  openRemindersPanel: () => void;
+  closeRemindersPanel: () => void;
+  // Contacts panel
+  openContactsPanel: () => void;
+  closeContactsPanel: () => void;
+  // Friends panel
+  openFriendsPanel: () => void;
+  closeFriendsPanel: () => void;
 }
 
 export const NavContext = createContext<NavContextType>({
@@ -41,6 +70,26 @@ export const NavContext = createContext<NavContextType>({
   openRecording: () => {},
   closeRecording: () => {},
   activeRecordingId: null,
+  openSplitBill: () => {},
+  closeSplitBill: () => {},
+  activeSplitBillId: null,
+  activeSplitBillName: null,
+  openTopSpending: () => {},
+  closeTopSpending: () => {},
+  openRecordingsPanel: () => {},
+  closeRecordingsPanel: () => {},
+  openSpacesPanel: () => {},
+  closeSpacesPanel: () => {},
+  openLoansPanel: () => {},
+  closeLoansPanel: () => {},
+  openReceivablesPanel: () => {},
+  closeReceivablesPanel: () => {},
+  openRemindersPanel: () => {},
+  closeRemindersPanel: () => {},
+  openContactsPanel: () => {},
+  closeContactsPanel: () => {},
+  openFriendsPanel: () => {},
+  closeFriendsPanel: () => {},
 });
 
 export const useNav = () => useContext(NavContext);

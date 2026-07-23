@@ -8,7 +8,7 @@
     "scheme": "ledgr",
     "userInterfaceStyle": "dark",
     "web": {
-      "favicon": "./assets/logo.png",
+      "favicon": "./assets/white.png",
       "bundler": "metro"
     },
     "plugins": [

@@ -14,8 +14,11 @@ import { compressImage, uploadReceiptPhoto } from '../../src/lib/receiptUpload';
 import { Colors, Fonts, Radius } from '@/components/ui/theme';
 import BottomSheet from '@/components/ui/BottomSheet';
 import { useScreenAnim } from '@/components/ui/ScreenWrapper';
+import PageHeader from '@/components/ui/PageHeader';
 import itemStyles from '@/components/ui/itemStyles';
 import { Brand } from '../../src/lib/brand';
+import { DC } from '../../src/lib/design';
+import { AppFont } from '../../src/lib/fonts';
 import { ocrReceiptImage, parseReceiptText, type ParsedItem } from '../../src/lib/receiptParser';
 import { CalSansBase64, ChillaxMediumBase64, ChillaxBoldBase64 } from '../../src/lib/fontBase64';
 
@@ -27,11 +30,14 @@ const PEACH = '#FFAB91';
 
 const { width } = Dimensions.get('window');
 
-export default function SplitBillDetailScreen() {
-  const { splitBillId, name } = useLocalSearchParams<{ splitBillId: string; name: string }>();
+export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, name: propName, onClose }: { splitBillId?: string; name?: string; onClose?: () => void }) {
+  const params = useLocalSearchParams<{ splitBillId: string; name: string }>();
+  const splitBillId = propSplitBillId ?? params.splitBillId;
+  const name = propName ?? params.name;
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { slideAnim, handleBack } = useScreenAnim();
+  const { slideAnim, handleBack: handleBackAnim } = useScreenAnim();
+  const handleBack = onClose ?? handleBackAnim;
 
   useEffect(() => {
     // Load current status
@@ -1176,9 +1182,16 @@ export default function SplitBillDetailScreen() {
   };
 
   const closeWithoutCompleting = async () => {
+    // Mark all linked expense recordings as is_due so their paid_amount is reflected correctly
+    for (const lr of incompleteRecs) {
+      const rec = lr.recording;
+      if (!rec) continue;
+      await supabase.from('recordings').update({ is_due: true }).eq('id', rec.id);
+    }
     await supabase.from('split_bills').update({ status: 'closed' }).eq('id', splitBillId);
     setBillStatus('closed');
     setCloseWithIncompleteModal(false);
+    queryClient.invalidateQueries({ queryKey: ['split-bill-recordings', splitBillId] });
   };
 
   // ── Auto-complete check after payment ────────────────────────────────────
@@ -1780,22 +1793,32 @@ export default function SplitBillDetailScreen() {
 
   return (
     <Animated.View style={[{ flex: 1, backgroundColor: Colors.white }, { transform: [{ translateX: slideAnim }] }]}>
-      <SafeAreaView style={{ flex: 1 }}>
+      <SafeAreaView style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
 
         {/* Header */}
-        <View style={s.header}>
-          <TouchableOpacity onPress={handleBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={s.backBtn}>
-            <Ionicons name="arrow-back" size={20} color="#B6E1DE" />
+        <PageHeader
+          title={String(name)}
+          onBack={handleBack}
+          right={
+            billStatus === 'ongoing' ? (
+              <TouchableOpacity onPress={openEditName} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Ionicons name="create-outline" size={18} color={DC.pageTextMuted} />
+              </TouchableOpacity>
+            ) : undefined
+          }
+        />
+
+        {/* Actions row */}
+        <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: PAGE, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.border }}>
+          <TouchableOpacity style={s.actionBtn} onPress={openShareModal}>
+            <Text style={s.actionBtnText}>share</Text>
           </TouchableOpacity>
-          <Text style={s.title} numberOfLines={1}>{name}</Text>
-          {billStatus === 'ongoing' && (
-            <TouchableOpacity onPress={openEditName} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={s.headerBtn}>
-              <Ionicons name="create-outline" size={16} color="#B6E1DE" />
-            </TouchableOpacity>
-          )}
-          <View style={s.totalBadge}>
-            <Text style={s.totalBadgeText}>{fmt(totalAmount)}</Text>
-          </View>
+          <TouchableOpacity style={s.actionBtn} onPress={handleToggleStatus}>
+            <Text style={s.actionBtnText}>{billStatus === 'closed' ? 'reopen' : 'close'}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={s.actionBtnDanger} onPress={() => setDeleteSplitModal(true)}>
+            <Text style={s.actionBtnDangerText}>delete</Text>
+          </TouchableOpacity>
         </View>
 
         <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
@@ -1804,13 +1827,13 @@ export default function SplitBillDetailScreen() {
           {/* Invite banner — shown to invitee only */}
           {myInvite && myInvite.status === 'pending' && (
             <View style={{ backgroundColor: ACCENT + '33', borderRadius: Radius.lg, padding: 16, marginBottom: 12, gap: 8 }}>
-              <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 13, color: ACCENT_DARK }}>
+              <Text style={{ fontFamily: AppFont.semiBold, fontSize: 13, color: ACCENT_DARK }}>
                 you've been added to this split bill
               </Text>
-              <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: Colors.text }}>
+              <Text style={{ fontFamily: AppFont.regular, fontSize: 11, color: Colors.text }}>
                 your share: {fmt(Number(myInvite.amount))}
               </Text>
-              <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: Colors.muted }}>
+              <Text style={{ fontFamily: AppFont.regular, fontSize: 11, color: Colors.muted }}>
                 accept to create a debt recording on your end.
               </Text>
               <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
@@ -1818,13 +1841,13 @@ export default function SplitBillDetailScreen() {
                   style={{ flex: 1, paddingVertical: 10, borderRadius: Radius.pill, backgroundColor: Colors.surface, alignItems: 'center', borderWidth: 1, borderColor: Colors.borderMid }}
                   onPress={confirmDecline}
                 >
-                  <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 12, color: Colors.muted }}>decline</Text>
+                  <Text style={{ fontFamily: AppFont.semiBold, fontSize: 12, color: Colors.muted }}>decline</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={{ flex: 2, paddingVertical: 10, borderRadius: Radius.pill, backgroundColor: ACCENT_DARK, alignItems: 'center' }}
                   onPress={openAcceptModal}
                 >
-                  <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 12, color: Colors.white }}>accept</Text>
+                  <Text style={{ fontFamily: AppFont.semiBold, fontSize: 12, color: Colors.white }}>accept</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -1832,34 +1855,14 @@ export default function SplitBillDetailScreen() {
           {myInvite && myInvite.status === 'accepted' && (
             <View style={{ backgroundColor: ACCENT + '22', borderRadius: Radius.lg, padding: 12, marginBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <Ionicons name="checkmark-circle" size={16} color={ACCENT_DARK} />
-              <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: ACCENT_DARK }}>you accepted this split bill — debt recorded</Text>
+              <Text style={{ fontFamily: AppFont.regular, fontSize: 11, color: ACCENT_DARK }}>you accepted this split bill — debt recorded</Text>
             </View>
           )}
-          <View style={s.sectionRow}>
-            <Text style={s.sectionHeader}>actions</Text>
-            <View style={{ flexDirection: 'row', gap: 6 }}>
-              <TouchableOpacity style={s.sectionAddBtn} onPress={openShareModal} activeOpacity={0.8}>
-                <Ionicons name="share-outline" size={12} color={ACCENT_DARK} />
-                <Text style={s.sectionAddText}>share</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={s.sectionAddBtn} onPress={handleToggleStatus} activeOpacity={0.8}>
-                <Ionicons name={billStatus === 'ongoing' ? 'lock-closed-outline' : 'lock-open-outline'} size={12} color={ACCENT_DARK} />
-                <Text style={s.sectionAddText}>{billStatus === 'ongoing' ? 'close' : 'reopen'}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[s.sectionAddBtn, { backgroundColor: Colors.expense + '18', borderColor: Colors.expense + '66' }]} onPress={() => setDeleteSplitModal(true)} activeOpacity={0.8}>
-                <Ionicons name="trash-outline" size={12} color={Colors.expense} />
-                <Text style={[s.sectionAddText, { color: Colors.expense }]}>delete</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-          <View style={s.divider} />
-
           <View style={s.sectionRow}>
             <Text style={s.sectionHeader}>recordings</Text>
             {billStatus === 'ongoing' && (
               <TouchableOpacity onPress={openAddRecording} style={s.sectionAddBtn}>
-                <Ionicons name="add" size={12} color={ACCENT_DARK} />
-                <Text style={s.sectionAddText}>add recording</Text>
+                <Text style={{ fontFamily: AppFont.bold, fontSize: 13, color: '#111111' }}>add</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -1867,11 +1870,11 @@ export default function SplitBillDetailScreen() {
             <ActivityIndicator color={ACCENT_DARK} />
           ) : linkedRecordings.length === 0 ? (
             <View style={s.emptyWrap}>
-              <Text style={Brand.type.emptyText}>no recordings linked yet</Text>
+              <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.muted }}>no recordings linked yet</Text>
             </View>
           ) : (
             <View style={s.list}>
-              {linkedRecordings.map((lr: any) => {
+              {linkedRecordings.map((lr: any, recIdx: number) => {
                   const rec = lr.recording;
                   const isDone =
                     (rec?.type === 'expense' && rec?.status === 'paid') ||
@@ -1889,9 +1892,8 @@ export default function SplitBillDetailScreen() {
                   activeOpacity={0.85}
                   onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: lr.recording?.id } } as any)}
                 >
-                  <View style={[s.recIconWrap, { backgroundColor: ACCENT + '44' }]}>
-                    <Ionicons name="receipt-outline" size={16} color={ACCENT_DARK} />
-                  </View>
+
+                  <Text style={s.recNum}>{recIdx + 1}</Text>
                   <View style={s.recMid}>
                     <Text style={s.recName} numberOfLines={1}>{lr.recording?.name ?? '—'}</Text>
                     <Text style={s.recDate}>
@@ -1899,61 +1901,27 @@ export default function SplitBillDetailScreen() {
                         ? new Date(rec.transaction_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
                         : '—'}
                     </Text>
+                    
+                  </View>
+                  <View style={s.recRight}>
+                    <Text style={s.recAmount}>{fmt(Number(lr.amount_contributed))}</Text>
                     {(() => {
                       const total = Number(rec?.amount ?? 0);
                       if (total <= 0) return null;
-                      // Sum collections by tallying split_bill_payments for people
-                      // assigned to items linked to this recording
-                      const itemsForRec = items.filter((item: any) => item.recording_id === rec?.id);
-                      let paidAmt = 0;
-                      if (itemsForRec.length > 0) {
-                        // Build per-person owed map for this recording
-                        const owedPerPerson: Record<string, number> = {};
-                        itemsForRec.forEach((item: any) => {
-                          const pp = (item.people ?? []).length > 0 ? Number(item.cost) / item.people.length : 0;
-                          (item.people ?? []).forEach((p: string) => {
-                            owedPerPerson[p] = (owedPerPerson[p] ?? 0) + pp;
-                          });
-                        });
-                        // For each payment, credit up to what that person owes for this recording
-                        const creditedPerPerson: Record<string, number> = {};
-                        payments.filter((pay: any) => pay.status !== 'cancelled').forEach((pay: any) => {
-                          const personOwed = owedPerPerson[pay.person_name] ?? 0;
-                          if (personOwed > 0) {
-                            const alreadyCredited = creditedPerPerson[pay.person_name] ?? 0;
-                            const credit = Math.min(Number(pay.amount), personOwed - alreadyCredited);
-                            if (credit > 0) {
-                              creditedPerPerson[pay.person_name] = alreadyCredited + credit;
-                              paidAmt += credit;
-                            }
-                          }
-                        });
-                      } else {
-                        // No items linked — fall back to paid_amount on the recording
-                        paidAmt = Number(rec?.paid_amount ?? 0);
-                      }
-                      const fullyCollected = paidAmt >= total - 0.01;
-                      const hasPartial = paidAmt > 0 && !fullyCollected;
-                      if (fullyCollected) {
-                        return (
-                          <Text style={{ fontFamily: Brand.font.mono, fontSize: 9, color: ACCENT_DARK }}>
-                            {rec?.type === 'due' ? 'fully collected' : 'fully paid'} · {fmt(paidAmt)}
-                          </Text>
-                        );
-                      }
-                      if (hasPartial) {
-                        return (
-                          <Text style={{ fontFamily: Brand.font.mono, fontSize: 9, color: PEACH }}>
-                            partially paid · {fmt(paidAmt)}
-                          </Text>
-                        );
-                      }
+                      const ifor = items.filter((i: any) => i.recording_id === rec?.id);
+                      let pa = 0;
+                      if (ifor.length > 0) {
+                        const op: Record<string, number> = {};
+                        ifor.forEach((i: any) => { const pp = (i.people ?? []).length > 0 ? Number(i.cost) / i.people.length : 0; (i.people ?? []).forEach((p: string) => { op[p] = (op[p] ?? 0) + pp; }); });
+                        const cp: Record<string, number> = {};
+                        payments.filter((pay: any) => pay.status !== 'cancelled').forEach((pay: any) => { const ow = op[pay.person_name] ?? 0; if (ow > 0) { const al = cp[pay.person_name] ?? 0; const cr = Math.min(Number(pay.amount), ow - al); if (cr > 0) { cp[pay.person_name] = al + cr; pa += cr; } } });
+                      } else { pa = Number(rec?.paid_amount ?? 0); }
+                      const fc = pa >= total - 0.01;
+                      if (fc) return <Text style={s.recStatus}>{rec?.type === 'due' ? 'fully collected' : 'fully paid'} {fmt(pa)}</Text>;
+                      if (pa > 0) return <Text style={s.recStatus}>partial {fmt(pa)}</Text>;
                       return null;
                     })()}
                   </View>
-                  <Text style={[s.recAmount, { color: typeColor(lr.recording?.type ?? '') }]}>
-                    {fmt(Number(lr.amount_contributed))}
-                  </Text>
                   {actionable && !isDone && billStatus === 'ongoing' && (
                     <TouchableOpacity
                       onPress={() => openMarkPaid(lr)}
@@ -1983,28 +1951,33 @@ export default function SplitBillDetailScreen() {
             <Text style={s.sectionHeader}>people</Text>
             {billStatus === 'ongoing' && (
               <TouchableOpacity onPress={() => { setTagInputVal(''); setContactsVisible(5); setAddPersonModal(true); }} style={s.sectionAddBtn}>
-                <Ionicons name="add" size={12} color={ACCENT_DARK} />
-                <Text style={s.sectionAddText}>add person</Text>
+                <Text style={{ fontFamily: AppFont.bold, fontSize: 13, color: '#111111' }}>add</Text>
               </TouchableOpacity>
             )}
           </View>
           {filledPeople.length === 0 ? (
             <View style={s.emptyWrap}>
-              <Text style={Brand.type.emptyText}>no people yet — tap add</Text>
+              <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.muted }}>no people yet — tap add</Text>
             </View>
           ) : (
             <View style={s.chipWrap}>
               {people.slice(0, peopleVisible).map((p: any) => {
                 const inviteStatus = getInviteStatus(p.person_name);
                 return (
-                <View key={p.id} style={s.personChip}>
-                  <Text style={s.personChipText}>{p.person_name}</Text>
-                  {inviteStatus === 'pending'  && <Ionicons name="time-outline"           size={11} color="#F59E0B" />}
-                  {inviteStatus === 'accepted' && <Ionicons name="checkmark-circle"       size={11} color={ACCENT_DARK} />}
-                  {inviteStatus === 'declined' && <Ionicons name="close-circle-outline"   size={11} color={Colors.muted} />}
+                <View key={p.id} style={{ position: 'relative' }}>
+                  <View style={s.personChip}>
+                    <Text style={s.personChipText}>{p.person_name}</Text>
+                    {inviteStatus === 'pending'  && <Ionicons name="time-outline"           size={11} color="#F59E0B" />}
+                    {inviteStatus === 'accepted' && <Ionicons name="checkmark-circle"       size={11} color={ACCENT_DARK} />}
+                    {inviteStatus === 'declined' && <Ionicons name="close-circle-outline"   size={11} color={Colors.muted} />}
+                  </View>
                   {billStatus === 'ongoing' && (
-                    <TouchableOpacity onPress={() => removePerson(p.id)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-                      <Ionicons name="close" size={11} color={Colors.muted} />
+                    <TouchableOpacity
+                      onPress={() => removePerson(p.id)}
+                      style={{ position: 'absolute', top: -5, right: -5, width: 16, height: 16, borderRadius: 8, backgroundColor: '#ef4444', alignItems: 'center', justifyContent: 'center' }}
+                      hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                    >
+                      <Ionicons name="close" size={9} color="#fff" />
                     </TouchableOpacity>
                   )}
                 </View>
@@ -2033,14 +2006,13 @@ export default function SplitBillDetailScreen() {
                 style={[s.sectionAddBtn, filledPeople.length === 0 && { opacity: 0.4 }]}
                 disabled={filledPeople.length === 0}
               >
-                <Ionicons name="add" size={12} color={ACCENT_DARK} />
-                <Text style={s.sectionAddText}>add item</Text>
+                <Text style={{ fontFamily: AppFont.bold, fontSize: 13, color: '#111111' }}>add</Text>
               </TouchableOpacity>
             )}
           </View>
           {items.length === 0 ? (
             <View style={s.emptyWrap}>
-              <Text style={Brand.type.emptyText}>{filledPeople.length === 0 ? 'add people first' : 'no items yet'}</Text>
+              <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.muted }}>{filledPeople.length === 0 ? 'add people first' : 'no items yet'}</Text>
             </View>
           ) : (
             <View style={s.list}>
@@ -2048,45 +2020,49 @@ export default function SplitBillDetailScreen() {
                 const deduct = isDeductType(item.recording_type);
                 const perPerson = item.people?.length > 0 ? Number(item.cost) / item.people.length : 0;
                 return (
-                  <TouchableOpacity key={item.id} style={s.itemCard} onPress={() => openAssign(item)} activeOpacity={0.8}>
+                  <View key={item.id} style={s.itemCard}>
                     <Text style={s.itemNum}>{idx + 1}</Text>
-                    <View style={{ flex: 1, gap: 2 }}>
+                    <TouchableOpacity style={{ flex: 1, gap: 2 }} onPress={() => openAssign(item)} activeOpacity={0.8}>
                       <Text style={s.itemName} numberOfLines={1}>{item.name}</Text>
+                      <Text style={s.itemCost}>{deduct ? '-' : ''}{fmt(Number(item.cost))}</Text>
                       {item.people?.length > 0 ? (
-                <Text style={[s.itemSplit, { color: deduct ? ACCENT_DARK : '#FFAB91' }]}>
-                          {deduct ? '-' : '+'}{perPerson.toLocaleString('en-US', { minimumFractionDigits: 2 })} each · {item.people.join(', ')}
-                        </Text>
+                        <>
+                          <Text style={s.itemSplit}>
+                            {deduct ? '-' : '+'}{perPerson.toLocaleString('en-US', { minimumFractionDigits: 2 })} each
+                          </Text>
+                          <Text style={s.itemSplit} numberOfLines={1}>{item.people.join(', ')}</Text>
+                        </>
                       ) : (
                         <Text style={[s.itemSplit, { color: Colors.faint }]}>tap to assign people</Text>
                       )}
-                    </View>
-                    <Text style={[s.itemCost, { color: deduct ? ACCENT_DARK : Colors.text }]}>{deduct ? '-' : ''}{fmt(Number(item.cost))}</Text>
-                    {billStatus === 'ongoing' && item.recording_id && (
-                      <TouchableOpacity
-                        onPress={async () => {
-                          const lr = linkedRecordings.find((l: any) => l.recording?.id === item.recording_id);
-                          if (!lr) return;
-                          setItemRows([{ name: '', cost: '' }]);
-                          setParsedItems([]);
-                          setParsedTotal(null);
-                          setParseReceiptPhotos([]);
-                          setParseError('');
-                          setSelectedRecording(lr);
-                          setItemStep('add-items');
-                          setAddItemModal(true);
-                        }}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                        style={{ padding: 4 }}
-                      >
-                        <Ionicons name="create-outline" size={15} color={ACCENT_DARK} />
-                      </TouchableOpacity>
-                    )}
+                    </TouchableOpacity>
                     {billStatus === 'ongoing' && (
-                      <TouchableOpacity onPress={() => deleteItem(item.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                        <Ionicons name="close" size={14} color={Colors.faint} />
-                      </TouchableOpacity>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        {item.recording_id && (
+                          <TouchableOpacity
+                            style={s.itemEditBtn}
+                            onPress={async () => {
+                              const lr = linkedRecordings.find((l: any) => l.recording?.id === item.recording_id);
+                              if (!lr) return;
+                              setItemRows([{ name: '', cost: '' }]);
+                              setParsedItems([]);
+                              setParsedTotal(null);
+                              setParseReceiptPhotos([]);
+                              setParseError('');
+                              setSelectedRecording(lr);
+                              setItemStep('add-items');
+                              setAddItemModal(true);
+                            }}
+                          >
+                            <Text style={s.itemEditBtnText}>edit</Text>
+                          </TouchableOpacity>
+                        )}
+                        <TouchableOpacity onPress={() => deleteItem(item.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                          <Ionicons name="close" size={14} color={Colors.faint} />
+                        </TouchableOpacity>
+                      </View>
                     )}
-                  </TouchableOpacity>
+                  </View>
                 );
               })}
               <View style={s.itemsTotalRow}>
@@ -2103,15 +2079,14 @@ export default function SplitBillDetailScreen() {
             <Text style={s.sectionHeader}>receipt</Text>
             {billStatus === 'ongoing' && (
               <TouchableOpacity onPress={() => setAddReceiptModal(true)} style={s.sectionAddBtn}>
-                <Ionicons name="add" size={12} color={ACCENT_DARK} />
-                <Text style={s.sectionAddText}>add receipt</Text>
+                <Text style={{ fontFamily: AppFont.bold, fontSize: 13, color: '#111111' }}>add</Text>
               </TouchableOpacity>
             )}
           </View>
           {/* Direct receipts uploaded to this split bill */}
           {linkedReceipt && receiptPhotos.length > 0 ? (
             <>
-              <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: ACCENT_DARK, letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 6 }}>uploaded here</Text>
+              <Text style={{ fontFamily: AppFont.semiBold, fontSize: 10, color: ACCENT_DARK, letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 6 }}>uploaded here</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ paddingBottom: 12 }} contentContainerStyle={{ gap: 8 }}>
                 {receiptPhotos.map((p, idx) => (
                   <TouchableOpacity key={p.id} onPress={() => { setPhotoModalPool('direct'); setPhotoModalIndex(idx); setPhotoModal(true); }} activeOpacity={0.85}>
@@ -2123,21 +2098,21 @@ export default function SplitBillDetailScreen() {
           ) : (
             receiptPhotos.length === 0 && recordingReceiptPhotos.length === 0 && (
               <View style={s.emptyWrap}>
-                <Text style={Brand.type.emptyText}>no receipt photos yet</Text>
+                <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.muted }}>no receipt photos yet</Text>
               </View>
             )
           )}
           {/* Receipts from linked recordings */}
           {recordingReceiptPhotos.length > 0 && (
             <>
-              <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: ACCENT_DARK, letterSpacing: 0.6, textTransform: 'uppercase', marginTop: linkedReceipt && receiptPhotos.length > 0 ? 8 : 0, marginBottom: 6 }}>from recordings</Text>
+              <Text style={{ fontFamily: AppFont.semiBold, fontSize: 10, color: ACCENT_DARK, letterSpacing: 0.6, textTransform: 'uppercase', marginTop: linkedReceipt && receiptPhotos.length > 0 ? 8 : 0, marginBottom: 6 }}>from recordings</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ paddingBottom: 12 }} contentContainerStyle={{ gap: 8 }}>
                 {recordingReceiptPhotos.map((p, idx) => (
                   <View key={p.id}>
                     <TouchableOpacity onPress={() => { setPhotoModalPool('recording'); setPhotoModalIndex(idx); setPhotoModal(true); }} activeOpacity={0.85}>
                       <Image source={{ uri: p.url }} style={{ width: 90, height: 90, borderRadius: Radius.md, backgroundColor: Colors.surface }} resizeMode="cover" />
                     </TouchableOpacity>
-                    <Text style={{ fontFamily: Brand.font.mono, fontSize: 9, color: Colors.muted, maxWidth: 90, marginTop: 3 }} numberOfLines={1}>{p.recordingName}</Text>
+                    <Text style={{ fontFamily: AppFont.regular, fontSize: 9, color: Colors.muted, maxWidth: 90, marginTop: 3 }} numberOfLines={1}>{p.recordingName}</Text>
                   </View>
                 ))}
               </ScrollView>
@@ -2183,7 +2158,7 @@ export default function SplitBillDetailScreen() {
           </View>
           {filledPeople.length === 0 || items.length === 0 ? (
             <View style={s.emptyWrap}>
-              <Text style={Brand.type.emptyText}>add people and items to see payment history</Text>
+              <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.muted }}>add people and items to see payment history</Text>
             </View>
           ) : (() => {
             const totals = computeTotals();
@@ -2209,98 +2184,66 @@ export default function SplitBillDetailScreen() {
                   const personManualOwed = getPersonManualOwed(p);
 
                   return (
-                    <View key={p} style={{ paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 8 }}>
-                      {/* Name row */}
-                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        <Text style={[s.recName, { flex: 1 }]}>{p}</Text>
+                    <View key={p} style={[s.itemCard, { flexDirection: 'column', alignItems: 'stretch', gap: 0, paddingHorizontal: 0, paddingVertical: 0, overflow: 'hidden' }]}>
+                      {/* Person row â€” no number */}
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, paddingHorizontal: 14 }}>
+                        <View style={{ flex: 1, gap: 2 }}>
+                          <Text style={[s.itemName, { fontSize: 18 }]}>{p}</Text>
+                          <Text style={s.itemSplit}>owes: {fmt(absOwed)}</Text>
+                        </View>
                         {!fullyPaid && absOwed > 0 && billStatus === 'ongoing' && (
-                          <TouchableOpacity
-                            onPress={() => openPaymentModal(p)}
-                            style={{ marginLeft: 10, paddingHorizontal: 10, paddingVertical: 5, backgroundColor: ACCENT + '44', borderRadius: Radius.pill }}
-                          >
-                            <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: ACCENT_DARK }}>add payment</Text>
+                          <TouchableOpacity style={s.itemEditBtn} onPress={() => openPaymentModal(p)}>
+                            <Text style={s.itemEditBtnText}>add payment</Text>
                           </TouchableOpacity>
                         )}
                         {fullyPaid && (
-                          <View style={{ marginLeft: 10, paddingHorizontal: 10, paddingVertical: 5, backgroundColor: ACCENT + '44', borderRadius: Radius.pill }}>
-                            <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: ACCENT_DARK }}>settled ✓</Text>
-                          </View>
-                        )}
-                        {!fullyPaid && paid > 0 && absOwed > 0 && (
-                          <View style={{ marginLeft: 10, paddingHorizontal: 10, paddingVertical: 5, backgroundColor: PEACH + '33', borderRadius: Radius.pill }}>
-                            <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: PEACH }}>partial ◑</Text>
+                          <View style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: '#F3FAD3' }}>
+                            <Text style={{ fontFamily: AppFont.bold, fontSize: 13, color: '#111111' }}>settled</Text>
                           </View>
                         )}
                       </View>
-                      {/* Progress bar */}
-                      {absOwed > 0 && (
+                      {/* Payment rows with numbering */}
+                      {personPayments.length > 0 && (
                         <>
-                          <View style={{ height: 3, backgroundColor: Colors.border, borderRadius: 2, overflow: 'hidden' }}>
-                            <View style={{ height: 3, width: `${pct * 100}%` as any, backgroundColor: fullyPaid ? ACCENT_DARK : '#FFAB91', borderRadius: 2 }} />
-                          </View>
-                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                            <View style={{ gap: 1 }}>
-                              <Text style={{ fontFamily: Brand.font.mono, fontSize: 9, color: Colors.muted }}>{fmt(paid)} paid</Text>
-                              {lastPayment && (
-                                <Text style={{ fontFamily: Brand.font.mono, fontSize: 9, color: Colors.faint }}>
-                                  last paid {new Date(lastPayment.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                          <View style={{ height: 2, backgroundColor: Colors.border, marginHorizontal: 0 }} />
+                          <View style={{ paddingHorizontal: 14, paddingTop: 4, paddingBottom: 8 }}>
+                            {personPayments.slice().sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                              .slice(0, showMorePayments[p] ? undefined : 3)
+                              .map((pay: any, payIdx: number) => (
+                              <View key={pay.id} style={[
+                                { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, borderBottomWidth: payIdx < (showMorePayments[p] ? personPayments.length : Math.min(3, personPayments.length)) - 1 ? 1 : 0, borderBottomColor: Colors.border },
+                                pay.status === 'cancelled' && { opacity: 0.45 },
+                              ]}>
+                                <Text style={s.itemNum}>{payIdx + 1}</Text>
+                                <View style={{ flex: 1, gap: 1 }}>
+                                  {pay.charged_recording_id ? (
+                                    <TouchableOpacity onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: pay.charged_recording_id } } as any)}>
+                                      <Text style={[s.itemName, pay.status === 'cancelled' && { textDecorationLine: 'line-through', color: Colors.muted }]}>{fmt(Number(pay.amount))}</Text>
+                                    </TouchableOpacity>
+                                  ) : (
+                                    <Text style={[s.itemName, pay.status === 'cancelled' && { textDecorationLine: 'line-through', color: Colors.muted }]}>{fmt(Number(pay.amount))}</Text>
+                                  )}
+                                  <Text style={[s.itemSplit, { fontStyle: 'italic' }]}>
+                                    {new Date(pay.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                    {pay.status === 'cancelled' && pay.cancelled_reason ? ` Â· ${pay.cancelled_reason}` : pay.status === 'cancelled' ? ' Â· cancelled' : ''}
+                                  </Text>
+                                </View>
+                                {pay.status !== 'cancelled' && billStatus === 'ongoing' && (
+                                  <TouchableOpacity onPress={() => openCancelPayment(pay)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                                    <Ionicons name="close" size={14} color={Colors.faint} />
+                                  </TouchableOpacity>
+                                )}
+                              </View>
+                            ))}
+                            {personPayments.length > 3 && (
+                              <TouchableOpacity onPress={() => setShowMorePayments(prev => ({ ...prev, [p]: !prev[p] }))} style={{ paddingTop: 8 }}>
+                                <Text style={{ fontFamily: AppFont.semiBold, fontSize: 10, color: ACCENT_DARK }}>
+                                  {showMorePayments[p] ? 'show less' : `show ${personPayments.length - 3} more`}
                                 </Text>
-                              )}
-                            </View>
-                            {!fullyPaid && (
-                              <Text style={{ fontFamily: Brand.font.mono, fontSize: 9, color: Colors.muted }}>{fmt(remaining)} left</Text>
+                              </TouchableOpacity>
                             )}
                           </View>
                         </>
-                      )}
-                      {/* Payment history rows - 3 per person, latest first, show more */}
-                      {personPayments.slice().sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-                        .slice(0, (showMorePayments[p] ? undefined : 3))
-                        .map((pay: any) => (
-                        <View key={pay.id} style={[
-                          { flexDirection: 'row', alignItems: 'center', paddingTop: 4 },
-                          pay.status === 'cancelled' && { opacity: 0.45 },
-                        ]}>
-                          <View style={{ flex: 1, gap: 2 }}>
-                            {pay.charged_recording_id ? (
-                              <TouchableOpacity onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: pay.charged_recording_id } } as any)}>
-                                <Text style={[
-                                  { fontFamily: Brand.font.monoBold, fontSize: 11, color: ACCENT_DARK, textDecorationLine: 'underline' },
-                                  pay.status === 'cancelled' && { textDecorationLine: 'line-through', color: Colors.muted },
-                                ]}>{fmt(Number(pay.amount))}</Text>
-                              </TouchableOpacity>
-                            ) : (
-                              <Text style={[
-                                { fontFamily: Brand.font.monoBold, fontSize: 11, color: ACCENT_DARK },
-                                pay.status === 'cancelled' && { textDecorationLine: 'line-through', color: Colors.muted },
-                              ]}>{fmt(Number(pay.amount))}</Text>
-                            )}
-                            {pay.status === 'cancelled' && (
-                              <Text style={{ fontFamily: Brand.font.mono, fontSize: 9, color: Colors.muted }}>
-                                cancelled{pay.cancelled_reason ? ` · ${pay.cancelled_reason}` : ''}
-                              </Text>
-                            )}
-                          </View>
-                          {pay.status !== 'cancelled' && billStatus === 'ongoing' && (
-                            <TouchableOpacity
-                              onPress={() => openCancelPayment(pay)}
-                              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                              style={{ marginLeft: 8 }}
-                            >
-                              <Ionicons name="close-circle-outline" size={14} color={Colors.muted} />
-                            </TouchableOpacity>
-                          )}
-                        </View>
-                      ))}
-                      {personPayments.length > 3 && (
-                        <TouchableOpacity
-                          onPress={() => setShowMorePayments(prev => ({ ...prev, [p]: !prev[p] }))}
-                          style={{ paddingTop: 6 }}
-                        >
-                          <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: ACCENT_DARK }}>
-                            {showMorePayments[p] ? 'show less' : `show ${personPayments.length - 3} more`}
-                          </Text>
-                        </TouchableOpacity>
                       )}
                     </View>
                   );
@@ -2352,7 +2295,7 @@ export default function SplitBillDetailScreen() {
           <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24, zIndex: 999 }}>
             <TouchableOpacity style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} activeOpacity={1} onPress={() => { setEditingParsedItem(null); setEditingExistingItem(null); }} />
             <View style={{ width: '100%', backgroundColor: Colors.white, borderRadius: 20, padding: 24, gap: 12 }}>
-              <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 11, color: Colors.muted, textTransform: 'uppercase', letterSpacing: 0.8 }}>
+              <Text style={{ fontFamily: AppFont.semiBold, fontSize: 11, color: Colors.muted, textTransform: 'uppercase', letterSpacing: 0.8 }}>
                 {(editingParsedItem?.field ?? editingExistingItem?.field) === 'name' ? 'item name' : 'item cost'}
               </Text>
               <TextInput
@@ -2393,7 +2336,7 @@ export default function SplitBillDetailScreen() {
         )}
         {itemStep === 'pick-type' ? (
           <View style={{ gap: 12 }}>
-            <Text style={{ fontFamily: Brand.font.mono, fontSize: 12, color: Colors.muted, marginBottom: 4 }}>how do you want to add items?</Text>
+            <Text style={{ fontFamily: AppFont.regular, fontSize: 12, color: Colors.muted, marginBottom: 4 }}>how do you want to add items?</Text>
             <TouchableOpacity
               style={[s.recPickRow, { borderBottomWidth: 0, backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: 16 }]}
               onPress={() => setItemStep(linkedRecordings.length > 0 ? 'pick-recording' : 'manual')}
@@ -2439,12 +2382,12 @@ export default function SplitBillDetailScreen() {
             </View>
             {itemRows.map((row, i) => (
               <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border }}>
-                <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: ACCENT_DARK, backgroundColor: ACCENT + '44', width: 20, height: 20, borderRadius: 10, textAlign: 'center', lineHeight: 20 }}>{i + 1}</Text>
+                <Text style={{ fontFamily: AppFont.semiBold, fontSize: 10, color: ACCENT_DARK, backgroundColor: ACCENT + '44', width: 20, height: 20, borderRadius: 10, textAlign: 'center', lineHeight: 20 }}>{i + 1}</Text>
                 <TouchableOpacity style={{ flex: 1 }} onPress={() => setEditingParsedItem({ idx: i, field: 'name', value: row.name })}>
-                  <Text style={{ fontFamily: Brand.font.mono, fontSize: 13, color: row.name ? Colors.text : Colors.faint }} numberOfLines={1}>{row.name || 'add name'}</Text>
+                  <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: row.name ? Colors.text : Colors.faint }} numberOfLines={1}>{row.name || 'add name'}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => setEditingParsedItem({ idx: i, field: 'cost', value: row.cost })}>
-                  <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 13, color: row.cost ? Colors.text : Colors.faint }}>{row.cost || '0.00'}</Text>
+                  <Text style={{ fontFamily: AppFont.semiBold, fontSize: 13, color: row.cost ? Colors.text : Colors.faint }}>{row.cost || '0.00'}</Text>
                 </TouchableOpacity>
                 {itemRows.length > 1 && (
                   <TouchableOpacity onPress={() => setItemRows(prev => prev.filter((_, idx) => idx !== i))} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -2455,7 +2398,7 @@ export default function SplitBillDetailScreen() {
             ))}
             <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 8 }} onPress={() => setItemRows(prev => [...prev, { name: '', cost: '' }])}>
               <Ionicons name="add" size={13} color={ACCENT_DARK} />
-              <Text style={{ fontFamily: Brand.font.mono, fontSize: 12, color: ACCENT_DARK }}>add another</Text>
+              <Text style={{ fontFamily: AppFont.regular, fontSize: 12, color: ACCENT_DARK }}>add another</Text>
             </TouchableOpacity>
             <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
               <TouchableOpacity style={[s.doneBtn, { flex: 1, backgroundColor: Colors.surface, marginTop: 0 }]} onPress={() => setItemStep('pick-type')}>
@@ -2500,15 +2443,15 @@ export default function SplitBillDetailScreen() {
               if (existing.length === 0) return null;
               return (
                 <View style={{ marginBottom: 12 }}>
-                  <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 6 }}>already added</Text>
+                  <Text style={{ fontFamily: AppFont.semiBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 6 }}>already added</Text>
                   {existing.map((item: any, i: number) => (
                     <View key={item.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: Colors.border }}>
-                      <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: ACCENT_DARK, backgroundColor: ACCENT + '44', width: 20, height: 20, borderRadius: 10, textAlign: 'center', lineHeight: 20 }}>{i + 1}</Text>
+                      <Text style={{ fontFamily: AppFont.semiBold, fontSize: 10, color: ACCENT_DARK, backgroundColor: ACCENT + '44', width: 20, height: 20, borderRadius: 10, textAlign: 'center', lineHeight: 20 }}>{i + 1}</Text>
                       <TouchableOpacity style={{ flex: 1 }} onPress={() => setEditingExistingItem({ item, field: 'name', value: item.name })}>
-                        <Text style={{ fontFamily: Brand.font.mono, fontSize: 13, color: Colors.text }} numberOfLines={1}>{item.name}</Text>
+                        <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.text }} numberOfLines={1}>{item.name}</Text>
                       </TouchableOpacity>
                       <TouchableOpacity onPress={() => setEditingExistingItem({ item, field: 'cost', value: String(item.cost) })}>
-                        <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 13, color: Colors.text }}>{fmt(Number(item.cost))}</Text>
+                        <Text style={{ fontFamily: AppFont.semiBold, fontSize: 13, color: Colors.text }}>{fmt(Number(item.cost))}</Text>
                       </TouchableOpacity>
                       <TouchableOpacity onPress={() => deleteItem(item.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                         <Ionicons name="close" size={14} color={Colors.faint} />
@@ -2534,8 +2477,8 @@ export default function SplitBillDetailScreen() {
                     <View style={{ height: 4, borderRadius: 2, width: `${pct * 100}%` as any, backgroundColor: over ? Colors.expense : ACCENT }} />
                   </View>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
-                    <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: over ? Colors.expense : ACCENT_DARK }}>{fmt(used)} used</Text>
-                    <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: over ? Colors.expense : Colors.muted }}>
+                    <Text style={{ fontFamily: AppFont.regular, fontSize: 10, color: over ? Colors.expense : ACCENT_DARK }}>{fmt(used)} used</Text>
+                    <Text style={{ fontFamily: AppFont.regular, fontSize: 10, color: over ? Colors.expense : Colors.muted }}>
                       {over ? `${fmt(used - recTotal)} over` : `${fmt(recTotal - used)} left`}
                     </Text>
                   </View>
@@ -2551,12 +2494,12 @@ export default function SplitBillDetailScreen() {
               const rowOver = recTotal > 0 && alreadyUsed + runningTotal > recTotal + 0.01;
               return (
                 <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border }}>
-                  <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: ACCENT_DARK, backgroundColor: ACCENT + '44', width: 20, height: 20, borderRadius: 10, textAlign: 'center', lineHeight: 20 }}>{i + 1}</Text>
+                  <Text style={{ fontFamily: AppFont.semiBold, fontSize: 10, color: ACCENT_DARK, backgroundColor: ACCENT + '44', width: 20, height: 20, borderRadius: 10, textAlign: 'center', lineHeight: 20 }}>{i + 1}</Text>
                   <TouchableOpacity style={{ flex: 1 }} onPress={() => setEditingParsedItem({ idx: i, field: 'name', value: row.name })}>
-                    <Text style={{ fontFamily: Brand.font.mono, fontSize: 13, color: row.name ? Colors.text : Colors.faint }} numberOfLines={1}>{row.name || 'add name'}</Text>
+                    <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: row.name ? Colors.text : Colors.faint }} numberOfLines={1}>{row.name || 'add name'}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity onPress={() => setEditingParsedItem({ idx: i, field: 'cost', value: row.cost })}>
-                    <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 13, color: rowOver ? Colors.expense : row.cost ? Colors.text : Colors.faint }}>{row.cost || '0.00'}</Text>
+                    <Text style={{ fontFamily: AppFont.semiBold, fontSize: 13, color: rowOver ? Colors.expense : row.cost ? Colors.text : Colors.faint }}>{row.cost || '0.00'}</Text>
                   </TouchableOpacity>
                   {itemRows.length > 1 && (
                     <TouchableOpacity onPress={() => setItemRows(prev => prev.filter((_, idx) => idx !== i))} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -2568,7 +2511,7 @@ export default function SplitBillDetailScreen() {
             })}
             <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 8 }} onPress={() => setItemRows(prev => [...prev, { name: '', cost: '' }])}>
               <Ionicons name="add" size={13} color={ACCENT_DARK} />
-              <Text style={{ fontFamily: Brand.font.mono, fontSize: 12, color: ACCENT_DARK }}>add another</Text>
+              <Text style={{ fontFamily: AppFont.regular, fontSize: 12, color: ACCENT_DARK }}>add another</Text>
             </TouchableOpacity>
             {(() => {
               const recTotal = Number(selectedRecording?.amount_contributed ?? 0);
@@ -2600,7 +2543,7 @@ export default function SplitBillDetailScreen() {
               {selectedRecording?.recording?.name} · {fmt(Number(selectedRecording?.amount_contributed))}
             </Text>
             {parseError ? (
-              <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: Colors.expense, marginBottom: 12 }}>{parseError}</Text>
+              <Text style={{ fontFamily: AppFont.regular, fontSize: 11, color: Colors.expense, marginBottom: 12 }}>{parseError}</Text>
             ) : null}
             {parseReceiptPhotos.length > 0 ? (
               <TouchableOpacity
@@ -2650,14 +2593,14 @@ export default function SplitBillDetailScreen() {
         ) : itemStep === 'parsing' ? (
           <View style={{ alignItems: 'center', paddingVertical: 40, gap: 16 }}>
             <ActivityIndicator color={ACCENT_DARK} size="large" />
-            <Text style={{ fontFamily: Brand.font.mono, fontSize: 13, color: Colors.muted }}>reading receipt...</Text>
+            <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.muted }}>reading receipt...</Text>
           </View>
         ) : itemStep === 'parse-review' ? (
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             {/* Receipt photos */}
             {parseReceiptPhotos.length > 0 && (
               <>
-                <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8 }}>receipt</Text>
+                <Text style={{ fontFamily: AppFont.semiBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8 }}>receipt</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }} style={{ marginBottom: 16 }}>
                   {parseReceiptPhotos.map((p, idx) => (
                     <TouchableOpacity key={p.id} onPress={() => setParsePhotoIndex(idx === parsePhotoIndex && parseEnlargeModal ? -1 : idx) || setParseEnlargeModal(true)} activeOpacity={0.85}>
@@ -2705,59 +2648,59 @@ export default function SplitBillDetailScreen() {
               const overRec = recTotal > 0 && totalWithExisting > recTotal + 0.01;
               return (
                 <View style={{ backgroundColor: Colors.surface, borderRadius: Radius.md, padding: 12, marginBottom: 16, gap: 6 }}>
-                  <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 4 }}>totals check</Text>
+                  <Text style={{ fontFamily: AppFont.semiBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 4 }}>totals check</Text>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                    <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: Colors.muted }}>new items sum</Text>
-                    <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 11, color: Colors.text }}>{fmt(parsedSum)}</Text>
+                    <Text style={{ fontFamily: AppFont.regular, fontSize: 11, color: Colors.muted }}>new items sum</Text>
+                    <Text style={{ fontFamily: AppFont.semiBold, fontSize: 11, color: Colors.text }}>{fmt(parsedSum)}</Text>
                   </View>
                   {alreadyUsed > 0 && (
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                      <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: Colors.muted }}>already allocated</Text>
-                      <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 11, color: Colors.muted }}>{fmt(alreadyUsed)}</Text>
+                      <Text style={{ fontFamily: AppFont.regular, fontSize: 11, color: Colors.muted }}>already allocated</Text>
+                      <Text style={{ fontFamily: AppFont.semiBold, fontSize: 11, color: Colors.muted }}>{fmt(alreadyUsed)}</Text>
                     </View>
                   )}
                   {alreadyUsed > 0 && (
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                      <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: Colors.muted }}>total after save</Text>
-                      <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 11, color: overRec ? Colors.expense : Colors.text }}>{fmt(totalWithExisting)}</Text>
+                      <Text style={{ fontFamily: AppFont.regular, fontSize: 11, color: Colors.muted }}>total after save</Text>
+                      <Text style={{ fontFamily: AppFont.semiBold, fontSize: 11, color: overRec ? Colors.expense : Colors.text }}>{fmt(totalWithExisting)}</Text>
                     </View>
                   )}
                   {parsedTotal ? (
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                      <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: Colors.muted }}>receipt total</Text>
-                      <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 11, color: diff && diff > 0.5 ? Colors.expense : ACCENT_DARK }}>{fmt(parsedTotal)}</Text>
+                      <Text style={{ fontFamily: AppFont.regular, fontSize: 11, color: Colors.muted }}>receipt total</Text>
+                      <Text style={{ fontFamily: AppFont.semiBold, fontSize: 11, color: diff && diff > 0.5 ? Colors.expense : ACCENT_DARK }}>{fmt(parsedTotal)}</Text>
                     </View>
                   ) : null}
                   {recTotal > 0 && (
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                      <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: Colors.muted }}>recording amount</Text>
-                      <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 11, color: overRec ? Colors.expense : Colors.text }}>{fmt(recTotal)}</Text>
+                      <Text style={{ fontFamily: AppFont.regular, fontSize: 11, color: Colors.muted }}>recording amount</Text>
+                      <Text style={{ fontFamily: AppFont.semiBold, fontSize: 11, color: overRec ? Colors.expense : Colors.text }}>{fmt(recTotal)}</Text>
                     </View>
                   )}
                   {diff && diff > 0.5 ? (
-                    <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: Colors.expense, marginTop: 2 }}>⚠ items sum differs from receipt total by {fmt(diff)} — check for missing items</Text>
+                    <Text style={{ fontFamily: AppFont.regular, fontSize: 10, color: Colors.expense, marginTop: 2 }}>⚠ items sum differs from receipt total by {fmt(diff)} — check for missing items</Text>
                   ) : parsedTotal ? (
-                    <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: ACCENT_DARK, marginTop: 2 }}>✓ items match receipt total</Text>
+                    <Text style={{ fontFamily: AppFont.regular, fontSize: 10, color: ACCENT_DARK, marginTop: 2 }}>✓ items match receipt total</Text>
                   ) : null}
                   {overRec && (
-                    <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: Colors.expense, marginTop: 2 }}>⚠ total exceeds recording amount</Text>
+                    <Text style={{ fontFamily: AppFont.regular, fontSize: 10, color: Colors.expense, marginTop: 2 }}>⚠ total exceeds recording amount</Text>
                   )}
                 </View>
               );
             })()}
 
             {/* Editable parsed items — tap to edit */}
-            <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8 }}>parsed items</Text>
+            <Text style={{ fontFamily: AppFont.semiBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8 }}>parsed items</Text>
             {parsedItems.map((row, i) => (
               <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border }}>
-                <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: ACCENT_DARK, backgroundColor: ACCENT + '44', width: 20, height: 20, borderRadius: 10, textAlign: 'center', lineHeight: 20 }}>{i + 1}</Text>
+                <Text style={{ fontFamily: AppFont.semiBold, fontSize: 10, color: ACCENT_DARK, backgroundColor: ACCENT + '44', width: 20, height: 20, borderRadius: 10, textAlign: 'center', lineHeight: 20 }}>{i + 1}</Text>
                 <TouchableOpacity style={{ flex: 1 }} onPress={() => setEditingParsedItem({ idx: i, field: 'name', value: row.name })}>
-                  <Text style={{ fontFamily: Brand.font.mono, fontSize: 13, color: row.name ? Colors.text : Colors.faint }} numberOfLines={1}>
+                  <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: row.name ? Colors.text : Colors.faint }} numberOfLines={1}>
                     {row.name || 'add name'}
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => setEditingParsedItem({ idx: i, field: 'cost', value: row.cost })}>
-                  <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 13, color: row.cost ? Colors.text : Colors.faint }}>
+                  <Text style={{ fontFamily: AppFont.semiBold, fontSize: 13, color: row.cost ? Colors.text : Colors.faint }}>
                     {row.cost || '0.00'}
                   </Text>
                 </TouchableOpacity>
@@ -2768,7 +2711,7 @@ export default function SplitBillDetailScreen() {
             ))}
             <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 8 }} onPress={() => setParsedItems(prev => [...prev, { name: '', cost: '' }])}>
               <Ionicons name="add" size={13} color={ACCENT_DARK} />
-              <Text style={{ fontFamily: Brand.font.mono, fontSize: 12, color: ACCENT_DARK }}>add item</Text>
+              <Text style={{ fontFamily: AppFont.regular, fontSize: 12, color: ACCENT_DARK }}>add item</Text>
             </TouchableOpacity>
             <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
               <TouchableOpacity style={[s.doneBtn, { flex: 1, backgroundColor: Colors.surface, marginTop: 0 }]} onPress={() => setItemStep('parse-choice')}>
@@ -2811,7 +2754,7 @@ export default function SplitBillDetailScreen() {
                 })}
               </View>
               {assignPeople.length > 0 && (
-                <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 11, color: deduct ? ACCENT_DARK : '#FFAB91', marginBottom: 12 }}>
+                <Text style={{ fontFamily: AppFont.semiBold, fontSize: 11, color: deduct ? ACCENT_DARK : '#FFAB91', marginBottom: 12 }}>
                   {deduct ? '-' : '+'}{fmt(perPerson)} each
                 </Text>
               )}
@@ -2860,7 +2803,7 @@ export default function SplitBillDetailScreen() {
                 {filteredFriends.map(f => (
                   <TouchableOpacity key={f.id} style={s.contactRow} onPress={() => { suppressSubmitRef.current = true; savePerson(f.name); setTagInputVal(''); }}>
                     <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: ACCENT + '44', justifyContent: 'center', alignItems: 'center' }}>
-                      <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 11, color: ACCENT_DARK }}>{f.name.charAt(0).toUpperCase()}</Text>
+                      <Text style={{ fontFamily: AppFont.semiBold, fontSize: 11, color: ACCENT_DARK }}>{f.name.charAt(0).toUpperCase()}</Text>
                     </View>
                     <Text style={[s.contactName, { flex: 1 }]}>{f.name}</Text>
                     <Ionicons name="add" size={14} color={ACCENT_DARK} />
@@ -2872,7 +2815,7 @@ export default function SplitBillDetailScreen() {
           })()}
           {/* Contacts section */}
           <Text style={[s.contactsLabel, { marginBottom: 6 }]}>contacts</Text>
-          {contacts.length === 0 && <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: Colors.faint }}>no contacts saved yet</Text>}
+          {contacts.length === 0 && <Text style={{ fontFamily: AppFont.regular, fontSize: 11, color: Colors.faint }}>no contacts saved yet</Text>}
           {(() => {
             const filtered = contacts.filter(c =>
               !tagInputVal.trim() || c.toLowerCase().includes(tagInputVal.toLowerCase())
@@ -2901,7 +2844,7 @@ export default function SplitBillDetailScreen() {
                     style={{ paddingVertical: 10, alignItems: 'center' }}
                     onPress={() => setContactsVisible(prev => prev + 5)}
                   >
-                    <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: ACCENT_DARK }}>
+                    <Text style={{ fontFamily: AppFont.regular, fontSize: 11, color: ACCENT_DARK }}>
                       show {Math.min(5, filtered.length - contactsVisible)} more
                     </Text>
                   </TouchableOpacity>
@@ -2922,10 +2865,10 @@ export default function SplitBillDetailScreen() {
           const amount = Math.abs(totals[pendingInvitePerson.name] ?? 0);
           return (
             <>
-              <Text style={{ fontFamily: Brand.font.mono, fontSize: 13, color: Colors.text, marginBottom: 4 }}>
+              <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.text, marginBottom: 4 }}>
                 {pendingInvitePerson.name} is one of your friends.
               </Text>
-              <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: Colors.muted, marginBottom: 16 }}>
+              <Text style={{ fontFamily: AppFont.regular, fontSize: 11, color: Colors.muted, marginBottom: 16 }}>
                 send them an invite? they'll see this split bill and their share ({amount > 0 ? amount.toLocaleString('en-US', { minimumFractionDigits: 2 }) : 'tbd'}) as a debt on their end.
               </Text>
               <TouchableOpacity
@@ -2968,7 +2911,7 @@ export default function SplitBillDetailScreen() {
         <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: Colors.borderMid, borderRadius: Radius.md, paddingHorizontal: 10, marginBottom: 10, gap: 6 }}>
           <Ionicons name="search-outline" size={14} color={Colors.faint} />
           <TextInput
-            style={{ flex: 1, fontFamily: Brand.font.mono, fontSize: 13, color: Colors.text, paddingVertical: 8 }}
+            style={{ flex: 1, fontFamily: AppFont.regular, fontSize: 13, color: Colors.text, paddingVertical: 8 }}
             placeholder="search..."
             placeholderTextColor={Colors.faint}
             value={recSearch}
@@ -2990,7 +2933,7 @@ export default function SplitBillDetailScreen() {
               (!cutoff || (r.transaction_date ?? '') >= cutoff)
             );
             if (filtered.length === 0)
-              return <Text style={{ fontFamily: Brand.font.mono, fontSize: 12, color: Colors.faint }}>no recordings found</Text>;
+              return <Text style={{ fontFamily: AppFont.regular, fontSize: 12, color: Colors.faint }}>no recordings found</Text>;
             const visible = filtered.slice(0, recShowMore ? filtered.length : 10);
             return (
               <>
@@ -3006,7 +2949,7 @@ export default function SplitBillDetailScreen() {
                         <Text style={s.recDate}>{rec.transaction_date ? new Date(rec.transaction_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</Text>
                       {(rec.type === 'payable' || rec.type === 'receivable') && rec.status && (
                         <View style={{ backgroundColor: rec.status === 'paid' || rec.status === 'received' ? ACCENT + '44' : rec.status === 'partial' ? '#FFAB9122' : Colors.border, borderRadius: Radius.pill, paddingHorizontal: 6, paddingVertical: 1, marginTop: 3, alignSelf: 'flex-start' }}>
-                          <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 9, color: rec.status === 'paid' || rec.status === 'received' ? ACCENT_DARK : rec.status === 'partial' ? '#FFAB91' : Colors.muted }}>{rec.status}</Text>
+                          <Text style={{ fontFamily: AppFont.semiBold, fontSize: 9, color: rec.status === 'paid' || rec.status === 'received' ? ACCENT_DARK : rec.status === 'partial' ? '#FFAB91' : Colors.muted }}>{rec.status}</Text>
                         </View>
                       )}
                       </View>
@@ -3016,7 +2959,7 @@ export default function SplitBillDetailScreen() {
                 })}
                 {!recShowMore && filtered.length > 10 && (
                   <TouchableOpacity style={{ paddingVertical: 12, alignItems: 'center' }} onPress={() => setRecShowMore(true)}>
-                    <Text style={{ fontFamily: Brand.font.mono, fontSize: 12, color: ACCENT_DARK }}>
+                    <Text style={{ fontFamily: AppFont.regular, fontSize: 12, color: ACCENT_DARK }}>
                       show {filtered.length - 10} more
                     </Text>
                   </TouchableOpacity>
@@ -3030,7 +2973,7 @@ export default function SplitBillDetailScreen() {
       {/* Share modal */}
       <BottomSheet visible={shareModal} onClose={() => setShareModal(false)} title="share split bill" maxHeight="72%">
         {/* Accounts */}
-        <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 6 }}>payment account (optional)</Text>
+        <Text style={{ fontFamily: AppFont.semiBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 6 }}>payment account (optional)</Text>
         <ScrollView style={{ maxHeight: 160 }} showsVerticalScrollIndicator={false}>
           {shareAccounts.map((acc: any) => {
             const sel = shareSelectedIds.includes(acc.id);
@@ -3042,13 +2985,13 @@ export default function SplitBillDetailScreen() {
               >
                 <Ionicons name={sel ? 'checkmark-circle' : 'ellipse-outline'} size={18} color={sel ? ACCENT_DARK : Colors.faint} />
                 <View style={{ flex: 1 }}>
-                  <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 13, color: Colors.text }}>{acc.account_name}</Text>
-                  <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: Colors.muted }}>{acc.bank} · {acc.account_number}</Text>
+                  <Text style={{ fontFamily: AppFont.semiBold, fontSize: 13, color: Colors.text }}>{acc.account_name}</Text>
+                  <Text style={{ fontFamily: AppFont.regular, fontSize: 10, color: Colors.muted }}>{acc.bank} · {acc.account_number}</Text>
                 </View>
               </TouchableOpacity>
             );
           })}
-          {shareAccounts.length === 0 && <Text style={{ fontFamily: Brand.font.mono, fontSize: 12, color: Colors.faint, paddingVertical: 8 }}>no accounts found</Text>}
+          {shareAccounts.length === 0 && <Text style={{ fontFamily: AppFont.regular, fontSize: 12, color: Colors.faint, paddingVertical: 8 }}>no accounts found</Text>}
         </ScrollView>
 
         {/* Save accounts button — only shown when link exists */}
@@ -3068,7 +3011,7 @@ export default function SplitBillDetailScreen() {
                 onPress={saveShareAccounts}
                 disabled={shareSaving || !hasChanged}
               >
-                <Text style={[s.modeBtnText, hasChanged && { color: ACCENT_DARK, fontFamily: Brand.font.monoBold }]}>
+                <Text style={[s.modeBtnText, hasChanged && { color: ACCENT_DARK, fontFamily: AppFont.semiBold }]}>
                   {shareSaving ? 'saving...' : 'save account selection'}
                 </Text>
               </TouchableOpacity>
@@ -3088,9 +3031,9 @@ export default function SplitBillDetailScreen() {
         )}
 
         {/* Link textbox + copy */}
-        <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginTop: 16, marginBottom: 6 }}>link</Text>
+        <Text style={{ fontFamily: AppFont.semiBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginTop: 16, marginBottom: 6 }}>link</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: shareLink ? ACCENT : Colors.borderMid, borderRadius: Radius.md, paddingHorizontal: 12, gap: 8 }}>
-          <Text style={{ flex: 1, fontFamily: Brand.font.mono, fontSize: 11, color: shareLink ? Colors.text : Colors.faint, paddingVertical: 12 }} numberOfLines={1}>
+          <Text style={{ flex: 1, fontFamily: AppFont.regular, fontSize: 11, color: shareLink ? Colors.text : Colors.faint, paddingVertical: 12 }} numberOfLines={1}>
             {shareLink || 'generate a link first'}
           </Text>
           {shareLink ? (
@@ -3099,7 +3042,7 @@ export default function SplitBillDetailScreen() {
             </TouchableOpacity>
           ) : null}
         </View>
-        {shareCopied && <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: Colors.income, marginTop: 4 }}>copied to clipboard!</Text>}
+        {shareCopied && <Text style={{ fontFamily: AppFont.regular, fontSize: 10, color: Colors.income, marginTop: 4 }}>copied to clipboard!</Text>}
 
         {/* Save as image */}
         <TouchableOpacity
@@ -3125,8 +3068,8 @@ export default function SplitBillDetailScreen() {
           return (
             <>
               <Text style={[s.recDate, { marginBottom: 12 }]}>{rec?.name} · {fmt(Number(rec?.amount))}</Text>
-              <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: Colors.muted, marginBottom: 16 }}>{hint}</Text>
-              <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 6 }}>account</Text>
+              <Text style={{ fontFamily: AppFont.regular, fontSize: 11, color: Colors.muted, marginBottom: 16 }}>{hint}</Text>
+              <Text style={{ fontFamily: AppFont.semiBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 6 }}>account</Text>
               <ScrollView style={{ maxHeight: 180 }} showsVerticalScrollIndicator={false}>
                 {markPaidAccounts.map((acc: any) => (
                   <TouchableOpacity
@@ -3136,12 +3079,12 @@ export default function SplitBillDetailScreen() {
                   >
                     <Ionicons name={markPaidAccount?.id === acc.id ? 'checkmark-circle' : 'ellipse-outline'} size={18} color={markPaidAccount?.id === acc.id ? ACCENT_DARK : Colors.faint} />
                     <View style={{ flex: 1 }}>
-                      <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 13, color: Colors.text }}>{acc.account_name}</Text>
-                      <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: Colors.muted }}>{acc.bank} · {acc.account_number}</Text>
+                      <Text style={{ fontFamily: AppFont.semiBold, fontSize: 13, color: Colors.text }}>{acc.account_name}</Text>
+                      <Text style={{ fontFamily: AppFont.regular, fontSize: 10, color: Colors.muted }}>{acc.bank} · {acc.account_number}</Text>
                     </View>
                   </TouchableOpacity>
                 ))}
-                {markPaidAccounts.length === 0 && <Text style={{ fontFamily: Brand.font.mono, fontSize: 12, color: Colors.faint }}>no accounts found</Text>}
+                {markPaidAccounts.length === 0 && <Text style={{ fontFamily: AppFont.regular, fontSize: 12, color: Colors.faint }}>no accounts found</Text>}
               </ScrollView>
               <TouchableOpacity
                 style={[s.doneBtn, { opacity: markPaidLoading ? 0.5 : 1 }]}
@@ -3172,7 +3115,7 @@ export default function SplitBillDetailScreen() {
           return (
             <>
               <Text style={[s.recDate, { marginBottom: 4 }]}>{paymentPerson}</Text>
-              <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 13, color: isNegative ? PEACH : ACCENT_DARK, marginBottom: 12 }}>
+              <Text style={{ fontFamily: AppFont.semiBold, fontSize: 13, color: isNegative ? PEACH : ACCENT_DARK, marginBottom: 12 }}>
                 {isNegative ? 'amount to pay: ' : 'amount to collect: '}{fmt(remaining)} remaining
               </Text>
               <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
@@ -3246,7 +3189,7 @@ export default function SplitBillDetailScreen() {
                 );
               })()}
               {paymentMode === 'full' && (
-                <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 15, color: ACCENT_DARK, marginBottom: 8 }}>{fmt(remaining)}</Text>
+                <Text style={{ fontFamily: AppFont.semiBold, fontSize: 15, color: ACCENT_DARK, marginBottom: 8 }}>{fmt(remaining)}</Text>
               )}
               {/* Charge to space */}
               <TouchableOpacity
@@ -3256,47 +3199,47 @@ export default function SplitBillDetailScreen() {
               >
                 <Ionicons name={chargeToSpace ? 'checkbox' : 'square-outline'} size={18} color={chargeToSpace ? ACCENT_DARK : Colors.muted} />
                 <View style={{ flex: 1 }}>
-                  <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 13, color: Colors.text }}>charge to a space</Text>
-                  <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: Colors.muted }}>creates an expense on the selected space</Text>
+                  <Text style={{ fontFamily: AppFont.semiBold, fontSize: 13, color: Colors.text }}>charge to a space</Text>
+                  <Text style={{ fontFamily: AppFont.regular, fontSize: 10, color: Colors.muted }}>creates an expense on the selected space</Text>
                 </View>
               </TouchableOpacity>
               {chargeToSpace && (
                 <View style={{ gap: 10, marginBottom: 8 }}>
-                  <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase' }}>space</Text>
+                  <Text style={{ fontFamily: AppFont.semiBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase' }}>space</Text>
                   <View style={{ borderWidth: 1, borderColor: Colors.borderMid, borderRadius: Radius.md, overflow: 'hidden' }}>
                     {[...chargeSpaces].sort((a: any, b: any) => a.name.localeCompare(b.name)).map((sp: any) => (
                       <TouchableOpacity key={sp.id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 11, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: Colors.border, backgroundColor: chargeSpaceId === sp.id ? ACCENT + '22' : Colors.white }} onPress={() => setChargeSpaceId(sp.id)}>
                         <Ionicons name={chargeSpaceId === sp.id ? 'radio-button-on' : 'radio-button-off'} size={16} color={chargeSpaceId === sp.id ? ACCENT_DARK : Colors.faint} style={{ marginRight: 10 }} />
-                        <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 13, color: chargeSpaceId === sp.id ? ACCENT_DARK : Colors.text }}>{sp.name}</Text>
+                        <Text style={{ fontFamily: AppFont.semiBold, fontSize: 13, color: chargeSpaceId === sp.id ? ACCENT_DARK : Colors.text }}>{sp.name}</Text>
                       </TouchableOpacity>
                     ))}
                   </View>
-                  <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase' }}>account <Text style={{ fontFamily: Brand.font.mono, textTransform: 'none' }}>(optional)</Text></Text>
+                  <Text style={{ fontFamily: AppFont.semiBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase' }}>account <Text style={{ fontFamily: AppFont.regular, textTransform: 'none' }}>(optional)</Text></Text>
                   <View style={{ borderWidth: 1, borderColor: Colors.borderMid, borderRadius: Radius.md, overflow: 'hidden' }}>
                     <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 11, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: Colors.border, backgroundColor: !chargeAccountId ? ACCENT + '22' : Colors.white }} onPress={() => setChargeAccountId(null)}>
                       <Ionicons name={!chargeAccountId ? 'radio-button-on' : 'radio-button-off'} size={16} color={!chargeAccountId ? ACCENT_DARK : Colors.faint} style={{ marginRight: 10 }} />
-                      <Text style={{ fontFamily: Brand.font.mono, fontSize: 13, color: Colors.muted }}>none</Text>
+                      <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.muted }}>none</Text>
                     </TouchableOpacity>
                     {[...chargeAccounts].sort((a: any, b: any) => a.account_name.localeCompare(b.account_name)).map((ac: any) => (
                       <TouchableOpacity key={ac.id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 11, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: Colors.border, backgroundColor: chargeAccountId === ac.id ? ACCENT + '22' : Colors.white }} onPress={() => setChargeAccountId(ac.id)}>
                         <Ionicons name={chargeAccountId === ac.id ? 'radio-button-on' : 'radio-button-off'} size={16} color={chargeAccountId === ac.id ? ACCENT_DARK : Colors.faint} style={{ marginRight: 10 }} />
                         <View>
-                          <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 13, color: chargeAccountId === ac.id ? ACCENT_DARK : Colors.text }}>{ac.account_name}</Text>
-                          <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: Colors.muted }}>{ac.bank}</Text>
+                          <Text style={{ fontFamily: AppFont.semiBold, fontSize: 13, color: chargeAccountId === ac.id ? ACCENT_DARK : Colors.text }}>{ac.account_name}</Text>
+                          <Text style={{ fontFamily: AppFont.regular, fontSize: 10, color: Colors.muted }}>{ac.bank}</Text>
                         </View>
                       </TouchableOpacity>
                     ))}
                   </View>
-                  <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase' }}>category <Text style={{ fontFamily: Brand.font.mono, textTransform: 'none' }}>(optional)</Text></Text>
+                  <Text style={{ fontFamily: AppFont.semiBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase' }}>category <Text style={{ fontFamily: AppFont.regular, textTransform: 'none' }}>(optional)</Text></Text>
                   <View style={{ borderWidth: 1, borderColor: Colors.borderMid, borderRadius: Radius.md, overflow: 'hidden' }}>
                     <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 11, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: Colors.border, backgroundColor: !chargeCategoryId ? ACCENT + '22' : Colors.white }} onPress={() => setChargeCategoryId(null)}>
                       <Ionicons name={!chargeCategoryId ? 'radio-button-on' : 'radio-button-off'} size={16} color={!chargeCategoryId ? ACCENT_DARK : Colors.faint} style={{ marginRight: 10 }} />
-                      <Text style={{ fontFamily: Brand.font.mono, fontSize: 13, color: Colors.muted }}>none</Text>
+                      <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.muted }}>none</Text>
                     </TouchableOpacity>
                     {[...chargeCategories].sort((a: any, b: any) => a.name.localeCompare(b.name)).map((cat: any) => (
                       <TouchableOpacity key={cat.id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 11, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: Colors.border, backgroundColor: chargeCategoryId === cat.id ? ACCENT + '22' : Colors.white }} onPress={() => setChargeCategoryId(cat.id)}>
                         <Ionicons name={chargeCategoryId === cat.id ? 'radio-button-on' : 'radio-button-off'} size={16} color={chargeCategoryId === cat.id ? ACCENT_DARK : Colors.faint} style={{ marginRight: 10 }} />
-                        <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 13, color: chargeCategoryId === cat.id ? ACCENT_DARK : Colors.text }}>{cat.name}</Text>
+                        <Text style={{ fontFamily: AppFont.semiBold, fontSize: 13, color: chargeCategoryId === cat.id ? ACCENT_DARK : Colors.text }}>{cat.name}</Text>
                       </TouchableOpacity>
                     ))}
                   </View>
@@ -3332,37 +3275,72 @@ export default function SplitBillDetailScreen() {
         </TouchableOpacity>
       </BottomSheet>
 
-      {/* Photo carousel modal */}
+            {/* Photo carousel modal */}
       <Modal visible={photoModal} transparent animationType="fade" onRequestClose={() => setPhotoModal(false)}>
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center' }}>
-          <TouchableOpacity style={{ position: 'absolute', top: 52, right: 24, zIndex: 10 }} onPress={() => setPhotoModal(false)}>
-            <Ionicons name="close" size={26} color="#fff" />
-          </TouchableOpacity>
+        <SafeAreaView style={{ flex: 1, backgroundColor: DC.photoViewerBg }}>
+          {/* Header */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: DC.pagePadding, paddingTop: 12, paddingBottom: 8 }}>
+            <View style={{ flex: 1, alignItems: 'center' }}>
+              <Text style={{ fontFamily: AppFont.bold, fontSize: 15, color: DC.pageText }}>receipt</Text>
+            </View>
+            <TouchableOpacity onPress={() => setPhotoModal(false)} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }} style={{ position: 'absolute', right: DC.pagePadding }}>
+              <Ionicons name="close" size={22} color={DC.pageText} />
+            </TouchableOpacity>
+          </View>
           {(() => {
             const pool = photoModalPool === 'direct' ? receiptPhotos : recordingReceiptPhotos;
             return (
-              <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} contentOffset={{ x: photoModalIndex * width, y: 0 }}>
-                {pool.map((p, i) => (
-                  <View key={p.id} style={{ width, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 16 }}>
-                    <Image source={{ uri: p.url }} style={{ width: width - 32, height: width - 32, borderRadius: 12 }} resizeMode="contain" />
-                    {'recordingName' in p && p.recordingName ? (
-                      <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: 'rgba(255,255,255,0.6)', marginTop: 8 }} numberOfLines={1}>{p.recordingName}</Text>
-                    ) : null}
-                    <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>{i + 1} / {pool.length}</Text>
-                  </View>
-                ))}
-              </ScrollView>
+              <>
+                {/* Photo + arrows */}
+                <View style={{ height: 420, justifyContent: 'center', alignItems: 'center', position: 'relative' }}>
+                  <TouchableOpacity
+                    onPress={() => setPhotoModalIndex(i => i - 1)}
+                    disabled={photoModalIndex === 0}
+                    style={{ position: 'absolute', left: 12, zIndex: 10, width: 36, height: 36, borderRadius: 18, backgroundColor: DC.photoViewerNav, justifyContent: 'center', alignItems: 'center', opacity: photoModalIndex === 0 ? 0.3 : 1 }}
+                  >
+                    <Ionicons name="chevron-back" size={20} color={DC.pageText} />
+                  </TouchableOpacity>
+                  <Image source={{ uri: pool[photoModalIndex]?.url ?? '' }} style={{ width: width - 80, height: 400, borderRadius: 12 }} resizeMode="contain" />
+                  <TouchableOpacity
+                    onPress={() => setPhotoModalIndex(i => i + 1)}
+                    disabled={photoModalIndex === pool.length - 1}
+                    style={{ position: 'absolute', right: 12, zIndex: 10, width: 36, height: 36, borderRadius: 18, backgroundColor: DC.photoViewerNav, justifyContent: 'center', alignItems: 'center', opacity: photoModalIndex === pool.length - 1 ? 0.3 : 1 }}
+                  >
+                    <Ionicons name="chevron-forward" size={20} color={DC.pageText} />
+                  </TouchableOpacity>
+                </View>
+                {/* Recording name label */}
+                {pool[photoModalIndex] && 'recordingName' in pool[photoModalIndex] && (pool[photoModalIndex] as any).recordingName ? (
+                  <Text style={{ fontFamily: AppFont.regular, fontSize: 11, color: DC.pageTextMuted, textAlign: 'center', marginTop: 4 }} numberOfLines={1}>{(pool[photoModalIndex] as any).recordingName}</Text>
+                ) : null}
+                {/* Dot indicators */}
+                <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 6, paddingVertical: 12 }}>
+                  {pool.map((_, i) => (
+                    <TouchableOpacity key={i} onPress={() => setPhotoModalIndex(i)}>
+                      <View style={{ width: i === photoModalIndex ? 18 : 6, height: 6, borderRadius: 3, backgroundColor: i === photoModalIndex ? DC.accent1 : DC.cardBorder }} />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                {/* Thumbnail strip */}
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: DC.pagePadding, gap: 8, paddingBottom: 16 }}>
+                  {pool.map((p, i) => (
+                    <TouchableOpacity key={p.id} onPress={() => setPhotoModalIndex(i)} activeOpacity={0.8}>
+                      <Image source={{ uri: p.url }} style={{ width: 64, height: 64, borderRadius: 8, borderWidth: i === photoModalIndex ? 2 : 0, borderColor: DC.accent1 }} resizeMode="cover" />
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </>
             );
           })()}
-        </View>
+        </SafeAreaView>
       </Modal>
 
       {/* Manual return prompt */}
       <BottomSheet visible={manualReturnModal} onClose={() => setManualReturnModal(false)} title="manual item settlement">
-        <Text style={{ fontFamily: Brand.font.mono, fontSize: 13, color: Colors.text, marginBottom: 16 }}>
+        <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.text, marginBottom: 16 }}>
           {defaultCurrency}{fmt(manualReturnAmount)} is from a manual item with no linked recording.
         </Text>
-        <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 10 }}>create a recording for this?</Text>
+        <Text style={{ fontFamily: AppFont.semiBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 10 }}>create a recording for this?</Text>
         <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
           <TouchableOpacity
             style={[s.modeBtn, manualReturnType === 'return' && s.modeBtnActive]}
@@ -3418,7 +3396,7 @@ export default function SplitBillDetailScreen() {
 
       {/* Delete split bill modal */}
       <BottomSheet visible={deleteSplitModal} onClose={() => setDeleteSplitModal(false)} title="delete split bill">
-        <Text style={{ fontFamily: Brand.font.mono, fontSize: 13, color: Colors.text, marginBottom: 16 }}>
+        <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.text, marginBottom: 16 }}>
           What would you like to do with the payment recordings and receipts?
         </Text>
         <TouchableOpacity
@@ -3428,7 +3406,7 @@ export default function SplitBillDetailScreen() {
         >
           <View style={{ gap: 4, alignItems: 'center' }}>
             <Text style={[s.doneBtnText, { color: Colors.text }]}>keep recordings &amp; receipts</Text>
-            <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: Colors.muted }}>deletes split bill only</Text>
+            <Text style={{ fontFamily: AppFont.regular, fontSize: 10, color: Colors.muted }}>deletes split bill only</Text>
           </View>
         </TouchableOpacity>
         <TouchableOpacity
@@ -3449,7 +3427,7 @@ export default function SplitBillDetailScreen() {
         >
           <View style={{ gap: 4, alignItems: 'center' }}>
             <Text style={[s.doneBtnText, { color: Colors.text }]}>keep recordings, delete receipts</Text>
-            <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: Colors.muted }}>deletes split bill + receipt photos</Text>
+            <Text style={{ fontFamily: AppFont.regular, fontSize: 10, color: Colors.muted }}>deletes split bill + receipt photos</Text>
           </View>
         </TouchableOpacity>
         <TouchableOpacity
@@ -3459,7 +3437,7 @@ export default function SplitBillDetailScreen() {
         >
           <View style={{ gap: 4, alignItems: 'center' }}>
             <Text style={[s.doneBtnText, { color: Colors.expense }]}>delete everything</Text>
-            <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: Colors.expense + 'CC' }}>deletes split bill + recordings + receipts</Text>
+            <Text style={{ fontFamily: AppFont.regular, fontSize: 10, color: Colors.expense + 'CC' }}>deletes split bill + recordings + receipts</Text>
           </View>
         </TouchableOpacity>
       </BottomSheet>
@@ -3473,16 +3451,16 @@ export default function SplitBillDetailScreen() {
           const isPartial = paid > 0 && paid < total - 0.01;
           return (
             <>
-              <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 14, color: Colors.text, marginBottom: 8 }}>{rec?.name}</Text>
+              <Text style={{ fontFamily: AppFont.semiBold, fontSize: 14, color: Colors.text, marginBottom: 8 }}>{rec?.name}</Text>
               {isPartial && (
                 <View style={{ backgroundColor: Colors.surface, borderRadius: Radius.md, padding: 12, marginBottom: 16, gap: 4 }}>
-                  <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: Colors.muted }}>partially collected</Text>
-                  <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 13, color: PEACH }}>{fmt(paid)} of {fmt(total)}</Text>
-                  <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: Colors.muted }}>{fmt(total - paid)} remaining — marking complete will set it as fully paid</Text>
+                  <Text style={{ fontFamily: AppFont.regular, fontSize: 11, color: Colors.muted }}>partially collected</Text>
+                  <Text style={{ fontFamily: AppFont.semiBold, fontSize: 13, color: PEACH }}>{fmt(paid)} of {fmt(total)}</Text>
+                  <Text style={{ fontFamily: AppFont.regular, fontSize: 10, color: Colors.muted }}>{fmt(total - paid)} remaining — marking complete will set it as fully paid</Text>
                 </View>
               )}
               {!isPartial && (
-                <Text style={{ fontFamily: Brand.font.mono, fontSize: 12, color: Colors.muted, marginBottom: 16 }}>
+                <Text style={{ fontFamily: AppFont.regular, fontSize: 12, color: Colors.muted, marginBottom: 16 }}>
                   {paid >= total - 0.01 ? 'fully collected — mark as complete?' : 'mark this recording as fully paid?'}
                 </Text>
               )}
@@ -3500,7 +3478,7 @@ export default function SplitBillDetailScreen() {
 
       {/* Close with incomplete recordings modal */}
       <BottomSheet visible={closeWithIncompleteModal} onClose={() => setCloseWithIncompleteModal(false)} title="incomplete recordings" maxHeight="60%">
-        <Text style={{ fontFamily: Brand.font.mono, fontSize: 12, color: Colors.muted, marginBottom: 12 }}>
+        <Text style={{ fontFamily: AppFont.regular, fontSize: 12, color: Colors.muted, marginBottom: 12 }}>
           {incompleteRecs.length} recording{incompleteRecs.length !== 1 ? 's are' : ' is'} not yet fully collected:
         </Text>
         <ScrollView style={{ maxHeight: 140 }} showsVerticalScrollIndicator={false}>
@@ -3508,16 +3486,16 @@ export default function SplitBillDetailScreen() {
             <View key={lr.id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 10 }}>
               <Ionicons name="alert-circle-outline" size={14} color={PEACH} />
               <View style={{ flex: 1 }}>
-                <Text style={{ fontFamily: Brand.font.mono, fontSize: 13, color: Colors.text }} numberOfLines={1}>{lr.recording?.name}</Text>
-                <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: Colors.muted }}>
+                <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.text }} numberOfLines={1}>{lr.recording?.name}</Text>
+                <Text style={{ fontFamily: AppFont.regular, fontSize: 10, color: Colors.muted }}>
                   {fmt(lr.collectedSoFar)} of {fmt(lr.collectible)} collected
                 </Text>
               </View>
-              <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 11, color: PEACH }}>{fmt(lr.collectible - lr.collectedSoFar)} left</Text>
+              <Text style={{ fontFamily: AppFont.semiBold, fontSize: 11, color: PEACH }}>{fmt(lr.collectible - lr.collectedSoFar)} left</Text>
             </View>
           ))}
         </ScrollView>
-        <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.6, textTransform: 'uppercase', marginTop: 16, marginBottom: 8 }}>mark recordings as</Text>
+        <Text style={{ fontFamily: AppFont.semiBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.6, textTransform: 'uppercase', marginTop: 16, marginBottom: 8 }}>mark recordings as</Text>
         <View style={{ gap: 8 }}>
           {(['as-is', 'full', 'write-off'] as const).map(m => (
             <TouchableOpacity
@@ -3527,10 +3505,10 @@ export default function SplitBillDetailScreen() {
             >
               <Ionicons name={completeMode === m ? 'radio-button-on' : 'radio-button-off'} size={16} color={completeMode === m ? ACCENT_DARK : Colors.muted} />
               <View style={{ flex: 1 }}>
-                <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 13, color: completeMode === m ? ACCENT_DARK : Colors.text }}>
+                <Text style={{ fontFamily: AppFont.semiBold, fontSize: 13, color: completeMode === m ? ACCENT_DARK : Colors.text }}>
                   {m === 'as-is' ? 'as is (default)' : m === 'full' ? 'full amount' : 'write off remainder'}
                 </Text>
-                <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: Colors.muted }}>
+                <Text style={{ fontFamily: AppFont.regular, fontSize: 10, color: Colors.muted }}>
                   {m === 'as-is' ? 'keep current collected amount, mark as paid' : m === 'full' ? 'set paid amount to full recording amount' : 'record unpaid remainder as a write-off expense'}
                 </Text>
               </View>
@@ -3554,14 +3532,14 @@ export default function SplitBillDetailScreen() {
 
       {/* Auto-complete prompt after payment */}
       <BottomSheet visible={autoCompleteModal} onClose={() => setAutoCompleteModal(false)} title="recordings fully paid">
-        <Text style={{ fontFamily: Brand.font.mono, fontSize: 12, color: Colors.muted, marginBottom: 12 }}>
+        <Text style={{ fontFamily: AppFont.regular, fontSize: 12, color: Colors.muted, marginBottom: 12 }}>
           all people have paid for the following recording{autoCompleteRecs.length !== 1 ? 's' : ''}. mark as complete?
         </Text>
         {autoCompleteRecs.map((lr: any) => (
           <View key={lr.id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 10 }}>
             <Ionicons name="checkmark-circle-outline" size={14} color={ACCENT_DARK} />
-            <Text style={{ fontFamily: Brand.font.mono, fontSize: 13, color: Colors.text, flex: 1 }} numberOfLines={1}>{lr.recording?.name}</Text>
-            <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 11, color: ACCENT_DARK }}>{fmt(Number(lr.recording?.amount ?? 0))}</Text>
+            <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.text, flex: 1 }} numberOfLines={1}>{lr.recording?.name}</Text>
+            <Text style={{ fontFamily: AppFont.semiBold, fontSize: 11, color: ACCENT_DARK }}>{fmt(Number(lr.recording?.amount ?? 0))}</Text>
           </View>
         ))}
         <TouchableOpacity
@@ -3581,10 +3559,10 @@ export default function SplitBillDetailScreen() {
 
       {/* Overpayment modal */}
       <BottomSheet visible={overpaymentModal} onClose={() => setOverpaymentModal(false)} title="overpayment detected">
-        <Text style={{ fontFamily: Brand.font.mono, fontSize: 13, color: Colors.text, marginBottom: 4 }}>
+        <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.text, marginBottom: 4 }}>
           {overpaymentPerson} paid {fmt(overpaymentAmount)} more than they owe.
         </Text>
-        <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: Colors.muted, marginBottom: 16 }}>
+        <Text style={{ fontFamily: AppFont.regular, fontSize: 11, color: Colors.muted, marginBottom: 16 }}>
           what would you like to do with the excess?
         </Text>
         <TouchableOpacity style={s.doneBtn} onPress={confirmOverpaymentIncome}>
@@ -3600,11 +3578,11 @@ export default function SplitBillDetailScreen() {
 
       {/* Apply overpayment to split bill picker */}
       <BottomSheet visible={overpaymentApplyModal} onClose={() => setOverpaymentApplyModal(false)} title="apply to split bill">
-        <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: Colors.muted, marginBottom: 12 }}>
+        <Text style={{ fontFamily: AppFont.regular, fontSize: 11, color: Colors.muted, marginBottom: 12 }}>
           {fmt(overpaymentAmount)} will be recorded as a payment from {overpaymentPerson} on the selected bill.
         </Text>
         {otherSplitBills.length === 0 ? (
-          <Text style={{ fontFamily: Brand.font.mono, fontSize: 12, color: Colors.faint }}>no other ongoing split bills found</Text>
+          <Text style={{ fontFamily: AppFont.regular, fontSize: 12, color: Colors.faint }}>no other ongoing split bills found</Text>
         ) : (
           otherSplitBills.map((bill: any) => (
             <TouchableOpacity key={bill.id} style={s.recPickRow} onPress={() => confirmApplyToSplitBill(bill.id)}>
@@ -3622,13 +3600,13 @@ export default function SplitBillDetailScreen() {
 
       {/* Cancel payment modal */}
       <BottomSheet visible={cancelPaymentModal} onClose={() => setCancelPaymentModal(false)} title="cancel payment">
-        <Text style={{ fontFamily: Brand.font.mono, fontSize: 13, color: Colors.text, marginBottom: 4 }}>
+        <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.text, marginBottom: 4 }}>
           {cancelPaymentTarget?.person_name} · {fmt(Number(cancelPaymentTarget?.amount ?? 0))}
         </Text>
-        <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: Colors.muted, marginBottom: 16 }}>
+        <Text style={{ fontFamily: AppFont.regular, fontSize: 11, color: Colors.muted, marginBottom: 16 }}>
           this will void the payment and reverse any collected amounts. the record will be kept for audit.
         </Text>
-        <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 6 }}>reason (optional)</Text>
+        <Text style={{ fontFamily: AppFont.semiBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 6 }}>reason (optional)</Text>
         <TextInput
           style={s.itemFormInput}
           placeholder="e.g. sent to wrong account"
@@ -3654,10 +3632,10 @@ export default function SplitBillDetailScreen() {
 
       {/* Remove recording blocked modal */}
       <BottomSheet visible={removeRecordingBlockedModal} onClose={() => setRemoveRecordingBlockedModal(false)} title="cannot remove">
-        <Text style={{ fontFamily: Brand.font.mono, fontSize: 13, color: Colors.text, marginBottom: 8 }}>
+        <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.text, marginBottom: 8 }}>
           this recording has payments already applied to it.
         </Text>
-        <Text style={{ fontFamily: Brand.font.mono, fontSize: 12, color: Colors.muted, marginBottom: 16 }}>
+        <Text style={{ fontFamily: AppFont.regular, fontSize: 12, color: Colors.muted, marginBottom: 16 }}>
           to remove it, first delete all payments linked to this recording from the payment history section.
         </Text>
         <TouchableOpacity style={s.doneBtn} onPress={() => setRemoveRecordingBlockedModal(false)}>
@@ -3669,10 +3647,10 @@ export default function SplitBillDetailScreen() {
       <BottomSheet visible={acceptModal} onClose={() => setAcceptModal(false)} title="accept split bill invite" maxHeight="60%">
         {myInvite && (
           <>
-            <Text style={{ fontFamily: Brand.font.mono, fontSize: 12, color: Colors.muted, marginBottom: 16 }}>
+            <Text style={{ fontFamily: AppFont.regular, fontSize: 12, color: Colors.muted, marginBottom: 16 }}>
               a debt of {fmt(Number(myInvite.amount))} will be created. pick where to store it.
             </Text>
-            <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8 }}>space</Text>
+            <Text style={{ fontFamily: AppFont.semiBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8 }}>space</Text>
             <ScrollView style={{ maxHeight: 160 }} showsVerticalScrollIndicator={false}>
               {acceptSpaces.map((sp: any) => (
                 <TouchableOpacity
@@ -3681,18 +3659,18 @@ export default function SplitBillDetailScreen() {
                   onPress={() => setAcceptSpaceId(sp.id)}
                 >
                   <Ionicons name={acceptSpaceId === sp.id ? 'radio-button-on' : 'radio-button-off'} size={16} color={acceptSpaceId === sp.id ? ACCENT_DARK : Colors.faint} />
-                  <Text style={{ fontFamily: Brand.font.heading, fontSize: 13, color: Colors.text }}>{sp.name}</Text>
+                  <Text style={{ fontFamily: AppFont.medium, fontSize: 13, color: Colors.text }}>{sp.name}</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
-            <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginTop: 16, marginBottom: 8 }}>category <Text style={{ fontFamily: Brand.font.mono, textTransform: 'none' }}>(optional)</Text></Text>
+            <Text style={{ fontFamily: AppFont.semiBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginTop: 16, marginBottom: 8 }}>category <Text style={{ fontFamily: AppFont.regular, textTransform: 'none' }}>(optional)</Text></Text>
             <ScrollView style={{ maxHeight: 120 }} showsVerticalScrollIndicator={false}>
               <TouchableOpacity
                 style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 10 }}
                 onPress={() => setAcceptCategoryId('')}
               >
                 <Ionicons name={!acceptCategoryId ? 'radio-button-on' : 'radio-button-off'} size={16} color={!acceptCategoryId ? ACCENT_DARK : Colors.faint} />
-                <Text style={{ fontFamily: Brand.font.mono, fontSize: 13, color: Colors.muted }}>none</Text>
+                <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.muted }}>none</Text>
               </TouchableOpacity>
               {acceptCategories.map((cat: any) => (
                 <TouchableOpacity
@@ -3701,7 +3679,7 @@ export default function SplitBillDetailScreen() {
                   onPress={() => setAcceptCategoryId(cat.id)}
                 >
                   <Ionicons name={acceptCategoryId === cat.id ? 'radio-button-on' : 'radio-button-off'} size={16} color={acceptCategoryId === cat.id ? ACCENT_DARK : Colors.faint} />
-                  <Text style={{ fontFamily: Brand.font.heading, fontSize: 13, color: Colors.text }}>{cat.name}</Text>
+                  <Text style={{ fontFamily: AppFont.medium, fontSize: 13, color: Colors.text }}>{cat.name}</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -3721,8 +3699,8 @@ export default function SplitBillDetailScreen() {
         <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32, zIndex: 9999 }}>
           <TouchableOpacity style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} activeOpacity={1} onPress={() => setParseOverBudgetModal(false)} />
           <View style={{ width: '100%', backgroundColor: Colors.white, borderRadius: 20, padding: 24, gap: 12 }}>
-            <Text style={{ fontFamily: Brand.font.display, fontSize: 20, color: Colors.text }}>items over budget</Text>
-            <Text style={{ fontFamily: Brand.font.mono, fontSize: 13, color: Colors.muted }}>
+            <Text style={{ fontFamily: AppFont.bold, fontSize: 20, color: Colors.text }}>items over budget</Text>
+            <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.muted }}>
               the sum of items exceeds the recording amount. please reduce item costs before saving.
             </Text>
             <TouchableOpacity style={[s.doneBtn, { marginTop: 0 }]} onPress={() => setParseOverBudgetModal(false)}>
@@ -3740,76 +3718,84 @@ const s = StyleSheet.create({
   header:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: PAGE, paddingTop: 16, paddingBottom: 16, gap: 10, backgroundColor: Colors.headerBg, borderBottomWidth: 1, borderBottomColor: Colors.borderMid },
   backBtn:    { width: 36, height: 36, borderRadius: 18, backgroundColor: Brand.color.accent + '22', alignItems: 'center', justifyContent: 'center' },
   headerBtn:  { width: 36, height: 36, borderRadius: 18, backgroundColor: Brand.color.accent + '22', alignItems: 'center', justifyContent: 'center' },
-  title:      { flex: 1, fontFamily: Brand.font.display, fontSize: 20, color: Brand.color.accent, letterSpacing: -0.3 },
+  title:      { flex: 1, fontFamily: AppFont.bold, fontSize: 20, color: Brand.color.accent, letterSpacing: -0.3 },
   totalBadge: { backgroundColor: ACCENT + '44', borderRadius: Radius.pill, paddingHorizontal: 12, paddingVertical: 5 },
-  totalBadgeText: { fontFamily: Brand.font.monoBold, fontSize: 12, color: ACCENT_DARK },
+  totalBadgeText: { fontFamily: AppFont.semiBold, fontSize: 12, color: ACCENT_DARK },
 
   scroll: { paddingBottom: 80, paddingHorizontal: PAGE },
-  divider: { height: 8, backgroundColor: Colors.surface, marginHorizontal: -PAGE },
+  divider: { height: 2, backgroundColor: Colors.border, marginTop: 16, marginBottom: 8, marginHorizontal: -PAGE },
 
   emptyWrap: { alignItems: 'center', gap: 8, paddingVertical: 16 },
 
   // ── Section blocks
   sectionBlock: { marginBottom: 4 },
-  sectionRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 20, paddingBottom: 8 },
-  sectionHeader: { ...Brand.type.sectionHeader },
-  sectionAddBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: Radius.pill, backgroundColor: ACCENT + '44' },
-  sectionAddText:{ fontFamily: Brand.font.heading, fontSize: 11, color: ACCENT_DARK },
+  sectionRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 24, paddingBottom: 10 },
+  sectionHeader: { fontFamily: AppFont.bold, fontSize: DC.sectionLabelSize, color: DC.sectionLabelColor, letterSpacing: 0.6, textTransform: 'uppercase' as const },
+  sectionAddBtn: { width: 28, height: 28, borderRadius: 14, backgroundColor: DC.btnBg, borderWidth: DC.btnBorderWidth, borderColor: DC.btnBorder, alignItems: 'center', justifyContent: 'center' },
+  sectionAddText:{ fontFamily: AppFont.medium, fontSize: 11, color: ACCENT_DARK },
+  actionBtn:        { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: Radius.pill, backgroundColor: DC.btnBg, borderWidth: DC.btnBorderWidth, borderColor: DC.btnBorder, shadowColor: DC.btnShadowColor, shadowOffset: DC.btnShadowOffset, shadowOpacity: DC.btnShadowOpacity, shadowRadius: DC.btnShadowRadius, elevation: DC.btnElevation },
+  actionBtnText:    { fontFamily: AppFont.bold, fontSize: 13, color: DC.btnText },
+  actionBtnDanger:  { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: Radius.pill, backgroundColor: DC.btnDangerBg },
+  actionBtnDangerText: { fontFamily: AppFont.bold, fontSize: 13, color: DC.btnDangerText },
 
   // ── List rows
-  list:       {},
-  recRow:     { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  recIconWrap:{ width: 34, height: 34, borderRadius: 17, backgroundColor: ACCENT + '44', justifyContent: 'center', alignItems: 'center' },
+  list:       { gap: 8 },
+  recRow:     { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 14, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.white },
+  recNum:     { width: 56, fontFamily: AppFont.bold, fontSize: 32, color: '#95D4CF', textAlign: 'center' },
+  recRight:   { alignItems: 'flex-end', gap: 2 },
+  recStatus:  { fontFamily: AppFont.regular, fontSize: 9, color: '#111111' },
   recMid:     { flex: 1, gap: 2 },
-  recName:    { ...Brand.type.cardTitle },
-  recDate:    { ...Brand.type.cardMeta },
-  recAmount:  { fontFamily: Brand.font.monoBold, fontSize: 14, letterSpacing: -0.3 },
+  recName:    { fontFamily: AppFont.bold, fontSize: 14, color: '#111111' },
+  recDate:    { fontFamily: AppFont.regular, fontSize: 11, color: '#111111' },
+  recAmount:  { fontFamily: AppFont.bold, fontSize: 14, letterSpacing: -0.3, color: '#111111' },
 
   // ── People chips
-  chipWrap:      { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingBottom: 12 },
-  personChip:    { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: ACCENT + '44', borderRadius: Radius.pill, paddingVertical: 5, paddingLeft: 12, paddingRight: 8 },
-  personChipText:{ fontFamily: Brand.font.heading, fontSize: 12, color: ACCENT_DARK },
+  chipWrap:      { flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingBottom: 12, paddingTop: 4 },
+  personChip:    { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#F8F8F8', borderRadius: Radius.pill, paddingVertical: 6, paddingHorizontal: 14, borderWidth: 1, borderColor: '#EFEFEF' },
+  personChipText:{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.text },
 
   tagInputWrap:  { flexDirection: 'row', flexWrap: 'wrap', gap: 6, borderWidth: 1, borderColor: Colors.borderMid, borderRadius: Radius.md, padding: 8, minHeight: 44, marginBottom: 12 },
   tagChip:       { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: ACCENT + '44', borderRadius: Radius.pill, paddingVertical: 4, paddingLeft: 10, paddingRight: 6 },
-  tagChipText:   { fontFamily: Brand.font.monoBold, fontSize: 11, color: ACCENT_DARK },
-  tagInput:      { fontFamily: Brand.font.mono, fontSize: 16, color: Colors.text, minWidth: 120, flex: 1, padding: 2 },
-  contactsLabel: { ...Brand.type.modalLabel, marginBottom: 6 },
+  tagChipText:   { fontFamily: AppFont.semiBold, fontSize: 11, color: ACCENT_DARK },
+  tagInput:      { fontFamily: AppFont.regular, fontSize: 16, color: Colors.text, minWidth: 120, flex: 1, padding: 2 },
+  contactsLabel: { fontFamily: AppFont.semiBold, fontSize: 11, letterSpacing: 0.4, textTransform: 'uppercase' as const, color: Colors.muted, marginBottom: 6 },
   contactRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  contactName:   { ...Brand.type.cardTitle },
+  contactName:   { fontFamily: AppFont.medium, fontSize: 14, color: Colors.text },
 
-  itemCard:      { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  itemNum:        { fontFamily: Brand.font.monoBold, fontSize: 10, color: ACCENT_DARK, backgroundColor: ACCENT + '44', width: 20, height: 20, borderRadius: 10, textAlign: 'center', lineHeight: 20 },
-  itemName:       { ...Brand.type.cardTitle, fontSize: 13 },
-  itemSplit:      { ...Brand.type.cardMeta },
-  itemCost:       { fontFamily: Brand.font.monoBold, fontSize: 13, letterSpacing: -0.2 },
-  itemsTotalRow:  { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, backgroundColor: Colors.surface, marginTop: 2 },
-  itemsTotalLabel:{ ...Brand.type.cardMeta },
+  itemCard:      { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, paddingHorizontal: 14, borderRadius: 14, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.white },
+  itemEditBtn:    { paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: DC.btnBg, borderWidth: DC.btnBorderWidth, borderColor: DC.btnBorder, shadowColor: DC.btnShadowColor, shadowOffset: DC.btnShadowOffset, shadowOpacity: DC.btnShadowOpacity, shadowRadius: DC.btnShadowRadius, elevation: DC.btnElevation },
+  itemEditBtnText:{ fontFamily: AppFont.bold, fontSize: 13, color: DC.btnText },
+  itemNum:        { width: 56, fontFamily: AppFont.bold, fontSize: 32, color: '#95D4CF', textAlign: 'center' },
+  itemName:       { fontFamily: AppFont.bold, fontSize: 14, color: '#111111' },
+  itemSplit:      { fontFamily: AppFont.regular, fontSize: 11, color: '#111111' },
+  itemCost:       { fontFamily: AppFont.bold, fontSize: 14, letterSpacing: -0.2, color: '#111111' },
+  itemsTotalRow:  { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 14, backgroundColor: Colors.surface, borderRadius: 10, marginTop: 4 },
+  itemsTotalLabel:{ fontFamily: AppFont.regular, fontSize: 10, color: Colors.muted },
   itemsTotalDots: { flex: 1, borderBottomWidth: 1, borderStyle: 'dotted', borderColor: Colors.faint, marginHorizontal: 8 },
-  itemsTotalValue:{ fontFamily: Brand.font.monoBold, fontSize: 11, color: Colors.text },
+  itemsTotalValue:{ fontFamily: AppFont.semiBold, fontSize: 11, color: Colors.text },
   itemFormRow:    { flexDirection: 'row', gap: 8, marginBottom: 10 },
-  itemFormInput:  { fontFamily: Brand.font.mono, fontSize: 16, color: Colors.text, backgroundColor: Colors.white, borderRadius: Radius.md, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: Colors.borderMid },
+  itemFormInput:  { fontFamily: AppFont.regular, fontSize: 16, color: Colors.text, backgroundColor: Colors.white, borderRadius: Radius.md, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: Colors.borderMid },
   manualRow:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 12, padding: 12, borderRadius: Radius.md, backgroundColor: Colors.surface },
   manualLeft:     { flex: 1, gap: 4 },
-  manualName:     { ...Brand.type.cardTitle, fontSize: 13, color: Colors.text },
-  manualHint:     { ...Brand.type.cardMeta, color: Colors.muted, fontSize: 11 },
+  manualName:     { fontFamily: AppFont.medium, fontSize: 13, color: Colors.text },
+  manualHint:     { fontFamily: AppFont.regular, fontSize: 11, color: Colors.muted },
   manualInput:    { flex: 0, minWidth: 96, width: 96, textAlign: 'right' },
   manualTotalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10, paddingHorizontal: 12, borderRadius: Radius.md, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.borderMid },
-  manualTotalLabel:{ ...Brand.type.cardMeta, color: Colors.muted },
-  manualTotalValue:{ fontFamily: Brand.font.monoBold, fontSize: 14, color: Colors.text },
+  manualTotalLabel:{ fontFamily: AppFont.regular, fontSize: 10, color: Colors.muted },
+  manualTotalValue:{ fontFamily: AppFont.semiBold, fontSize: 14, color: Colors.text },
 
   summaryRow:    { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surface, borderRadius: Radius.pill, paddingVertical: 12, paddingHorizontal: PAGE, borderWidth: 1, borderColor: Colors.border },
-  summaryName:   { ...Brand.type.cardMeta, color: Colors.text, flexShrink: 0 },
+  summaryName:   { fontFamily: AppFont.regular, fontSize: 10, color: Colors.text, flexShrink: 0 },
   summaryDots:   { flex: 1, borderBottomWidth: 1, borderStyle: 'dotted', borderColor: Colors.faint, marginHorizontal: 10 },
-  summaryAmount: { fontFamily: Brand.font.monoBold, fontSize: 13, color: Colors.text, flexShrink: 0 },
+  summaryAmount: { fontFamily: AppFont.semiBold, fontSize: 13, color: Colors.text, flexShrink: 0 },
 
 
   recPickRow:    { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 12 },
 
   modeBtn:           { paddingHorizontal: 14, paddingVertical: 7, borderRadius: Radius.pill, borderWidth: 1, borderColor: Colors.borderMid, backgroundColor: Colors.surface },
   modeBtnActive:     { backgroundColor: ACCENT + '44', borderColor: ACCENT },
-  modeBtnText:       { fontFamily: Brand.font.mono,     fontSize: 12, color: Colors.muted },
-  modeBtnTextActive: { color: ACCENT_DARK, fontFamily: Brand.font.monoBold },
-  doneBtn:           { backgroundColor: ACCENT + '44', borderRadius: Radius.pill, paddingVertical: 14, alignItems: 'center', marginTop: 16 },
-  doneBtnText:       { fontFamily: Brand.font.monoBold, fontSize: 14, color: ACCENT_DARK },
+  modeBtnText:       { fontFamily: AppFont.regular,     fontSize: 12, color: Colors.muted },
+  modeBtnTextActive: { color: ACCENT_DARK, fontFamily: AppFont.semiBold },
+  doneBtn:           { backgroundColor: DC.btnBg, borderRadius: Radius.pill, paddingVertical: 14, alignItems: 'center', marginTop: 16, borderWidth: DC.btnBorderWidth, borderColor: DC.btnBorder, shadowColor: DC.btnShadowColor, shadowOffset: DC.btnShadowOffset, shadowOpacity: DC.btnShadowOpacity, shadowRadius: DC.btnShadowRadius, elevation: DC.btnElevation },
+  doneBtnText:       { fontFamily: AppFont.bold, fontSize: 14, color: DC.btnText },
 });

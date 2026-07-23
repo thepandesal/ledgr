@@ -1,4 +1,6 @@
-﻿import AddItemModal from './AddItemModal';
+﻿import GooeyLoader from '@/components/ui/GooeyLoader';
+import { BlurView } from 'expo-blur';
+import AddItemModal from './AddItemModal';
 import { setPendingFocusDate } from './space-detail';
 import { useScreenAnim } from '@/components/ui/ScreenWrapper';
 import PageHeader from '@/components/ui/PageHeader';
@@ -26,6 +28,7 @@ import { writeOff } from '../../src/lib/writeOff';
 
 import { useUser } from '../../src/hooks/useUser';
 import { useNav } from '../../src/lib/NavContext';
+import { useQueryClient } from '@tanstack/react-query';
 
 const ACCENT      = Brand.color.accent;
 const ACCENT_DARK = Brand.color.accentDark;
@@ -47,7 +50,8 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
   const handleBack = onClose ?? handleBackAnim;
   const webviewRef = useRef<any>(null);
   const { defaultCurrency, userId, userName } = useUser();
-  const { openRecording } = useNav();
+  const { openRecording, openSplitBill } = useNav();
+  const queryClient = useQueryClient();
 
   // Tag a friend state
   const [tagFriendModal, setTagFriendModal] = useState(false);
@@ -454,7 +458,7 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
       split_bill_id: bill.id, recording_id: recordingId, amount_contributed: recording.amount,
     });
     setSplitBillModal(false);
-    router.push({ pathname: '/(app)/split-bill-detail', params: { splitBillId: bill.id, name: bill.name } } as any);
+    openSplitBill(bill.id, bill.name);
   };
 
   const linkToExistingSplitBill = async (bill: any) => {
@@ -462,7 +466,7 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
       split_bill_id: bill.id, recording_id: recordingId, amount_contributed: recording?.amount ?? 0,
     });
     setSplitBillModal(false);
-    router.push({ pathname: '/(app)/split-bill-detail', params: { splitBillId: bill.id, name: bill.name } } as any);
+    openSplitBill(bill.id, bill.name);
   };
 
   const openSplitBillModal = async () => {
@@ -511,6 +515,14 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
         }).eq('id', linkedPayable.id);
       }
       if (recordingDate) setPendingFocusDate(recordingDate);
+      queryClient.invalidateQueries({ queryKey: ['recordings-panel', userId] });
+      queryClient.invalidateQueries({ queryKey: ['home-summary-v2', userId] });
+      queryClient.invalidateQueries({ queryKey: ['home-recent', userId] });
+      queryClient.invalidateQueries({ queryKey: ['home-loans', userId] });
+      queryClient.invalidateQueries({ queryKey: ['home-receivables', userId] });
+      queryClient.invalidateQueries({ queryKey: ['home-spaces', userId] });
+      queryClient.invalidateQueries({ queryKey: ['home-totals', userId] });
+      queryClient.invalidateQueries({ queryKey: ['spaces-panel', userId] });
       handleBack();
     } catch (e) { /* delete failed silently */ }
     finally { setDeleteLoading(false); }
@@ -528,6 +540,19 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
       loadAvailableSpaces(),
       supabase.from('split_shares').select('id').eq('recording_id', recordingId).maybeSingle()
         .then(({ data }) => { if (data) setShareRowId(data.id); }),
+      // Pre-load edit modal data
+      supabase.auth.getUser().then(({ data: { user } }) => {
+        if (!user) return;
+        Promise.all([
+          supabase.from('accounts').select().eq('user_id', user.id).order('account_name'),
+          supabase.from('categories').select().eq('user_id', user.id).order('name'),
+          supabase.from('recordings').select('id').eq('linked_recording_id', recordingId).limit(1),
+        ]).then(([{ data: accs }, { data: cats }, { data: linked }]) => {
+          if (accs) setEditAccounts(accs);
+          if (cats) setEditCategories(cats);
+          setEditAmountLocked((linked ?? []).length > 0);
+        });
+      }),
     ]).then(() => loadPaymentData());
   }, []);
 
@@ -1740,24 +1765,14 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
   };
 
 
-  const openEditModal = async () => {
+  const openEditModal = () => {
     setEditDate(recording?.transaction_date ?? '');
     setEditAccountId(recording?.account_id ?? '');
     setEditName(recording?.name ?? '');
     setEditNotes(recording?.notes ?? '');
     setEditCategoryId(recording?.category_id ?? null);
     setEditAmount(String(recording?.amount ?? ''));
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    const [{ data: accs }, { data: cats }, { data: linked }] = await Promise.all([
-      supabase.from('accounts').select().eq('user_id', user.id).order('account_name'),
-      supabase.from('categories').select().eq('user_id', user.id).order('name'),
-      supabase.from('recordings').select('id').eq('linked_recording_id', recordingId).limit(1),
-    ]);
-    if (accs) setEditAccounts(accs);
-    if (cats) setEditCategories(cats);
-    // Lock amount if any linked recordings exist (payments, returns, etc.)
-    setEditAmountLocked((linked ?? []).length > 0);
+    setEditError('');
     setEditModal(true);
   };
 
@@ -2077,7 +2092,16 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
             <View style={rd.infoRowDotted}>
               <Text style={rd.infoRowLabel}>Type</Text>
               <View style={rd.infoRowDots} />
-              <Text style={rd.infoRowValue}>{typeLabel(recording?.type ?? '', recording?.status ?? '')}</Text>
+              {(() => {
+                const label = typeLabel(recording?.type ?? '', recording?.status ?? '');
+                const isOut = ['expense', 'debt', 'payment'].includes(recording?.type ?? '');
+                const badgeColor = isOut ? '#FFAB91' : '#9cd7d2';
+                return (
+                  <View style={{ backgroundColor: badgeColor + '33', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3 }}>
+                    <Text style={{ fontFamily: AppFont.semiBold, fontSize: 11, color: badgeColor }}>{label}</Text>
+                  </View>
+                );
+              })()}
             </View>
             <View style={rd.infoRowDotted}>
               <Text style={rd.infoRowLabel}>Status</Text>
@@ -2104,13 +2128,12 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
           <View style={rd.sectionDivider} />
           <View style={rd.infoSectionHeader}>
             <Text style={rd.infoSectionTitle}>SPLIT BILL</Text>
-            <TouchableOpacity style={rd.pillBtn} onPress={openSplitBillModal} activeOpacity={0.8}>
-              <Text style={rd.pillBtnText}>Create</Text>
+            <TouchableOpacity style={rd.pillBtn} onPress={() => linkedSplitBill ? openSplitBill(linkedSplitBill.id, linkedSplitBill.name) : openSplitBillModal()} activeOpacity={0.8}>
+              <Text style={rd.pillBtnText}>{linkedSplitBill ? 'View' : 'Create'}</Text>
             </TouchableOpacity>
           </View>
 
           {/* RECEIPTS section */}
-          <View style={rd.sectionDivider} />
           <View style={rd.infoSectionHeader}>
             <Text style={rd.infoSectionTitle}>RECEIPTS</Text>
             <TouchableOpacity style={rd.pillBtn} onPress={() => receiptPhotos.length > 0 ? (setPhotoModalIndex(0), setPhotoModal(true)) : setAddReceiptModal(true)} activeOpacity={0.8}>
@@ -2208,7 +2231,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                     style={[rd.recRow, p.status === 'cancelled' && { opacity: 0.45 }]}
                     onPress={() => {
                       if (chargedFromSplitBill) {
-                        router.push({ pathname: '/(app)/split-bill-detail', params: { splitBillId: chargedFromSplitBill.id, name: chargedFromSplitBill.name } } as any);
+                        openSplitBill(chargedFromSplitBill.id, chargedFromSplitBill.name);
                       }
                     }}
                     activeOpacity={chargedFromSplitBill ? 0.7 : 1}
@@ -2268,7 +2291,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
           const total = Number(recording.amount ?? 0);
           if (paid >= total - 0.01) return null;
           return (
-            <TouchableOpacity style={rd.choiceRow} activeOpacity={0.8} onPress={() => { setShowAddChoice(false); linkedSplitBill ? router.push({ pathname: '/(app)/split-bill-detail', params: { splitBillId: linkedSplitBill.id, name: linkedSplitBill.name } } as any) : openCollectDueModal(); }}>
+            <TouchableOpacity style={rd.choiceRow} activeOpacity={0.8} onPress={() => { setShowAddChoice(false); linkedSplitBill ? openSplitBill(linkedSplitBill.id, linkedSplitBill.name) : openCollectDueModal(); }}>
               <View style={[rd.choiceIcon, { backgroundColor: DC.accent1 + '22' }]}><Ionicons name="arrow-down-circle-outline" size={20} color={DC.accent1} /></View>
               <View style={{ flex: 1 }}><Text style={rd.choiceTitle}>Collect Payment</Text><Text style={rd.choiceSub}>Record a collection for this due</Text></View>
               <Ionicons name="chevron-forward" size={14} color={Colors.faint} />
@@ -2612,68 +2635,102 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
         </TouchableOpacity>
       </BottomSheet>
 
-      {/* Edit recording modal */}
-      <BottomSheet visible={editModal} onClose={() => { setEditModal(false); setEditError(''); }} sub="recording" title="edit recording">
-        <View style={formStyles.block}>
-          {editError ? <Text style={{ fontFamily: Brand.font.mono, fontSize: 12, color: Colors.expense, marginBottom: 8 }}>{editError}</Text> : null}
-          <View style={formStyles.blockRow}>
-            <Text style={formStyles.blockLabel}>name</Text>
-            <TextInput style={formStyles.inlineInput} placeholder="recording name" placeholderTextColor={Colors.faint} value={editName} onChangeText={setEditName} />
-          </View>
-          <View style={formStyles.blockDivider} />
-          <View style={formStyles.blockRow}>
-            <Text style={formStyles.blockLabel}>amount</Text>
-            {editAmountLocked
-              ? <Text style={[formStyles.inlineInput, { color: Colors.muted }]}>{editAmount} · locked (has linked records)</Text>
-              : <TextInput style={formStyles.inlineInput} placeholder="0.00" placeholderTextColor={Colors.faint} value={editAmount} onChangeText={setEditAmount} keyboardType="decimal-pad" />}
-          </View>
-          <View style={formStyles.blockDivider} />
-          <View style={formStyles.blockRow}>
-            <Text style={formStyles.blockLabel}>date</Text>
-            <TextInput style={formStyles.inlineInput} placeholder="YYYY-MM-DD" placeholderTextColor={Colors.faint} value={editDate} onChangeText={setEditDate} />
-          </View>
-          <View style={formStyles.blockDivider} />
-          <TouchableOpacity style={formStyles.blockRow} onPress={() => setShowEditCategoryModal(true)}>
-            <Text style={formStyles.blockLabel}>category</Text>
-            <Text style={[formStyles.inlineInput, { color: editCategoryId ? Colors.text : Colors.faint }]}>
-              {editCategoryId ? (editCategories.find(c => c.id === editCategoryId)?.name ?? 'select') : 'optional'}
-            </Text>
-            <Ionicons name="chevron-down" size={13} color={Colors.faint} />
-          </TouchableOpacity>
-          <View style={formStyles.blockDivider} />
-          <View style={formStyles.blockRow}>
-            <Text style={formStyles.blockLabel}>notes</Text>
-            <TextInput style={[formStyles.inlineInput, { flex: 1 }]} placeholder="optional" placeholderTextColor={Colors.faint} value={editNotes} onChangeText={setEditNotes} multiline />
-          </View>
-          <View style={formStyles.blockDivider} />
-          <View style={[formStyles.blockRow, { flexDirection: 'column', alignItems: 'flex-start', gap: 8 }]}>
-            <Text style={formStyles.blockLabel}>bank / account</Text>
-            <ScrollView style={{ maxHeight: 180, width: '100%' }} showsVerticalScrollIndicator={false}>
-              {editAccounts.map(acc => (
-                <TouchableOpacity
-                  key={acc.id}
-                  style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 10, ...(editAccountId === acc.id ? { backgroundColor: ACCENT + '44', borderRadius: Radius.md, paddingHorizontal: 8 } : {}) }}
-                  onPress={() => setEditAccountId(acc.id)}
-                >
-                  <Ionicons name={editAccountId === acc.id ? 'checkmark-circle' : 'ellipse-outline'} size={18} color={editAccountId === acc.id ? ACCENT_DARK : Colors.faint} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontFamily: Brand.font.heading, fontSize: 13, color: Colors.text }}>{acc.account_name}</Text>
-                    <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: Colors.muted }}>{acc.bank} · {acc.account_number}</Text>
+      {/* Edit recording modal — new recording modal design */}
+      <Modal visible={editModal} animationType="slide" transparent statusBarTranslucent onRequestClose={() => { setEditModal(false); setEditError(''); }}>
+        <BlurView intensity={60} tint="light" style={StyleSheet.absoluteFill} />
+        <View style={{ flex: 1 }}>
+          <SafeAreaView style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.88)' }}>
+            <View style={{ flex: 1, paddingHorizontal: DC.pagePadding, paddingTop: 16 }}>
+
+              {/* Header */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 16 }}>
+                <Text style={{ fontFamily: AppFont.bold, fontSize: 22, color: DC.accent1, letterSpacing: -0.5 }}>Edit Recording</Text>
+                <TouchableOpacity onPress={() => { setEditModal(false); setEditError(''); }} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+                  <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.06)', alignItems: 'center', justifyContent: 'center' }}>
+                    <Text style={{ fontFamily: AppFont.bold, fontSize: 14, color: DC.pageText }}>✕</Text>
                   </View>
                 </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
+              </View>
+
+              <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: 12, paddingBottom: 40 }}>
+                {editError ? <Text style={{ fontFamily: AppFont.regular, fontSize: 12, color: Colors.expense }}>{editError}</Text> : null}
+
+                {/* Name */}
+                <View style={em.field}>
+                  <Text style={em.label}>Name</Text>
+                  <TextInput style={em.input} placeholder="recording name" placeholderTextColor={Colors.faint} value={editName} onChangeText={setEditName} autoFocus />
+                </View>
+
+                {/* Amount */}
+                <View style={em.field}>
+                  <Text style={em.label}>Amount {editAmountLocked && <Text style={{ color: Colors.muted, textTransform: 'none', fontFamily: AppFont.regular }}>(locked)</Text>}</Text>
+                  <TextInput style={[em.input, editAmountLocked && { color: Colors.muted }]} placeholder="0.00" placeholderTextColor={Colors.faint} value={editAmount} onChangeText={setEditAmount} keyboardType="decimal-pad" editable={!editAmountLocked} />
+                </View>
+
+                {/* Date */}
+                <View style={em.field}>
+                  <Text style={em.label}>Date</Text>
+                  <TextInput style={em.input} placeholder="YYYY-MM-DD" placeholderTextColor={Colors.faint} value={editDate} onChangeText={setEditDate} />
+                </View>
+
+                {/* Category */}
+                <View style={em.field}>
+                  <Text style={em.label}>Category</Text>
+                  <TouchableOpacity style={em.selector} onPress={() => setShowEditCategoryModal(true)} activeOpacity={0.8}>
+                    <Text style={[em.selectorText, !editCategoryId && { color: Colors.faint }]}>
+                      {editCategoryId ? (editCategories.find(c => c.id === editCategoryId)?.name ?? 'select') : 'optional'}
+                    </Text>
+                    <Ionicons name="chevron-down" size={13} color={Colors.faint} />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Notes */}
+                <View style={em.field}>
+                  <Text style={em.label}>Notes</Text>
+                  <TextInput style={[em.input, { minHeight: 60, textAlignVertical: 'top' }]} placeholder="optional" placeholderTextColor={Colors.faint} value={editNotes} onChangeText={setEditNotes} multiline />
+                </View>
+
+                {/* Account */}
+                <View style={em.field}>
+                  <Text style={em.label}>Account</Text>
+                  {editAccounts.length === 0 ? (
+                    <View style={{ height: 80 }}><GooeyLoader size={36} /></View>
+                  ) : (
+                    <View style={em.accountList}>
+                      <TouchableOpacity
+                        style={[em.accountRow, !editAccountId && em.accountRowActive]}
+                        onPress={() => setEditAccountId('')}
+                      >
+                        <Ionicons name={!editAccountId ? 'radio-button-on' : 'radio-button-off'} size={16} color={!editAccountId ? DC.accent1 : Colors.faint} />
+                        <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.muted }}>none</Text>
+                      </TouchableOpacity>
+                      {editAccounts.map(acc => (
+                        <TouchableOpacity key={acc.id} style={[em.accountRow, editAccountId === acc.id && em.accountRowActive]} onPress={() => setEditAccountId(acc.id)}>
+                          <Ionicons name={editAccountId === acc.id ? 'radio-button-on' : 'radio-button-off'} size={16} color={editAccountId === acc.id ? DC.accent1 : Colors.faint} />
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ fontFamily: AppFont.semiBold, fontSize: 13, color: DC.pageText }}>{acc.account_name}</Text>
+                            <Text style={{ fontFamily: AppFont.regular, fontSize: 10, color: Colors.muted }}>{acc.bank}</Text>
+                          </View>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+                </View>
+
+                {/* Save */}
+                <TouchableOpacity
+                  style={[rd.doneBtn, !editDate && { opacity: 0.4 }]}
+                  onPress={saveEdit}
+                  disabled={!editDate}
+                  activeOpacity={0.8}
+                >
+                  <Text style={rd.doneBtnText}>Save Changes</Text>
+                </TouchableOpacity>
+              </ScrollView>
+            </View>
+          </SafeAreaView>
         </View>
-        <View style={formStyles.actions}>
-          <TouchableOpacity style={formStyles.cancelBtn} onPress={() => setEditModal(false)}>
-            <Text style={formStyles.cancelBtnText}>cancel</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[formStyles.primaryBtn, !editDate && { opacity: 0.4 }]} onPress={saveEdit} disabled={!editDate}>
-            <Text style={formStyles.primaryBtnText}>save</Text>
-          </TouchableOpacity>
-        </View>
-      </BottomSheet>
+      </Modal>
 
       {/* Edit category picker */}
       <BottomSheet visible={showEditCategoryModal} onClose={() => setShowEditCategoryModal(false)} sub="recording" title="category">
@@ -2963,6 +3020,13 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
         })()}
       </BottomSheet>
 
+      {/* Loading overlay — shown while recording data is fetching */}
+      {!recording && (
+        <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}>
+          <GooeyLoader />
+        </BlurView>
+      )}
+
       {/* Hidden WebView for image capture - native only */}
       {captureHtml && Platform.OS !== 'web' && (() => {
         const { WebView } = require('react-native-webview');
@@ -2993,8 +3057,8 @@ const rd = StyleSheet.create({
   // INFORMATION section header
   infoSectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: DC.pagePadding, paddingTop: 20, paddingBottom: 12 },
   infoSectionTitle:  { fontFamily: AppFont.bold, fontSize: 13, color: DC.pageText, letterSpacing: 1, textTransform: 'uppercase' as const },
-  pillBtn:           { paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: DC.btnBg, borderWidth: DC.btnBorderWidth },
-  pillBtnText:       { fontFamily: AppFont.regular, fontSize: 13, color: DC.btnText },
+  pillBtn:           { paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: DC.pageActionBg, borderWidth: DC.pageActionBorderWidth },
+  pillBtnText:       { fontFamily: AppFont.regular, fontSize: 13, color: DC.pageActionText },
 
   // Dotted info rows
   infoRowDotted: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10 },
@@ -3053,8 +3117,8 @@ const rd = StyleSheet.create({
   emptyWrap:  { alignItems: 'center', gap: 8, paddingVertical: 16, paddingHorizontal: DC.pagePadding },
 
   // Done button
-  doneBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: ACCENT + '44', borderRadius: Radius.pill, paddingVertical: 14, marginTop: 8 },
-  doneBtnText: { fontFamily: Brand.font.monoBold, fontSize: 13, color: ACCENT_DARK },
+  doneBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: DC.btnBg, borderRadius: Radius.pill, paddingVertical: 14, marginTop: 8, borderWidth: DC.btnBorderWidth },
+  doneBtnText: { fontFamily: AppFont.semiBold, fontSize: 13, color: DC.btnText },
 
   // Toast
   toast:      { position: 'absolute', bottom: 48, alignSelf: 'center', backgroundColor: Colors.text, borderRadius: Radius.pill, paddingVertical: 10, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', gap: 8 },
@@ -3072,6 +3136,17 @@ const rd = StyleSheet.create({
   contactsLabel:{ ...Brand.type.modalLabel, marginBottom: 6 },
   contactRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.border },
   contactName:  { fontFamily: Brand.font.mono, fontSize: 13, color: Colors.text },
+});
+
+const em = StyleSheet.create({
+  field:       { gap: 6 },
+  label:       { fontFamily: AppFont.semiBold, fontSize: 11, color: DC.pageTextMuted, textTransform: 'uppercase' as const, letterSpacing: 0.6 },
+  input:       { fontFamily: AppFont.regular, fontSize: 16, color: DC.pageText, backgroundColor: Colors.surface, borderRadius: Radius.lg, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1, borderColor: Colors.borderMid },
+  selector:    { flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'space-between' as const, backgroundColor: Colors.surface, borderRadius: Radius.lg, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1, borderColor: Colors.borderMid },
+  selectorText:{ fontFamily: AppFont.regular, fontSize: 16, color: DC.pageText },
+  accountList: { borderWidth: 1, borderColor: Colors.borderMid, borderRadius: Radius.lg, overflow: 'hidden' as const },
+  accountRow:  { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 12, paddingVertical: 12, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  accountRowActive: { backgroundColor: DC.pageActionBg },
 });
 
 const styles = StyleSheet.create({

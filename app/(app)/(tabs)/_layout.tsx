@@ -1,8 +1,11 @@
-import { View, TouchableOpacity, Text, StyleSheet, Animated, Dimensions, Platform, SafeAreaView, ScrollView, useWindowDimensions, Clipboard, TextInput, ActivityIndicator } from 'react-native';
+import { View, TouchableOpacity, Text, StyleSheet, Animated, Dimensions, Platform, SafeAreaView, ScrollView, useWindowDimensions, Clipboard, TextInput, ActivityIndicator, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useRef, memo, useCallback, useEffect }from 'react';
+import AnimatedIcon from '@/components/ui/AnimatedIcon';
 import { BlurView } from 'expo-blur';
+import GooeyLoader from '@/components/ui/GooeyLoader';
+import HomeScreen from './home';
 import SpacesScreen from './spaces';
 import AccountsScreen from './accounts';
 import BillSplitScreen from './bill-split';
@@ -14,6 +17,15 @@ import NotificationsScreen from '../notifications';
 import RemindersScreen from './reminders';
 import SpaceDetailScreen from '../space-detail';
 import RecordingDetailScreen from '../recording-detail';
+import SplitBillDetailScreen from '../split-bill-detail';
+import CategoriesPanel from '../top-spending';
+import RecordingsPanel from '../recordings-panel';
+import SpacesPanel from '../spaces-panel';
+import LoansPanel from '../loans-panel';
+import ReceivablesPanel from '../receivables-panel';
+import RemindersPanel from '../reminders-panel';
+import ContactsPanel from '../contacts-panel';
+import FriendsPanel from '../friends-panel';
 import { Colors, Fonts, Radius, Spacing } from '@/components/ui/theme';
 import BottomNav from '@/components/ui/BottomNav';
 import { AppFont } from '../../../src/lib/fonts';
@@ -25,7 +37,7 @@ import TourTarget from '@/components/TourTarget';
 import AppTourOverlay from '@/components/AppTourOverlay';
 import { TourContext, APP_TOUR_STEPS } from '../../../src/lib/TourContext';
 import { NavContext } from '../../../src/lib/NavContext';
-import { consumePendingTabGlobal } from '../../../src/lib/NavContext';
+import { consumePendingTabGlobal, useNav } from '../../../src/lib/NavContext';
 import type { RefObject } from 'react';
 import type { View as RNView } from 'react-native';
 
@@ -44,9 +56,9 @@ const BUBBLE_ACTIVE_BG = '#EEF2FB'; // bubble active item bg
 const { width } = Dimensions.get('window');
 
 const MAIN_TABS = [
-  { key: 'spaces',              label: 'Spaces',        icon: 'grid' },
+  { key: 'home',                label: 'Home',          icon: 'home-outline' },
   { key: 'accounts',            label: 'Accounts',      icon: 'wallet-outline' },
-  { key: 'dashboard',           label: 'Dashboard',     icon: 'pulse-outline' },
+  { key: 'bill-split',          label: 'Split Bill',    icon: 'people-outline' },
   { key: 'notifications-tab',   label: 'Notifications', icon: 'notifications-outline' },
   { key: 'others',              label: 'Others',        icon: 'apps-outline' },
 ];
@@ -67,6 +79,7 @@ const TAB_META: Record<string, { title: string; subtitle: string }> = {
 };
 
 const OTHERS_ITEMS = [
+  { key: 'dashboard',   label: 'Dashboard',   icon: 'pulse-outline',         route: null },
   { key: 'receipts',    label: 'Receipts',    icon: 'receipt-outline',       route: null },
   { key: 'bill-split',  label: 'Split Bill',  icon: 'people-outline',        route: null },
   { key: 'contacts',    label: 'Contacts',    icon: 'people-circle-outline', route: null },
@@ -77,10 +90,11 @@ const OTHERS_ITEMS = [
   { key: 'profile',     label: 'Profile',     icon: 'person-outline',        route: null },
 ];
 
-const SLIDE_KEYS = ['spaces', 'accounts', 'dashboard', 'categories', 'receipts', 'bill-split', 'contacts', 'notifications-page', 'reminders', 'profile'];
+const SLIDE_KEYS = ['home', 'spaces', 'accounts', 'dashboard', 'categories', 'receipts', 'bill-split', 'contacts', 'notifications-page', 'reminders', 'profile'];
 
 const PROFILE_DANGER   = '#FFAB91';
 const PROFILE_DANGEBG  = '#FFF5F2';
+const MemoHome       = memo(HomeScreen);
 const MemoSpaces     = memo(SpacesScreen);
 const MemoAccounts   = memo(AccountsScreen);
 const MemoBillSplit  = memo(BillSplitScreen);
@@ -92,6 +106,7 @@ const MemoNotifications  = memo(NotificationsScreen);
 const MemoReminders      = memo(RemindersScreen);
 
 const SCREENS: Record<string, (isActive: boolean) => React.ReactNode> = {
+  home:                 (isActive) => <MemoHome isActive={isActive} />,
   spaces:               (isActive) => <MemoSpaces isActive={isActive} />,
   accounts:             (isActive) => <MemoAccounts isActive={isActive} />,
   dashboard:            (isActive) => <MemoDashboard isActive={isActive} />,
@@ -103,189 +118,450 @@ const SCREENS: Record<string, (isActive: boolean) => React.ReactNode> = {
 };
 
 const CURRENCIES = [
-  { code: 'PHP', symbol: '₱', label: 'Philippine Peso' },
-  { code: 'USD', symbol: '$', label: 'US Dollar' },
-  { code: 'EUR', symbol: '€', label: 'Euro' },
-  { code: 'GBP', symbol: '£', label: 'British Pound' },
-  { code: 'JPY', symbol: '¥', label: 'Japanese Yen' },
-  { code: 'AUD', symbol: 'A$', label: 'Australian Dollar' },
-  { code: 'CAD', symbol: 'C$', label: 'Canadian Dollar' },
-  { code: 'SGD', symbol: 'S$', label: 'Singapore Dollar' },
-  { code: 'MYR', symbol: 'RM', label: 'Malaysian Ringgit' },
-  { code: 'IDR', symbol: 'Rp', label: 'Indonesian Rupiah' },
-  { code: 'THB', symbol: '฿', label: 'Thai Baht' },
-  { code: 'VND', symbol: '₫', label: 'Vietnamese Dong' },
-  { code: 'KRW', symbol: '₩', label: 'South Korean Won' },
-  { code: 'CNY', symbol: '¥', label: 'Chinese Yuan' },
-  { code: 'INR', symbol: '₹', label: 'Indian Rupee' },
-  { code: 'HKD', symbol: 'HK$', label: 'Hong Kong Dollar' },
-  { code: 'NZD', symbol: 'NZ$', label: 'New Zealand Dollar' },
-  { code: 'CHF', symbol: 'Fr', label: 'Swiss Franc' },
-  { code: 'BRL', symbol: 'R$', label: 'Brazilian Real' },
-  { code: 'MXN', symbol: 'MX$', label: 'Mexican Peso' },
+  { code: 'AUD', symbol: 'A$', label: 'Australian Dollar', country: 'Australia', flag: 'au' },
+  { code: 'BRL', symbol: 'R$', label: 'Brazilian Real', country: 'Brazil', flag: 'br' },
+  { code: 'CAD', symbol: 'C$', label: 'Canadian Dollar', country: 'Canada', flag: 'ca' },
+  { code: 'CNY', symbol: '¥', label: 'Chinese Yuan', country: 'China', flag: 'cn' },
+  { code: 'EUR', symbol: '€', label: 'Euro', country: 'European Union', flag: 'eu' },
+  { code: 'GBP', symbol: '£', label: 'British Pound', country: 'United Kingdom', flag: 'gb' },
+  { code: 'HKD', symbol: 'HK$', label: 'Hong Kong Dollar', country: 'Hong Kong', flag: 'hk' },
+  { code: 'IDR', symbol: 'Rp', label: 'Indonesian Rupiah', country: 'Indonesia', flag: 'id' },
+  { code: 'INR', symbol: '₹', label: 'Indian Rupee', country: 'India', flag: 'in' },
+  { code: 'JPY', symbol: '¥', label: 'Japanese Yen', country: 'Japan', flag: 'jp' },
+  { code: 'KRW', symbol: '₩', label: 'South Korean Won', country: 'South Korea', flag: 'kr' },
+  { code: 'MXN', symbol: 'MX$', label: 'Mexican Peso', country: 'Mexico', flag: 'mx' },
+  { code: 'MYR', symbol: 'RM', label: 'Malaysian Ringgit', country: 'Malaysia', flag: 'my' },
+  { code: 'NZD', symbol: 'NZ$', label: 'New Zealand Dollar', country: 'New Zealand', flag: 'nz' },
+  { code: 'PHP', symbol: '₱', label: 'Philippine Peso', country: 'Philippines', flag: 'ph' },
+  { code: 'SGD', symbol: 'S$', label: 'Singapore Dollar', country: 'Singapore', flag: 'sg' },
+  { code: 'CHF', symbol: 'Fr', label: 'Swiss Franc', country: 'Switzerland', flag: 'ch' },
+  { code: 'THB', symbol: '฿', label: 'Thai Baht', country: 'Thailand', flag: 'th' },
+  { code: 'USD', symbol: '$', label: 'US Dollar', country: 'United States', flag: 'us' },
+  { code: 'VND', symbol: '₫', label: 'Vietnamese Dong', country: 'Vietnam', flag: 'vn' },
 ];
 
 function ProfileScreen() {
   const router = useRouter();
+  const { switchTab, openContactsPanel, openFriendsPanel } = useNav();
   const { user, userName, profileCode, defaultCurrency, setDefaultCurrency } = useUser();
   const [codeCopied, setCodeCopied] = useState(false);
   const [showCurrencyModal, setShowCurrencyModal] = useState(false);
+  const [currencySearch, setCurrencySearch] = useState('');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+  const [friends, setFriends] = useState<{ id: string; name: string }[]>([]);
+  const [contacts, setContacts] = useState<string[]>([]);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [showAllFriends, setShowAllFriends] = useState(false);
+  const [showAllContacts, setShowAllContacts] = useState(false);
+  const [friendRequests, setFriendRequests] = useState<{ id: string; name: string; requesterId: string }[]>([]);
+  const [outgoingRequests, setOutgoingRequests] = useState<{ id: string; name: string; receiverId: string }[]>([]);
+  const [respondingId, setRespondingId] = useState<string | null>(null);
+  const [showAddFriend, setShowAddFriend] = useState(false);
+  const [addFriendCode, setAddFriendCode] = useState('');
+  const [addFriendError, setAddFriendError] = useState('');
+  const [addFriendLoading, setAddFriendLoading] = useState(false);
+  const [toastVisible, setToastVisible] = useState(false);
+  const toastAnim = useRef(new Animated.Value(0)).current;
   const email = user?.email ?? '';
+  const userId = user?.id ?? '';
+
+  useEffect(() => {
+    if (!userId) return;
+    // Load friends
+    supabase.from('friendships').select('requester_id, receiver_id').eq('status', 'accepted')
+      .or(`requester_id.eq.${userId},receiver_id.eq.${userId}`)
+      .then(async ({ data }) => {
+        if (!data) return;
+        const ids = data.map((f: any) => f.requester_id === userId ? f.receiver_id : f.requester_id);
+        const names = await Promise.all(ids.map(async (id: string) => {
+          const { data: n } = await supabase.rpc('get_user_display_name', { user_id: id });
+          return { id, name: n ?? 'unknown' };
+        }));
+        setFriends(names);
+      });
+    // Load contacts
+    supabase.from('contacts').select('name').eq('user_id', userId).order('name')
+      .then(({ data }) => { if (data) setContacts(data.map((c: any) => c.name)); setProfileLoading(false); });
+    // Load friend requests (pending, where current user is receiver)
+    supabase.from('friendships').select('id, requester_id').eq('receiver_id', userId).eq('status', 'pending')
+      .then(async ({ data }) => {
+        if (!data || data.length === 0) return;
+        const requests = await Promise.all(data.map(async (f: any) => {
+          const { data: n } = await supabase.rpc('get_user_display_name', { user_id: f.requester_id });
+          return { id: f.id, name: n ?? 'unknown', requesterId: f.requester_id };
+        }));
+        setFriendRequests(requests);
+      });
+    // Load outgoing requests (pending, where current user is requester)
+    supabase.from('friendships').select('id, receiver_id').eq('requester_id', userId).eq('status', 'pending')
+      .then(async ({ data }) => {
+        if (!data || data.length === 0) return;
+        const requests = await Promise.all(data.map(async (f: any) => {
+          const { data: n } = await supabase.rpc('get_user_display_name', { user_id: f.receiver_id });
+          return { id: f.id, name: n ?? 'unknown', receiverId: f.receiver_id };
+        }));
+        setOutgoingRequests(requests);
+      });
+  }, [userId]);
+
+  const respondToRequest = async (id: string, accept: boolean) => {
+    setRespondingId(id);
+    await supabase.from('friendships').update({ status: accept ? 'accepted' : 'rejected' }).eq('id', id);
+    setFriendRequests(prev => prev.filter(r => r.id !== id));
+    if (accept) {
+      const req = friendRequests.find(r => r.id === id);
+      if (req) setFriends(prev => [...prev, { id: req.requesterId, name: req.name }]);
+    }
+    setRespondingId(null);
+  };
+
+  const sendFriendRequest = async () => {
+    if (!addFriendCode.trim()) return;
+    setAddFriendLoading(true); setAddFriendError('');
+    try {
+      // Look up user by profile code
+      const { data: target } = await supabase.rpc('get_user_by_profile_code', { code: addFriendCode.trim().toUpperCase() });
+      if (!target) { setAddFriendError('no user found with that code'); return; }
+      if (target === userId) { setAddFriendError('that\'s your own code'); return; }
+      // Check not already friends or pending
+      const { data: existing } = await supabase.from('friendships')
+        .select('id, status').or(`and(requester_id.eq.${userId},receiver_id.eq.${target}),and(requester_id.eq.${target},receiver_id.eq.${userId})`).maybeSingle();
+      if (existing) { setAddFriendError(existing.status === 'accepted' ? 'already friends' : 'request already sent'); return; }
+      await supabase.from('friendships').insert({ requester_id: userId, receiver_id: target, status: 'pending' });
+      const { data: n } = await supabase.rpc('get_user_display_name', { user_id: target });
+      setOutgoingRequests(prev => [...prev, { id: '', name: n ?? 'unknown', receiverId: target }]);
+      setShowAddFriend(false); setAddFriendCode('');
+    } catch (e: any) {
+      setAddFriendError(e.message ?? 'something went wrong');
+    } finally {
+      setAddFriendLoading(false);
+    }
+  };
+
+  const showToast = () => {
+    setToastVisible(true);
+    Animated.sequence([
+      Animated.timing(toastAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
+      Animated.delay(1500),
+      Animated.timing(toastAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
+    ]).start(() => setToastVisible(false));
+  };
 
   const copyCode = () => {
     if (!profileCode) return;
     if (typeof navigator !== 'undefined' && navigator.clipboard) {
-      navigator.clipboard.writeText(profileCode).then(() => { setCodeCopied(true); setTimeout(() => setCodeCopied(false), 2000); });
+      navigator.clipboard.writeText(profileCode).then(() => showToast());
     } else {
       Clipboard.setString(profileCode);
-      setCodeCopied(true);
-      setTimeout(() => setCodeCopied(false), 2000);
+      showToast();
     }
   };
-  const joinedDate = user?.created_at
-    ? new Date(user.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-    : '';
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-  };
+  const handleLogout = async () => { await supabase.auth.signOut(); };
 
   const handleDeleteAccount = async () => {
-    if (deleteConfirmText.toLowerCase() !== 'delete') {
-      setDeleteError('type "delete" to confirm');
-      return;
-    }
-    setDeleting(true);
-    setDeleteError('');
+    if (deleteConfirmText.toLowerCase() !== 'delete') { setDeleteError('type "delete" to confirm'); return; }
+    setDeleting(true); setDeleteError('');
     try {
       const { data: { user: currentUser } } = await supabase.auth.getUser();
       if (!currentUser) throw new Error('not authenticated');
-      // Call the delete_user_data DB function via RPC
-      // This requires the function to be created with SECURITY DEFINER in Supabase
       const { error } = await supabase.rpc('delete_user_data', { target_user_id: currentUser.id });
       if (error) throw error;
       await supabase.auth.signOut();
-      if (typeof window !== 'undefined') {
-        window.location.href = '/';
-      } else {
-        router.replace('/' as any);
-      }
+      if (typeof window !== 'undefined') window.location.href = '/';
+      else router.replace('/' as any);
     } catch (e: any) {
-      setDeleteError(e.message ?? 'something went wrong. please try again.');
+      setDeleteError(e.message ?? 'something went wrong.');
       setDeleting(false);
     }
   };
 
   return (
-    <SafeAreaView style={p.container}>
+    <View style={p.container}>
       <ScrollView contentContainerStyle={p.scroll} showsVerticalScrollIndicator={false}>
 
-        {/* Avatar + name */}
+        {/* Avatar */}
         <View style={p.avatarSection}>
           <View style={p.avatar}>
             <Text style={p.avatarText}>{userName ? userName.charAt(0).toUpperCase() : '?'}</Text>
           </View>
           <Text style={p.name}>{userName || 'My Account'}</Text>
           <Text style={p.email}>{email}</Text>
+          <TouchableOpacity style={p.logoutBtn} onPress={handleLogout} activeOpacity={0.8}>
+            <Text style={p.logoutText}>Log Out</Text>
+          </TouchableOpacity>
         </View>
 
-        {/* Info card */}
+        {/* General Information */}
+        <Text style={p.sectionLabel}>General Information</Text>
         <View style={p.card}>
+          {/* Name */}
           <View style={p.row}>
-            <View style={p.rowIcon}><Ionicons name="person-outline" size={16} color={Colors.muted} /></View>
+            <View style={p.rowIcon}><AnimatedIcon set="basil" icon="user-solid" size={16} color={Colors.muted} /></View>
             <View style={p.rowBody}>
-              <Text style={p.rowLabel}>Full Name</Text>
+              <Text style={p.rowLabel}>Name</Text>
               <Text style={p.rowValue}>{userName || '—'}</Text>
             </View>
           </View>
           <View style={p.divider} />
+          {/* Email */}
           <View style={p.row}>
-            <View style={p.rowIcon}><Ionicons name="mail-outline" size={16} color={Colors.muted} /></View>
+            <View style={p.rowIcon}><AnimatedIcon set="basil" icon="gmail-solid" size={16} color={Colors.muted} /></View>
             <View style={p.rowBody}>
               <Text style={p.rowLabel}>Email</Text>
               <Text style={p.rowValue}>{email || '—'}</Text>
             </View>
           </View>
           <View style={p.divider} />
+          {/* Subscription */}
           <View style={p.row}>
-            <View style={p.rowIcon}><Ionicons name="calendar-outline" size={16} color={Colors.muted} /></View>
+            <View style={p.rowIcon}><AnimatedIcon set="basil" icon="lightning-solid" size={16} color={Colors.muted} /></View>
             <View style={p.rowBody}>
-              <Text style={p.rowLabel}>Member Since</Text>
-              <Text style={p.rowValue}>{joinedDate || '—'}</Text>
+              <Text style={p.rowLabel}>Subscription</Text>
+              <Text style={[p.rowValue, { color: HEADER_BG }]}>Free</Text>
             </View>
           </View>
           <View style={p.divider} />
+          {/* Profile Code */}
           <View style={p.row}>
-            <View style={p.rowIcon}><Ionicons name="shield-checkmark-outline" size={16} color={Colors.muted} /></View>
-            <View style={p.rowBody}>
-              <Text style={p.rowLabel}>Account Status</Text>
-              <Text style={[p.rowValue, { color: HEADER_BG }]}>Active</Text>
-            </View>
-          </View>
-          <View style={p.divider} />
-          <TouchableOpacity style={p.row} onPress={copyCode} activeOpacity={0.7}>
-            <View style={p.rowIcon}><Ionicons name="qr-code-outline" size={16} color={Colors.muted} /></View>
+            <View style={p.rowIcon}><AnimatedIcon set="basil" icon="id-card-solid" size={16} color={Colors.muted} /></View>
             <View style={p.rowBody}>
               <Text style={p.rowLabel}>Profile Code</Text>
-              <Text style={[p.rowValue, { fontFamily: Fonts.monoBold, letterSpacing: 1.5 }]}>{profileCode || '—'}</Text>
+              <Text style={[p.rowValue, { fontFamily: AppFont.bold, letterSpacing: 1.5 }]}>{profileCode || '—'}</Text>
             </View>
-            <Ionicons name={codeCopied ? 'checkmark-circle' : 'copy-outline'} size={16} color={codeCopied ? HEADER_BG : Colors.faint} />
-          </TouchableOpacity>
+            <TouchableOpacity onPress={copyCode} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <AnimatedIcon set="basil" icon="clipboard-solid" size={18} color={Colors.muted} />
+            </TouchableOpacity>
+          </View>
           <View style={p.divider} />
+          {/* Default Currency */}
           <TouchableOpacity style={p.row} onPress={() => setShowCurrencyModal(true)} activeOpacity={0.7}>
-            <View style={p.rowIcon}><Ionicons name="cash-outline" size={16} color={Colors.muted} /></View>
+            <View style={p.rowIcon}>
+              <AnimatedIcon set="circle-flags" icon={CURRENCIES.find(c => c.code === defaultCurrency)?.flag ?? 'us'} size={24} />
+            </View>
             <View style={p.rowBody}>
               <Text style={p.rowLabel}>Default Currency</Text>
-              <Text style={p.rowValue}>{defaultCurrency} · {CURRENCIES.find(c => c.code === defaultCurrency)?.symbol ?? ''}</Text>
+              <Text style={p.rowValue}>{CURRENCIES.find(c => c.code === defaultCurrency)?.country ?? ''} - {defaultCurrency}</Text>
             </View>
             <Ionicons name="chevron-forward" size={16} color={Colors.faint} />
           </TouchableOpacity>
         </View>
 
-        {/* Actions */}
-        <TouchableOpacity style={p.logoutBtn} onPress={handleLogout} activeOpacity={0.8}>
-          <Ionicons name="log-out-outline" size={18} color={Colors.muted} />
-          <Text style={p.logoutText}>Log Out</Text>
+        {/* Friends */}
+        <Text style={p.sectionLabel}>Friends</Text>
+        <View style={p.card}>
+          {friends.length === 0 ? (
+            <View style={[p.row, p.rowLast]}>
+              <Text style={[p.rowValue, { color: Colors.faint }]}>no friends yet</Text>
+            </View>
+          ) : (
+            (showAllFriends ? friends : friends.slice(0, 3)).map((f, i, arr) => (
+              <View key={f.id}>
+                <View style={[p.row, i === arr.length - 1 && p.rowLast]}>
+                  <View style={p.rowIcon}><AnimatedIcon set="basil" icon="user-solid" size={16} color={Colors.muted} /></View>
+                  <Text style={p.rowValue}>{f.name}</Text>
+                </View>
+                {i < arr.length - 1 && <View style={p.divider} />}
+              </View>
+            ))
+          )}
+        </View>
+        <TouchableOpacity style={p.seeMoreBtn} onPress={openFriendsPanel} activeOpacity={0.7}>
+          <Text style={p.seeMoreText}>{friends.length > 3 ? `see ${friends.length - 3} more...` : 'see all'}</Text>
         </TouchableOpacity>
 
+        {/* Pending friend requests (incoming) */}
+        {friendRequests.length > 0 && (
+          <>
+            <Text style={[p.sectionLabel, { marginTop: 8 }]}>Pending Requests</Text>
+            <View style={p.card}>
+              {friendRequests.map((req, i) => (
+                <View key={req.id}>
+                  <View style={[p.row, { gap: 10 }]}>
+                    <View style={p.rowIcon}><AnimatedIcon set="basil" icon="user-solid" size={16} color={Colors.muted} /></View>
+                    <Text style={[p.rowValue, { flex: 1 }]}>{req.name}</Text>
+                    <TouchableOpacity
+                      style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: Radius.pill, backgroundColor: HEADER_BG + '33', opacity: respondingId === req.id ? 0.5 : 1 }}
+                      onPress={() => respondToRequest(req.id, true)}
+                      disabled={respondingId === req.id}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={{ fontFamily: AppFont.semiBold, fontSize: 12, color: HEADER_BG }}>Accept</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: Radius.pill, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border, opacity: respondingId === req.id ? 0.5 : 1 }}
+                      onPress={() => respondToRequest(req.id, false)}
+                      disabled={respondingId === req.id}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={{ fontFamily: AppFont.regular, fontSize: 12, color: Colors.muted }}>Decline</Text>
+                    </TouchableOpacity>
+                  </View>
+                  {i < friendRequests.length - 1 && <View style={p.divider} />}
+                </View>
+              ))}
+            </View>
+          </>
+        )}
+
+        {/* Outgoing friend requests */}
+        {outgoingRequests.length > 0 && (
+          <>
+            <Text style={[p.sectionLabel, { marginTop: 8 }]}>Outgoing Requests</Text>
+            <View style={p.card}>
+              {outgoingRequests.map((req, i) => (
+                <View key={req.id || req.receiverId}>
+                  <View style={p.row}>
+                    <View style={p.rowIcon}><AnimatedIcon set="basil" icon="user-solid" size={16} color={Colors.muted} /></View>
+                    <Text style={[p.rowValue, { flex: 1 }]}>{req.name}</Text>
+                    <Text style={{ fontFamily: AppFont.regular, fontSize: 11, color: Colors.faint, fontStyle: 'italic' }}>pending</Text>
+                  </View>
+                  {i < outgoingRequests.length - 1 && <View style={p.divider} />}
+                </View>
+              ))}
+            </View>
+          </>
+        )}
+
+        {/* Contacts */}
+        <Text style={p.sectionLabel}>Contacts</Text>
+        <View style={p.card}>
+          {contacts.length === 0 ? (
+            <View style={[p.row, p.rowLast]}>
+              <Text style={[p.rowValue, { color: Colors.faint }]}>no contacts yet</Text>
+            </View>
+          ) : (
+            contacts.slice(0, 3).map((c, i, arr) => (
+              <View key={c}>
+                <View style={[p.row, i === arr.length - 1 && p.rowLast]}>
+                  <View style={p.rowIcon}><AnimatedIcon set="basil" icon="contacts-solid" size={16} color={Colors.muted} /></View>
+                  <Text style={p.rowValue}>{c}</Text>
+                </View>
+                {i < arr.length - 1 && <View style={p.divider} />}
+              </View>
+            ))
+          )}
+        </View>
+        <TouchableOpacity style={p.seeMoreBtn} onPress={openContactsPanel} activeOpacity={0.7}>
+          <Text style={p.seeMoreText}>{contacts.length > 3 ? `see ${contacts.length - 3} more...` : 'see all'}</Text>
+        </TouchableOpacity>
+
+        {/* Delete */}
         <TouchableOpacity style={p.deleteBtn} onPress={() => { setShowDeleteModal(true); setDeleteConfirmText(''); setDeleteError(''); }} activeOpacity={0.8}>
-          <Ionicons name="trash-outline" size={18} color={PROFILE_DANGER} />
           <Text style={p.deleteText}>Delete Account</Text>
         </TouchableOpacity>
 
       </ScrollView>
 
-      {/* ── Currency picker modal ── */}
-      {showCurrencyModal && (
+      {/* Toast */}
+      {toastVisible && (
+        <Animated.View style={[p.toast, { opacity: toastAnim }]}>
+          <Text style={p.toastText}>copied to clipboard</Text>
+        </Animated.View>
+      )}
+
+      {/* Loading overlay */}
+      {profileLoading && (
+        <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}>
+          <GooeyLoader />
+        </BlurView>
+      )}
+
+      {/* Add Friend modal */}
+      {showAddFriend && (
         <View style={p.modalOverlay}>
           <View style={p.modalBox}>
-            <Text style={p.modalTitle}>default currency</Text>
-            <ScrollView style={{ maxHeight: 360 }} showsVerticalScrollIndicator={false}>
-              {CURRENCIES.map(c => (
-                <TouchableOpacity
-                  key={c.code}
-                  style={[p.currencyRow, defaultCurrency === c.code && p.currencyRowActive]}
-                  onPress={() => { setDefaultCurrency(c.code); setShowCurrencyModal(false); }}
-                  activeOpacity={0.75}
-                >
-                  <Text style={p.currencySymbol}>{c.symbol}</Text>
-                  <View style={{ flex: 1 }}>
-                    <Text style={p.currencyCode}>{c.code}</Text>
-                    <Text style={p.currencyLabel}>{c.label}</Text>
-                  </View>
-                  {defaultCurrency === c.code && <Ionicons name="checkmark" size={16} color={HEADER_BG} />}
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-            <TouchableOpacity style={p.modalCancelBtn} onPress={() => setShowCurrencyModal(false)} activeOpacity={0.8}>
-              <Text style={p.modalCancelText}>cancel</Text>
-            </TouchableOpacity>
+            <Text style={p.modalTitle}>Add Friend</Text>
+            <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.muted, marginBottom: 12 }}>Enter their profile code to send a friend request.</Text>
+            <TextInput
+              style={p.deleteInput}
+              value={addFriendCode}
+              onChangeText={v => { setAddFriendCode(v); setAddFriendError(''); }}
+              placeholder="e.g. ABC123"
+              placeholderTextColor={Colors.faint}
+              autoCapitalize="characters"
+              autoFocus
+            />
+            {addFriendError ? <Text style={[p.deleteErrorText, { marginBottom: 8 }]}>{addFriendError}</Text> : null}
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
+              <TouchableOpacity style={[p.modalCancelBtn, { flex: 1 }]} onPress={() => setShowAddFriend(false)} activeOpacity={0.8}>
+                <Text style={p.modalCancelText}>cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[p.deleteConfirmBtn, { backgroundColor: HEADER_BG, opacity: (!addFriendCode.trim() || addFriendLoading) ? 0.4 : 1 }]}
+                onPress={sendFriendRequest}
+                disabled={!addFriendCode.trim() || addFriendLoading}
+                activeOpacity={0.8}
+              >
+                {addFriendLoading
+                  ? <ActivityIndicator color="#fff" size="small" />
+                  : <Text style={p.deleteConfirmText}>Send Request</Text>}
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
+      )}
+
+      {/* ── Currency picker modal ── */}
+      {showCurrencyModal && (
+        <Modal visible animationType="slide" transparent statusBarTranslucent onRequestClose={() => { setShowCurrencyModal(false); setCurrencySearch(''); }}>
+          <BlurView intensity={60} tint="light" style={StyleSheet.absoluteFill} />
+          <View style={{ flex: 1 }}>
+            <SafeAreaView style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.82)' }}>
+              <View style={{ flex: 1, paddingHorizontal: 20, paddingTop: 16 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 16 }}>
+                  <Text style={{ fontFamily: AppFont.bold, fontSize: 22, color: DC.accent1, letterSpacing: -0.5 }}>Select Currency</Text>
+                  <TouchableOpacity onPress={() => { setShowCurrencyModal(false); setCurrencySearch(''); }} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+                    <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.06)', alignItems: 'center', justifyContent: 'center' }}>
+                      <Text style={{ fontFamily: AppFont.bold, fontSize: 14, color: DC.pageText }}>✕</Text>
+                    </View>
+                  </TouchableOpacity>
+                </View>
+                <View style={p.searchRow}>
+                  <Ionicons name="search-outline" size={14} color={Colors.faint} />
+                  <TextInput
+                    style={p.searchInput}
+                    placeholder="search country or currency..."
+                    placeholderTextColor={Colors.faint}
+                    value={currencySearch}
+                    onChangeText={setCurrencySearch}
+                    autoFocus
+                  />
+                  {currencySearch.length > 0 && (
+                    <TouchableOpacity onPress={() => setCurrencySearch('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                      <Ionicons name="close-circle" size={14} color={Colors.faint} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+                <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
+                  {CURRENCIES.filter(c =>
+                    !currencySearch.trim() ||
+                    c.country.toLowerCase().includes(currencySearch.toLowerCase()) ||
+                    c.code.toLowerCase().includes(currencySearch.toLowerCase()) ||
+                    c.label.toLowerCase().includes(currencySearch.toLowerCase())
+                  ).map(c => (
+                    <TouchableOpacity
+                      key={c.code}
+                      style={[p.currencyRow, defaultCurrency === c.code && p.currencyRowActive]}
+                      onPress={() => { setDefaultCurrency(c.code); setShowCurrencyModal(false); setCurrencySearch(''); }}
+                      activeOpacity={0.75}
+                    >
+                      <AnimatedIcon set="circle-flags" icon={c.flag} size={32} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={p.currencyCode}>{c.country}</Text>
+                        <Text style={p.currencyLabel}>{c.code} · {c.symbol} · {c.label}</Text>
+                      </View>
+                      {defaultCurrency === c.code && <Ionicons name="checkmark" size={16} color={HEADER_BG} />}
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            </SafeAreaView>
+          </View>
+        </Modal>
       )}
 
       {/* ── Delete account confirmation modal ── */}
@@ -325,7 +601,7 @@ function ProfileScreen() {
           </View>
         </View>
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 const MemoProfile = ProfileScreen;
@@ -342,11 +618,11 @@ const NAV_TOUR_IDS: Record<string, string> = {
 export default function TabsLayout() {
   const router = useRouter();
   const { width: W } = useWindowDimensions();
-  const { user } = useUser();
+  const { user, userName } = useUser();
   const insets = useSafeAreaInsets();
-  const [activeTab, setActiveTab] = useState('spaces');
+  const [activeTab, setActiveTab] = useState('home');
   const [othersOpen, setOthersOpen] = useState(false);
-  const activeTabRef = useRef('spaces');
+  const activeTabRef = useRef('home');
   const titleAnim = useRef(new Animated.Value(1)).current;
   const blurAnim   = useRef(new Animated.Value(0)).current;
   const [blurActive, setBlurActive] = useState(false);
@@ -389,11 +665,13 @@ export default function TabsLayout() {
   const [pendingTab, setPendingTab] = useState<string | null>(null);
   const [activeSpaceId,   setActiveSpaceId]   = useState<string | null>(null);
   const [activeSpaceName, setActiveSpaceName] = useState<string | null>(null);
+  const [activeSpaceOpenEdit, setActiveSpaceOpenEdit] = useState(false);
   const spaceSlideAnim = useRef(new Animated.Value(width)).current;
 
-  const openSpace = useCallback((spaceId: string, name: string) => {
+  const openSpace = useCallback((spaceId: string, name: string, edit = false) => {
     setActiveSpaceId(spaceId);
     setActiveSpaceName(name);
+    setActiveSpaceOpenEdit(edit);
     spaceSlideAnim.setValue(width);
     Animated.timing(spaceSlideAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start();
   }, []);
@@ -402,6 +680,7 @@ export default function TabsLayout() {
     Animated.timing(spaceSlideAnim, { toValue: width, duration: 260, useNativeDriver: true }).start(() => {
       setActiveSpaceId(null);
       setActiveSpaceName(null);
+      setActiveSpaceOpenEdit(false);
     });
   }, []);
 
@@ -419,6 +698,117 @@ export default function TabsLayout() {
       setActiveRecordingId(null);
     });
   }, []);
+
+  const [activeSplitBillId,   setActiveSplitBillId]   = useState<string | null>(null);
+  const [activeSplitBillName, setActiveSplitBillName] = useState<string | null>(null);
+  const splitBillSlideAnim = useRef(new Animated.Value(width)).current;
+
+  const openSplitBill = useCallback((splitBillId: string, name: string) => {
+    setActiveSplitBillId(splitBillId);
+    setActiveSplitBillName(name);
+    splitBillSlideAnim.setValue(width);
+    Animated.timing(splitBillSlideAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start();
+  }, []);
+
+  const closeSplitBill = useCallback(() => {
+    Animated.timing(splitBillSlideAnim, { toValue: width, duration: 260, useNativeDriver: true }).start(() => {
+      setActiveSplitBillId(null);
+      setActiveSplitBillName(null);
+    });
+  }, []);
+
+  const [topSpendingOpen, setTopSpendingOpen] = useState(false);
+  const topSpendingOpenRef = useRef(false);
+  const topSpendingAnim = useRef(new Animated.Value(width)).current;
+
+  const openTopSpending = useCallback(() => {
+    topSpendingOpenRef.current = true;
+    setTopSpendingOpen(true);
+    topSpendingAnim.setValue(width);
+    Animated.timing(topSpendingAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start();
+  }, []);
+
+  const closeTopSpending = useCallback(() => {
+    topSpendingOpenRef.current = false;
+    Animated.timing(topSpendingAnim, { toValue: width, duration: 260, useNativeDriver: true }).start(() => {
+      setTopSpendingOpen(false);
+    });
+  }, []);
+
+  const dismissTopSpending = useCallback(() => {
+    topSpendingAnim.setValue(width);
+    setTopSpendingOpen(false);
+  }, []);
+
+  const [recordingsPanelOpen, setRecordingsPanelOpen] = useState(false);
+  const recordingsPanelOpenRef = useRef(false);
+  const recordingsPanelAnim = useRef(new Animated.Value(width)).current;
+  const [recordingsPanelOpts, setRecordingsPanelOpts] = useState<{ categoryId?: string; categoryName?: string; spaceId?: string; spaceName?: string }>({});
+
+  const openRecordingsPanel = useCallback((opts?: { categoryId?: string; categoryName?: string; spaceId?: string; spaceName?: string }) => {
+    recordingsPanelOpenRef.current = true;
+    setRecordingsPanelOpts(opts ?? {});
+    recordingsPanelAnim.setValue(width);
+    setRecordingsPanelOpen(true);
+    requestAnimationFrame(() => {
+      Animated.timing(recordingsPanelAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start();
+    });
+  }, []);
+
+  const closeRecordingsPanel = useCallback(() => {
+    recordingsPanelOpenRef.current = false;
+    Animated.timing(recordingsPanelAnim, { toValue: width, duration: 260, useNativeDriver: true }).start(() => {
+      setRecordingsPanelOpen(false);
+    });
+  }, []);
+
+  const [spacesPanelOpen, setSpacesPanelOpen] = useState(false);
+  const spacesPanelOpenRef = useRef(false);
+  const spacesPanelAnim = useRef(new Animated.Value(width)).current;
+
+  const openSpacesPanel = useCallback(() => {
+    spacesPanelOpenRef.current = true;
+    setSpacesPanelOpen(true);
+    spacesPanelAnim.setValue(width);
+    requestAnimationFrame(() => {
+      Animated.timing(spacesPanelAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start();
+    });
+  }, []);
+
+  const closeSpacesPanel = useCallback(() => {
+    spacesPanelOpenRef.current = false;
+    Animated.timing(spacesPanelAnim, { toValue: width, duration: 260, useNativeDriver: true }).start(() => {
+      setSpacesPanelOpen(false);
+    });
+  }, []);
+
+  const [loansPanelOpen, setLoansPanelOpen] = useState(false);
+  const loansPanelOpenRef = useRef(false);
+  const loansPanelAnim = useRef(new Animated.Value(width)).current;
+  const openLoansPanel = useCallback(() => { loansPanelOpenRef.current = true; setLoansPanelOpen(true); loansPanelAnim.setValue(width); requestAnimationFrame(() => { Animated.timing(loansPanelAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start(); }); }, []);
+  const closeLoansPanel = useCallback(() => { loansPanelOpenRef.current = false; Animated.timing(loansPanelAnim, { toValue: width, duration: 260, useNativeDriver: true }).start(() => { setLoansPanelOpen(false); }); }, []);
+
+  const [receivablesPanelOpen, setReceivablesPanelOpen] = useState(false);
+  const receivablesPanelOpenRef = useRef(false);
+  const receivablesPanelAnim = useRef(new Animated.Value(width)).current;
+  const openReceivablesPanel = useCallback(() => { receivablesPanelOpenRef.current = true; setReceivablesPanelOpen(true); receivablesPanelAnim.setValue(width); requestAnimationFrame(() => { Animated.timing(receivablesPanelAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start(); }); }, []);
+  const closeReceivablesPanel = useCallback(() => { receivablesPanelOpenRef.current = false; Animated.timing(receivablesPanelAnim, { toValue: width, duration: 260, useNativeDriver: true }).start(() => { setReceivablesPanelOpen(false); }); }, []);
+
+  const [remindersPanelOpen, setRemindersPanelOpen] = useState(false);
+  const remindersPanelOpenRef = useRef(false);
+  const remindersPanelAnim = useRef(new Animated.Value(width)).current;
+  const openRemindersPanel = useCallback(() => { remindersPanelOpenRef.current = true; setRemindersPanelOpen(true); remindersPanelAnim.setValue(width); requestAnimationFrame(() => { Animated.timing(remindersPanelAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start(); }); }, []);
+  const closeRemindersPanel = useCallback(() => { remindersPanelOpenRef.current = false; Animated.timing(remindersPanelAnim, { toValue: width, duration: 260, useNativeDriver: true }).start(() => { setRemindersPanelOpen(false); }); }, []);
+
+  const [contactsPanelOpen, setContactsPanelOpen] = useState(false);
+  const contactsPanelAnim = useRef(new Animated.Value(width)).current;
+  const openContactsPanel = useCallback(() => { setContactsPanelOpen(true); contactsPanelAnim.setValue(width); requestAnimationFrame(() => { Animated.timing(contactsPanelAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start(); }); }, []);
+  const closeContactsPanel = useCallback(() => { Animated.timing(contactsPanelAnim, { toValue: width, duration: 260, useNativeDriver: true }).start(() => { setContactsPanelOpen(false); }); }, []);
+
+  const [friendsPanelOpen, setFriendsPanelOpen] = useState(false);
+  const friendsPanelAnim = useRef(new Animated.Value(width)).current;
+  const openFriendsPanel = useCallback(() => { setFriendsPanelOpen(true); friendsPanelAnim.setValue(width); requestAnimationFrame(() => { Animated.timing(friendsPanelAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start(); }); }, []);
+  const closeFriendsPanel = useCallback(() => { Animated.timing(friendsPanelAnim, { toValue: width, duration: 260, useNativeDriver: true }).start(() => { setFriendsPanelOpen(false); }); }, []);
 
   const fetchUnread = useCallback(async () => {
     if (!userId) return;
@@ -449,13 +839,13 @@ export default function TabsLayout() {
   }, [userId, fetchUnread]);
 
   const slideAnims = useRef<Record<string, Animated.Value>>(
-    Object.fromEntries(SLIDE_KEYS.map((k, i) => [k, new Animated.Value(i === 0 ? 0 : width)]))
+    Object.fromEntries(SLIDE_KEYS.map((k) => [k, new Animated.Value(k === 'home' ? 0 : width)]))
   ).current;
 
   // Notification slide anim — no longer needed (notifications-page is in SLIDE_KEYS)
 
   // Per-tab navigation stack cache (Instagram-style)
-  const tabStacks = useRef<Record<string, { spaceId: string | null; spaceName: string | null; recordingId: string | null }>>({});
+  const tabStacks = useRef<Record<string, { spaceId: string | null; spaceName: string | null; recordingId: string | null; topSpendingOpen: boolean; recordingsPanelOpen: boolean; spacesPanelOpen: boolean; loansPanelOpen: boolean; receivablesPanelOpen: boolean; remindersPanelOpen: boolean }>>({});
 
   const switchTab = useCallback((key: string) => {
     if (key === activeTabRef.current) return;
@@ -466,14 +856,40 @@ export default function TabsLayout() {
       spaceId: activeSpaceId,
       spaceName: activeSpaceName,
       recordingId: activeRecordingId,
+      topSpendingOpen: topSpendingOpenRef.current,
+      recordingsPanelOpen: recordingsPanelOpenRef.current,
+      spacesPanelOpen: spacesPanelOpenRef.current,
+      loansPanelOpen: loansPanelOpenRef.current,
+      receivablesPanelOpen: receivablesPanelOpenRef.current,
+      remindersPanelOpen: remindersPanelOpenRef.current,
     };
 
-    // Instantly hide panels without animation (no closeSpace/closeRecording)
+    // Instantly hide panels without animation
     setActiveSpaceId(null);
     setActiveSpaceName(null);
     setActiveRecordingId(null);
     spaceSlideAnim.setValue(width);
     recordingSlideAnim.setValue(width);
+    topSpendingOpenRef.current = topSpendingOpenRef.current; // preserve — panel stays mounted
+    topSpendingAnim.setValue(width); // hide off-screen while on other tab
+    recordingsPanelOpenRef.current = recordingsPanelOpenRef.current;
+    recordingsPanelAnim.setValue(width);
+    spacesPanelOpenRef.current = spacesPanelOpenRef.current;
+    spacesPanelAnim.setValue(width);
+    loansPanelOpenRef.current = loansPanelOpenRef.current;
+    loansPanelAnim.setValue(width);
+    receivablesPanelOpenRef.current = receivablesPanelOpenRef.current;
+    receivablesPanelAnim.setValue(width);
+    remindersPanelOpenRef.current = remindersPanelOpenRef.current;
+    remindersPanelAnim.setValue(width);
+    contactsPanelAnim.setValue(width);
+    friendsPanelAnim.setValue(width);
+    // Hide conditional panels
+    setLoansPanelOpen(false);
+    setReceivablesPanelOpen(false);
+    setRemindersPanelOpen(false);
+    setContactsPanelOpen(false);
+    setFriendsPanelOpen(false);
 
     activeTabRef.current = key;
 
@@ -490,10 +906,40 @@ export default function TabsLayout() {
       setActiveSpaceId(saved.spaceId);
       setActiveSpaceName(saved.spaceName);
       spaceSlideAnim.setValue(0);
-      if (saved.recordingId) {
-        setActiveRecordingId(saved.recordingId);
-        recordingSlideAnim.setValue(0);
-      }
+    }
+    if (saved?.recordingId) {
+      setActiveRecordingId(saved.recordingId);
+      recordingSlideAnim.setValue(0);
+    }
+    if (saved?.topSpendingOpen) {
+      topSpendingOpenRef.current = true;
+      setTopSpendingOpen(true);
+      topSpendingAnim.setValue(0);
+    }
+    if (saved?.recordingsPanelOpen) {
+      recordingsPanelOpenRef.current = true;
+      setRecordingsPanelOpen(true);
+      recordingsPanelAnim.setValue(0);
+    }
+    if (saved?.spacesPanelOpen) {
+      spacesPanelOpenRef.current = true;
+      setSpacesPanelOpen(true);
+      spacesPanelAnim.setValue(0);
+    }
+    if (saved?.loansPanelOpen) {
+      loansPanelOpenRef.current = true;
+      setLoansPanelOpen(true);
+      loansPanelAnim.setValue(0);
+    }
+    if (saved?.receivablesPanelOpen) {
+      receivablesPanelOpenRef.current = true;
+      setReceivablesPanelOpen(true);
+      receivablesPanelAnim.setValue(0);
+    }
+    if (saved?.remindersPanelOpen) {
+      remindersPanelOpenRef.current = true;
+      setRemindersPanelOpen(true);
+      remindersPanelAnim.setValue(0);
     }
 
     setActiveTab(key);
@@ -602,14 +1048,14 @@ export default function TabsLayout() {
   return (
     <TourContext.Provider value={{ register: registerTourTarget, unregister: unregisterTourTarget }}>
     <BlurContext.Provider value={{ setBlur, registerAdd, unregisterAdd, activeTab, __hasProvider: true }}>
-    <NavContext.Provider value={{ activeTab, switchTab, handleNavPress, unreadCount, pendingTab, setPendingTab, openSpace, closeSpace, activeSpaceId, activeSpaceName, openRecording, closeRecording, activeRecordingId }}>
+    <NavContext.Provider value={{ activeTab, switchTab, handleNavPress, unreadCount, pendingTab, setPendingTab, openSpace, closeSpace, activeSpaceId, activeSpaceName, openRecording, closeRecording, activeRecordingId, openSplitBill, closeSplitBill, activeSplitBillId, activeSplitBillName, openTopSpending, closeTopSpending, openRecordingsPanel, closeRecordingsPanel, openSpacesPanel, closeSpacesPanel, openLoansPanel, closeLoansPanel, openReceivablesPanel, closeReceivablesPanel, openRemindersPanel, closeRemindersPanel, openContactsPanel, closeContactsPanel, openFriendsPanel, closeFriendsPanel }}>
     <View style={s.container}>
 
       {/* ── Shared flat header ── */}
       <View style={[s.waveBg, { paddingTop: insets.top + 20 }]}>
         <Text style={s.appLabelText}>LEDGR</Text>
         <Animated.View style={{ opacity: titleAnim }}>
-          <Text style={s.pageTitle}>{activeSpaceId ? (activeSpaceName ?? '') : (TAB_META[activeTab]?.title ?? activeTab)}</Text>
+          <Text style={s.pageTitle}>Hi, {userName?.split(' ')[0] || 'there'}!</Text>
         </Animated.View>
       </View>
 
@@ -635,6 +1081,7 @@ export default function TabsLayout() {
             spaceId={activeSpaceId}
             name={activeSpaceName ?? ''}
             onClose={closeSpace}
+            openEdit={activeSpaceOpenEdit}
           />
         </Animated.View>
       )}
@@ -642,12 +1089,81 @@ export default function TabsLayout() {
       {/* Recording detail panel — slides in over space detail */}
       {activeRecordingId && (
         <Animated.View
-          style={[s.screen, s.panel, { transform: [{ translateX: recordingSlideAnim }], zIndex: 30 }]}
+          style={[s.screen, s.panel, { transform: [{ translateX: recordingSlideAnim }], zIndex: 70 }]}
         >
           <MemoRecordingDetail
             recordingId={activeRecordingId}
             onClose={closeRecording}
           />
+        </Animated.View>
+      )}
+
+      {/* Split bill detail panel — slides in over recording detail */}
+      {activeSplitBillId && (
+        <Animated.View
+          style={[s.screen, s.panel, { transform: [{ translateX: splitBillSlideAnim }], zIndex: 80 }]}
+        >
+          <SplitBillDetailScreen
+            splitBillId={activeSplitBillId}
+            name={activeSplitBillName ?? ''}
+            onClose={closeSplitBill}
+          />
+        </Animated.View>
+      )}
+
+      {/* Top Spending panel — always mounted, shown/hidden via transform */}
+      <Animated.View
+        style={[s.screen, s.panel, { transform: [{ translateX: topSpendingAnim }], zIndex: 50 }]}
+        pointerEvents={activeTab === 'home' && topSpendingOpen ? 'auto' : 'none'}
+      >
+        <CategoriesPanel onClose={closeTopSpending} />
+      </Animated.View>
+
+      {/* Recordings panel — conditionally rendered like space/recording panels */}
+      {recordingsPanelOpen && (
+        <Animated.View
+          style={[s.screen, s.panel, { transform: [{ translateX: recordingsPanelAnim }], zIndex: 65 }]}
+        >
+          <RecordingsPanel onClose={closeRecordingsPanel} {...recordingsPanelOpts} />
+        </Animated.View>
+      )}
+
+      {/* Spaces panel — conditionally rendered */}
+      {spacesPanelOpen && (
+        <Animated.View style={[s.screen, s.panel, { transform: [{ translateX: spacesPanelAnim }], zIndex: 55 }]}>
+          <SpacesPanel onClose={closeSpacesPanel} />
+        </Animated.View>
+      )}
+
+      {/* Loans panel */}
+      <Animated.View style={[s.screen, s.panel, { transform: [{ translateX: loansPanelAnim }], zIndex: 55 }]}
+        pointerEvents={loansPanelOpen ? 'auto' : 'none'}>
+        <LoansPanel onClose={closeLoansPanel} />
+      </Animated.View>
+
+      {/* Receivables panel */}
+      <Animated.View style={[s.screen, s.panel, { transform: [{ translateX: receivablesPanelAnim }], zIndex: 55 }]}
+        pointerEvents={receivablesPanelOpen ? 'auto' : 'none'}>
+        <ReceivablesPanel onClose={closeReceivablesPanel} />
+      </Animated.View>
+
+      {/* Reminders panel */}
+      <Animated.View style={[s.screen, s.panel, { transform: [{ translateX: remindersPanelAnim }], zIndex: 55 }]}
+        pointerEvents={remindersPanelOpen ? 'auto' : 'none'}>
+        <RemindersPanel onClose={closeRemindersPanel} />
+      </Animated.View>
+
+      {/* Contacts panel */}
+      {contactsPanelOpen && (
+        <Animated.View style={[s.screen, s.panel, { transform: [{ translateX: contactsPanelAnim }], zIndex: 60 }]}>
+          <ContactsPanel onClose={closeContactsPanel} />
+        </Animated.View>
+      )}
+
+      {/* Friends panel */}
+      {friendsPanelOpen && (
+        <Animated.View style={[s.screen, s.panel, { transform: [{ translateX: friendsPanelAnim }], zIndex: 60 }]}>
+          <FriendsPanel onClose={closeFriendsPanel} />
         </Animated.View>
       )}
 
@@ -750,9 +1266,9 @@ const s = StyleSheet.create({
   panel:     { bottom: 0 },
 
   // ── Shared header
-  waveBg:       { backgroundColor: Colors.white, paddingHorizontal: DC.pagePadding, paddingBottom: 14, zIndex: 10, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: DC.cardBorder },
-  appLabelText: { fontFamily: AppFont.brandLight, fontSize: 11, color: DC.pageTextMuted, letterSpacing: 2, marginBottom: -4 },
-  pageTitle:    { fontFamily: AppFont.bold, fontSize: 24, color: DC.accent1, letterSpacing: -0.5, textAlign: 'center' },
+  waveBg:       { backgroundColor: Colors.white, paddingHorizontal: DC.pagePadding, paddingBottom: 14, zIndex: 10, alignItems: 'flex-start' },
+  appLabelText: { fontFamily: AppFont.brandLight, fontSize: 16, color: DC.pageText, letterSpacing: 0.5 },
+  pageTitle:    { fontFamily: AppFont.bold, fontSize: 18, color: DC.pageText, letterSpacing: 0.3 },
   pageSubtitle: { display: 'none' as any },
   waveTitleRow: { alignItems: 'center' },
   wave:         { display: 'none' as any },
@@ -781,7 +1297,7 @@ const s = StyleSheet.create({
 
 const p = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.white },
-  scroll:    { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 60, gap: 12 },
+  scroll:    { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 100, gap: 12 },
 
   // ── Avatar
   avatarSection: { alignItems: 'center', gap: 6, paddingVertical: 24 },
@@ -791,9 +1307,9 @@ const p = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center',
     marginBottom: 4,
   },
-  avatarText: { fontFamily: 'MuseoModerno_Black', fontSize: 28, color: HEADER_TEXT },
-  name:  { fontFamily: 'CalSans', fontSize: 22, color: Colors.text, letterSpacing: -0.3 },
-  email: { fontFamily: Fonts.mono, fontSize: 12, color: Colors.muted },
+  avatarText: { fontFamily: AppFont.bold, fontSize: 28, color: HEADER_TEXT },
+  name:  { fontFamily: AppFont.bold, fontSize: 22, color: Colors.text, letterSpacing: -0.3 },
+  email: { fontFamily: AppFont.regular, fontSize: 12, color: Colors.muted },
 
   // ── Info rows (same style as accounts cards)
   card: {
@@ -802,28 +1318,34 @@ const p = StyleSheet.create({
     borderTopWidth: 1, borderTopColor: Colors.border,
   },
   row:     { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 16, paddingHorizontal: 4, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  rowLast: { borderBottomWidth: 0 },
   rowIcon: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.surface, justifyContent: 'center', alignItems: 'center' },
   rowBody: { flex: 1, gap: 2 },
-  rowLabel: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted, letterSpacing: 0.3, textTransform: 'uppercase' },
-  rowValue: { fontFamily: 'ChillaxMedium', fontSize: 14, color: Colors.text },
+  rowLabel: { fontFamily: AppFont.semiBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.3, textTransform: 'uppercase' },
+  rowValue: { fontFamily: AppFont.regular, fontSize: 14, color: Colors.text },
   divider:  { height: 0 }, // kept for compat but unused
+
+  sectionLabel: { fontFamily: AppFont.semiBold, fontSize: 11, color: Colors.muted, textTransform: 'uppercase', letterSpacing: 0.6, marginTop: 8, marginBottom: 4 },
+  seeMoreBtn:  { alignSelf: 'center', marginTop: 10, paddingHorizontal: DC.pageActionPaddingH, paddingVertical: DC.pageActionPaddingV, borderRadius: DC.pageActionRadius, backgroundColor: DC.pageActionBg, borderWidth: DC.pageActionBorderWidth },
+  seeMoreText: { fontFamily: AppFont.regular, fontSize: DC.dropdownFontSize, color: DC.pageActionText },
 
   // ── Action buttons
   logoutBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    alignSelf: 'stretch',
+    alignItems: 'center', justifyContent: 'center',
     backgroundColor: Colors.surface, borderRadius: Radius.pill,
     borderWidth: 1, borderColor: Colors.border,
-    paddingVertical: 14, marginTop: 8,
+    paddingVertical: 14, marginTop: 12,
   },
-  logoutText: { fontFamily: 'ChillaxMedium', fontSize: 14, color: Colors.text },
+  logoutText: { fontFamily: AppFont.regular, fontSize: 14, color: Colors.text },
 
   deleteBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    alignItems: 'center', justifyContent: 'center',
     backgroundColor: PROFILE_DANGEBG, borderRadius: Radius.pill,
     borderWidth: 1, borderColor: PROFILE_DANGER,
     paddingVertical: 14,
   },
-  deleteText: { fontFamily: 'ChillaxMedium', fontSize: 14, color: PROFILE_DANGER },
+  deleteText: { fontFamily: AppFont.regular, fontSize: 14, color: PROFILE_DANGER },
 
   // ── Modals
   modalOverlay: {
@@ -833,12 +1355,12 @@ const p = StyleSheet.create({
   modalBox: {
     backgroundColor: Colors.white, borderRadius: Radius.xl, padding: 24, width: '100%',
   },
-  modalTitle: { fontFamily: 'CalSans', fontSize: 18, color: Colors.text, marginBottom: 16, letterSpacing: -0.3 },
+  modalTitle: { fontFamily: AppFont.bold, fontSize: 18, color: Colors.text, marginBottom: 16, letterSpacing: -0.3 },
   modalCancelBtn: {
     backgroundColor: Colors.surface, borderRadius: Radius.pill,
     paddingVertical: 12, alignItems: 'center', borderWidth: 1, borderColor: Colors.border,
   },
-  modalCancelText: { fontFamily: Fonts.monoBold, fontSize: 13, color: Colors.muted },
+  modalCancelText: { fontFamily: AppFont.regular, fontSize: 13, color: Colors.muted },
 
   // Currency picker
   currencyRow: {
@@ -846,17 +1368,21 @@ const p = StyleSheet.create({
     paddingVertical: 12, paddingHorizontal: 8, borderRadius: Radius.md,
   },
   currencyRowActive: { backgroundColor: Colors.surface },
-  currencySymbol: { fontFamily: Fonts.monoBold, fontSize: 18, color: Colors.text, width: 28, textAlign: 'center' },
-  currencyCode:   { fontFamily: Fonts.monoBold, fontSize: 13, color: Colors.text },
-  currencyLabel:  { fontFamily: Fonts.mono, fontSize: 11, color: Colors.muted },
+  currencySymbol: { fontFamily: AppFont.bold, fontSize: 18, color: Colors.text, width: 28, textAlign: 'center' },
+  currencyCode:   { fontFamily: AppFont.bold, fontSize: 13, color: Colors.text },
+  currencyLabel:  { fontFamily: AppFont.regular, fontSize: 11, color: Colors.muted },
+  searchRow:  { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: Colors.surface, borderRadius: Radius.lg, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: Colors.borderMid, marginBottom: 12 },
+  searchInput:{ flex: 1, fontFamily: AppFont.regular, fontSize: 13, color: Colors.text, padding: 0 },
 
   // Delete confirmation
-  deleteWarning:     { fontFamily: Fonts.mono, fontSize: 13, color: Colors.muted, lineHeight: 20, marginBottom: 16 },
-  deletePrompt:      { fontFamily: Fonts.monoBold, fontSize: 11, color: Colors.text, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
-  deleteInput:       { fontFamily: Fonts.mono, fontSize: 15, color: Colors.text, backgroundColor: Colors.surface, borderRadius: Radius.lg, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1, borderColor: Colors.borderMid },
-  deleteErrorText:   { fontFamily: Fonts.mono, fontSize: 12, color: PROFILE_DANGER, marginTop: 6 },
+  deleteWarning:     { fontFamily: AppFont.regular, fontSize: 13, color: Colors.muted, lineHeight: 20, marginBottom: 16 },
+  deletePrompt:      { fontFamily: AppFont.bold, fontSize: 11, color: Colors.text, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
+  deleteInput:       { fontFamily: AppFont.regular, fontSize: 15, color: Colors.text, backgroundColor: Colors.surface, borderRadius: Radius.lg, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1, borderColor: Colors.borderMid },
+  deleteErrorText:   { fontFamily: AppFont.regular, fontSize: 12, color: PROFILE_DANGER, marginTop: 6 },
   deleteConfirmBtn:  { flex: 1, backgroundColor: PROFILE_DANGER, borderRadius: Radius.pill, paddingVertical: 12, alignItems: 'center' },
-  deleteConfirmText: { fontFamily: Fonts.monoBold, fontSize: 13, color: '#fff' },
+  deleteConfirmText: { fontFamily: AppFont.semiBold, fontSize: 13, color: '#fff' },
+  toast: { position: 'absolute', bottom: 24, right: 20, backgroundColor: '#111111', borderRadius: Radius.pill, paddingHorizontal: 16, paddingVertical: 10 },
+  toastText: { fontFamily: AppFont.regular, fontSize: 12, color: '#ffffff' },
 });
 
 

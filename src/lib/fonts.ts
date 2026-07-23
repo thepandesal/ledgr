@@ -15,4 +15,5 @@ export const AppFont = {
   bold:       'Poppins-Bold',
   brand:      'MuseoModerno_Black',
   brandLight: 'MuseoModerno_Regular',
+  brandMedium:'MuseoModerno_Medium',
 } as const;

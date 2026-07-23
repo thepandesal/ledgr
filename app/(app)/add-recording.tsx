@@ -12,7 +12,7 @@ import {
 import { BlurView } from 'expo-blur';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { supabase } from '../../src/lib/supabase';
 import * as ImagePicker from 'expo-image-picker';
 import { compressImage, uploadReceiptPhoto } from '../../src/lib/receiptUpload';
@@ -42,29 +42,27 @@ import { useUser } from '../../src/hooks/useUser';
 
 const TYPE_GROUPS = [
   {
-    label: 'money out',
-    types: [
-      { key: 'expense',            label: 'expense',            color: Colors.expense, icon: 'arrow-down-outline' },
-    ],
-  },
-  {
     label: 'money in',
     types: [
-      { key: 'income',             label: 'income',             color: Colors.income,  icon: 'arrow-up-outline' },
-      { key: 'savings',            label: 'savings',            color: Colors.income,  icon: 'save-outline' },
+      { key: 'income', label: 'Money In', color: Colors.income, icon: 'arrow-up-outline' },
     ],
   },
   {
-    label: 'loan',
+    label: 'money out',
     types: [
-      { key: 'payable',            label: 'payable',            color: Colors.text,    icon: 'ellipsis-horizontal-outline' },
+      { key: 'expense', label: 'Money Out', color: Colors.expense, icon: 'arrow-down-outline' },
     ],
   },
   {
     label: 'receivable',
     types: [
-      { key: 'receivable',         label: 'receivable',         color: Colors.text,    icon: 'arrow-undo-outline' },
-      { key: 'expense_receivable', label: 'expense + receivable', color: Colors.cyan,  icon: 'git-branch-outline' },
+      { key: 'due', label: 'Receivable', color: Colors.text, icon: 'arrow-undo-outline' },
+    ],
+  },
+  {
+    label: 'loan',
+    types: [
+      { key: 'debt', label: 'Loan', color: Colors.text, icon: 'cash-outline' },
     ],
   },
 ] as const;
@@ -74,20 +72,33 @@ const TYPES: { key: string; label: string; color: string; icon: string }[] = (TY
 // --- Component ---------------------------------------------------------------
 
 export default function AddRecordingScreen({ inlineProps }: {
-  inlineProps?: { spaceId: string; spaceName: string; defaultDate: string; onClose: () => void };
+  inlineProps?: { spaceId?: string; spaceName?: string; defaultDate: string; onClose: () => void; categoryId?: string; categoryName?: string };
 }) {
   const params = useLocalSearchParams<{ spaceId: string; spaceName: string; defaultDate: string; editId: string; receiptId?: string }>();
   const router = useRouter();
 
-  const spaceId   = inlineProps?.spaceId   ?? params.spaceId;
-  const spaceName = inlineProps?.spaceName ?? params.spaceName;
+  const propSpaceId   = inlineProps?.spaceId   ?? params.spaceId;
+  const propSpaceName = inlineProps?.spaceName ?? params.spaceName;
+  const propCategoryId   = inlineProps?.categoryId;
+  const propCategoryName = inlineProps?.categoryName;
   const defaultDate = inlineProps?.defaultDate ?? params.defaultDate;
   const editId    = params.editId;
   const receiptId = params.receiptId;
   const handleClose = inlineProps?.onClose ?? (() => router.back());
-  const { defaultCurrency } = useUser();
+  const { defaultCurrency, userId } = useUser();
   const [currency, setCurrency] = useState(defaultCurrency);
   const [showCurrencyModal, setShowCurrencyModal] = useState(false);
+
+  // Space picker (when no space pre-set)
+  const [selectedSpaceId, setSelectedSpaceId] = useState<string | null>(propSpaceId || null);
+  const [selectedSpaceName, setSelectedSpaceName] = useState<string>(propSpaceName || '');
+  const [spaces, setSpaces] = useState<{ id: string; name: string }[]>([]);
+  const [showSpaceModal, setShowSpaceModal] = useState(false);
+  const needsSpacePicker = !propSpaceId;
+
+  // Use selectedSpaceId for saving
+  const spaceId = selectedSpaceId || null;
+  const spaceName = selectedSpaceName;
 
   const CURRENCIES = [
     'PHP','USD','EUR','GBP','JPY','AUD','CAD','SGD','MYR','IDR',
@@ -111,7 +122,7 @@ export default function AddRecordingScreen({ inlineProps }: {
   const removeItem = (id: string) => setItems(prev => prev.length > 1 ? prev.filter(it => it.id !== id) : prev);
 
   // Legacy state for editId and shared fields
-  const [type, setType]         = useState<string>("expense");
+  const [type, setType] = useState<string>("income");
   const [date, setDate]         = useState(defaultDate ?? new Date().toISOString().split("T")[0]);
   const [notes, setNotes]       = useState("");
   const [loading, setLoading]   = useState(false);
@@ -176,12 +187,13 @@ export default function AddRecordingScreen({ inlineProps }: {
   const [singularPersonUserId, setSingularPersonUserId] = useState<string | null>(null);
 
   // -- Derived --------------------------------------------------------------
-  const effectiveType = type === 'expense' && expenseIsReceivable ? 'expense_receivable'
-                      : type === 'income'  && incomeIsLoan        ? 'payable'
-                      : type;
-  const isLoanType  = effectiveType === 'receivable' || effectiveType === 'payable';
-  const isComboType = effectiveType === 'expense_receivable';
+  const isLoanType  = type === 'debt';
+  const isReceivableType = type === 'due';
+  const isComboType = false;
+  const [receivableIsExpense, setReceivableIsExpense] = useState(false);
   const selectedType = (TYPES.find(t => t.key === type) ?? TYPES[0]) as { key: string; label: string; color: string; icon: string };
+
+  const savingRef = useRef(false);
 
   // --- Lifecycle ---------------------------------------------------------
   useEffect(() => {
@@ -199,8 +211,21 @@ export default function AddRecordingScreen({ inlineProps }: {
       supabase.from('categories').select().eq('user_id', user.id).order('name'),
       supabase.from('accounts').select().eq('user_id', user.id).order('account_name'),
     ]);
-    if (cats.data) setCategories(cats.data);
+    if (cats.data) {
+      setCategories(cats.data);
+      // Pre-set category if coming from a category filter
+      if (propCategoryId && propCategoryName) {
+        const cat = cats.data.find((c: any) => c.id === propCategoryId);
+        if (cat) setItems(prev => prev.map((it, i) => i === 0 ? { ...it, category: cat } : it));
+      }
+    }
     if (accs.data) setAccounts(accs.data);
+
+    // Load spaces for picker if no space pre-set
+    if (needsSpacePicker) {
+      const { data: sp } = await supabase.from('spaces').select('id, name').eq('user_id', user.id).neq('is_active', false).order('sort_order', { ascending: true, nullsFirst: false });
+      setSpaces(sp ?? []);
+    }
 
     // Load person suggestions: manual contacts + friends
     const [{ data: contactsData }, { data: friendships }] = await Promise.all([
@@ -303,6 +328,8 @@ export default function AddRecordingScreen({ inlineProps }: {
   // --- Save ---------------------------------------------------------------
 
   const handleSave = async () => {
+    if (savingRef.current) return;
+    savingRef.current = true;
     const invalid = items.find(it => !it.name.trim() || !it.amount);
     if (invalid) { setError("name and amount are required for all items."); return; }
     setLoading(true); setError("");
@@ -311,8 +338,10 @@ export default function AddRecordingScreen({ inlineProps }: {
       const user = session?.user;
       if (!user) { setError('not logged in'); setLoading(false); return; }
       const statusMap: Record<string, string> = {
-        expense: "paid", income: "received", savings: "saved",
-        payable: "unpaid", receivable: "pending", expense_receivable: "paid",
+        income: 'received',
+        expense: 'paid',
+        due: 'unpaid',
+        debt: 'unpaid',
       };
       if (editId) {
         const it = items[0];
@@ -327,63 +356,41 @@ export default function AddRecordingScreen({ inlineProps }: {
           const effectiveAccount = useSingularAccount ? singularAccount : it.account;
           const effectivePerson  = useSingularPerson  ? singularPerson  : it.person;
           const effectivePersonId = useSingularPerson ? singularPersonUserId : it.personUserId;
-          const effectiveType = type === "expense" && it.isReceivable ? "expense_receivable" : type;
-          const isComboItem = effectiveType === "expense_receivable";
-          const isLoanItem  = effectiveType === "receivable" || effectiveType === "payable";
-          if (isComboItem) {
-            const { data: expRec, error: expErr } = await supabase.from("recordings").insert({
-              space_id: spaceId, user_id: user!.id, name: it.name.trim(), type: "expense",
-              amount: parseFloat(it.amount), transaction_date: date, notes: notes.trim() || null,
-              category_id: it.category?.id || null, account_id: effectiveAccount?.id || null,
-              status: "paid", is_due: true, person_name: effectivePerson || null,
-              tagged_friend_user_id: effectivePersonId || null, currency,
-            }).select("id").single();
-            if (expErr) throw expErr;
-            await supabase.from("recordings").insert({
-              space_id: spaceId, user_id: user!.id, name: it.name.trim(), type: "receivable",
-              amount: parseFloat(it.amount), transaction_date: date, notes: notes.trim() || null,
-              category_id: it.category?.id || null, account_id: effectiveAccount?.id || null,
-              status: "pending", person_name: effectivePerson || null,
-              linked_recording_id: expRec!.id, currency,
-            });
-          } else {
-            const { data: newRec, error: err } = await supabase.from("recordings").insert({
-              space_id: spaceId, user_id: user!.id, name: it.name.trim(), type: effectiveType,
-              amount: parseFloat(it.amount), transaction_date: date, notes: notes.trim() || null,
-              category_id: it.category?.id || null, account_id: effectiveAccount?.id || null,
-              status: statusMap[effectiveType] ?? "paid",
-              person_name: (isLoanItem || isComboItem) ? effectivePerson || null : null,
-              tagged_friend_user_id: (isLoanItem || isComboItem) ? effectivePersonId || null : null,
-              currency,
-            }).select("id").single();
-            if (err) throw err;
-            if (effectiveType === "expense" && spaceId && spaceBudget && newRec?.id) {
-              const newSpent = spaceSpent + parseFloat(it.amount);
-              const pct = newSpent / spaceBudget;
-              const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0,0,0,0);
-              if (pct >= 1.0) {
-                const { data: ex } = await supabase.from("notifications").select("id").eq("user_id", user!.id).eq("type","budget_limit_reached").contains("data",{spaceId}).gte("created_at",monthStart.toISOString()).maybeSingle();
-                if (!ex) await supabase.from("notifications").insert({ user_id: user!.id, type:"budget_limit_reached", title:"budget limit reached", body:`${spaceName} has exceeded its budget`, message:`${spaceName} has exceeded its budget`, data:{spaceId,spaceName}, is_read:false, status:"new" });
-              } else if (pct >= 0.8) {
-                const { data: ex } = await supabase.from("notifications").select("id").eq("user_id", user!.id).eq("type","budget_warning_80").contains("data",{spaceId}).gte("created_at",monthStart.toISOString()).maybeSingle();
-                if (!ex) await supabase.from("notifications").insert({ user_id: user!.id, type:"budget_warning_80", title:"80% budget used", body:`${spaceName} is almost at its limit`, message:`${spaceName} is almost at its limit`, data:{spaceId,spaceName}, is_read:false, status:"new" });
-              }
-            }
-            if (newRec?.id && it.photos.length > 0) {
-              const { data: entry, error: entryErr } = await supabase.from("receipt_entries").insert({ user_id: user.id, note: it.name.trim(), recording_id: newRec.id }).select().single();
-              if (entryErr) throw entryErr;
-              if (entry?.id) {
-                for (const uri of it.photos) {
-                  const compressed = await compressImage(uri);
-                  try {
-                    await uploadReceiptPhoto(compressed, entry.id);
-                  } catch (uploadErr: any) {
-                    if (uploadErr?.message === 'RECEIPT_LIMIT_REACHED') {
-                      setError('monthly receipt limit reached.');
-                      break;
-                    }
-                    throw uploadErr;
+          // expense + isReceivable = expense with is_due
+          // due + receivableIsExpense = expense with is_due
+          const isDue = (type === 'expense' && it.isReceivable) || (type === 'due' && receivableIsExpense);
+          const dbType = isDue ? 'expense' : type;
+          const { data: newRec, error: err } = await supabase.from("recordings").insert({
+            space_id: spaceId || null,
+            user_id: user!.id,
+            name: it.name.trim(),
+            type: dbType,
+            amount: parseFloat(it.amount),
+            transaction_date: date,
+            notes: notes.trim() || null,
+            category_id: it.category?.id || null,
+            account_id: effectiveAccount?.id || null,
+            status: isDue ? 'unpaid' : (statusMap[type] ?? 'paid'),
+            is_due: isDue || undefined,
+            person_name: (type === 'debt' || type === 'due' || isDue) ? effectivePerson || null : null,
+            tagged_friend_user_id: (type === 'debt' || type === 'due' || isDue) ? effectivePersonId || null : null,
+            currency,
+          }).select("id").single();
+          if (err) throw err;
+          if (newRec?.id && it.photos.length > 0) {
+            const { data: entry, error: entryErr } = await supabase.from("receipt_entries").insert({ user_id: user.id, note: it.name.trim(), recording_id: newRec.id }).select().single();
+            if (entryErr) throw entryErr;
+            if (entry?.id) {
+              for (const uri of it.photos) {
+                const compressed = await compressImage(uri);
+                try {
+                  await uploadReceiptPhoto(compressed, entry.id);
+                } catch (uploadErr: any) {
+                  if (uploadErr?.message === 'RECEIPT_LIMIT_REACHED') {
+                    setError('monthly receipt limit reached.');
+                    break;
                   }
+                  throw uploadErr;
                 }
               }
             }
@@ -395,6 +402,7 @@ export default function AddRecordingScreen({ inlineProps }: {
     } catch (e: any) {
       setError(e.message);
       setLoading(false);
+      savingRef.current = false;
     }
   };
 
@@ -440,6 +448,15 @@ export default function AddRecordingScreen({ inlineProps }: {
                 <Ionicons name="chevron-down" size={13} color={DC.pageText} />
               </View>
             </TouchableOpacity>
+            {needsSpacePicker && (
+              <TouchableOpacity style={s.frozenRow} onPress={() => setShowSpaceModal(true)} activeOpacity={0.8}>
+                <Text style={s.frozenLabel}>Space</Text>
+                <View style={s.frozenPill}>
+                  <Text style={s.frozenPillText}>{selectedSpaceName || 'None (Uncategorized)'}</Text>
+                  <Ionicons name="chevron-down" size={13} color={DC.pageText} />
+                </View>
+              </TouchableOpacity>
+            )}
  <View style={s.frozenRow}>
  <Text style={s.frozenLabel}>Singular account?</Text>
  <View style={[s.yesNoRow, { flex: 1 }]}>
@@ -460,14 +477,27 @@ export default function AddRecordingScreen({ inlineProps }: {
                 </View>
               </TouchableOpacity>
             )}
-            {(isLoanType || isComboType) && (
+            {(isLoanType || isReceivableType) && (
               <TouchableOpacity style={s.frozenRow} onPress={() => { setActivePickerItemId('singular'); setShowPersonModal(true); }} activeOpacity={0.8}>
-                <Text style={s.frozenLabel}>{type === 'payable' ? 'Paying' : 'Owes You'}</Text>
+                <Text style={s.frozenLabel}>{isLoanType ? 'Paying' : 'Owes You'}</Text>
                 <View style={s.frozenPill}>
                   <Text style={s.frozenPillText}>{singularPerson || 'Select'}</Text>
                   <Ionicons name="chevron-down" size={13} color={DC.pageText} />
                 </View>
               </TouchableOpacity>
+            )}
+            {isReceivableType && (
+              <View style={s.frozenRow}>
+                <Text style={s.frozenLabel}>Is this an expense?</Text>
+                <View style={[s.yesNoRow, { flex: 1 }]}>
+                  <TouchableOpacity style={[s.yesNoBtn, receivableIsExpense && s.yesNoBtnActive]} onPress={() => setReceivableIsExpense(true)} activeOpacity={0.8}>
+                    <Text style={[s.yesNoBtnText, receivableIsExpense && s.yesNoBtnTextActive]}>Yes</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[s.yesNoBtn, !receivableIsExpense && s.yesNoBtnActive]} onPress={() => setReceivableIsExpense(false)} activeOpacity={0.8}>
+                    <Text style={[s.yesNoBtnText, !receivableIsExpense && s.yesNoBtnTextActive]}>No</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
             )}
           </View>
           <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: DC.cardBorder, marginTop: 14, marginBottom: 22, marginHorizontal: -DC.pagePadding }} />
@@ -493,7 +523,7 @@ export default function AddRecordingScreen({ inlineProps }: {
 
           {/* Name */}
           <View style={s.itemRow}>
-            <Text style={s.itemLabel}>Name</Text>
+            <Text style={s.itemLabel}>Name <Text style={{ color: '#FF5757' }}>*</Text></Text>
             <TextInput
               style={s.itemInput}
               placeholder="e.g. grocery run"
@@ -505,7 +535,7 @@ export default function AddRecordingScreen({ inlineProps }: {
 
           {/* Amount */}
           <View style={s.itemRow}>
-            <Text style={s.itemLabel}>Amount</Text>
+            <Text style={s.itemLabel}>Amount <Text style={{ color: '#FF5757' }}>*</Text></Text>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flex: 1, minWidth: 0 }}>
               <TouchableOpacity onPress={() => setShowCurrencyModal(true)} style={s.currencyPill}>
                 <Text style={s.currencyPillText}>{currency}</Text>
@@ -522,18 +552,27 @@ export default function AddRecordingScreen({ inlineProps }: {
           </View>
 
           {/* Category */}
-          <TouchableOpacity style={s.itemRow} onPress={() => { setActivePickerItemId(item.id); setShowCategoryModal(true); }} activeOpacity={0.8}>
-            <Text style={s.itemLabel}>Category</Text>
-            <View style={s.itemPill}>
-              <Text style={s.itemPillText}>{item.category ? item.category.name : "Select"}</Text>
-              <Ionicons name="chevron-down" size={13} color={DC.pageText} />
+          {propCategoryId ? (
+            <View style={s.itemRow}>
+              <Text style={s.itemLabel}>Category</Text>
+              <View style={[s.itemPill, { opacity: 0.6 }]}>
+                <Text style={s.itemPillText}>{item.category?.name ?? propCategoryName ?? 'Loading...'}</Text>
+              </View>
             </View>
-          </TouchableOpacity>
+          ) : (
+            <TouchableOpacity style={s.itemRow} onPress={() => { setActivePickerItemId(item.id); setShowCategoryModal(true); }} activeOpacity={0.8}>
+              <Text style={s.itemLabel}>Category <Text style={{ color: Colors.muted, fontSize: 9, fontFamily: AppFont.regular }}>(optional)</Text></Text>
+              <View style={s.itemPill}>
+                <Text style={s.itemPillText}>{item.category ? item.category.name : "Select"}</Text>
+                <Ionicons name="chevron-down" size={13} color={DC.pageText} />
+              </View>
+            </TouchableOpacity>
+          )}
 
           {/* Account — hidden if singular account */}
           {!useSingularAccount && (
             <TouchableOpacity style={s.itemRow} onPress={() => { setActivePickerItemId(item.id); setShowAccountModal(true); }} activeOpacity={0.8}>
-              <Text style={s.itemLabel}>Account</Text>
+              <Text style={s.itemLabel}>Account <Text style={{ color: Colors.muted, fontSize: 9, fontFamily: AppFont.regular }}>(optional)</Text></Text>
               <View style={s.itemPill}>
                 <Text style={s.itemPillText}>{item.account ? item.account.account_name : "Select"}</Text>
                 <Ionicons name="chevron-down" size={13} color={DC.pageText} />
@@ -541,10 +580,10 @@ export default function AddRecordingScreen({ inlineProps }: {
             </TouchableOpacity>
           )}
 
-          {/* Receivable per item + Owes You */}
-          {type === "expense" && (
+          {/* Receivable per item + Owes You - removed, now a top-level type */}
+          {type === 'expense' && (
             <View style={s.itemRow}>
-              <Text style={s.itemLabel}>Receivable?</Text>
+              <Text style={s.itemLabel}>Receivable? <Text style={{ color: '#FF5757' }}>*</Text></Text>
               <View style={[s.yesNoRow, { flex: 1 }]}>
                 <TouchableOpacity style={[s.yesNoBtn, item.isReceivable && s.yesNoBtnActive]} onPress={() => updateItem(item.id, { isReceivable: true })} activeOpacity={0.8}>
                   <Text style={[s.yesNoBtnText, item.isReceivable && s.yesNoBtnTextActive]}>Yes</Text>
@@ -555,28 +594,19 @@ export default function AddRecordingScreen({ inlineProps }: {
               </View>
             </View>
           )}
-          {type === "expense" && item.isReceivable && (
+          {/* Person - loan/receivable types */}
+          {(isLoanType || isReceivableType) && !useSingularPerson && (
             <TouchableOpacity style={s.itemRow} onPress={() => { setActivePickerItemId(item.id); setShowPersonModal(true); }} activeOpacity={0.8}>
-              <Text style={s.itemLabel}>Owes You</Text>
+              <Text style={s.itemLabel}>{isLoanType ? 'Paying' : 'Owes You'} <Text style={{ color: Colors.muted, fontSize: 9, fontFamily: AppFont.regular }}>(optional)</Text></Text>
               <View style={s.itemPill}>
                 <Text style={s.itemPillText}>{item.person || 'Select'}</Text>
                 <Ionicons name="chevron-down" size={13} color={DC.pageText} />
               </View>
             </TouchableOpacity>
           )}
-          {/* Person - loan/combo types */}
-          {(isLoanType || isComboType) && !useSingularPerson && (
-            <TouchableOpacity style={s.itemRow} onPress={() => { setActivePickerItemId(item.id); setShowPersonModal(true); }} activeOpacity={0.8}>
-              <Text style={s.itemLabel}>{type === "payable" ? "Paying" : "Owes You"}</Text>
-              <View style={s.itemPill}>
-                <Text style={s.itemPillText}>{item.person || "Select"}</Text>
-                <Ionicons name="chevron-down" size={13} color={DC.pageText} />
-              </View>
-            </TouchableOpacity>
-          )}
           {/* Receipts */}
           <View style={[s.itemRow, { borderBottomWidth: 0 }]}>
-            <Text style={s.itemLabel}>Receipts</Text>
+            <Text style={s.itemLabel}>Receipts <Text style={{ color: Colors.muted, fontSize: 9, fontFamily: AppFont.regular }}>(optional)</Text></Text>
             <View style={[s.yesNoRow, { flex: 1 }]}>
               <TouchableOpacity style={s.yesNoBtn} onPress={() => addFromCamera(item.id)} activeOpacity={0.8}>
                 <Text style={s.yesNoBtnText}>Camera</Text>
@@ -642,7 +672,7 @@ export default function AddRecordingScreen({ inlineProps }: {
                   <TouchableOpacity
                     key={t.key}
                     style={[s.chip, type === t.key && s.chipActive]}
-                    onPress={() => { setType(t.key); setExpenseIsReceivable(false); setIncomeIsLoan(false); setShowTypeModal(false); }}
+                    onPress={() => { setType(t.key); setExpenseIsReceivable(false); setIncomeIsLoan(false); setReceivableIsExpense(false); setShowTypeModal(false); }}
                     activeOpacity={0.75}
                   >
                     <Text style={[s.chipText, type === t.key && s.chipTextActive]}>{t.label}</Text>
@@ -824,6 +854,33 @@ export default function AddRecordingScreen({ inlineProps }: {
         <FormActions onCancel={() => { setShowPersonModal(false); setPersonSearch(""); setShowAllFriends(false); setShowAllContacts(false); }} onConfirm={() => { setShowPersonModal(false); setPersonSearch(""); }} cancelLabel="cancel" confirmLabel="done" />
       </BottomSheet>
 
+
+      {/* Space picker modal */}
+      {needsSpacePicker && (
+        <BottomSheet visible={showSpaceModal} onClose={() => setShowSpaceModal(false)} title="select space">
+          <TouchableOpacity
+            style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 12 }}
+            onPress={() => { setSelectedSpaceId(null); setSelectedSpaceName(''); setShowSpaceModal(false); }}
+            activeOpacity={0.7}
+          >
+            <Ionicons name={!selectedSpaceId ? 'radio-button-on' : 'radio-button-off'} size={18} color={!selectedSpaceId ? DC.accent1 : Colors.faint} />
+            <Text style={{ fontFamily: AppFont.regular, fontSize: 14, color: Colors.muted }}>None (Uncategorized)</Text>
+          </TouchableOpacity>
+          <ScrollView style={{ maxHeight: 300 }} showsVerticalScrollIndicator={false}>
+            {spaces.map((sp: any) => (
+              <TouchableOpacity
+                key={sp.id}
+                style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 12 }}
+                onPress={() => { setSelectedSpaceId(sp.id); setSelectedSpaceName(sp.name); setShowSpaceModal(false); }}
+                activeOpacity={0.7}
+              >
+                <Ionicons name={selectedSpaceId === sp.id ? 'radio-button-on' : 'radio-button-off'} size={18} color={selectedSpaceId === sp.id ? DC.accent1 : Colors.faint} />
+                <Text style={{ fontFamily: AppFont.regular, fontSize: 14, color: Colors.text }}>{sp.name}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </BottomSheet>
+      )}
 
       </SafeAreaView>
       </View>

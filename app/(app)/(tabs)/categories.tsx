@@ -3,6 +3,7 @@ import {
 } from 'react-native';
 import { supabase } from '../../../src/lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
+import AnimatedIcon from '@/components/ui/AnimatedIcon';
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useUser } from '../../../src/hooks/useUser';
@@ -60,7 +61,9 @@ export default function CategoriesScreen() {
           {categories.map(cat => (
             <View key={cat.id} style={s.catRow}>
               <View style={[s.catIcon, { backgroundColor: Brand.color.headerBg }]}>
-                <Ionicons name={cat.icon as any} size={16} color={Brand.color.headerText} />
+                {cat.icon === 'cart-outline'
+                  ? <AnimatedIcon set="svg-spinners" icon="3-dots-bounce" size={20} color={Brand.color.headerText} />
+                  : <Ionicons name={cat.icon as any} size={16} color={Brand.color.headerText} />}
               </View>
               <Text style={s.catName}>{cat.name}</Text>
               {cat.is_default && <Text style={s.defaultBadge}>default</Text>}

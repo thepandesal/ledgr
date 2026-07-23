@@ -16,6 +16,7 @@ export const DC = {
   pageText:         '#111111',
   pageTextMuted:    '#555555',
   pagePadding:      28,         // horizontal padding for all pages
+  letterSpacing:    0.3,        // subtle letter spacing for all text
 
   // Header
   headerBrand:      '#111111',  // LEDGR wordmark color
@@ -81,9 +82,40 @@ export const DC = {
   accent1:          '#5dc4bb',  // primary accent — arrows, active dots
 
   // Buttons (non-tab)
-  btnBg:            '#ebf7f6',  // background for all non-tab buttons
-  btnText:          '#111111',  // button text — always black
-  btnBorderWidth:   0,          // no border on buttons
+  btnBg:            '#111111',  // background for all non-tab buttons
+  btnText:          '#ffffff',  // button text — always white
+  btnBorder:        '#E5E5E5',  // border for all standard buttons
+  btnBorderWidth:   0,          // border width for all standard buttons
+  btnShadowColor:   '#000000',
+  btnShadowOffset:  { width: 0, height: 2 },
+  btnShadowOpacity: 0.12,
+  btnShadowRadius:  4,
+  btnElevation:     3,
+  btnDangerBg:      '#FF5757',  // danger button background
+  btnDangerText:    '#ffffff',  // danger button text
+
+  // Space cards
+  spaceCardBg:          '#ebf7f6',
+  spaceCardBgOver:      '#f7f2eb',
+  spaceCardRadius:      14,
+  spaceCardBorderWidth: 0,
+  spaceCardAmountColor: '#111111',
+  spaceCardOverColor:   '#ff5757',
+  spaceCardDivider:     '#d1d1d1',
+
+  // Page action buttons (filters, new space, etc.)
+  pageActionBg:          '#ebf7f6',
+  pageActionText:        '#111111',
+  pageActionBorderWidth: 0,
+  pageActionDotColor:    '#5dc4bb',
+  pageActionPaddingH:    14,
+  pageActionPaddingV:    10,
+  pageActionRadius:      999,
+
+  // Section headers
+  sectionLabelColor:  '#111111', // section label text color — always black
+  sectionLabelSize:   13,        // section label font size
+  sectionLabelWeight: 'bold' as const,
 
   // Badge active state
   badgeActiveBg:    '#ebf7f6',
@@ -116,7 +148,7 @@ export const DC = {
   inputRadius:      999,                    // input border radius (pill)
   inputPaddingH:    16,                     // input horizontal padding
   inputPaddingV:    12,                     // input vertical padding
-  inputFontSize:    14,                     // input font size
+  inputFontSize:    16,                     // input font size — must be ≥16 to prevent Safari zoom
   inputTextColor:   '#111111',              // input text color
   inputPlaceholder: '#c0c0c0',              // placeholder text color
 

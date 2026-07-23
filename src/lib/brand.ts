@@ -51,13 +51,13 @@ export const BrandColors = {
 // ─── Fonts ───────────────────────────────────────────────────────────────────
 
 export const BrandFonts = {
-  display:        'CalSans',              // page titles, space names
-  appLabel:       'MuseoModerno_Black',   // LEDGR wordmark
-  heading:        'ChillaxMedium',        // section headings, card names
-  headingBold:    'ChillaxBold',          // strong headings
-  body:           'ChillaxRegular',       // body text, nav labels, subtitles
-  mono:           'RobotoMono_400Regular',// amounts, dates, metadata
-  monoBold:       'RobotoMono_700Bold',   // bold amounts, labels
+  display:        'Poppins-Bold',
+  appLabel:       'MuseoModerno_Black',
+  heading:        'Poppins-SemiBold',
+  headingBold:    'Poppins-Bold',
+  body:           'Poppins-Regular',
+  mono:           'Poppins-Regular',
+  monoBold:       'Poppins-Bold',
 } as const;
 
 // ─── Typography ──────────────────────────────────────────────────────────────

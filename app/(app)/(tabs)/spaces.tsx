@@ -300,62 +300,52 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
   };
 
   const renderExpenseCard = (space: SpaceData) => {
-    const value     = space.spent ?? 0;
-    const budget    = space.budget ? convert(space.budget, space.budget_currency ?? 'PHP', defaultCurrency) : 0;
-    const over      = budget > 0 && value > budget;
-    const remaining = budget - value;
+    const value  = space.spent ?? 0;
+    const budget = space.budget ? convert(space.budget, space.budget_currency ?? 'PHP', defaultCurrency) : 0;
+    const over   = budget > 0 && value > budget;
+    const name   = space.name.replace(/\w\S*/g, t => t.charAt(0).toUpperCase() + t.slice(1).toLowerCase());
+    const bg     = over ? '#f7f2eb' : '#ebf7f6';
     return (
       <TouchableOpacity
         key={space.id}
-        style={[s.gridCard, { width: cardSize, height: cardSize }]}
-        activeOpacity={0.85}
+        style={[s.listCard, { backgroundColor: bg }]}
+        activeOpacity={0.82}
         onPress={() => openSpace(space.id, space.name)}
         onLongPress={() => { setSelectedSpace(space); setMenuModal(true); setBlur(true); }}
         delayLongPress={300}
       >
-        <Text style={[s.gridCardName, over && { borderBottomColor: DC.overBudgetColor }]} numberOfLines={1}>{space.name.replace(/\w\S*/g, t => t.charAt(0).toUpperCase() + t.slice(1).toLowerCase())}</Text>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', width: '100%' }}>
-          <View style={s.gridAmountRow}>
-            <Text style={[s.gridSpent, over && { color: DC.overBudgetColor }]}>{fmtCompact(value)}</Text>
-            {budget > 0 && <Text style={s.gridSep}> / </Text>}
-            {budget > 0 && <Text style={s.gridBudget}>{fmtCompact(budget)}</Text>}
-          </View>
-          {budget > 0 && (
-            <Text style={[s.gridStatus, over && { color: DC.overBudgetColor }]}>
-              {over ? `Over ${fmtStatus(Math.abs(remaining))}` : `${fmtStatus(remaining)} left`}
-            </Text>
-          )}
+        <Text style={s.listCardName} numberOfLines={1}>{name}</Text>
+        <View style={s.listCardRight}>
+          <Text style={s.listCardCurrency}>{defaultCurrency}</Text>
+          <Text style={[s.listCardAmount, over && { color: DC.overBudgetColor }]}>{fmt(value)}</Text>
+          {budget > 0 && <View style={s.listCardDivider} />}
+          {budget > 0 && <Text style={s.listCardBudget}>{fmt(budget)}</Text>}
         </View>
       </TouchableOpacity>
     );
   };
 
   const renderSavingsCard = (space: SpaceData) => {
-    const allTime   = space.savedAllTime ?? 0;
-    const budget    = space.budget ? convert(space.budget, space.budget_currency ?? 'PHP', defaultCurrency) : 0;
-    const remaining = Math.max(budget - allTime, 0);
-    const reached   = budget > 0 && allTime >= budget;
+    const allTime = space.savedAllTime ?? 0;
+    const budget  = space.budget ? convert(space.budget, space.budget_currency ?? 'PHP', defaultCurrency) : 0;
+    const reached = budget > 0 && allTime >= budget;
+    const name    = space.name.replace(/\w\S*/g, t => t.charAt(0).toUpperCase() + t.slice(1).toLowerCase());
+    const bg      = reached ? '#ebf7f6' : '#f7f2eb';
     return (
       <TouchableOpacity
         key={space.id}
-        style={[s.gridCard, { width: cardSize, height: cardSize }]}
-        activeOpacity={0.85}
+        style={[s.listCard, { backgroundColor: bg }]}
+        activeOpacity={0.82}
         onPress={() => openSpace(space.id, space.name)}
         onLongPress={() => { setSelectedSpace(space); setMenuModal(true); setBlur(true); }}
         delayLongPress={300}
       >
-        <Text style={s.gridCardName} numberOfLines={1}>{space.name.replace(/\w\S*/g, t => t.charAt(0).toUpperCase() + t.slice(1).toLowerCase())}</Text>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', width: '100%' }}>
-          <View style={s.gridAmountRow}>
-            <Text style={[s.gridSpent, { color: DC.accent1 }]}>{fmtCompact(allTime)}</Text>
-            {budget > 0 && <Text style={s.gridSep}> / </Text>}
-            {budget > 0 && <Text style={s.gridBudget}>{fmtCompact(budget)}</Text>}
-          </View>
-          {budget > 0 && (
-            <Text style={[s.gridStatus, reached && { color: DC.accent1 }]}>
-              {reached ? 'Goal reached!' : `${fmtStatus(remaining)} left`}
-            </Text>
-          )}
+        <Text style={s.listCardName} numberOfLines={1}>{name}</Text>
+        <View style={s.listCardRight}>
+          <Text style={s.listCardCurrency}>{defaultCurrency}</Text>
+          <Text style={[s.listCardAmount, reached && { color: DC.accent1 }]}>{fmt(allTime)}</Text>
+          {budget > 0 && <View style={s.listCardDivider} />}
+          {budget > 0 && <Text style={s.listCardBudget}>{fmt(budget)}</Text>}
         </View>
       </TouchableOpacity>
     );
@@ -368,7 +358,8 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
   const dateRange = useMemo(() => getDateRange(dateMode, dateOffset, weekStart, useCutoff, cutoffDay), [dateMode, dateOffset, weekStart, useCutoff, cutoffDay]);
   const GRID_GAP = 10;
   const COLS = 3;
-  const cardSize = (W - DC.pagePadding * 2 - GRID_GAP * (COLS - 1)) / COLS;
+  const contentW = W - DC.pagePadding * 2;
+  const cardSize = (contentW - GRID_GAP * (COLS - 1)) / COLS;
 
   const expenseActive   = spaces.filter(sp => (sp.space_type ?? 'expense') === 'expense' && sp.is_active !== false);
   const savingsActive   = spaces.filter(sp => sp.space_type === 'savings'  && sp.is_active !== false);
@@ -478,7 +469,7 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
 
   return (
     <SafeAreaView style={s.root}>
-      <ScrollView ref={scrollViewRef} scrollEnabled={true} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
+      <ScrollView ref={scrollViewRef} scrollEnabled={true} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />} >
         {/* Pending space invites */}
         {pendingInvites.length > 0 && (
           <View style={{ paddingHorizontal: DC.pagePadding, paddingTop: 16, gap: 8 }}>
@@ -515,9 +506,11 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
         )}
 
         {/* Date filter row */}
+        <Text style={s.pageName}>Spaces</Text>
         <View style={s.dateFilterRow}>
           <TouchableOpacity style={[s.modeSelectorBtn, { flex: 1, justifyContent: 'center' }]} onPress={openDateModal} activeOpacity={0.8}>
             <Text style={s.modeSelectorText}>Filters</Text>
+            {(dateMode !== 'monthly' || dateOffset !== 0 || useCutoff) && <View style={s.filterDot} />}
           </TouchableOpacity>
           <DateNavBar style={{ flex: 2 }} label={dateLabel} onPrev={() => { const next = dateOffset - 1; setDateOffset(next); saveSetting({ spaces_date_offset: next }); }} onNext={() => { const next = dateOffset + 1; setDateOffset(next); saveSetting({ spaces_date_offset: next }); }} onLabelPress={openMonthYearModal} />
           <TourTarget id="tour-new-space">
@@ -537,39 +530,39 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
             <Animated.View style={[s.slidePair, { width: W * 2, transform: [{ translateX: slideAnim }] }]}>
 
               {/* -- Panel 1: Active -- */}
-              <View style={{ width: W }}>
+              <View style={{ width: W, overflow: 'hidden' }}>
                 {expenseActive.length === 0 && savingsActive.length === 0 && (
                   <View style={s.emptyWrap}><Text style={s.emptyText}>no active spaces</Text></View>
                 )}
                 {expenseActive.length > 0 && (
                   <>
                     <Text style={s.sectionHeader}>Expense tracker</Text>
-                    <View style={s.grid}>{expenseActive.map(space => renderExpenseCard(space))}</View>
+                    <View style={s.list}>{expenseActive.map(space => renderExpenseCard(space))}</View>
                   </>
                 )}
                 {savingsActive.length > 0 && (
                   <>
                     <Text style={s.sectionHeader}>Savings Tracker</Text>
-                    <View style={s.grid}>{savingsActive.map(space => renderSavingsCard(space))}</View>
+                    <View style={s.list}>{savingsActive.map(space => renderSavingsCard(space))}</View>
                   </>
                 )}
               </View>
 
               {/* -- Panel 2: Inactive -- */}
-              <View style={{ width: W }}>
+              <View style={{ width: W, overflow: 'hidden' }}>
                 {expenseInactive.length === 0 && savingsInactive.length === 0 && (
                   <View style={s.emptyWrap}><Text style={s.emptyText}>no inactive spaces</Text></View>
                 )}
                 {expenseInactive.length > 0 && (
                   <>
                     <Text style={s.sectionHeader}>Expense tracker</Text>
-                    <View style={s.grid}>{expenseInactive.map(space => renderExpenseCard(space))}</View>
+                    <View style={s.list}>{expenseInactive.map(space => renderExpenseCard(space))}</View>
                   </>
                 )}
                 {savingsInactive.length > 0 && (
                   <>
                     <Text style={s.sectionHeader}>Savings Tracker</Text>
-                    <View style={s.grid}>{savingsInactive.map(space => renderSavingsCard(space))}</View>
+                    <View style={s.list}>{savingsInactive.map(space => renderSavingsCard(space))}</View>
                   </>
                 )}
               </View>
@@ -584,39 +577,26 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
         {sharedSpaces.length > 0 && (
           <>
             <Text style={[s.sectionHeader, { marginTop: 24 }]}>Shared Spaces</Text>
-            <View style={s.grid}>
+            <View style={s.list}>
               {sharedSpaces.map((space: any) => {
                 const isExpense = (space.space_type ?? 'expense') === 'expense';
                 const value   = space.spent ?? 0;
-                const saved   = space.saved ?? 0;
                 const allTime = space.savedAllTime ?? 0;
-                const budget  = space.budget ?? 0;
+                const budget  = space.budget ? convert(space.budget, space.budget_currency ?? 'PHP', defaultCurrency) : 0;
                 const over    = isExpense && budget > 0 && value > budget;
-                const remaining = isExpense ? budget - value : Math.max(budget - allTime, 0);
-                const statusColor = over ? Colors.expense : budget > 0 && isExpense && remaining / budget < 0.2 ? '#F97316' : ACCENT_DARK;
-                const savingsPct  = budget > 0 ? Math.min(allTime / budget, 1) : 0;
-                const savingsColor = savingsPct >= 1 ? ACCENT_DARK : '#F97316';
+                const pct     = budget > 0 ? Math.min((isExpense ? value : allTime) / budget, 1) : 0;
+                const barColor = over ? DC.overBudgetColor : pct > 0.8 ? '#F97316' : DC.accent1;
+                const displayVal = isExpense ? value : allTime;
                 return (
                   <TouchableOpacity
                     key={space.id}
-                    style={[s.gridCard, { width: cardSize, height: cardSize }, isExpense && over && s.cardOver]}
-                    activeOpacity={0.85}
+                    style={s.listCard}
+                    activeOpacity={0.82}
                     onPress={() => openSpace(space.id, space.name)}
                   >
-                    <Text style={s.gridCardName}>{space.name}</Text>
-                    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', width: '100%' }}>
-
-                      <View style={s.gridAmountRow}>
-                        <Text style={[s.gridSpent, isExpense && over && { color: DC.overBudgetColor }]}>{fmtCompact(isExpense ? value : allTime)}</Text>
-                        {budget > 0 && <Text style={s.gridSep}> / </Text>}
-                        {budget > 0 && <Text style={s.gridBudget}>{fmtCompact(budget)}</Text>}
-                      </View>
-                      {budget > 0 && (
-                        <Text style={[s.gridStatus, isExpense && over && { color: DC.overBudgetColor }]}>
-                          {isExpense && over ? `Over ${fmtStatus(Math.abs(remaining))}` : `${fmtStatus(Math.abs(remaining))} left`}
-                        </Text>
-                      )}
-                    </View>
+                    <Text style={s.listCardName} numberOfLines={1}>
+                      {space.name.replace(/\w\S*/g, (t: string) => t.charAt(0).toUpperCase() + t.slice(1).toLowerCase())}
+                    </Text>
                   </TouchableOpacity>
                 );
               })}
@@ -889,7 +869,7 @@ const s = StyleSheet.create({
   scroll: { paddingBottom: 100 },
 
   // -- Header --------------------------------------------------------------
-  slideOuter: { overflow: 'hidden' },
+  slideOuter: { width: '100%', overflow: 'hidden' },
   slidePair:  { flexDirection: 'row' },
 
   // -- Circle tabs (active/inactive) --------------------------------------------------------------------------------------
@@ -907,20 +887,25 @@ const s = StyleSheet.create({
   emptyText: { fontFamily: AppFont.regular, fontSize: 13, color: DC.pageTextMuted },
 
   // -- Section --------------------------------------------------------------
-  sectionHeader: { fontFamily: AppFont.bold, fontSize: 11, color: DC.pageTextMuted, marginBottom: 10, marginTop: Brand.spacing.section, paddingHorizontal: DC.pagePadding, textAlign: 'left', textTransform: 'uppercase', letterSpacing: 0.6 },
-  list: { marginBottom: 8, paddingHorizontal: DC.pagePadding },
+  sectionHeader: { fontFamily: AppFont.bold, fontSize: 14, color: '#111111', marginBottom: 10, marginTop: Brand.spacing.section, paddingHorizontal: DC.pagePadding, textAlign: 'left', textTransform: 'uppercase', letterSpacing: 0.6 },
 
-  // -- Grid cards ------------------------------------------------------------
-  grid:          { flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingHorizontal: DC.pagePadding, marginBottom: 8, justifyContent: 'flex-start' },
-  gridCard:      { marginBottom: 10, paddingVertical: 0, paddingHorizontal: 0, borderRadius: 18, borderWidth: DC.cardBorderWidth, borderColor: DC.cardBorder, backgroundColor: DC.cardBg, alignItems: 'center', justifyContent: 'space-between', overflow: 'hidden' },
-  cardOver:      { borderColor: DC.overBudgetColor, borderWidth: 2.5 },
+  // -- List cards (new design) -----------------------------------------------
+  list:            { flexDirection: 'column', gap: 16, marginBottom: 8, paddingHorizontal: DC.pagePadding },
+  listCard:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 16, paddingLeft: 24, paddingRight: 16, borderRadius: 14, backgroundColor: '#F8F8F8', shadowColor: '#d1d1d1', shadowOffset: { width: 2, height: 2 }, shadowOpacity: 1, shadowRadius: 0, elevation: 3 },
+  listCardName:    { fontFamily: AppFont.bold, fontSize: 14, color: '#111111', flex: 1, marginRight: 12 },
+  listCardRight:   { alignItems: 'center', gap: 2, width: '35%' },
+  listCardCurrency:{ fontFamily: AppFont.regular, fontSize: 9, color: '#111111' },
+  listCardAmount:  { fontFamily: AppFont.bold, fontSize: 16, color: '#111111', letterSpacing: -0.3 },
+  listCardDivider: { width: 70, height: 1, backgroundColor: '#d1d1d1', marginVertical: 2 },
+  listCardBudget:  { fontFamily: AppFont.bold, fontSize: 16, color: '#111111', letterSpacing: -0.3 },
+
   cardDragging:  { opacity: 0.85, shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.18, shadowRadius: 10, elevation: 8 },
-  gridCardName:  { fontFamily: AppFont.regular, fontSize: 11, color: DC.pageText, paddingVertical: 8, paddingHorizontal: 6, borderBottomWidth: 1, borderBottomColor: DC.cardBorder, width: '100%', textAlign: 'center' },
-  gridAmountRow: { flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', justifyContent: 'center', paddingHorizontal: 4 },
-  gridSpent:     { fontFamily: AppFont.bold, fontSize: 13, color: DC.pageText, letterSpacing: -0.3 },
-  gridSep:       { fontFamily: AppFont.regular, fontSize: 13, color: DC.pageTextMuted },
-  gridBudget:    { fontFamily: AppFont.bold, fontSize: 13, color: DC.pageTextMuted, letterSpacing: -0.3 },
-  gridStatus:    { fontFamily: AppFont.regular, fontSize: 9, color: DC.pageTextMuted, marginTop: 2, fontStyle: 'italic', textAlign: 'center', paddingHorizontal: 4 },
+
+
+
+
+
+
   // legacy (kept for shared spaces inline usage)
   card:          { paddingVertical: 18, paddingHorizontal: 18, borderRadius: DC.cardRadius, borderWidth: DC.cardBorderWidth, borderColor: DC.cardBorder, marginBottom: DC.cardGap, backgroundColor: DC.cardBg, overflow: 'hidden' },
   cardHeader:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, paddingBottom: 12, marginHorizontal: -18, paddingHorizontal: 18, borderBottomWidth: 1.5, borderBottomColor: DC.cardBorder },
@@ -949,7 +934,7 @@ const s = StyleSheet.create({
   typeBtnText:       { fontFamily: AppFont.regular, fontSize: 12, color: DC.btnText },
   typeBtnTextActive: { fontFamily: AppFont.semiBold, fontSize: 12, color: DC.btnText },
 
-  saveBtn:     { backgroundColor: DC.btnBg, borderRadius: Radius.pill, paddingVertical: 16, alignItems: 'center', marginTop: 20, borderWidth: DC.btnBorderWidth },
+  saveBtn:     { backgroundColor: DC.btnBg, borderRadius: Radius.pill, paddingVertical: 16, alignItems: 'center', marginTop: 20, borderWidth: DC.btnBorderWidth, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 4, elevation: 3 },
   saveBtnText: { fontFamily: AppFont.semiBold, fontSize: 15, color: DC.btnText },
 
   // -- Footer ---------------------------------------------------------------
@@ -960,11 +945,12 @@ const s = StyleSheet.create({
   resetBtnTextActive: { fontFamily: AppFont.semiBold, color: DC.badgeActiveText },
 
   // -- Date filter ----------------------------------------------------------
-  dateFilterRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingHorizontal: DC.pagePadding, marginTop: 20, marginBottom: 8 },
+  pageName:          { fontFamily: AppFont.bold, fontSize: 29, color: '#9cd7d2', paddingHorizontal: DC.pagePadding, marginTop: 8, marginBottom: 4 },
+  dateFilterRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingHorizontal: DC.pagePadding, marginTop: 8, marginBottom: 8 },
   dateNav:           { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  filterDot:        { width: 8, height: 8, borderRadius: 4, backgroundColor: DC.btnText },
-  modeSelectorBtn:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 10, borderRadius: Radius.pill, backgroundColor: DC.btnBg, borderWidth: DC.btnBorderWidth },
-  modeSelectorText:  { fontFamily: AppFont.regular, fontSize: 13, color: DC.btnText },
+  filterDot:         { width: 8, height: 8, borderRadius: 4, backgroundColor: DC.pageActionDotColor },
+  modeSelectorBtn:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: DC.pageActionPaddingH, paddingVertical: DC.pageActionPaddingV, borderRadius: DC.pageActionRadius, backgroundColor: DC.pageActionBg, borderWidth: DC.pageActionBorderWidth },
+  modeSelectorText:  { fontFamily: AppFont.regular, fontSize: 13, color: DC.pageActionText },
   dateNavArrow:      { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.surface },
   dateNavArrowText:  { fontFamily: AppFont.regular, fontSize: 18, color: DC.accent1, lineHeight: 22 },
   dateLabelBtn:      { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 20, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: DC.cardBg, borderWidth: 1, borderColor: DC.cardBorder, minWidth: 160, justifyContent: 'space-between' },

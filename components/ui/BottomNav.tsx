@@ -6,9 +6,9 @@ import { AppFont } from '@/src/lib/fonts';
 import { useNav } from '@/src/lib/NavContext';
 
 const TABS = [
-  { key: 'spaces',            label: 'Spaces',        icon: 'grid' },
-  { key: 'accounts',          label: 'Accounts',      icon: 'wallet-outline' },
-  { key: 'dashboard',         label: 'Dashboard',     icon: 'pulse-outline' },
+  { key: 'home',              label: 'Home',          icon: 'home-outline' },
+  { key: 'profile',           label: 'Profile',       icon: 'person-outline' },
+  { key: 'bill-split',        label: 'Split Bill',    icon: 'people-outline' },
   { key: 'notifications-tab', label: 'Notifications', icon: 'notifications-outline' },
   { key: 'others',            label: 'Others',        icon: 'apps-outline' },
 ];
@@ -20,7 +20,7 @@ const NAV_INACTIVE = 'rgba(255,255,255,0.45)';
 export default function BottomNav() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { activeTab, handleNavPress, unreadCount, closeSpace } = useNav();
+  const { activeTab, handleNavPress, unreadCount } = useNav();
 
   const handlePress = (key: string) => {
     if (router.canDismiss()) {
@@ -78,8 +78,8 @@ const s = StyleSheet.create({
   pill: {
     flexDirection: 'row',
     backgroundColor: NAV_BG,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
     paddingVertical: 10,
     paddingHorizontal: 8,
     alignItems: 'center',

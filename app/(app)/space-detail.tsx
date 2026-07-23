@@ -21,6 +21,7 @@ import { AppFont } from '../../src/lib/fonts';
 import { DC } from '../../src/lib/design';
 import AddRecordingScreen from './add-recording';
 import BottomNav from '@/components/ui/BottomNav';
+import StatementWebView from '@/components/ui/StatementWebView';
 import { useNav } from '../../src/lib/NavContext';
 
 // ── Module-level pending focus date ─────────────────────────────────────────
@@ -103,22 +104,22 @@ function getTypeLabel(type: string, status: string, is_due?: boolean, paid_amoun
       const collected = total > 0 && paid >= total - 0.01;
       const partial   = paid > 0 && !collected;
       if (collected) return { label: 'Expense · Collected',        color: DC.incomeColor };
-      if (partial)   return { label: 'Expense · Due · Partial',    color: DC.expenseColor };
-      return               { label: 'Expense · Due',               color: DC.expenseColor };
+      if (partial)   return { label: 'Expense · Due · Partial',    color: DC.overBudgetColor };
+      return               { label: 'Expense · Due',               color: DC.overBudgetColor };
     }
-    return { label: 'Expense', color: DC.expenseColor };
+    return { label: 'Expense', color: DC.overBudgetColor };
   }
   if (type === 'debt') {
-    if (status === 'paid')    return { label: 'Debt · Paid',           color: DC.expenseColor };
-    if (status === 'partial') return { label: 'Debt · Partially Paid', color: DC.expenseColor };
-    return                           { label: 'Debt',                  color: DC.expenseColor };
+    if (status === 'paid')    return { label: 'Debt · Paid',           color: DC.overBudgetColor };
+    if (status === 'partial') return { label: 'Debt · Partially Paid', color: DC.overBudgetColor };
+    return                           { label: 'Debt',                  color: DC.overBudgetColor };
   }
   if (type === 'due') {
     if (status === 'paid')    return { label: 'Due · Collected',        color: DC.incomeColor };
     if (status === 'partial') return { label: 'Due · Partially Paid',   color: DC.incomeColor };
     return                           { label: 'Due',                    color: DC.incomeColor };
   }
-  if (type === 'payment') return { label: 'Payment', color: DC.expenseColor };
+  if (type === 'payment') return { label: 'Payment', color: DC.overBudgetColor };
   if (type === 'return')  return { label: 'Return',  color: DC.incomeColor };
   return { label: type, color: Colors.muted };
 }
@@ -129,7 +130,7 @@ import { computeGhosts, getDueDateForCycle, isLoanComplete, type GhostRow } from
 import { isReminderDueToday } from '../../src/lib/reminderUtils';
 import type { RecordingReminder } from '../../src/types';
 
-export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName, onClose }: { spaceId?: string; name?: string; onClose?: () => void }) {
+export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName, onClose, openEdit }: { spaceId?: string; name?: string; onClose?: () => void; openEdit?: boolean }) {
   const params = useLocalSearchParams<{ spaceId: string; name: string }>();
   const spaceId = propSpaceId ?? params.spaceId;
   const name    = propName    ?? params.name;
@@ -1118,6 +1119,46 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
     return false;
   };
 
+  // Space edit state
+  const [showSpaceActions, setShowSpaceActions] = useState(openEdit ?? false);
+  const [showEditSpaceName, setShowEditSpaceName] = useState(false);
+  const [editSpaceName, setEditSpaceName] = useState('');
+  const [editSpaceNameSaving, setEditSpaceNameSaving] = useState(false);
+  const [showDeleteSpaceConfirm, setShowDeleteSpaceConfirm] = useState(false);
+  const [deleteSpaceConfirmText, setDeleteSpaceConfirmText] = useState('');
+  const [deletingSpace, setDeletingSpace] = useState(false);
+
+  const handleEditSpaceName = async () => {
+    if (!editSpaceName.trim()) return;
+    setEditSpaceNameSaving(true);
+    await supabase.from('spaces').update({ name: editSpaceName.trim() }).eq('id', spaceId);
+    setEditSpaceNameSaving(false);
+    setShowEditSpaceName(false);
+    queryClient.invalidateQueries({ queryKey: ['space-budget', spaceId] });
+    queryClient.invalidateQueries({ queryKey: ['spaces-panel'] });
+    queryClient.invalidateQueries({ queryKey: ['spaces'] });
+  };
+
+  const handleArchiveSpace = async () => {
+    await supabase.from('spaces').update({ is_active: false }).eq('id', spaceId as string);
+    setShowSpaceActions(false);
+    queryClient.invalidateQueries({ queryKey: ['spaces-panel'] });
+    queryClient.invalidateQueries({ queryKey: ['spaces'] });
+    handleBack();
+  };
+
+  const handleDeleteSpace = async () => {
+    if (deleteSpaceConfirmText.toLowerCase() !== 'delete') return;
+    setDeletingSpace(true);
+    await supabase.from('recordings').delete().eq('space_id', spaceId as string);
+    await supabase.from('spaces').delete().eq('id', spaceId as string);
+    setDeletingSpace(false);
+    setShowDeleteSpaceConfirm(false);
+    queryClient.invalidateQueries({ queryKey: ['spaces-panel'] });
+    queryClient.invalidateQueries({ queryKey: ['spaces'] });
+    handleBack();
+  };
+
   const [membersModal, setMembersModal] = useState(false);
   const [inviteModal, setInviteModal] = useState(false);
   const [inviteFriends, setInviteFriends] = useState<{ id: string; name: string }[]>([]);
@@ -1185,6 +1226,9 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
         <PageHeader
           title={String(name)}
           onBack={handleBack}
+          right={isOwner ? (
+            <HeaderActionBtn icon="ellipsis-horizontal" onPress={() => setShowSpaceActions(true)} />
+          ) : undefined}
         />
 
         {/* ── Sticky controls ── */}
@@ -1653,19 +1697,7 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
       </BottomSheet>
 
       {/* Hidden WebView for native statement capture */}
-      {captureHtml && Platform.OS !== 'web' && (() => {
-        const { WebView } = require('react-native-webview');
-        return (
-          <WebView
-            ref={webviewRef}
-            source={{ html: captureHtml }}
-            style={{ position: 'absolute', width: 794, height: 1, opacity: 0, top: -9999 }}
-            onMessage={handleStatementWebViewMessage}
-            javaScriptEnabled
-            originWhitelist={['*']}
-          />
-        );
-      })()}
+      {captureHtml && <StatementWebView html={captureHtml} webviewRef={webviewRef} onMessage={handleStatementWebViewMessage} />}
 
       {/* Reminder choice modal */}
       <BottomSheet visible={reminderChoiceModal} onClose={() => setReminderChoiceModal(false)} title={reminderChoiceTarget?.name ?? 'reminder'} height="45%">
@@ -1942,6 +1974,86 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
         )}
       </BottomSheet>
 
+      {/* Space actions sheet */}
+      <BottomSheet visible={showSpaceActions} onClose={() => setShowSpaceActions(false)} title={String(name)}>
+        <TouchableOpacity style={s.choiceRow} activeOpacity={0.7} onPress={() => { setShowSpaceActions(false); setEditSpaceName(String(name)); setShowEditSpaceName(true); }}>
+          <View style={{ flex: 1 }}>
+            <Text style={s.choiceTitle}>Edit Name</Text>
+            <Text style={s.choiceSub}>rename this space</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={14} color={Colors.faint} />
+        </TouchableOpacity>
+        <TouchableOpacity style={s.choiceRow} activeOpacity={0.7} onPress={handleArchiveSpace}>
+          <View style={{ flex: 1 }}>
+            <Text style={s.choiceTitle}>Archive</Text>
+            <Text style={s.choiceSub}>mark as inactive — recordings are kept</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={14} color={Colors.faint} />
+        </TouchableOpacity>
+        <TouchableOpacity style={[s.choiceRow, { borderBottomWidth: 0 }]} activeOpacity={0.7} onPress={() => { setShowSpaceActions(false); setDeleteSpaceConfirmText(''); setShowDeleteSpaceConfirm(true); }}>
+          <View style={{ flex: 1 }}>
+            <Text style={[s.choiceTitle, { color: '#FF5757' }]}>Delete</Text>
+            <Text style={s.choiceSub}>permanently deletes space and all recordings</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={14} color={Colors.faint} />
+        </TouchableOpacity>
+      </BottomSheet>
+
+      {/* Edit space name sheet */}
+      <BottomSheet visible={showEditSpaceName} onClose={() => setShowEditSpaceName(false)} title="Edit Space Name">
+        <TextInput
+          style={{ fontFamily: AppFont.regular, fontSize: 16, color: DC.pageText, backgroundColor: Colors.surface, borderRadius: Radius.lg, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1, borderColor: Colors.borderMid, marginBottom: 16 }}
+          value={editSpaceName}
+          onChangeText={setEditSpaceName}
+          placeholder="space name"
+          placeholderTextColor={Colors.faint}
+          autoFocus
+        />
+        <TouchableOpacity
+          style={[s.saveBtn, (!editSpaceName.trim() || editSpaceNameSaving) && { opacity: 0.4 }]}
+          onPress={handleEditSpaceName}
+          disabled={!editSpaceName.trim() || editSpaceNameSaving}
+          activeOpacity={0.8}
+        >
+          <Text style={s.saveBtnText}>{editSpaceNameSaving ? 'saving...' : 'Save'}</Text>
+        </TouchableOpacity>
+      </BottomSheet>
+
+      {/* Delete space confirmation overlay */}
+      {showDeleteSpaceConfirm && (
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 24, zIndex: 999 }}>
+          <View style={{ backgroundColor: Colors.white, borderRadius: Radius.xl, padding: 24, width: '100%' }}>
+            <Text style={{ fontFamily: AppFont.bold, fontSize: 16, color: '#111111', marginBottom: 8 }}>Delete "{name}"?</Text>
+            <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.muted, lineHeight: 20, marginBottom: 16 }}>
+              ⚠️ This will permanently delete the space and ALL recordings under it. This cannot be undone.{' '}We recommend archiving instead to keep your data.
+            </Text>
+            <Text style={{ fontFamily: AppFont.semiBold, fontSize: 11, color: DC.pageTextMuted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8 }}>Type "delete" to confirm</Text>
+            <TextInput
+              style={{ fontFamily: AppFont.regular, fontSize: 16, color: DC.pageText, backgroundColor: Colors.surface, borderRadius: Radius.lg, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1, borderColor: Colors.borderMid, marginBottom: 16 }}
+              value={deleteSpaceConfirmText}
+              onChangeText={setDeleteSpaceConfirmText}
+              placeholder="delete"
+              placeholderTextColor={Colors.faint}
+              autoCapitalize="none"
+              autoFocus
+            />
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <TouchableOpacity style={[s.saveBtn, { flex: 1, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border }]} onPress={() => setShowDeleteSpaceConfirm(false)} activeOpacity={0.8}>
+                <Text style={[s.saveBtnText, { color: Colors.muted }]}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[s.saveBtn, { flex: 1, backgroundColor: '#FF5757', opacity: (deleteSpaceConfirmText.toLowerCase() !== 'delete' || deletingSpace) ? 0.4 : 1 }]}
+                onPress={handleDeleteSpace}
+                disabled={deleteSpaceConfirmText.toLowerCase() !== 'delete' || deletingSpace}
+                activeOpacity={0.8}
+              >
+                <Text style={[s.saveBtnText, { color: '#ffffff' }]}>{deletingSpace ? 'Deleting...' : 'Delete'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
+
       {/* Delete confirm */}
       <ConfirmModal
         visible={confirmModal}
@@ -2009,8 +2121,8 @@ const s = StyleSheet.create({
   dateHeaderText: { fontFamily: AppFont.regular, fontSize: 11, color: DC.pageTextMuted },
 
   // Recording / reminder row
-  row:         { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, paddingHorizontal: 14, borderRadius: 14, borderWidth: 1, borderColor: DC.cardBorder, backgroundColor: DC.cardBg },
-  rowIconWrap: { width: 44, height: 44, borderRadius: 12, justifyContent: 'center', alignItems: 'center', backgroundColor: DC.cardBg },
+  row:         { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, paddingHorizontal: 14, borderRadius: 14, borderWidth: 1, borderColor: DC.cardBorder, backgroundColor: '#ffffff' },
+  rowIconWrap: { width: 44, height: 44, borderRadius: 12, justifyContent: 'center', alignItems: 'center', backgroundColor: '#ffffff' },
   rowMid:      { flex: 1, gap: 3 },
   rowType:     { fontFamily: AppFont.regular, fontSize: 11, color: DC.pageTextMuted, fontStyle: 'italic' },
   rowName:     { fontFamily: AppFont.bold, fontSize: 14, color: DC.pageText },

@@ -12,6 +12,7 @@ import BottomSheet from '@/components/ui/BottomSheet';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import { Colors, Radius, Spacing } from '@/components/ui/theme';
 import { Brand } from '../../../src/lib/brand';
+import { useNav } from '../../../src/lib/NavContext';
 
 interface SplitBillRow {
   id: string;
@@ -27,6 +28,7 @@ export default function BillSplitScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { userId } = useUser();
+  const { openSplitBill } = useNav();
 
   const [createModal, setCreateModal] = useState(false);
   const [billName, setBillName] = useState('');
@@ -158,7 +160,7 @@ export default function BillSplitScreen() {
     setCreateModal(false);
     setBillName('');
     setDisplayCount(10);
-    router.push({ pathname: '/(app)/split-bill-detail', params: { splitBillId: data.id, name: billName.trim() } } as any);
+    openSplitBill(data.id, billName.trim());
   };
 
   const handleToggleStatus = async () => {
@@ -309,7 +311,7 @@ export default function BillSplitScreen() {
                           key={bill.id}
                           style={s.card}
                           activeOpacity={0.85}
-                          onPress={() => router.push({ pathname: '/(app)/split-bill-detail', params: { splitBillId: bill.id, name: bill.name } } as any)}
+                          onPress={() => openSplitBill(bill.id, bill.name)}
                         >
                           <View style={s.cardIconWrap}>
                             <Ionicons name="people-outline" size={18} color={Brand.color.headerText} />
@@ -361,7 +363,7 @@ export default function BillSplitScreen() {
                           key={b.id}
                           style={s.card}
                           activeOpacity={0.85}
-                          onPress={() => router.push({ pathname: '/(app)/split-bill-detail', params: { splitBillId: b.id, name: b.name } } as any)}
+                          onPress={() => openSplitBill(b.id, b.name)}
                         >
                           <View style={s.cardIconWrap}>
                             <Ionicons name="people-outline" size={18} color={Brand.color.headerText} />
