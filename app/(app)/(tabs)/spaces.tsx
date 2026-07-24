@@ -286,24 +286,33 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
     setError(''); setCreateModal(true);
   };
 
+  const doDeleteSpace = async (sp: typeof selectedSpace) => {
+    if (!sp) return;
+    try {
+      const recordingIds = await supabase.from('recordings').select('id').eq('space_id', sp.id);
+      const ids = (recordingIds.data ?? []).map((r: any) => r.id);
+      if (ids.length > 0) {
+        await supabase.from('recording_breakdowns').delete().in('recording_id', ids);
+      }
+      const { error: recErr } = await supabase.from('recordings').delete().eq('space_id', sp.id);
+      if (recErr) { Alert.alert('Delete failed', recErr.message); return; }
+      const { error } = await supabase.from('spaces').delete().eq('id', sp.id);
+      if (error) { Alert.alert('Delete failed', error.message); return; }
+      queryClient.invalidateQueries({ queryKey: ['spaces', userId] });
+    } catch (e: any) {
+      Alert.alert('Error', e?.message ?? 'Failed to delete space');
+    }
+  };
+
   const handleDeleteSpace = () => {
-    const space = selectedSpace;
+    const sp = selectedSpace;
     setMenuModal(false); setBlur(false);
     Alert.alert(
-      `Delete "${space?.name ?? 'this space'}"?`,
+      `Delete "${sp?.name ?? 'this space'}"?`,
       'This will permanently delete the space and all recordings under it. This cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: async () => {
-            try {
-              await supabase.from('recordings').delete().eq('space_id', space!.id);
-              const { error } = await supabase.from('spaces').delete().eq('id', space!.id);
-              if (error) { Alert.alert('Error', error.message); return; }
-              queryClient.invalidateQueries({ queryKey: ['spaces', userId] });
-            } catch (e: any) {
-              Alert.alert('Error', e?.message ?? 'Failed to delete space');
-            }
-        }},
+        { text: 'Delete', style: 'destructive', onPress: () => { doDeleteSpace(sp); } },
       ]
     );
   };
