@@ -2062,82 +2062,88 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
         <PageHeader
           title={recording?.name ?? ''}
           onBack={handleBack}
+          titleColor="#9cd7d2"
         />
 
         <ScrollView contentContainerStyle={rd.scroll} showsVerticalScrollIndicator={false} style={{ backgroundColor: Colors.white }}>
           <View style={{ height: 8 }} />
-          {/* INFORMATION section */}
-          <View style={rd.infoSectionHeader}>
-            <Text style={rd.infoSectionTitle}>INFORMATION</Text>
-            <TouchableOpacity style={rd.pillBtn} onPress={() => setShowAddChoice(true)} activeOpacity={0.8}>
-              <Text style={rd.pillBtnText}>Actions</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={{ paddingHorizontal: DC.pagePadding }}>
-            <View style={rd.infoRowDotted}>
-              <Text style={rd.infoRowLabel}>Amount</Text>
-              <View style={rd.infoRowDots} />
-              <Text style={[rd.infoRowValue, { color: amountColor() }]}>{Number(recording?.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+
+          {/* Info card */}
+          <View style={rd.infoCard}>
+            <View style={rd.amountRow}>
+              <Text style={[rd.amountValue, { color: amountColor() }]}>
+                {Number(recording?.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              </Text>
+              <TouchableOpacity style={rd.actionsBtn} onPress={() => setShowAddChoice(true)} activeOpacity={0.8}>
+                <Ionicons name="ellipsis-horizontal" size={16} color="#111111" />
+              </TouchableOpacity>
             </View>
-            <View style={rd.infoRowDotted}>
-              <Text style={rd.infoRowLabel}>Date</Text>
-              <View style={rd.infoRowDots} />
-              <Text style={rd.infoRowValue}>{formatDate(recording?.transaction_date)}</Text>
+
+            <View style={rd.infoGrid}>
+              <View style={rd.infoCell}>
+                <Text style={rd.infoCellLabel}>Date</Text>
+                <Text style={rd.infoCellValue}>{formatDate(recording?.transaction_date)}</Text>
+              </View>
+              <View style={rd.infoCell}>
+                <Text style={rd.infoCellLabel}>Category</Text>
+                <Text style={rd.infoCellValue} numberOfLines={1}>{recording?.categories?.name ?? '—'}</Text>
+              </View>
+              <View style={rd.infoCell}>
+                <Text style={rd.infoCellLabel}>Type</Text>
+                {(() => {
+                  const label = typeLabel(recording?.type ?? '', recording?.status ?? '');
+                  const isOut = ['expense', 'debt', 'payment'].includes(recording?.type ?? '');
+                  const badgeColor = isOut ? '#FFAB91' : '#9cd7d2';
+                  return (
+                    <View style={[rd.typeBadge, { backgroundColor: badgeColor + '22' }]}>
+                      <Text style={[rd.typeBadgeText, { color: badgeColor }]}>{label}</Text>
+                    </View>
+                  );
+                })()}
+              </View>
+              <View style={rd.infoCell}>
+                <Text style={rd.infoCellLabel}>Status</Text>
+                <Text style={rd.infoCellValue}>{displayStatus()}</Text>
+              </View>
+              <View style={rd.infoCell}>
+                <Text style={rd.infoCellLabel}>Account</Text>
+                <Text style={rd.infoCellValue} numberOfLines={1}>{recording?.account?.account_name ?? '—'}</Text>
+              </View>
+              <View style={rd.infoCell}>
+                <Text style={rd.infoCellLabel}>Owes You</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Text style={rd.infoCellValue} numberOfLines={1}>{recording?.person_name ?? '—'}</Text>
+                  {linkedSplitBill && <Ionicons name="lock-closed-outline" size={10} color={Colors.muted} />}
+                </View>
+              </View>
             </View>
-            <View style={rd.infoRowDotted}>
-              <Text style={rd.infoRowLabel}>Category</Text>
-              <View style={rd.infoRowDots} />
-              <Text style={rd.infoRowValue}>{recording?.categories?.name ?? '—'}</Text>
-            </View>
-            <View style={rd.infoRowDotted}>
-              <Text style={rd.infoRowLabel}>Type</Text>
-              <View style={rd.infoRowDots} />
-              {(() => {
-                const label = typeLabel(recording?.type ?? '', recording?.status ?? '');
-                const isOut = ['expense', 'debt', 'payment'].includes(recording?.type ?? '');
-                const badgeColor = isOut ? '#FFAB91' : '#9cd7d2';
-                return (
-                  <View style={{ backgroundColor: badgeColor + '33', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3 }}>
-                    <Text style={{ fontFamily: AppFont.semiBold, fontSize: 11, color: badgeColor }}>{label}</Text>
-                  </View>
-                );
-              })()}
-            </View>
-            <View style={rd.infoRowDotted}>
-              <Text style={rd.infoRowLabel}>Status</Text>
-              <View style={rd.infoRowDots} />
-              <Text style={rd.infoRowValue}>{displayStatus()}</Text>
-            </View>
-            <View style={rd.infoRowDotted}>
-              <Text style={rd.infoRowLabel}>Account</Text>
-              <View style={rd.infoRowDots} />
-              <Text style={rd.infoRowValue}>{recording?.account?.account_name ?? '—'}</Text>
-            </View>
-            <View style={rd.infoRowDotted}>
-              <Text style={rd.infoRowLabel}>Owes You</Text>
-              <View style={rd.infoRowDots} />
-              <Text style={rd.infoRowValue}>{recording?.person_name ?? '—'}</Text>
-            </View>
-            <View style={{ paddingVertical: 12 }}>
-              <Text style={rd.notesLabel}>Notes</Text>
-              <Text style={rd.notesValue}>{recording?.notes ?? 'None'}</Text>
-            </View>
+
+            {(recording?.notes ?? '').trim() ? (
+              <View style={rd.notesBlock}>
+                <Text style={rd.notesLabel}>Notes</Text>
+                <Text style={rd.notesValue}>{recording?.notes}</Text>
+              </View>
+            ) : null}
           </View>
 
-          {/* SPLIT BILL section */}
-          <View style={rd.sectionDivider} />
-          <View style={rd.infoSectionHeader}>
-            <Text style={rd.infoSectionTitle}>SPLIT BILL</Text>
-            <TouchableOpacity style={rd.pillBtn} onPress={() => linkedSplitBill ? openSplitBill(linkedSplitBill.id, linkedSplitBill.name) : openSplitBillModal()} activeOpacity={0.8}>
-              <Text style={rd.pillBtnText}>{linkedSplitBill ? 'View' : 'Create'}</Text>
-            </TouchableOpacity>
-          </View>
+          {/* SPLIT BILL section — disabled for manual due/owes recordings */}
+          {!((recording?.type === 'debt' || recording?.type === 'due' || recording?.is_due) && !linkedSplitBill) && (
+            <View style={rd.sectionDivider} />
+          )}
+          {!((recording?.type === 'debt' || recording?.type === 'due' || recording?.is_due) && !linkedSplitBill) && (
+            <View style={rd.sectionRow}>
+              <Text style={rd.sectionLabel}>Split Bill</Text>
+              <TouchableOpacity style={rd.sectionBtn} onPress={() => linkedSplitBill ? openSplitBill(linkedSplitBill.id, linkedSplitBill.name) : openSplitBillModal()} activeOpacity={0.8}>
+                <Text style={rd.sectionBtnText}>{linkedSplitBill ? 'View' : 'Create'}</Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
           {/* RECEIPTS section */}
-          <View style={rd.infoSectionHeader}>
-            <Text style={rd.infoSectionTitle}>RECEIPTS</Text>
-            <TouchableOpacity style={rd.pillBtn} onPress={() => receiptPhotos.length > 0 ? (setPhotoModalIndex(0), setPhotoModal(true)) : setAddReceiptModal(true)} activeOpacity={0.8}>
-              <Text style={rd.pillBtnText}>{receiptPhotos.length > 0 ? `View (${receiptPhotos.length})` : 'Add'}</Text>
+          <View style={rd.sectionRow}>
+            <Text style={rd.sectionLabel}>Receipts</Text>
+            <TouchableOpacity style={rd.sectionBtn} onPress={() => receiptPhotos.length > 0 ? (setPhotoModalIndex(0), setPhotoModal(true)) : setAddReceiptModal(true)} activeOpacity={0.8}>
+              <Text style={rd.sectionBtnText}>{receiptPhotos.length > 0 ? `View (${receiptPhotos.length})` : 'Add'}</Text>
             </TouchableOpacity>
           </View>
 
@@ -2147,8 +2153,8 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
           {(recording?.type === 'debt' || recording?.type === 'due' || (recording?.type === 'expense' && linkedPayments.length > 0)) && linkedPayments.length > 0 && (
             <>
               <View style={rd.sectionDivider} />
-              <View style={rd.infoSectionHeader}>
-                <Text style={rd.infoSectionTitle}>Collections</Text>
+              <View style={rd.sectionRow}>
+                <Text style={rd.sectionLabel}>Collections</Text>
               </View>
               <View style={{ paddingHorizontal: DC.pagePadding }}>
                 {linkedPayments.map((p: any, i: number) => (
@@ -2168,8 +2174,8 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
               </View>
               {personPayStatus.length > 0 && (
                 <>
-                  <View style={rd.infoSectionHeader}>
-                    <Text style={rd.infoSectionTitle}>Per Person Status</Text>
+                  <View style={rd.sectionRow}>
+                    <Text style={rd.sectionLabel}>Per Person Status</Text>
                   </View>
                   <View style={{ paddingHorizontal: DC.pagePadding }}>
                     {personPayStatus.map((s, i) => {
@@ -2197,8 +2203,8 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
           {splitBillPayments.length > 0 && (
             <>
               <View style={rd.sectionDivider} />
-              <View style={rd.infoSectionHeader}>
-                <Text style={rd.infoSectionTitle}>Split Bill Collections</Text>
+              <View style={rd.sectionRow}>
+                <Text style={rd.sectionLabel}>Split Bill Collections</Text>
               </View>
               <View style={{ paddingHorizontal: DC.pagePadding }}>
                 {splitBillPayments.map((p: any) => (
@@ -2221,8 +2227,8 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
           {relatedSplitBillPayments.length > 0 && (
             <>
               <View style={rd.sectionDivider} />
-              <View style={rd.infoSectionHeader}>
-                <Text style={rd.infoSectionTitle}>Related Records</Text>
+              <View style={rd.sectionRow}>
+                <Text style={rd.sectionLabel}>Related Records</Text>
               </View>
               <View style={{ paddingHorizontal: DC.pagePadding }}>
                 {relatedSplitBillPayments.map((p: any) => (
@@ -2272,7 +2278,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
           <View style={{ flex: 1 }}><Text style={rd.choiceTitle}>Edit Recording</Text><Text style={rd.choiceSub}>Change name, date, amount, category</Text></View>
           <Ionicons name="chevron-forward" size={14} color={Colors.faint} />
         </TouchableOpacity>
-        {recording?.type === 'expense' && !linkedPayable && !linkedReceivable && !recording?.is_due && !recording?.person_name && (
+        {recording?.type === 'expense' && !linkedPayable && !linkedReceivable && !recording?.is_due && !recording?.person_name && !linkedSplitBill && (
           <TouchableOpacity style={rd.choiceRow} activeOpacity={0.8} onPress={() => { setShowAddChoice(false); setReceivableMode('full'); setReceivableManualAmount(''); setReceivableSelectedPeople([]); setReceivableModal(true); }}>
             <View style={[rd.choiceIcon, { backgroundColor: DC.accent1 + '22' }]}><Ionicons name="arrow-undo-outline" size={20} color={DC.accent1} /></View>
             <View style={{ flex: 1 }}><Text style={rd.choiceTitle}>Tag as Due</Text><Text style={rd.choiceSub}>Mark this expense as collectible</Text></View>
@@ -3054,21 +3060,20 @@ const rd = StyleSheet.create({
   amountBadgeText: { fontFamily: Brand.font.monoBold, fontSize: 13 },
   scroll:     { paddingBottom: 100, backgroundColor: Colors.white },
 
-  // INFORMATION section header
-  infoSectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: DC.pagePadding, paddingTop: 20, paddingBottom: 12 },
-  infoSectionTitle:  { fontFamily: AppFont.bold, fontSize: 13, color: DC.pageText, letterSpacing: 1, textTransform: 'uppercase' as const },
-  pillBtn:           { paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: DC.pageActionBg, borderWidth: DC.pageActionBorderWidth },
-  pillBtnText:       { fontFamily: AppFont.regular, fontSize: 13, color: DC.pageActionText },
-
-  // Dotted info rows
-  infoRowDotted: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10 },
-  infoRowDots:   { flex: 1, borderBottomWidth: 2, borderBottomColor: DC.cardBorder, borderStyle: 'dotted' as const, marginHorizontal: 20, marginBottom: 2 },
-  infoRowLabel:  { fontFamily: AppFont.regular, fontSize: 12, color: DC.pageTextMuted },
-  infoRowValue:  { fontFamily: AppFont.semiBold, fontSize: 12, color: DC.pageText },
-
-  // Notes
-  notesLabel: { fontFamily: AppFont.bold, fontSize: 12, color: DC.pageText, marginBottom: 4 },
-  notesValue: { fontFamily: AppFont.regular, fontSize: 12, color: DC.pageTextMuted, fontStyle: 'italic' as const },
+  // Info card
+  infoCard: { marginHorizontal: DC.pagePadding, borderRadius: 16, backgroundColor: '#F8F8F8', padding: 16, marginTop: 8 },
+  amountRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
+  amountValue: { fontFamily: AppFont.bold, fontSize: 28, letterSpacing: -0.5 },
+  actionsBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#eeeeee', alignItems: 'center', justifyContent: 'center' },
+  infoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  infoCell: { width: '46%', gap: 2 },
+  infoCellLabel: { fontFamily: AppFont.regular, fontSize: 10, color: '#999999', textTransform: 'uppercase', letterSpacing: 0.5 },
+  infoCellValue: { fontFamily: AppFont.semiBold, fontSize: 13, color: '#111111' },
+  typeBadge: { alignSelf: 'flex-start', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
+  typeBadgeText: { fontFamily: AppFont.semiBold, fontSize: 11 },
+  notesBlock: { marginTop: 16, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#eeeeee', gap: 4 },
+  notesLabel: { fontFamily: AppFont.semiBold, fontSize: 10, color: '#999999', textTransform: 'uppercase', letterSpacing: 0.5 },
+  notesValue: { fontFamily: AppFont.regular, fontSize: 13, color: '#111111', lineHeight: 18 },
 
   // Choice rows (actions sheet)
   choiceRow:   { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: DC.cardBorder },
@@ -3087,9 +3092,12 @@ const rd = StyleSheet.create({
   summaryLabel: { fontFamily: Brand.font.mono, fontSize: 10, color: Colors.muted, letterSpacing: 0.4, textTransform: 'uppercase', marginBottom: 3 },
   summaryValue: { fontFamily: Brand.font.monoBold, fontSize: 13, color: Colors.text },
 
-  // Divider
-  divider:        { height: 8, backgroundColor: Colors.surface, marginHorizontal: -DC.pagePadding },
+  // Section headers
   sectionDivider: { height: 1, backgroundColor: DC.cardBorder, marginHorizontal: DC.pagePadding, marginVertical: 4 },
+  sectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: DC.pagePadding, paddingTop: 20, paddingBottom: 6 },
+  sectionLabel: { fontFamily: AppFont.bold, fontSize: 12, color: '#999999', textTransform: 'uppercase', letterSpacing: 0.8 },
+  sectionBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: Radius.pill, backgroundColor: '#9cd7d222' },
+  sectionBtnText: { fontFamily: AppFont.semiBold, fontSize: 12, color: '#5dc4bb' },
 
   // Section rows
   sectionRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: DC.pagePadding, paddingTop: 20, paddingBottom: 8 },

@@ -1,6 +1,6 @@
 import {
   View, Text, StyleSheet, ScrollView, SafeAreaView,
-  TouchableOpacity, RefreshControl,
+  TouchableOpacity, RefreshControl, Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useMemo, useEffect } from 'react';
@@ -130,6 +130,27 @@ export default function SpacesPanel({ onClose }: Props) {
     );
   };
 
+  const handleDeleteSpace = (sp: { id: string; name: string }) => {
+    Alert.alert(
+      `Delete "${sp.name}"?`,
+      'This will permanently delete the space and all recordings under it. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: async () => {
+            setSpaceChoice(null);
+            try {
+              await supabase.from('recordings').delete().eq('space_id', sp.id);
+              const { error } = await supabase.from('spaces').delete().eq('id', sp.id);
+              if (error) { Alert.alert('Error', error.message); return; }
+              await invalidate();
+            } catch (e: any) {
+              Alert.alert('Error', e?.message ?? 'Failed to delete space');
+            }
+        }},
+      ]
+    );
+  };
+
   return (
     <SafeAreaView style={st.root}>
       <PageHeader title="Spaces" onBack={onClose} titleColor={TEAL} />
@@ -191,12 +212,19 @@ export default function SpacesPanel({ onClose }: Props) {
           </View>
           <Ionicons name="chevron-forward" size={14} color={Colors.muted} />
         </TouchableOpacity>
-        <TouchableOpacity style={[st.choiceRow, { borderBottomWidth: 0 }]} activeOpacity={0.8} onPress={() => { const sp = spaceChoice; setSpaceChoice(null); openSpace(sp!.id, sp!.name, true); }}>
+        <TouchableOpacity style={st.choiceRow} activeOpacity={0.8} onPress={() => { const sp = spaceChoice; setSpaceChoice(null); openSpace(sp!.id, sp!.name, true); }}>
           <View style={{ flex: 1 }}>
             <Text style={st.choiceTitle}>Edit Space</Text>
-            <Text style={st.choiceSub}>rename, archive, or delete</Text>
+            <Text style={st.choiceSub}>rename or archive</Text>
           </View>
           <Ionicons name="chevron-forward" size={14} color={Colors.muted} />
+        </TouchableOpacity>
+        <TouchableOpacity style={[st.choiceRow, { borderBottomWidth: 0 }]} activeOpacity={0.8} onPress={() => { const sp = spaceChoice!; handleDeleteSpace(sp); }}>
+          <View style={{ flex: 1 }}>
+            <Text style={[st.choiceTitle, { color: '#FF5757' }]}>Delete Space</Text>
+            <Text style={st.choiceSub}>permanently deletes space and all recordings</Text>
+          </View>
+          <Ionicons name="trash-outline" size={14} color="#FF5757" />
         </TouchableOpacity>
       </BottomSheet>
     </SafeAreaView>

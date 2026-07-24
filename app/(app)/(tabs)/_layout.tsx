@@ -6,7 +6,6 @@ import AnimatedIcon from '@/components/ui/AnimatedIcon';
 import { BlurView } from 'expo-blur';
 import GooeyLoader from '@/components/ui/GooeyLoader';
 import HomeScreen from './home';
-import SpacesScreen from './spaces';
 import AccountsScreen from './accounts';
 import BillSplitScreen from './bill-split';
 import ReceiptsScreen from './receipts';
@@ -22,7 +21,7 @@ import CategoriesPanel from '../top-spending';
 import RecordingsPanel from '../recordings-panel';
 import SpacesPanel from '../spaces-panel';
 import LoansPanel from '../loans-panel';
-import ReceivablesPanel from '../receivables-panel';
+import PeoplePanel from '../people-panel';
 import RemindersPanel from '../reminders-panel';
 import ContactsPanel from '../contacts-panel';
 import FriendsPanel from '../friends-panel';
@@ -64,7 +63,6 @@ const MAIN_TABS = [
 ];
 
 const TAB_META: Record<string, { title: string; subtitle: string }> = {
-  spaces:        { title: 'Spaces',     subtitle: 'track your budgets & savings'    },
   accounts:      { title: 'accounts',   subtitle: 'your saved payment methods'      },
   dashboard:     { title: 'activities', subtitle: 'all your recordings in one place' },
   receipts:      { title: 'receipts',   subtitle: 'your paper trail, digitized'     },
@@ -90,12 +88,11 @@ const OTHERS_ITEMS = [
   { key: 'profile',     label: 'Profile',     icon: 'person-outline',        route: null },
 ];
 
-const SLIDE_KEYS = ['home', 'spaces', 'accounts', 'dashboard', 'categories', 'receipts', 'bill-split', 'contacts', 'notifications-page', 'reminders', 'profile'];
+const SLIDE_KEYS = ['home', 'accounts', 'dashboard', 'categories', 'receipts', 'bill-split', 'contacts', 'notifications-page', 'reminders', 'profile'];
 
 const PROFILE_DANGER   = '#FFAB91';
 const PROFILE_DANGEBG  = '#FFF5F2';
 const MemoHome       = memo(HomeScreen);
-const MemoSpaces     = memo(SpacesScreen);
 const MemoAccounts   = memo(AccountsScreen);
 const MemoBillSplit  = memo(BillSplitScreen);
 const MemoReceipts   = memo(ReceiptsScreen);
@@ -107,7 +104,6 @@ const MemoReminders      = memo(RemindersScreen);
 
 const SCREENS: Record<string, (isActive: boolean) => React.ReactNode> = {
   home:                 (isActive) => <MemoHome isActive={isActive} />,
-  spaces:               (isActive) => <MemoSpaces isActive={isActive} />,
   accounts:             (isActive) => <MemoAccounts isActive={isActive} />,
   dashboard:            (isActive) => <MemoDashboard isActive={isActive} />,
   categories:           (isActive) => <MemoCategories isActive={isActive} />,
@@ -791,8 +787,9 @@ export default function TabsLayout() {
   const [receivablesPanelOpen, setReceivablesPanelOpen] = useState(false);
   const receivablesPanelOpenRef = useRef(false);
   const receivablesPanelAnim = useRef(new Animated.Value(width)).current;
-  const openReceivablesPanel = useCallback(() => { receivablesPanelOpenRef.current = true; setReceivablesPanelOpen(true); receivablesPanelAnim.setValue(width); requestAnimationFrame(() => { Animated.timing(receivablesPanelAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start(); }); }, []);
-  const closeReceivablesPanel = useCallback(() => { receivablesPanelOpenRef.current = false; Animated.timing(receivablesPanelAnim, { toValue: width, duration: 260, useNativeDriver: true }).start(() => { setReceivablesPanelOpen(false); }); }, []);
+  const [receivablesInitialPerson, setReceivablesInitialPerson] = useState<string | null>(null);
+  const openReceivablesPanel = useCallback((person?: string) => { setReceivablesInitialPerson(person ?? null); receivablesPanelOpenRef.current = true; setReceivablesPanelOpen(true); receivablesPanelAnim.setValue(width); requestAnimationFrame(() => { Animated.timing(receivablesPanelAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start(); }); }, []);
+  const closeReceivablesPanel = useCallback(() => { receivablesPanelOpenRef.current = false; setReceivablesInitialPerson(null); Animated.timing(receivablesPanelAnim, { toValue: width, duration: 260, useNativeDriver: true }).start(() => { setReceivablesPanelOpen(false); }); }, []);
 
   const [remindersPanelOpen, setRemindersPanelOpen] = useState(false);
   const remindersPanelOpenRef = useRef(false);
@@ -876,17 +873,17 @@ export default function TabsLayout() {
     recordingsPanelAnim.setValue(width);
     spacesPanelOpenRef.current = spacesPanelOpenRef.current;
     spacesPanelAnim.setValue(width);
-    loansPanelOpenRef.current = loansPanelOpenRef.current;
     loansPanelAnim.setValue(width);
-    receivablesPanelOpenRef.current = receivablesPanelOpenRef.current;
     receivablesPanelAnim.setValue(width);
-    remindersPanelOpenRef.current = remindersPanelOpenRef.current;
     remindersPanelAnim.setValue(width);
     contactsPanelAnim.setValue(width);
     friendsPanelAnim.setValue(width);
-    // Hide conditional panels
+    // Hide conditional panels and reset refs
+    loansPanelOpenRef.current = false;
     setLoansPanelOpen(false);
+    receivablesPanelOpenRef.current = false;
     setReceivablesPanelOpen(false);
+    remindersPanelOpenRef.current = false;
     setRemindersPanelOpen(false);
     setContactsPanelOpen(false);
     setFriendsPanelOpen(false);
@@ -1144,7 +1141,7 @@ export default function TabsLayout() {
       {/* Receivables panel */}
       <Animated.View style={[s.screen, s.panel, { transform: [{ translateX: receivablesPanelAnim }], zIndex: 55 }]}
         pointerEvents={receivablesPanelOpen ? 'auto' : 'none'}>
-        <ReceivablesPanel onClose={closeReceivablesPanel} />
+        <PeoplePanel onClose={closeReceivablesPanel} initialPerson={receivablesInitialPerson} />
       </Animated.View>
 
       {/* Reminders panel */}

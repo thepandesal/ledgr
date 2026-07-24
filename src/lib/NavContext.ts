@@ -17,7 +17,7 @@ interface NavContextType {
   pendingTab: string | null;
   setPendingTab: (key: string | null) => void;
   // Space detail panel
-  openSpace: (spaceId: string, name: string) => void;
+  openSpace: (spaceId: string, name: string, edit?: boolean) => void;
   closeSpace: () => void;
   activeSpaceId: string | null;
   activeSpaceName: string | null;
@@ -43,7 +43,7 @@ interface NavContextType {
   openLoansPanel: () => void;
   closeLoansPanel: () => void;
   // Receivables panel
-  openReceivablesPanel: () => void;
+  openReceivablesPanel: (person?: string) => void;
   closeReceivablesPanel: () => void;
   // Reminders panel
   openRemindersPanel: () => void;

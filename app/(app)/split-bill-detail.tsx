@@ -21,6 +21,7 @@ import { DC } from '../../src/lib/design';
 import { AppFont } from '../../src/lib/fonts';
 import { ocrReceiptImage, parseReceiptText, type ParsedItem } from '../../src/lib/receiptParser';
 import { CalSansBase64, ChillaxMediumBase64, ChillaxBoldBase64 } from '../../src/lib/fontBase64';
+import PaymentModal, { type PaymentItem } from './payment-modal';
 
 const ACCENT      = Brand.color.accent;      // light mint — backgrounds/chips only
 const ACCENT_DARK = Brand.color.accentDark;  // #2A7A6F — text/icons on white
@@ -124,6 +125,33 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
 
   // ── Load linked recordings ────────────────────────────────────────────────
   const { userId, defaultCurrency } = useUser();
+
+  // ── All-time loan/due balance per person (where you stand) ─────────────
+  const { data: personBalances = {} } = useQuery({
+    queryKey: ['person-loan-balances', userId],
+    queryFn: async () => {
+      const { data: recs } = await supabase
+        .from('recordings')
+        .select('type, person_name, amount, paid_amount')
+        .eq('user_id', userId)
+        .in('type', ['debt', 'due'])
+        .neq('status', 'voided');
+      const balances: Record<string, number> = {};
+      (recs ?? []).forEach((r: any) => {
+        const name = r.person_name;
+        if (!name) return;
+        const paid = Number(r.paid_amount ?? 0);
+        const net = Number(r.amount) - paid;
+        if (r.type === 'due') {
+          balances[name] = (balances[name] ?? 0) + net; // they owe me
+        } else {
+          balances[name] = (balances[name] ?? 0) - net; // I owe them
+        }
+      });
+      return balances;
+    },
+    enabled: !!userId,
+  });
 
   // ── People state ─────────────────────────────────────────────────────────
   const [addPersonModal, setAddPersonModal] = useState(false);
@@ -449,7 +477,7 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
       .in('type', ['expense', 'due', 'debt', 'income'])
       .order('transaction_date', { ascending: false })
       .limit(200);
-    setAllRecordings((data ?? []).filter((r: any) => !linkedIds.includes(r.id)));
+    setAllRecordings((data ?? []).filter((r: any) => !linkedIds.includes(r.id) && r.type !== 'debt' && r.type !== 'due'));
     setRecTab('expense');
     setRecSearch('');
     setRecDays(30);
@@ -1055,11 +1083,14 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
     queryClient.invalidateQueries({ queryKey: ['split-bill-recordings', splitBillId] });
   };
 
-  // ── Close bill with incomplete recordings ────────────────────────────────
-  const [closeWithIncompleteModal, setCloseWithIncompleteModal] = useState(false);
-  const [incompleteRecs, setIncompleteRecs] = useState<any[]>([]);
+  // ── Close confirm ────────────────────────────────────────────────────────
+  const [closeConfirmModal, setCloseConfirmModal] = useState(false);
+  const [unpaidPeopleNames, setUnpaidPeopleNames] = useState<string[]>([]);
   const [closingLoading, setClosingLoading] = useState(false);
-  const [completeMode, setCompleteMode] = useState<'as-is' | 'full' | 'write-off'>('as-is');
+  const [closeCreateRecording, setCloseCreateRecording] = useState(false);
+  const [closeSpaceId, setCloseSpaceId] = useState<string | null>(null);
+  const [closeSpaces, setCloseSpaces] = useState<any[]>([]);
+  const [closeNoRecordings, setCloseNoRecordings] = useState(false);
 
   const handleToggleStatus = async () => {
     if (billStatus === 'closed') {
@@ -1067,7 +1098,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
       for (const lr of linkedRecordings) {
         const rec = lr.recording;
         if (!rec) continue;
-        // Sum what was actually collected via split bill payments for this recording
         const { data: returnRecs } = await supabase
           .from('recordings')
           .select('amount')
@@ -1087,35 +1117,31 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
       queryClient.invalidateQueries({ queryKey: ['split-bills', userId] });
       return;
     }
-    // Closing — check for incomplete recordings
-    const incomplete = linkedRecordings.filter((lr: any) => {
-      const rec = lr.recording;
-      if (!rec) return false;
-      // Calculate the collectible amount from items assigned to this recording
-      const recItems = items.filter((item: any) => item.recording_id === rec.id);
-      if (recItems.length === 0) return false; // no items linked, skip
-      const collectible = recItems.reduce((s: number, item: any) => {
-        const pp = (item.people ?? []).length > 0 ? Number(item.cost) / item.people.length : 0;
-        return s + pp * (item.people ?? []).length;
-      }, 0);
-      const paid = Number(rec.paid_amount ?? 0);
-      return collectible > 0 && paid < collectible - 0.01;
+    // Closing — find people who haven't fully paid
+    const totals = computeTotals();
+    const unpaid = filledPeople.filter(p => {
+      const owed = Math.abs(totals[p] ?? 0);
+      const paid = activePayments
+        .filter((pay: any) => pay.person_name === p)
+        .reduce((s: number, pay: any) => s + Number(pay.amount), 0);
+      return owed > 0 && paid < owed - 0.01;
     });
-    // Attach collectible amount to each incomplete rec for display
-    const incompleteWithAmounts = incomplete.map((lr: any) => {
-      const rec = lr.recording;
-      const recItems = items.filter((item: any) => item.recording_id === rec.id);
-      const collectible = recItems.reduce((s: number, item: any) => {
-        const pp = (item.people ?? []).length > 0 ? Number(item.cost) / item.people.length : 0;
-        return s + pp * (item.people ?? []).length;
-      }, 0);
-      const paid = Number(rec.paid_amount ?? 0);
-      return { ...lr, collectible, collectedSoFar: paid };
-    });
-    if (incomplete.length > 0) {
-      setIncompleteRecs(incompleteWithAmounts);
-      setCompleteMode('as-is');
-      setCloseWithIncompleteModal(true);
+    const noRecs = linkedRecordings.length === 0;
+    if (unpaid.length > 0) {
+      setUnpaidPeopleNames(unpaid);
+      setCloseNoRecordings(noRecs);
+      setCloseCreateRecording(false);
+      setCloseSpaceId(null);
+      if (noRecs) {
+        const { data: sp } = await supabase.from('spaces').select('id, name').eq('user_id', userId).eq('is_active', true).order('name');
+        setCloseSpaces(sp ?? []);
+      }
+      setCloseConfirmModal(true);
+    } else if (noRecs) {
+      // No unpaid people and no recordings — just close
+      await supabase.from('split_bills').update({ status: 'closed' }).eq('id', splitBillId);
+      setBillStatus('closed');
+      queryClient.invalidateQueries({ queryKey: ['split-bills', userId] });
     } else {
       await supabase.from('split_bills').update({ status: 'closed' }).eq('id', splitBillId);
       setBillStatus('closed');
@@ -1123,75 +1149,65 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
     }
   };
 
-  const closeAndCompleteAll = async () => {
+  const confirmClose = async () => {
     setClosingLoading(true);
     const today = new Date().toISOString().split('T')[0];
-    for (const lr of incompleteRecs) {
+    let expenseId: string | null = null;
+    if (closeCreateRecording && closeSpaceId) {
+      const total = items.reduce((s: number, i: any) => s + Number(i.cost), 0);
+      const { data: expense } = await supabase.from('recordings').insert({
+        user_id: userId,
+        space_id: closeSpaceId,
+        name: String(name),
+        type: 'expense',
+        amount: total,
+        transaction_date: today,
+        status: 'paid',
+        paid_amount: total,
+        split_bill_id: splitBillId,
+      }).select('id').single();
+      expenseId = expense?.id ?? null;
+      if (expenseId) {
+        await supabase.from('split_bill_recordings').insert({
+          split_bill_id: splitBillId,
+          recording_id: expenseId,
+          amount_contributed: total,
+        });
+      }
+      // Create return recordings for each person's payments
+      for (const pay of activePayments) {
+        const amt = Number(pay.amount);
+        if (amt <= 0) continue;
+        await supabase.from('recordings').insert({
+          user_id: userId,
+          space_id: closeSpaceId,
+          name: `${String(name)} · ${pay.person_name}`,
+          type: 'return',
+          amount: amt,
+          transaction_date: today,
+          status: 'received',
+          linked_recording_id: expenseId,
+          split_bill_id: splitBillId,
+        });
+      }
+    }
+    for (const lr of linkedRecordings) {
       const rec = lr.recording;
       if (!rec) continue;
-      const currentPaid = Number(rec.paid_amount ?? 0);
-      const fullAmount = Number(rec.amount);
-      if (completeMode === 'full') {
-        const difference = fullAmount - currentPaid;
-        if (difference > 0.01) {
-          await supabase.from('recordings').insert({
-            user_id: userId,
-            space_id: rec.space_id,
-            name: `${rec.name} · manual override`,
-            type: 'return',
-            amount: difference,
-            transaction_date: today,
-            status: 'received',
-            linked_recording_id: rec.id,
-            split_bill_id: splitBillId,
-          });
-        }
-        await supabase.from('recordings').update({
-          paid_amount: fullAmount,
-          status: 'paid',
-          is_due: true,
-        }).eq('id', rec.id);
-      } else if (completeMode === 'write-off') {
-        const remainder = fullAmount - currentPaid;
-        if (remainder > 0.01) {
-          await writeOff({
-            parentRecordingId: rec.id,
-            parentName: rec.name,
-            amount: remainder,
-            spaceId: rec.space_id,
-            userId,
-            reason: 'split bill closed with unpaid remainder',
-          });
-        } else {
-          await supabase.from('recordings').update({ status: 'paid', is_due: true }).eq('id', rec.id);
-        }
-      } else {
-        // as-is: just mark paid without changing paid_amount
-        await supabase.from('recordings').update({
-          status: 'paid',
-          is_due: true,
-        }).eq('id', rec.id);
-      }
+      await supabase.from('recordings').update({
+        status: 'paid',
+        is_due: true,
+      }).eq('id', rec.id);
     }
     await supabase.from('split_bills').update({ status: 'closed' }).eq('id', splitBillId);
     setBillStatus('closed');
-    setCloseWithIncompleteModal(false);
+    setCloseConfirmModal(false);
     setClosingLoading(false);
     queryClient.invalidateQueries({ queryKey: ['split-bills', userId] });
     queryClient.invalidateQueries({ queryKey: ['split-bill-recordings', splitBillId] });
-  };
-
-  const closeWithoutCompleting = async () => {
-    // Mark all linked expense recordings as is_due so their paid_amount is reflected correctly
-    for (const lr of incompleteRecs) {
-      const rec = lr.recording;
-      if (!rec) continue;
-      await supabase.from('recordings').update({ is_due: true }).eq('id', rec.id);
+    if (closeCreateRecording && closeSpaceId) {
+      queryClient.invalidateQueries({ queryKey: ['recordings', closeSpaceId] });
     }
-    await supabase.from('split_bills').update({ status: 'closed' }).eq('id', splitBillId);
-    setBillStatus('closed');
-    setCloseWithIncompleteModal(false);
-    queryClient.invalidateQueries({ queryKey: ['split-bill-recordings', splitBillId] });
   };
 
   // ── Auto-complete check after payment ────────────────────────────────────
@@ -1350,6 +1366,8 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
   const [paymentManualAmounts, setPaymentManualAmounts] = useState<Record<string, string>>({});
   const [paymentRecord, setPaymentRecord]   = useState(true);
   const [paymentSaving, setPaymentSaving]   = useState(false);
+  const [itemPayModal, setItemPayModal]     = useState(false);
+  const [itemPayPerson, setItemPayPerson]   = useState('');
   const [chargeToSpace, setChargeToSpace]   = useState(false);
   const [showMorePayments, setShowMorePayments] = useState<Record<string, boolean>>({});
   const [chargeSpaceId, setChargeSpaceId]   = useState<string | null>(null);
@@ -1784,6 +1802,72 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
       setOverpaymentModal(true);
     }
   };
+  const confirmItemPay = async (paymentItems: PaymentItem[], mode: 'all' | 'this-bill' | 'selected') => {
+    setItemPayModal(false);
+    if (paymentItems.length === 0) return;
+    const linkedRecUpdates: { id: string; amount: number }[] = [];
+    const manualAmounts: { name: string; amount: number }[] = [];
+    for (const pi of paymentItems) {
+      if (pi.source === 'split_bill') {
+        const billId = pi.id.replace('sb-', '');
+        const billItems = items.filter((i: any) => i.split_bill_id === billId && (i.people ?? []).includes(itemPayPerson));
+        const linkedRecMap = new Map<string, number>();
+        let manualTotal = 0;
+        billItems.forEach((bi: any) => {
+          const pp = (bi.people ?? []).length > 0 ? Number(bi.cost) / bi.people.length : 0;
+          const deduct = isDeductType(bi.recording_type);
+          const amt = Math.abs(deduct ? -pp : pp);
+          if (bi.recording_id) {
+            linkedRecMap.set(bi.recording_id, (linkedRecMap.get(bi.recording_id) ?? 0) + amt);
+          } else {
+            manualTotal += amt;
+          }
+        });
+        for (const [recId, amt] of linkedRecMap) {
+          linkedRecUpdates.push({ id: recId, amount: amt });
+        }
+        if (manualTotal > 0) {
+          const bill = items.find((i: any) => i.split_bill_id === billId);
+          manualAmounts.push({ name: String(name), amount: manualTotal });
+        }
+        const payRow = {
+          user_id: userId, split_bill_id: billId, person_name: itemPayPerson,
+          amount: pi.amount, created_at: new Date().toISOString(),
+        };
+        await supabase.from('split_bill_payments').insert(payRow);
+      } else {
+        const recId = pi.id.replace('rec-', '');
+        linkedRecUpdates.push({ id: recId, amount: pi.amount });
+      }
+    }
+    const readIds = linkedRecUpdates.map((u) => u.id);
+    const { data: existingRecs } = await supabase.from('recordings').select('id, paid_amount, amount').in('id', readIds);
+    const recMap = new Map((existingRecs ?? []).map((r: any) => [r.id, r]));
+    const updates: { id: string; paid_amount: number; status?: string }[] = [];
+    linkedRecUpdates.forEach((u) => {
+      const rec = recMap.get(u.id);
+      if (!rec) return;
+      const newPaid = Number(rec.paid_amount ?? 0) + u.amount;
+      const upd: any = { paid_amount: newPaid };
+      if (newPaid >= Number(rec.amount)) upd.status = 'paid';
+      updates.push({ id: u.id, ...upd });
+    });
+    const spaceId = linkedRecordings[0]?.recording?.space_id ?? null;
+    const insertPromises = manualAmounts.map((m) =>
+      supabase.from('recordings').insert({
+        user_id: userId, space_id: spaceId,
+        name: `${m.name} · ${itemPayPerson}`,
+        type: 'return', amount: m.amount,
+        transaction_date: new Date().toISOString().split('T')[0],
+        status: 'paid', paid_amount: m.amount,
+      })
+    );
+    const updatePromises = updates.map((u) =>
+      supabase.from('recordings').update({ paid_amount: u.paid_amount, status: u.status ?? undefined }).eq('id', u.id)
+    );
+    await Promise.all([...insertPromises, ...updatePromises]);
+    await Promise.all([refetchItems(), refetchPayments(), queryClient.invalidateQueries({ queryKey: ['transactions'] })]);
+  };
   const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   const typeColor = (type: string) => {
@@ -2189,11 +2273,21 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, paddingHorizontal: 14 }}>
                         <View style={{ flex: 1, gap: 2 }}>
                           <Text style={[s.itemName, { fontSize: 18 }]}>{p}</Text>
-                          <Text style={s.itemSplit}>owes: {fmt(absOwed)}</Text>
+                          <Text style={s.itemSplit}>this bill: {fmt(absOwed)}</Text>
+                          {personBalances[p] !== undefined && (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                              <Text style={{ fontFamily: AppFont.regular, fontSize: 10, color: Colors.muted }}>
+                                {personBalances[p] < 0 ? 'you owe' : 'owed'} all time:
+                              </Text>
+                              <Text style={{ fontFamily: AppFont.semiBold, fontSize: 10, color: personBalances[p] < 0 ? Colors.expense : ACCENT_DARK }}>
+                                {fmt(Math.abs(personBalances[p]))}
+                              </Text>
+                            </View>
+                          )}
                         </View>
                         {!fullyPaid && absOwed > 0 && billStatus === 'ongoing' && (
-                          <TouchableOpacity style={s.itemEditBtn} onPress={() => openPaymentModal(p)}>
-                            <Text style={s.itemEditBtnText}>add payment</Text>
+                          <TouchableOpacity style={s.itemEditBtn} onPress={() => { setItemPayPerson(p); setItemPayModal(true); }}>
+                            <Text style={s.itemEditBtnText}>mark paid</Text>
                           </TouchableOpacity>
                         )}
                         {fullyPaid && (
@@ -3476,57 +3570,74 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
         })()}
       </BottomSheet>
 
-      {/* Close with incomplete recordings modal */}
-      <BottomSheet visible={closeWithIncompleteModal} onClose={() => setCloseWithIncompleteModal(false)} title="incomplete recordings" maxHeight="60%">
+      {/* Close confirm modal */}
+      <BottomSheet visible={closeConfirmModal} onClose={() => setCloseConfirmModal(false)} title="close split bill?" maxHeight="50%">
         <Text style={{ fontFamily: AppFont.regular, fontSize: 12, color: Colors.muted, marginBottom: 12 }}>
-          {incompleteRecs.length} recording{incompleteRecs.length !== 1 ? 's are' : ' is'} not yet fully collected:
+          these people haven't paid yet:
         </Text>
-        <ScrollView style={{ maxHeight: 140 }} showsVerticalScrollIndicator={false}>
-          {incompleteRecs.map((lr: any) => (
-            <View key={lr.id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 10 }}>
+        <View style={{ gap: 8, marginBottom: 16 }}>
+          {unpaidPeopleNames.map((name, i) => (
+            <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <Ionicons name="alert-circle-outline" size={14} color={PEACH} />
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.text }} numberOfLines={1}>{lr.recording?.name}</Text>
-                <Text style={{ fontFamily: AppFont.regular, fontSize: 10, color: Colors.muted }}>
-                  {fmt(lr.collectedSoFar)} of {fmt(lr.collectible)} collected
-                </Text>
-              </View>
-              <Text style={{ fontFamily: AppFont.semiBold, fontSize: 11, color: PEACH }}>{fmt(lr.collectible - lr.collectedSoFar)} left</Text>
+              <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.text }}>{name}</Text>
             </View>
           ))}
-        </ScrollView>
-        <Text style={{ fontFamily: AppFont.semiBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.6, textTransform: 'uppercase', marginTop: 16, marginBottom: 8 }}>mark recordings as</Text>
-        <View style={{ gap: 8 }}>
-          {(['as-is', 'full', 'write-off'] as const).map(m => (
-            <TouchableOpacity
-              key={m}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: Radius.md, borderWidth: 1, borderColor: completeMode === m ? ACCENT_DARK : Colors.borderMid, backgroundColor: completeMode === m ? ACCENT + '22' : Colors.surface }}
-              onPress={() => setCompleteMode(m)}
-            >
-              <Ionicons name={completeMode === m ? 'radio-button-on' : 'radio-button-off'} size={16} color={completeMode === m ? ACCENT_DARK : Colors.muted} />
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontFamily: AppFont.semiBold, fontSize: 13, color: completeMode === m ? ACCENT_DARK : Colors.text }}>
-                  {m === 'as-is' ? 'as is (default)' : m === 'full' ? 'full amount' : 'write off remainder'}
-                </Text>
-                <Text style={{ fontFamily: AppFont.regular, fontSize: 10, color: Colors.muted }}>
-                  {m === 'as-is' ? 'keep current collected amount, mark as paid' : m === 'full' ? 'set paid amount to full recording amount' : 'record unpaid remainder as a write-off expense'}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          ))}
         </View>
+        {closeNoRecordings ? (
+          <>
+            <Text style={{ fontFamily: AppFont.regular, fontSize: 11, color: Colors.muted, marginBottom: 12 }}>
+              no recordings linked to this split bill. you can create one now.
+            </Text>
+            <TouchableOpacity
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10 }}
+              onPress={() => setCloseCreateRecording(v => !v)}
+            >
+              <Ionicons name={closeCreateRecording ? 'checkbox' : 'square-outline'} size={20} color={ACCENT_DARK} />
+              <Text style={{ fontFamily: AppFont.regular, fontSize: 12, color: Colors.text, flex: 1 }}>
+                create an expense and return recordings
+              </Text>
+            </TouchableOpacity>
+            {closeCreateRecording && (
+              <View style={{ marginBottom: 12 }}>
+                <Text style={{ fontFamily: AppFont.semiBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 6 }}>space</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+                  {closeSpaces.map(sp => (
+                    <TouchableOpacity
+                      key={sp.id}
+                      style={{
+                        paddingHorizontal: 14, paddingVertical: 10, borderRadius: 999, borderWidth: 1,
+                        borderColor: closeSpaceId === sp.id ? ACCENT_DARK : Colors.borderMid,
+                        backgroundColor: closeSpaceId === sp.id ? ACCENT + '22' : Colors.surface,
+                      }}
+                      onPress={() => setCloseSpaceId(sp.id)}
+                    >
+                      <Text style={{
+                        fontFamily: AppFont.semiBold, fontSize: 12,
+                        color: closeSpaceId === sp.id ? ACCENT_DARK : Colors.text,
+                      }}>{sp.name}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+          </>
+        ) : (
+          <Text style={{ fontFamily: AppFont.regular, fontSize: 11, color: Colors.muted, marginBottom: 16 }}>
+            closing will mark all linked recordings as paid.
+          </Text>
+        )}
         <TouchableOpacity
-          style={[s.doneBtn, { marginTop: 16, opacity: closingLoading ? 0.5 : 1 }]}
-          onPress={closeAndCompleteAll}
-          disabled={closingLoading}
+          style={[s.doneBtn, { opacity: closingLoading || (closeCreateRecording && !closeSpaceId) ? 0.5 : 1 }]}
+          onPress={confirmClose}
+          disabled={closingLoading || (closeCreateRecording && !closeSpaceId)}
         >
-          <Text style={s.doneBtnText}>{closingLoading ? 'saving...' : 'complete all & close'}</Text>
+          <Text style={s.doneBtnText}>{closingLoading ? 'closing...' : 'close anyway'}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[s.doneBtn, { backgroundColor: Colors.surface, marginTop: 8 }]}
-          onPress={closeWithoutCompleting}
+          onPress={() => setCloseConfirmModal(false)}
         >
-          <Text style={[s.doneBtnText, { color: Colors.muted }]}>close without completing</Text>
+          <Text style={[s.doneBtnText, { color: Colors.muted }]}>cancel</Text>
         </TouchableOpacity>
       </BottomSheet>
 
@@ -3710,6 +3821,13 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
         </View>
       )}
 
+      <PaymentModal
+        visible={itemPayModal}
+        person={itemPayPerson}
+        splitBillId={splitBillId}
+        onClose={() => setItemPayModal(false)}
+        onConfirm={confirmItemPay}
+      />
     </Animated.View>
   );
 }

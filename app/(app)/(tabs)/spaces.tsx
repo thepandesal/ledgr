@@ -1,6 +1,6 @@
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  SafeAreaView, TextInput, ActivityIndicator, useWindowDimensions, Animated, RefreshControl,
+  SafeAreaView, TextInput, ActivityIndicator, useWindowDimensions, Animated, RefreshControl, Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -286,10 +286,26 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
     setError(''); setCreateModal(true);
   };
 
-  const handleDeleteSpace = async () => {
+  const handleDeleteSpace = () => {
+    const space = selectedSpace;
     setMenuModal(false); setBlur(false);
-    await supabase.from('spaces').delete().eq('id', selectedSpace!.id);
-    queryClient.invalidateQueries({ queryKey: ['spaces', userId] });
+    Alert.alert(
+      `Delete "${space?.name ?? 'this space'}"?`,
+      'This will permanently delete the space and all recordings under it. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: async () => {
+            try {
+              await supabase.from('recordings').delete().eq('space_id', space!.id);
+              const { error } = await supabase.from('spaces').delete().eq('id', space!.id);
+              if (error) { Alert.alert('Error', error.message); return; }
+              queryClient.invalidateQueries({ queryKey: ['spaces', userId] });
+            } catch (e: any) {
+              Alert.alert('Error', e?.message ?? 'Failed to delete space');
+            }
+        }},
+      ]
+    );
   };
 
   const handleToggleActive = async () => {

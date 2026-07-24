@@ -1,8 +1,9 @@
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  SafeAreaView, ActivityIndicator, RefreshControl,
+  SafeAreaView, ActivityIndicator, RefreshControl, Animated, Pressable,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import Svg, { Path } from 'react-native-svg';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useUser } from '../../../src/hooks/useUser';
 import { supabase } from '../../../src/lib/supabase';
@@ -16,7 +17,7 @@ import { BlurView } from 'expo-blur';
 import GooeyLoader from '@/components/ui/GooeyLoader';
 import BottomSheet from '@/components/ui/BottomSheet';
 import { isReminderDueToday, reminderFrequencyLabel } from '../../../src/lib/reminderUtils';
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 
 const TEAL = '#5dc4bb';
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -27,7 +28,7 @@ type DateMode = 'monthly' | '3months';
 
 export default function HomeScreen({ isActive }: { isActive?: boolean }) {
   const { userId, defaultCurrency } = useUser();
-  const { switchTab, openSpace, openRecording, openTopSpending, openRecordingsPanel, openSpacesPanel, openLoansPanel, openReceivablesPanel, openRemindersPanel } = useNav();
+  const { switchTab, openSpace, openRecording, openTopSpending, openRecordingsPanel, openSpacesPanel, openReceivablesPanel, openRemindersPanel } = useNav();
   const router = useRouter();
   const queryClient = useQueryClient();
   const [dateMode, setDateMode] = useState<DateMode>('monthly');
@@ -68,8 +69,7 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
     const invalidateAll = () => {
       queryClient.invalidateQueries({ queryKey: ['home-summary-v2', userId] });
       queryClient.invalidateQueries({ queryKey: ['home-recent', userId] });
-      queryClient.invalidateQueries({ queryKey: ['home-loans', userId] });
-      queryClient.invalidateQueries({ queryKey: ['home-receivables', userId] });
+      queryClient.invalidateQueries({ queryKey: ['home-people', userId] });
       queryClient.invalidateQueries({ queryKey: ['home-spaces', userId] });
       queryClient.invalidateQueries({ queryKey: ['home-totals', userId] });
     };
@@ -90,8 +90,7 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['home-summary-v2', userId, monthFrom] }),
       queryClient.invalidateQueries({ queryKey: ['home-recent', userId] }),
-      queryClient.invalidateQueries({ queryKey: ['home-loans', userId] }),
-      queryClient.invalidateQueries({ queryKey: ['home-receivables', userId] }),
+      queryClient.invalidateQueries({ queryKey: ['home-people', userId] }),
       queryClient.invalidateQueries({ queryKey: ['home-spaces', userId, monthFrom] }),
       queryClient.invalidateQueries({ queryKey: ['home-reminders', userId] }),
     ]);
@@ -112,7 +111,7 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
         .neq('status', 'voided')
         .gte('transaction_date', from)
         .lte('transaction_date', to);
-      if (!data) return { items: [], total: 0 };
+      if (!data) return { all: [], total: 0 };
       const map: Record<string, { name: string; icon: string; total: number }> = {};
       data.forEach((r: any) => {
         const cat = Array.isArray(r.categories) ? r.categories[0] : r.categories;
@@ -121,13 +120,64 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
         map[key].total += Number(r.amount);
       });
       const all = Object.values(map).sort((a, b) => b.total - a.total);
-      return { items: all.slice(0, 4), total: all.length };
+      return { all, total: all.length };
     },
     enabled: !!userId,
   });
 
-  const topCategories = topCategoriesData?.items ?? [];
+  const allCats = topCategoriesData?.all ?? [];
   const totalTopCategories = topCategoriesData?.total ?? 0;
+
+  const [selectedPieCat, setSelectedPieCat] = useState<number | null>(null);
+  const pieFadeAnim = useRef(new Animated.Value(1)).current;
+
+  const selectPie = (index: number | null) => {
+    setSelectedPieCat(index);
+    pieFadeAnim.setValue(0.6);
+    Animated.timing(pieFadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start();
+  };
+
+  const pieCategories = useMemo(() => {
+    if (allCats.length === 0) return [];
+    const top4 = allCats.slice(0, 4);
+    const rest = allCats.slice(4);
+    if (rest.length > 0) {
+      const othersTotal = rest.reduce((s, c) => s + c.total, 0);
+      top4.push({ name: 'Others', icon: 'other-1-outline', total: othersTotal, categoryId: null });
+    }
+    return top4;
+  }, [allCats]);
+
+  const pieColors = ['#9cd7d2', '#5dc4bb', '#4f9289', '#3d7a72', '#b6e1de'];
+  const totalPie = useMemo(() => pieCategories.reduce((s, c) => s + c.total, 0), [pieCategories]);
+
+  const pieSegments = useMemo(() => {
+    if (totalPie === 0) return [];
+    let startAngle = -Math.PI / 2;
+    const rOuter = 55;
+    const rInner = 25;
+    const cx = 60;
+    const cy = 60;
+    return pieCategories.map((cat, i) => {
+      const pct = cat.total / totalPie;
+      const endAngle = startAngle + pct * 2 * Math.PI;
+      const largeArc = pct > 0.5 ? 1 : 0;
+      const x1o = cx + rOuter * Math.cos(startAngle);
+      const y1o = cy + rOuter * Math.sin(startAngle);
+      const x2o = cx + rOuter * Math.cos(endAngle);
+      const y2o = cy + rOuter * Math.sin(endAngle);
+      const x1i = cx + rInner * Math.cos(endAngle);
+      const y1i = cy + rInner * Math.sin(endAngle);
+      const x2i = cx + rInner * Math.cos(startAngle);
+      const y2i = cy + rInner * Math.sin(startAngle);
+      const path = `M${x1o},${y1o} A${rOuter},${rOuter} 0 ${largeArc},1 ${x2o},${y2o} L${x1i},${y1i} A${rInner},${rInner} 0 ${largeArc},0 ${x2i},${y2i} Z`;
+      const seg = { path, color: pieColors[i % pieColors.length], cat, pct, index: i };
+      startAngle = endAngle;
+      return seg;
+    });
+  }, [pieCategories, totalPie]);
+
+  const top3 = allCats.slice(0, 3);
 
   // ── Latest recordings ────────────────────────────────────────────────
   const { data: recent = [], isLoading: loadingRecent } = useQuery({
@@ -161,74 +211,112 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
     enabled: !!userId,
   });
 
-  // ── Loans ───────────────────────────────────────────────────────────────
-  const { data: loans = [], isLoading: loadingLoans } = useQuery({
-    queryKey: ['home-loans', userId],
+  // ── People — unified loans + receivables ──────────────────────────────
+  const { data: peopleData, isLoading: loadingPeople } = useQuery({
+    queryKey: ['home-people', userId],
     queryFn: async () => {
-      const { data } = await supabase
-        .from('recordings')
-        .select('id, name, amount, status, split_bill_id')
-        .eq('user_id', userId)
-        .eq('type', 'debt')
-        .neq('status', 'paid')
-        .neq('status', 'voided')
-        .order('transaction_date', { ascending: false })
-        .limit(3);
-      return data ?? [];
-    },
-    enabled: !!userId,
-  });
+      const { data: friendships } = await supabase
+        .from('friendships')
+        .select('requester_id, receiver_id')
+        .eq('status', 'accepted')
+        .or(`requester_id.eq.${userId},receiver_id.eq.${userId}`);
+      const friendIds = (friendships ?? []).map((f: any) => f.requester_id === userId ? f.receiver_id : f.requester_id);
+      const friendNames = await Promise.all(friendIds.map((id: string) =>
+        supabase.rpc('get_user_display_name', { user_id: id }).then(({ data: n }) => (n ?? '').toLowerCase())
+      ));
+      const friendNameSet = new Set(friendNames);
 
-  // ── Receivables — by people (split bills you created) ─────────────────
-  const { data: receivablesPeople = [], isLoading: loadingReceivables } = useQuery({
-    queryKey: ['home-receivables', userId],
-    queryFn: async () => {
-      const { data: bills } = await supabase
-        .from('split_bills').select('id, name, status').eq('user_id', userId);
-      if (!bills || bills.length === 0) return [];
-      const billIds = bills.map((b: any) => b.id);
-      const [{ data: billSplits }, { data: items }, { data: payments }] = await Promise.all([
-        supabase.from('bill_splits').select('split_bill_id, person_name').in('split_bill_id', billIds),
-        supabase.from('split_items').select('split_bill_id, cost, people, recording_type').in('split_bill_id', billIds),
-        supabase.from('split_bill_payments').select('split_bill_id, person_name, amount, status').in('split_bill_id', billIds).neq('status', 'cancelled'),
-      ]);
-      const billMap: Record<string, any> = {};
-      bills.forEach((b: any) => { billMap[b.id] = b; });
-      const owedMap: Record<string, Record<string, number>> = {};
+      // All recordings with a person (filtered to financial relationships)
+      const { data: allRecs } = await supabase
+        .from('recordings')
+        .select('person_name, type, amount, paid_amount, status, is_due')
+        .eq('user_id', userId)
+        .neq('person_name', '')
+        .not('person_name', 'is', null)
+        .neq('status', 'voided');
+      const recs = (allRecs ?? []).filter(
+        (r: any) => r.type === 'debt' || r.type === 'due' || r.is_due
+      );
+
+      // Scope split data to user's bills
+      const { data: userBills } = await supabase
+        .from('split_bills')
+        .select('id')
+        .eq('user_id', userId);
+      const billIds = (userBills ?? []).map((b: any) => b.id);
+
+      const { data: splits } = billIds.length > 0
+        ? await supabase.from('bill_splits').select('person_name').in('split_bill_id', billIds)
+        : { data: [] };
+      const splitPeople = [...new Set((splits ?? []).map((s: any) => s.person_name).filter(Boolean))];
+
+      // Split bill items for amounts (old schema)
+      const { data: items } = billIds.length > 0
+        ? await supabase.from('split_items').select('cost, people, recording_type').in('split_bill_id', billIds)
+        : { data: [] };
+
+      // Payments
+      const { data: payments } = billIds.length > 0
+        ? await supabase.from('split_bill_payments').select('person_name, amount, status').in('split_bill_id', billIds).neq('status', 'cancelled')
+        : { data: [] };
+
+      // Calculate net per person
+      const net: Record<string, number> = {};
+      const details: Record<string, { owedToMe: number; iOwe: number }> = {};
+
+      (recs ?? []).forEach((r: any) => {
+        if (!r.person_name) return;
+        const paid = Number(r.paid_amount ?? 0);
+        const remaining = Number(r.amount) - paid;
+        if (remaining <= 0.01) return;
+        if (!details[r.person_name]) details[r.person_name] = { owedToMe: 0, iOwe: 0 };
+        if (r.type === 'due') { details[r.person_name].owedToMe += remaining; net[r.person_name] = (net[r.person_name] ?? 0) + remaining; }
+        else { details[r.person_name].iOwe += remaining; net[r.person_name] = (net[r.person_name] ?? 0) - remaining; }
+      });
+
+      // Combine split people (may or may not have recordings)
+      splitPeople.forEach((name: string) => {
+        if (!details[name]) details[name] = { owedToMe: 0, iOwe: 0 };
+      });
+
+      // Calculate split bill debts
       (items ?? []).forEach((item: any) => {
         const people: string[] = item.people ?? [];
         if (!people.length) return;
         const isDeduct = item.recording_type === 'payable';
         const pp = Number(item.cost) / people.length;
         people.forEach((p: string) => {
-          if (!owedMap[p]) owedMap[p] = {};
-          owedMap[p][item.split_bill_id] = (owedMap[p][item.split_bill_id] ?? 0) + (isDeduct ? -pp : pp);
+          if (!details[p]) details[p] = { owedToMe: 0, iOwe: 0 };
+          net[p] = (net[p] ?? 0) + (isDeduct ? -pp : pp);
+          if (isDeduct) details[p].iOwe += pp;
+          else details[p].owedToMe += pp;
         });
       });
-      const paidMap: Record<string, Record<string, number>> = {};
+
+      // Subtract payments
       (payments ?? []).forEach((pay: any) => {
-        if (!paidMap[pay.person_name]) paidMap[pay.person_name] = {};
-        paidMap[pay.person_name][pay.split_bill_id] = (paidMap[pay.person_name][pay.split_bill_id] ?? 0) + Number(pay.amount);
+        net[pay.person_name] = (net[pay.person_name] ?? 0) - Number(pay.amount);
+        if (details[pay.person_name]) details[pay.person_name].owedToMe -= Number(pay.amount);
       });
-      const allPeople = [...new Set((billSplits ?? []).map((bs: any) => bs.person_name as string))];
-      return allPeople.map((person: string) => {
-        const personBillIds = (billSplits ?? []).filter((bs: any) => bs.person_name === person).map((bs: any) => bs.split_bill_id);
-        const billEntries = personBillIds.map((billId: string) => {
-          const bill = billMap[billId]; if (!bill) return null;
-          const owed = owedMap[person]?.[billId] ?? 0;
-          const paid = paidMap[person]?.[billId] ?? 0;
-          return { billId, billName: bill.name, billStatus: bill.status, owed, paid, remaining: Math.max(0, owed - paid), isComplete: bill.status === 'closed' || (owed > 0 && paid >= owed - 0.01) };
-        }).filter(Boolean).filter((b: any) => b.owed > 0);
-        const totalRemaining = billEntries.reduce((s: number, b: any) => s + (b.remaining ?? 0), 0);
-        return { person, billEntries, totalOwed: billEntries.reduce((s: number, b: any) => s + (b.owed ?? 0), 0), totalRemaining };
-      }).filter((p: any) => p.billEntries.length > 0 && (p.totalRemaining ?? 0) > 0)
-        .sort((a: any, b: any) => b.totalRemaining - a.totalRemaining)
-        .slice(0, 3);
+
+      const people = Object.entries(details)
+        .filter(([name]) => name)
+        .map(([name, d]) => ({
+          person: name,
+          net: Math.round((net[name] ?? 0) * 100) / 100,
+          isFriend: friendNameSet.has(name.toLowerCase()),
+          owedToMe: Math.round(d.owedToMe * 100) / 100,
+          iOwe: Math.round(d.iOwe * 100) / 100,
+        }))
+        .filter(p => Math.abs(p.net) > 0.01)
+        .sort((a, b) => Math.abs(b.net) - Math.abs(a.net));
+
+      return people;
     },
     enabled: !!userId,
   });
 
-  // ── Spaces (top 3, with current-month spent) ────────────────────────────
+  const peopleSummary = peopleData ?? [];
   const { data: spaces = [], isLoading: loadingSpaces } = useQuery({
     queryKey: ['home-spaces', userId, monthFrom],
     queryFn: async () => {
@@ -238,12 +326,38 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
         .eq('user_id', userId)
         .neq('is_active', false)
         .order('sort_order', { ascending: true, nullsFirst: false })
-        .limit(3);
-      if (!spaceRows || spaceRows.length === 0) return [];
+        .limit(10);
+
+      const { data: memberRows } = await supabase
+        .from('space_members')
+        .select('space_id, role')
+        .eq('user_id', userId)
+        .eq('status', 'accepted');
+
+      const memberSpaceIds = (memberRows ?? []).map((m: any) => m.space_id);
+      let sharedSpaces: any[] = [];
+      if (memberSpaceIds.length > 0) {
+        const { data: sharedRows } = await supabase
+          .from('spaces')
+          .select('id, name, budget, budget_currency, space_type')
+          .in('id', memberSpaceIds)
+          .neq('is_active', false);
+        sharedSpaces = (sharedRows ?? []).map((s: any) => ({
+          ...s,
+          space_type: 'shared',
+        }));
+      }
+
+      const allSpaces = [
+        ...(spaceRows ?? []),
+        ...sharedSpaces,
+      ].slice(0, 10);
+
+      if (allSpaces.length === 0) return [];
 
       const from = monthFrom;
       const to   = monthTo;
-      const ids = spaceRows.map((s: any) => s.id);
+      const ids = allSpaces.map((s: any) => s.id);
 
       const { data: recs } = await supabase
         .from('recordings')
@@ -261,7 +375,6 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
         }
       });
 
-      // For savings spaces: fetch all-time up to end of selected month
       const { data: savingsRecs } = await supabase
         .from('recordings')
         .select('space_id, amount, type')
@@ -275,7 +388,7 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
         }
       });
 
-      return spaceRows.map((s: any) => ({
+      return allSpaces.map((s: any) => ({
         ...s,
         spent: s.space_type === 'savings' ? (savedMap[s.id] ?? 0) : (spentMap[s.id] ?? 0),
       }));
@@ -284,25 +397,34 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
   });
 
   // ── Total counts for see more ──────────────────────────────────────────
-  const { data: totalCounts = { recordings: 0, spaces: 0, reminders: 0, loans: 0, receivables: 0 } } = useQuery({
+  const { data: totalCounts = { recordings: 0, spaces: 0, reminders: 0, people: 0 } } = useQuery({
     queryKey: ['home-totals', userId],
     queryFn: async () => {
-      const [rec, sp, rem, ln, rv] = await Promise.all([
+      const [rec, sp, rem, sharedSp] = await Promise.all([
         supabase.from('recordings').select('*', { count: 'exact', head: true }).eq('user_id', userId).neq('status', 'voided'),
         supabase.from('spaces').select('*', { count: 'exact', head: true }).eq('user_id', userId).neq('is_active', false),
+        supabase.from('space_members').select('*', { count: 'exact', head: true }).eq('user_id', userId).eq('status', 'accepted'),
         supabase.from('recording_reminders').select('*', { count: 'exact', head: true }).eq('user_id', userId).eq('status', 'active'),
-        supabase.from('recordings').select('*', { count: 'exact', head: true }).eq('user_id', userId).eq('type', 'debt').neq('status', 'paid').neq('status', 'voided'),
-        supabase.from('recordings').select('*', { count: 'exact', head: true }).eq('user_id', userId).eq('type', 'receivable').neq('status', 'received').neq('status', 'voided'),
       ]);
-      return { recordings: rec.count ?? 0, spaces: sp.count ?? 0, reminders: rem.count ?? 0, loans: ln.count ?? 0, receivables: rv.count ?? 0 };
+      const { data: personCount } = await supabase
+        .from('recordings')
+        .select('person_name')
+        .eq('user_id', userId)
+        .in('type', ['debt', 'due'])
+        .neq('status', 'voided')
+        .neq('status', 'paid')
+        .neq('person_name', '')
+        .not('person_name', 'is', null);
+      const distinctPeople = new Set((personCount ?? []).map((r: any) => r.person_name));
+      return { recordings: rec.count ?? 0, spaces: (sp.count ?? 0) + (sharedSp.count ?? 0), reminders: rem.count ?? 0, people: distinctPeople.size };
     },
     enabled: !!userId,
   });
 
   const [spaceChoice, setSpaceChoice] = useState<{ id: string; name: string } | null>(null);
 
-  const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const isLoading = loadingCats || loadingRecent || loadingLoans || loadingReceivables || loadingSpaces || loadingReminders;
+  const fmt = (n: number | undefined | null) => (n ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const isLoading = loadingCats || loadingRecent || loadingPeople || loadingSpaces || loadingReminders;
 
   return (
     <SafeAreaView style={s.root}>
@@ -353,25 +475,89 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
       >
         <>
             {/* ── Top Spending ── */}
-            <SectionHeader title="Top Spending" onSeeMore={openTopSpending} seeMoreLabel={totalTopCategories > topCategories.length ? `see ${totalTopCategories - topCategories.length} more...` : 'see all'} />
-            {topCategories.length === 0 ? (
+            <SectionHeader title="Top Spending" onSeeMore={openTopSpending} seeMoreLabel="go to categories" />
+            {allCats.length === 0 ? (
               <EmptyRow label="no expenses this month" onPress={openTopSpending} />
             ) : (
-              <View style={s.catGrid}>
-                {topCategories.map((cat, i) => (
-                  <TouchableOpacity key={i} style={s.catCard} activeOpacity={0.7} onPress={() => openRecordingsPanel({ categoryId: cat.categoryId ?? undefined, categoryName: cat.name })}>
-                    <View style={{ width: 28, height: 28, alignItems: 'center', justifyContent: 'center' }}>
-                      <AnimatedIcon set="basil" icon={cat.icon} size={28} color="#111111" />
-                    </View>
-                    <Text style={s.catName} numberOfLines={1}>{cat.name}</Text>
-                    <Text style={s.catAmount}>{fmt(cat.total)}</Text>
-                  </TouchableOpacity>
-                ))}
+              <View style={s.topSpendingRow}>
+                <View style={s.pieColumn}>
+                  <Animated.View style={{ opacity: pieFadeAnim }}>
+                    <Pressable onPress={(e) => {
+                      const { locationX, locationY } = e.nativeEvent;
+                      const dx = locationX - 60;
+                      const dy = locationY - 60;
+                      const dist = Math.sqrt(dx * dx + dy * dy);
+                      if (dist < 25) { selectPie(null); return; }
+                      let angle = Math.atan2(dy, dx) + Math.PI / 2;
+                      if (angle < 0) angle += 2 * Math.PI;
+                      const totalPct = angle / (2 * Math.PI);
+                      let cum = 0;
+                      for (const seg of pieSegments) {
+                        cum += seg.pct;
+                        if (totalPct <= cum) { selectPie(seg.index); return; }
+                      }
+                    }}>
+                      <Svg width={120} height={120} viewBox="0 0 120 120">
+                        {pieSegments.map((seg, i) => (
+                          <Path key={i} d={seg.path} fill={seg.color} opacity={selectedPieCat === null || selectedPieCat === seg.index ? 1 : 0.3} />
+                        ))}
+                        <Path d={`M60,35 A25,25 0 1,1 59.9,35 Z`} fill="#ffffff" />
+                      </Svg>
+                    </Pressable>
+                  </Animated.View>
+                  <View style={s.pieLabel}>
+                    {selectedPieCat !== null ? (
+                      <>
+                        <Text style={s.pieLabelName} numberOfLines={1}>{pieCategories[selectedPieCat].name}</Text>
+                        <Text style={s.pieLabelAmount}>{fmt(pieCategories[selectedPieCat].total)}</Text>
+                      </>
+                    ) : (
+                      <>
+                        <Text style={s.pieLabelName} numberOfLines={1}>Total</Text>
+                        <Text style={s.pieLabelAmount}>{fmt(totalPie)}</Text>
+                      </>
+                    )}
+                  </View>
+                </View>
+                <View style={s.top3Column}>
+                  {top3.map((cat, i) => (
+                    <TouchableOpacity key={i} style={s.top3Card} activeOpacity={0.7} onPress={() => openRecordingsPanel({ categoryId: cat.categoryId ?? undefined, categoryName: cat.name })}>
+                      <AnimatedIcon set="basil" icon={cat.icon} size={18} color="#111111" />
+                      <View style={{ flex: 1 }}>
+                        <Text style={s.catName} numberOfLines={1}>{cat.name}</Text>
+                        <Text style={s.catAmount}>{fmt(cat.total)}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </View>
               </View>
             )}
 
+            {/* ── Spaces ── */}
+            <SectionHeader title="Spaces" onSeeMore={openSpacesPanel} seeMoreLabel="go to spaces" />
+            {spaces.length === 0 ? (
+              <EmptyRow label="no spaces" />
+            ) : (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.spaceAlbum} decelerationRate="fast" snapToInterval={90} snapToAlignment="start">
+                {spaces.map((sp: any) => (
+                  <TouchableOpacity key={sp.id} style={s.spaceCard} activeOpacity={0.7} onPress={() => setSpaceChoice({ id: sp.id, name: sp.name })}>
+                    <AnimatedIcon set="basil" icon={sp.space_type === 'shared' ? 'folder-user-solid' : 'folder-solid'} size={80} color="#e8e8e8" />
+                    <Text style={s.spaceCardName} numberOfLines={1}>{sp.name}</Text>
+                    <Text style={s.spaceCardAmount}>{fmt(sp.spent)}</Text>
+                    {sp.budget && <Text style={s.spaceCardSub}>{fmt(sp.budget)}</Text>}
+                  </TouchableOpacity>
+                ))}
+                {totalCounts.spaces > spaces.length && (
+                  <TouchableOpacity style={s.spaceCard} activeOpacity={0.7} onPress={openSpacesPanel}>
+                    <AnimatedIcon set="basil" icon="folder-solid" size={80} color="#e8e8e8" />
+                    <Text style={s.spaceCardName}>+{totalCounts.spaces - spaces.length} more</Text>
+                  </TouchableOpacity>
+                )}
+              </ScrollView>
+            )}
+
             {/* ── Latest Recordings ── */}
-            <SectionHeader title="Recordings" onSeeMore={openRecordingsPanel} seeMoreLabel={totalCounts.recordings > recent.length ? `see ${totalCounts.recordings - recent.length} more...` : 'see all'} />
+            <SectionHeader title="Recordings" onSeeMore={openRecordingsPanel} seeMoreLabel="go to recordings" />
             {recent.length === 0 ? (
               <EmptyRow label="go to recordings" onPress={openRecordingsPanel} />
             ) : (
@@ -389,36 +575,8 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
               </View>
             )}
 
-            {/* ── Spaces ── */}
-            <SectionHeader title="Spaces" onSeeMore={openSpacesPanel} seeMoreLabel={totalCounts.spaces > spaces.length ? `see ${totalCounts.spaces - spaces.length} more...` : 'see all'} />
-            {spaces.length === 0 ? (
-              <EmptyRow label="go to spaces" onPress={openSpacesPanel} />
-            ) : (
-              <View style={s.list}>
-                {spaces.map((sp: any, i: number) => (
-                  <TouchableOpacity
-                    key={sp.id}
-                    style={[s.row, i === spaces.length - 1 && s.rowLast]}
-                    activeOpacity={0.7}
-                    onPress={() => setSpaceChoice({ id: sp.id, name: sp.name })}
-                  >
-                    <View style={{ flex: 1 }}>
-                      <Text style={s.rowName} numberOfLines={1}>{sp.name}</Text>
-                      <Text style={s.rowSub}>{sp.space_type === 'savings' ? 'savings tracker' : 'expense tracker'}</Text>
-                    </View>
-                    <View style={{ alignItems: 'flex-end' }}>
-                      <Text style={s.rowValue}>{fmt(sp.spent)}</Text>
-                      {sp.budget && (
-                        <Text style={s.rowSub}>{fmt(sp.budget)}</Text>
-                      )}
-                    </View>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-
             {/* ── Reminders ── */}
-            <SectionHeader title="Reminders" onSeeMore={openRemindersPanel} seeMoreLabel={totalCounts.reminders > reminders.length ? `see ${totalCounts.reminders - reminders.length} more...` : 'see all'} />
+            <SectionHeader title="Reminders" onSeeMore={openRemindersPanel} seeMoreLabel="go to reminders" />
             {reminders.length === 0 ? (
               <EmptyRow label="go to reminders" onPress={openRemindersPanel} />
             ) : (
@@ -440,49 +598,27 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
               </View>
             )}
 
-            {/* ── Loans ── */}
-            <SectionHeader title="Loans" onSeeMore={openLoansPanel} seeMoreLabel={totalCounts.loans > loans.length ? `see ${totalCounts.loans - loans.length} more...` : 'see all'} />
-            {loans.length === 0 ? (
-              <EmptyRow label="go to loans" onPress={openLoansPanel} />
+            {/* ── People ── */}
+            <SectionHeader title="People" onSeeMore={() => openReceivablesPanel()} seeMoreLabel="all people" />
+            {peopleSummary.length === 0 ? (
+              <EmptyRow label="no people with balances" />
             ) : (
-              <View style={s.list}>
-                {loans.map((l: any, i: number) => (
-                  <TouchableOpacity key={l.id} style={[s.row, i === loans.length - 1 && s.rowLast]} activeOpacity={0.7} onPress={() => openRecording(l.id)}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={s.rowName} numberOfLines={1}>{l.name}</Text>
-                      <Text style={s.rowSub}>{l.split_bill_id ? 'split bill' : 'recording'}</Text>
-                    </View>
-                    <Text style={s.rowValueBold}>{fmt(Number(l.amount))}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-
-            {/* ── Receivables ── */}
-            <SectionHeader title="Receivables" onSeeMore={openReceivablesPanel} seeMoreLabel={receivablesPeople.length > 0 ? 'see all' : undefined} />
-            {receivablesPeople.length === 0 ? (
-              <EmptyRow label="go to receivables" onPress={openReceivablesPanel} />
-            ) : (
-              <View style={s.list}>
-                {receivablesPeople.map((p: any, i: number) => (
-                  <TouchableOpacity
-                    key={p.person}
-                    style={[s.row, i === receivablesPeople.length - 1 && s.rowLast]}
-                    activeOpacity={0.7}
-                    onPress={openReceivablesPanel}
-                  >
-                    <View style={{ flex: 1 }}>
-                      <Text style={s.rowName} numberOfLines={1}>{p.person}</Text>
-                      <Text style={s.rowSub}>
-                        {(p.billEntries ?? []).filter((b: any) => !b.isComplete).length} unpaid
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.spaceAlbum} decelerationRate="fast" snapToInterval={90} snapToAlignment="start">
+                {peopleSummary.map((p: any) => {
+                  const isNegative = p.net < 0;
+                  const absNet = Math.abs(p.net);
+                  return (
+                    <TouchableOpacity key={p.person} style={s.spaceCard} activeOpacity={0.7} onPress={() => openReceivablesPanel(p.person)}>
+                      <AnimatedIcon set="material-symbols" icon="person-rounded" size={80} color={p.isFriend ? '#9cd7d2' : '#e8e8e8'} />
+                      <Text style={s.spaceCardName} numberOfLines={1}>{p.person}</Text>
+                      <Text style={[s.spaceCardAmount, { color: isNegative ? '#e74c3c' : '#2A7A6F' }]}>
+                        {isNegative ? '-' : ''}{fmt(absNet)}
                       </Text>
-                    </View>
-                    <Text style={[s.rowValueBold, { color: '#111111' }]}>
-                      {fmt(Number(p.totalRemaining ?? 0))}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+                      <Text style={s.spaceCardSub}>{isNegative ? 'you owe' : 'owes you'}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
             )}
           </>
       </ScrollView>
@@ -589,7 +725,7 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
           </View>
           <Ionicons name="chevron-forward" size={14} color={Colors.faint} />
         </TouchableOpacity>
-        <TouchableOpacity style={[s.choiceRow, { borderBottomWidth: 0 }]} activeOpacity={0.8} onPress={() => { const sp = spaceChoice; setSpaceChoice(null); openRecordingsPanel({ spaceId: sp!.id, spaceName: sp!.name }); }}>
+        <TouchableOpacity style={[s.choiceRow, { borderBottomWidth: 0 }]} activeOpacity={0.8} onPress={() => { const sp = spaceChoice; setSpaceChoice(null); openSpace(sp!.id, sp!.name, true); }}>
           <View style={{ flex: 1 }}>
             <Text style={s.choiceTitle}>Edit Space</Text>
             <Text style={s.choiceSub}>rename, archive, or delete</Text>
@@ -642,8 +778,8 @@ const s = StyleSheet.create({
   monthBtnText: { fontFamily: AppFont.regular, fontSize: DC.dropdownFontSize, color: DC.pageActionText },
 
   // Section header
-  sectionRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 28, marginBottom: 14 },
-  sectionTitle:{ fontFamily: 'Poppins-Bold', fontSize: 20, color: '#9cd7d2' },
+  sectionRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 24, marginBottom: 10 },
+  sectionTitle:{ fontFamily: 'Poppins-Bold', fontSize: 13, color: '#9cd7d2', textTransform: 'uppercase', letterSpacing: 0.8 },
   seeMoreRow:  { paddingHorizontal: 12, paddingVertical: 7, borderRadius: DC.pageActionRadius, backgroundColor: DC.pageActionBg, borderWidth: DC.pageActionBorderWidth },
   seeMoreText: { fontFamily: AppFont.regular, fontSize: 12, color: DC.pageActionText },
 
@@ -651,18 +787,36 @@ const s = StyleSheet.create({
   emptyRow:  { paddingVertical: 12 },
   emptyText: { fontFamily: 'Poppins-Regular', fontSize: 12, color: Colors.faint },
 
-  // Top spending grid
-  catGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  catCard: {
-    width: '47%',
-    backgroundColor: '#F8F8F8',
-    borderRadius: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 14,
-    gap: 6,
+  // Spaces album
+  spaceAlbum: { gap: 10, paddingBottom: 4 },
+  spaceCard: {
+    width: 90,
+    alignItems: 'center',
+    gap: 1,
   },
-  catName:   { fontFamily: 'Poppins-Bold', fontSize: 13, color: '#111111' },
-  catAmount: { fontFamily: 'Poppins-Regular', fontSize: 12, color: '#555555' },
+  spaceCardName: { fontFamily: 'Poppins-Bold', fontSize: 10, color: '#111111', textAlign: 'center', marginTop: -6 },
+  spaceCardAmount: { fontFamily: 'Poppins-Bold', fontSize: 11, color: '#111111', textAlign: 'center', lineHeight: 14 },
+  spaceCardSub: { fontFamily: 'Poppins-Regular', fontSize: 9, color: '#999999', textAlign: 'center', lineHeight: 12 },
+  receivableName: { fontFamily: 'Poppins-Regular', fontSize: 12, color: '#111111', textAlign: 'center', marginTop: 4 },
+  receivableAmount: { fontFamily: 'Poppins-Bold', fontSize: 11, color: '#111111', textAlign: 'center', lineHeight: 14 },
+  receivableUnpaid: { fontFamily: 'Poppins-Regular', fontSize: 9, color: '#999999', textAlign: 'center', fontStyle: 'italic', lineHeight: 12 },
+
+  // Top spending
+  topSpendingRow: { flexDirection: 'row', gap: 16, alignItems: 'flex-start' },
+  pieColumn: { alignItems: 'center', gap: 8 },
+  pieLabel: { alignItems: 'center', maxWidth: 120 },
+  pieLabelName: { fontFamily: 'Poppins-Bold', fontSize: 10, color: '#111111', textAlign: 'center' },
+  pieLabelAmount: { fontFamily: 'Poppins-Regular', fontSize: 10, color: '#555555', textAlign: 'center' },
+  top3Column: { flex: 1, gap: 6 },
+  top3Card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 6,
+  },
+  catName:   { fontFamily: 'Poppins-Bold', fontSize: 11, color: '#111111' },
+  catAmount: { fontFamily: 'Poppins-Regular', fontSize: 10, color: '#555555' },
 
   // Shared list rows
   list: { gap: 0 },
@@ -670,15 +824,15 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 14,
+    paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
-  rowName:      { fontFamily: 'Poppins-Regular', fontSize: 14, color: '#111111' },
-  rowSub:       { fontFamily: 'Poppins-Regular', fontSize: 11, color: '#999999' },
-  rowValue:     { fontFamily: 'Poppins-Bold', fontSize: 13, color: '#111111' },
+  rowName:      { fontFamily: 'Poppins-Regular', fontSize: 12, color: '#111111' },
+  rowSub:       { fontFamily: 'Poppins-Regular', fontSize: 10, color: '#999999' },
+  rowValue:     { fontFamily: 'Poppins-Bold', fontSize: 11, color: '#111111' },
   rowLast:     { borderBottomWidth: 0 },
-  rowValueBold: { fontFamily: 'Poppins-Bold', fontSize: 14, color: '#111111' },
+  rowValueBold: { fontFamily: 'Poppins-Bold', fontSize: 12, color: '#111111' },
   choiceRow:   { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
   choiceTitle: { fontFamily: AppFont.semiBold, fontSize: 14, color: '#111111' },
   choiceSub:   { fontFamily: AppFont.regular, fontSize: 11, color: '#999999', marginTop: 2 },

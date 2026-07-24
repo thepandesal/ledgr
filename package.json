@@ -21,6 +21,7 @@
     "@iconify-json/basil": "^1.2.4",
     "@iconify-json/circle-flags": "^1.2.10",
     "@iconify-json/line-md": "^1.2.16",
+    "@iconify-json/material-symbols": "^1.2.87",
     "@iconify-json/svg-spinners": "^1.2.4",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@supabase/supabase-js": "^2.106.2",

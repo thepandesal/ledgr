@@ -67,14 +67,7 @@ export default function RecordingsPanel({ onClose, categoryId, categoryName, spa
   const hasActiveFilter = !filterTypes.has('all') || !filterSpaces.has('all') || amountSort !== 'none';
 
   const handleTabToggle = (key: ActivityTab) => {
-    if (key === 'all') { setSelectedTabs(new Set(['all'])); return; }
-    setSelectedTabs(prev => {
-      const next = new Set(prev);
-      next.delete('all');
-      if (next.has(key)) { next.delete(key); if (next.size === 0) return new Set(['all']); }
-      else next.add(key);
-      return next;
-    });
+    setSelectedTabs(new Set([key]));
   };
 
   const activeTypes = useMemo(() => {
@@ -96,7 +89,7 @@ export default function RecordingsPanel({ onClose, categoryId, categoryName, spa
     queryFn: async () => {
       let query = supabase
         .from('recordings')
-        .select('id, name, type, amount, transaction_date, created_at, currency, space_id, spaces:space_id(name)')
+        .select('id, name, type, amount, transaction_date, created_at, currency, space_id, spaces:space_id(name), is_due, paid_amount, status')
         .eq('user_id', userId)
         .neq('status', 'voided')
         .gte('transaction_date', from)
@@ -160,16 +153,46 @@ export default function RecordingsPanel({ onClose, categoryId, categoryName, spa
     return '';
   };
 
+  const activeTab = useMemo(() => {
+    if (selectedTabs.has('all')) return 'all';
+    return [...selectedTabs][0];
+  }, [selectedTabs]);
+
+  const isStatusGrouped = activeTab === 'loans' || activeTab === 'receivables';
+
   const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   const grouped = useMemo(() => {
+    if (isStatusGrouped) {
+      const pending: typeof filtered = [];
+      const completed: typeof filtered = [];
+      filtered.forEach(r => {
+        const isDebtDue = r.type === 'debt' || r.type === 'due' || (r.type === 'expense' && r.is_due);
+        if (isDebtDue) {
+          const paid = Number(r.paid_amount ?? 0);
+          const total = Number(r.amount ?? 0);
+          if (paid >= total - 0.01 && total > 0) completed.push(r);
+          else pending.push(r);
+        } else {
+          completed.push(r);
+        }
+      });
+      return { type: 'status', pending, completed } as const;
+    }
     const map: Record<string, typeof filtered> = {};
     filtered.forEach(r => {
       if (!map[r.transaction_date]) map[r.transaction_date] = [];
       map[r.transaction_date].push(r);
     });
-    return Object.entries(map).sort(([a], [b]) => b.localeCompare(a));
-  }, [filtered]);
+    const entries = Object.entries(map).sort(([a], [b]) => b.localeCompare(a));
+    return { type: 'date', entries } as const;
+  }, [filtered, isStatusGrouped]);
+
+  const formatDate = (d: string) => {
+    if (!d) return '—';
+    const [y, m, day] = d.split('-').map(Number);
+    return new Date(y, m - 1, day).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
 
   const toggleSet = (set: Set<string>, key: string, setFn: (s: Set<string>) => void) => {
     if (key === 'all') { setFn(new Set(['all'])); return; }
@@ -254,37 +277,96 @@ export default function RecordingsPanel({ onClose, categoryId, categoryName, spa
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         >
-          {grouped.map(([date, items]) => (
-            <View key={date}>
-              <Text style={s.dateHeader}>
-                {new Date(date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-              </Text>
-              {items.map((r, i) => {
-                const badge = TYPE_BADGE[r.type] ?? { label: r.type, color: BADGE_COLOR };
-                return (
-                  <TouchableOpacity
-                    key={r.id}
-                    style={[s.row, i === items.length - 1 && s.rowLast]}
-                    activeOpacity={0.7}
-                    onPress={() => openRecording(r.id)}
-                  >
-                    <View style={s.rowLeft}>
-                      <Text style={s.rowName} numberOfLines={1}>{r.name}</Text>
-                      {r.space?.name && (
-                        <Text style={s.rowCat} numberOfLines={1}>{r.space.name}</Text>
-                      )}
-                    </View>
-                    <View style={s.rowRight}>
-                      <Text style={s.rowAmount}>{r.currency ?? defaultCurrency} {fmt(Number(r.amount))}</Text>
-                      <View style={[s.badge, { backgroundColor: badge.color + '22', alignSelf: 'flex-end' }]}>
-                        <Text style={[s.badgeText, { color: badge.color }]}>{badge.label}</Text>
+          {grouped.type === 'status' ? (
+            <>
+              {grouped.pending.length > 0 && (
+                <View>
+                  <Text style={s.sectionHeader}>Ongoing</Text>
+                  {grouped.pending.map((r, i) => {
+                    const badge = TYPE_BADGE[r.type] ?? { label: r.type, color: BADGE_COLOR };
+                    return (
+                      <TouchableOpacity
+                        key={r.id}
+                        style={[s.row, i === grouped.pending.length - 1 && grouped.completed.length === 0 && s.rowLast]}
+                        activeOpacity={0.7}
+                        onPress={() => openRecording(r.id)}
+                      >
+                        <View style={s.rowLeft}>
+                          <Text style={s.rowName} numberOfLines={1}>{r.name}</Text>
+                          <Text style={s.rowDate}>{formatDate(r.transaction_date)}</Text>
+                        </View>
+                        <View style={s.rowRight}>
+                          <Text style={s.rowAmount}>{r.currency ?? defaultCurrency} {fmt(Number(r.amount))}</Text>
+                          <View style={[s.badge, { backgroundColor: badge.color + '22', alignSelf: 'flex-end' }]}>
+                            <Text style={[s.badgeText, { color: badge.color }]}>{badge.label}</Text>
+                          </View>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
+              {grouped.completed.length > 0 && (
+                <View>
+                  <Text style={s.sectionHeader}>Completed</Text>
+                  {grouped.completed.map((r, i) => {
+                    const badge = TYPE_BADGE[r.type] ?? { label: r.type, color: BADGE_COLOR };
+                    return (
+                      <TouchableOpacity
+                        key={r.id}
+                        style={[s.row, i === grouped.completed.length - 1 && s.rowLast]}
+                        activeOpacity={0.7}
+                        onPress={() => openRecording(r.id)}
+                      >
+                        <View style={s.rowLeft}>
+                          <Text style={s.rowName} numberOfLines={1}>{r.name}</Text>
+                          <Text style={s.rowDate}>{formatDate(r.transaction_date)}</Text>
+                        </View>
+                        <View style={s.rowRight}>
+                          <Text style={s.rowAmount}>{r.currency ?? defaultCurrency} {fmt(Number(r.amount))}</Text>
+                          <View style={[s.badge, { backgroundColor: badge.color + '22', alignSelf: 'flex-end' }]}>
+                            <Text style={[s.badgeText, { color: badge.color }]}>{badge.label}</Text>
+                          </View>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
+            </>
+          ) : (
+            grouped.entries.map(([date, items]) => (
+              <View key={date}>
+                <Text style={s.sectionHeader}>
+                  {new Date(date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                </Text>
+                {items.map((r, i) => {
+                  const badge = TYPE_BADGE[r.type] ?? { label: r.type, color: BADGE_COLOR };
+                  return (
+                    <TouchableOpacity
+                      key={r.id}
+                      style={[s.row, i === items.length - 1 && s.rowLast]}
+                      activeOpacity={0.7}
+                      onPress={() => openRecording(r.id)}
+                    >
+                      <View style={s.rowLeft}>
+                        <Text style={s.rowName} numberOfLines={1}>{r.name}</Text>
+                        {r.space?.name && (
+                          <Text style={s.rowCat} numberOfLines={1}>{r.space.name}</Text>
+                        )}
                       </View>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          ))}
+                      <View style={s.rowRight}>
+                        <Text style={s.rowAmount}>{r.currency ?? defaultCurrency} {fmt(Number(r.amount))}</Text>
+                        <View style={[s.badge, { backgroundColor: badge.color + '22', alignSelf: 'flex-end' }]}>
+                          <Text style={[s.badgeText, { color: badge.color }]}>{badge.label}</Text>
+                        </View>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            ))
+          )}
         </ScrollView>
       )}
 
@@ -372,7 +454,7 @@ const s = StyleSheet.create({
   empty:     { flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 80 },
   emptyText: { fontFamily: AppFont.regular, fontSize: 13, color: Colors.muted },
 
-  dateHeader: { fontFamily: AppFont.semiBold, fontSize: 11, color: Colors.muted, letterSpacing: 0.6, textTransform: 'uppercase', marginTop: 20, marginBottom: 8 },
+  sectionHeader: { fontFamily: AppFont.semiBold, fontSize: 11, color: Colors.muted, letterSpacing: 0.6, textTransform: 'uppercase', marginTop: 20, marginBottom: 8 },
 
   row: {
     flexDirection: 'row',
@@ -388,6 +470,7 @@ const s = StyleSheet.create({
   badge:     { alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 2, borderRadius: Radius.pill },
   badgeText: { fontFamily: AppFont.semiBold, fontSize: 10 },
   rowName:   { fontFamily: AppFont.regular, fontSize: 14, color: '#111111' },
+  rowDate:   { fontFamily: AppFont.regular, fontSize: 10, color: Colors.muted, marginTop: 1 },
   rowCat:    { fontFamily: AppFont.regular, fontSize: 11, color: Colors.muted, fontStyle: 'italic' },
   rowRight:  { alignItems: 'flex-end', gap: 4 },
   rowAmount: { fontFamily: AppFont.bold, fontSize: 13, color: '#111111' },

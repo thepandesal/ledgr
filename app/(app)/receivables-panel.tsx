@@ -2,7 +2,8 @@ import {
   View, Text, StyleSheet, ScrollView, SafeAreaView,
   TouchableOpacity, RefreshControl, TextInput,
 } from 'react-native';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import ReceivableDetail from './receivable-detail';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useUser } from '../../src/hooks/useUser';
@@ -22,14 +23,15 @@ const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2,
 
 type DateFilter = 'this-month' | 'monthly' | 'yearly' | 'all-time';
 
-interface Props { onClose: () => void; }
+interface Props { onClose: () => void; initialPerson?: string | null; }
 
-export default function ReceivablesPanel({ onClose }: Props) {
+export default function ReceivablesPanel({ onClose, initialPerson }: Props) {
   const { userId } = useUser();
   const { openRecording, openSplitBill } = useNav();
   const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
   const [expandedPeople, setExpandedPeople] = useState<Set<string>>(new Set(['__unassigned__']));
+  const [detailPerson, setDetailPerson] = useState<string | null>(null);
   const [dateFilter, setDateFilter] = useState<DateFilter>('this-month');
   const [showDateSheet, setShowDateSheet] = useState(false);
   const [search, setSearch] = useState('');
@@ -44,6 +46,18 @@ export default function ReceivablesPanel({ onClose }: Props) {
 
   const MONTHS_FULL = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   const YEARS = Array.from({ length: 21 }, (_, i) => 2020 + i);
+
+  const initialPersonSet = useRef(false);
+  useEffect(() => {
+    if (!initialPerson) {
+      initialPersonSet.current = false;
+      return;
+    }
+    if (!initialPersonSet.current) {
+      initialPersonSet.current = true;
+      setDetailPerson(initialPerson);
+    }
+  }, [initialPerson]);
 
   const openDateSheet = () => {
     setDraftFilter(dateFilter);
@@ -153,46 +167,59 @@ export default function ReceivablesPanel({ onClose }: Props) {
         }).filter(Boolean).filter((b: any) => b.owed > 0);
 
         const totalOwed = billEntries.reduce((s: number, b: any) => s + b.owed, 0);
-        const totalRemaining = billEntries.reduce((s: number, b: any) => s + b.remaining, 0);
+        const totalRemaining = billEntries.filter((b: any) => !b.isComplete).reduce((s: number, b: any) => s + b.remaining, 0);
         return { person, billEntries, totalOwed, totalRemaining };
       }).filter((p: any) => p.billEntries.length > 0 && p.totalOwed > 0)
         .sort((a: any, b: any) => b.totalRemaining - a.totalRemaining);
 
       // ── 2. Unassigned ─────────────────────────────────────────────────────
-      // a) expense recordings tagged as due with no person_name
-      let dueQuery = supabase
-        .from('recordings')
-        .select('id, name, amount, paid_amount, status, transaction_date')
-        .eq('user_id', userId)
-        .eq('is_due', true)
-        .is('person_name', null)
-        .neq('status', 'voided')
-        .neq('status', 'paid')
-        .order('transaction_date', { ascending: false });
-      if (fromDate) dueQuery = dueQuery.gte('transaction_date', fromDate);
-      if (toDate) dueQuery = dueQuery.lte('transaction_date', toDate);
-      const { data: dueSolo } = await dueQuery;
-
-      // Filter out those linked to a split bill that has people
-      const { data: sbrRows } = (dueSolo ?? []).length > 0
-        ? await supabase.from('split_bill_recordings')
-            .select('recording_id, split_bill_id')
-            .in('recording_id', (dueSolo ?? []).map((r: any) => r.id))
-        : { data: [] };
-
-      const recToSplitBill: Record<string, string> = {};
-      (sbrRows ?? []).forEach((r: any) => { recToSplitBill[r.recording_id] = r.split_bill_id; });
-
-      const unassignedRecordings = (dueSolo ?? []).filter((r: any) => {
-        const linkedBillId = recToSplitBill[r.id];
-        if (!linkedBillId) return true; // no split bill → unassigned
-        return !billsWithPeople.has(linkedBillId); // split bill has no people → unassigned
+      // Bills with people but no items assigned to anyone
+      const billsWithNoItemAssignments = (bills ?? []).filter((b: any) => {
+        if (!billsWithPeople.has(b.id)) return false;
+        const billItems = (items ?? []).filter((item: any) => item.split_bill_id === b.id);
+        return billItems.every((item: any) => !item.people || item.people.length === 0);
       });
 
-      // b) split bills with no people
-      const unassignedBills = (bills ?? []).filter((b: any) => !billsWithPeople.has(b.id));
+      // unassigned split bills (no people OR people but no item assignments), not closed
+      const unassignedBillIds = new Set([
+        ...(bills ?? []).filter((b: any) => !billsWithPeople.has(b.id) && b.status !== 'closed').map((b: any) => b.id),
+        ...billsWithNoItemAssignments.filter((b: any) => b.status !== 'closed').map((b: any) => b.id),
+      ]);
+      const unassignedBills = (bills ?? []).filter((b: any) => unassignedBillIds.has(b.id));
 
-      return { peopleEntries, unassignedRecordings, unassignedBills };
+      // fetch all expense recordings linked to unassigned bills + due recordings
+      const { data: expenseRecs } = await supabase
+        .from('recordings')
+        .select('id, name, amount, paid_amount, status, transaction_date, split_bill_id, person_name, is_due')
+        .eq('user_id', userId)
+        .eq('type', 'expense')
+        .neq('status', 'voided')
+        .order('transaction_date', { ascending: false });
+
+      const seenIds = new Set<string>();
+      const unassignedRecordings: any[] = [];
+
+      (expenseRecs ?? []).forEach((r: any) => {
+        if (r.person_name) return; // has owes you — skip
+        const inUnassignedBill = r.split_bill_id && unassignedBillIds.has(r.split_bill_id) && billMap[r.split_bill_id]?.status !== 'closed';
+        const isDueNoSplitBill = r.is_due && !r.split_bill_id && r.status !== 'paid';
+        const isDueUnassignedBill = r.is_due && inUnassignedBill && r.status !== 'paid';
+        if ((inUnassignedBill || isDueNoSplitBill || isDueUnassignedBill) && !seenIds.has(r.id)) {
+          seenIds.add(r.id);
+          unassignedRecordings.push(r);
+        }
+      });
+
+      // apply date filter to recordings
+      const filteredUnassignedRecordings = unassignedRecordings.filter((r: any) => {
+        if (!fromDate && !toDate) return true;
+        const d = r.transaction_date;
+        if (fromDate && d < fromDate) return false;
+        if (toDate && d > toDate) return false;
+        return true;
+      });
+
+      return { peopleEntries, unassignedRecordings: filteredUnassignedRecordings, unassignedBills };
     },
     enabled: !!userId,
   });
@@ -296,11 +323,101 @@ export default function ReceivablesPanel({ onClose }: Props) {
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         >
+          {/* Unassigned card */}
+          {hasUnassigned && (
+            <View style={st.personCard}>
+              <TouchableOpacity style={st.personRow} onPress={() => togglePerson('__unassigned__')} activeOpacity={0.7}>
+                <View style={[st.personAvatar, { backgroundColor: Colors.surface }]}>
+                  <Ionicons name="help-outline" size={18} color={Colors.muted} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={st.personName}>Unassigned</Text>
+                  <Text style={st.personSub}>{unassignedRecordings.length + unassignedBills.length} item{unassignedRecordings.length + unassignedBills.length !== 1 ? 's' : ''}</Text>
+                </View>
+                <Ionicons name={expandedPeople.has('__unassigned__') ? 'chevron-up' : 'chevron-down'} size={14} color={Colors.muted} style={{ marginLeft: 8 }} />
+              </TouchableOpacity>
+              {expandedPeople.has('__unassigned__') && (
+                <View style={st.personItems}>
+                  {(() => {
+                    const pendingBills = unassignedBills.filter((b: any) => b.status !== 'closed');
+                    const completedBills = unassignedBills.filter((b: any) => b.status === 'closed');
+                    const pendingRecs = unassignedRecordings;
+                    const hasAnyPending = pendingBills.length > 0 || pendingRecs.length > 0;
+                    return (
+                      <>
+                        {hasAnyPending && (
+                          <>
+                            <Text style={st.personSectionLabel}>Pending</Text>
+                            {pendingRecs.map((r: any, i: number) => (
+                              <TouchableOpacity
+                                key={r.id}
+                                style={[st.personItem, i === pendingRecs.length - 1 && pendingBills.length === 0 && completedBills.length === 0 && { borderBottomWidth: 0 }]}
+                                activeOpacity={0.7}
+                                onPress={() => openRecording(r.id)}
+                              >
+                                <View style={{ flex: 1 }}>
+                                  <Text style={st.rowName} numberOfLines={1}>{r.name}</Text>
+                                  <Text style={st.rowSub}>due · {Number(r.paid_amount ?? 0) > 0 ? `paid: ${fmt(Number(r.paid_amount))}` : 'no payment yet'}</Text>
+                                </View>
+                                <Text style={[st.rowAmount, { fontSize: 13, color: TEAL }]}>{fmt(Number(r.amount))}</Text>
+                                <Ionicons name="chevron-forward" size={13} color={Colors.faint} style={{ marginLeft: 6 }} />
+                              </TouchableOpacity>
+                            ))}
+                            {pendingBills.map((b: any, i: number) => (
+                              <TouchableOpacity
+                                key={b.id}
+                                style={[st.personItem, i === pendingBills.length - 1 && completedBills.length === 0 && { borderBottomWidth: 0 }]}
+                                activeOpacity={0.7}
+                                onPress={() => openSplitBill(b.id, b.name)}
+                              >
+                                <View style={{ flex: 1 }}>
+                                  <Text style={st.rowName} numberOfLines={1}>{b.name}</Text>
+                                  <Text style={st.rowSub}>split bill · no people added</Text>
+                                </View>
+                                <Ionicons name="chevron-forward" size={13} color={Colors.faint} style={{ marginLeft: 6 }} />
+                              </TouchableOpacity>
+                            ))}
+                          </>
+                        )}
+                        {completedBills.length > 0 && (
+                          <>
+                            <Text style={[st.personSectionLabel, { borderTopWidth: hasAnyPending ? 1 : 0, borderTopColor: Colors.border }]}>Completed</Text>
+                            {completedBills.map((b: any, i: number) => (
+                              <TouchableOpacity
+                                key={b.id}
+                                style={[st.personItem, i === completedBills.length - 1 && { borderBottomWidth: 0 }]}
+                                activeOpacity={0.7}
+                                onPress={() => openSplitBill(b.id, b.name)}
+                              >
+                                <View style={{ flex: 1 }}>
+                                  <Text style={st.rowName} numberOfLines={1}>{b.name}</Text>
+                                  <View style={[st.badge, { backgroundColor: '#9cd7d222', marginTop: 2 }]}>
+                                    <Text style={[st.badgeText, { color: '#4f9289' }]}>closed</Text>
+                                  </View>
+                                </View>
+                                <Ionicons name="chevron-forward" size={13} color={Colors.faint} style={{ marginLeft: 6 }} />
+                              </TouchableOpacity>
+                            ))}
+                          </>
+                        )}
+                        <TouchableOpacity style={st.showAllBtn} onPress={() => setDetailPerson('__unassigned__')} activeOpacity={0.7}>
+                          <Text style={st.showAllText}>show all</Text>
+                        </TouchableOpacity>
+                      </>
+                    );
+                  })()}
+                </View>
+              )}
+            </View>
+          )}
+
           {/* People cards */}
           {peopleEntries.map((personData: any) => {
             const expanded = expandedPeople.has(personData.person);
             const pendingBills = personData.billEntries.filter((b: any) => !b.isComplete);
-            const completedBills = personData.billEntries.filter((b: any) => b.isComplete);
+            const allCompletedBills = personData.billEntries.filter((b: any) => b.isComplete);
+            const completedBills = allCompletedBills.slice(0, 3);
+            const hasMoreCompleted = allCompletedBills.length > 3;
 
             return (
               <View key={personData.person} style={st.personCard}>
@@ -366,64 +483,25 @@ export default function ReceivablesPanel({ onClose }: Props) {
                         ))}
                       </>
                     )}
+                    <TouchableOpacity style={st.showAllBtn} onPress={() => setDetailPerson(personData.person)} activeOpacity={0.7}>
+                      <Text style={st.showAllText}>show all</Text>
+                    </TouchableOpacity>
                   </View>
                 )}
               </View>
             );
           })}
 
-          {/* Unassigned card */}
-          {hasUnassigned && (
-            <View style={st.personCard}>
-              <TouchableOpacity style={st.personRow} onPress={() => togglePerson('__unassigned__')} activeOpacity={0.7}>
-                <View style={[st.personAvatar, { backgroundColor: Colors.surface }]}>
-                  <Ionicons name="help-outline" size={18} color={Colors.muted} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={st.personName}>Unassigned</Text>
-                  <Text style={st.personSub}>{unassignedRecordings.length + unassignedBills.length} item{unassignedRecordings.length + unassignedBills.length !== 1 ? 's' : ''}</Text>
-                </View>
-                <Ionicons name={expandedPeople.has('__unassigned__') ? 'chevron-up' : 'chevron-down'} size={14} color={Colors.muted} style={{ marginLeft: 8 }} />
-              </TouchableOpacity>
-
-              {expandedPeople.has('__unassigned__') && (
-                <View style={st.personItems}>
-                  {unassignedRecordings.map((r: any, i: number) => (
-                    <TouchableOpacity
-                      key={r.id}
-                      style={[st.personItem, i === unassignedRecordings.length - 1 && unassignedBills.length === 0 && { borderBottomWidth: 0 }]}
-                      activeOpacity={0.7}
-                      onPress={() => openRecording(r.id)}
-                    >
-                      <View style={{ flex: 1 }}>
-                        <Text style={st.rowName} numberOfLines={1}>{r.name}</Text>
-                        <Text style={st.rowSub}>
-                          due · {Number(r.paid_amount ?? 0) > 0 ? `paid: ${fmt(Number(r.paid_amount))}` : 'no payment yet'}
-                        </Text>
-                      </View>
-                      <Text style={[st.rowAmount, { fontSize: 13, color: TEAL }]}>{fmt(Number(r.amount))}</Text>
-                      <Ionicons name="chevron-forward" size={13} color={Colors.faint} style={{ marginLeft: 6 }} />
-                    </TouchableOpacity>
-                  ))}
-                  {unassignedBills.map((b: any, i: number) => (
-                    <TouchableOpacity
-                      key={b.id}
-                      style={[st.personItem, i === unassignedBills.length - 1 && { borderBottomWidth: 0 }]}
-                      activeOpacity={0.7}
-                      onPress={() => openSplitBill(b.id, b.name)}
-                    >
-                      <View style={{ flex: 1 }}>
-                        <Text style={st.rowName} numberOfLines={1}>{b.name}</Text>
-                        <Text style={st.rowSub}>split bill · no people added</Text>
-                      </View>
-                      <Ionicons name="chevron-forward" size={13} color={Colors.faint} style={{ marginLeft: 6 }} />
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
-            </View>
-          )}
         </ScrollView>
+      )}
+
+      {detailPerson && (
+        <View style={StyleSheet.absoluteFill}>
+          <ReceivableDetail
+            person={detailPerson}
+            onClose={() => setDetailPerson(null)}
+          />
+        </View>
       )}
 
       <BottomSheet visible={showDateSheet} onClose={() => setShowDateSheet(false)} title="date filter">
@@ -530,4 +608,6 @@ const st = StyleSheet.create({
   personItems:     { borderTopWidth: 1, borderTopColor: Colors.border },
   personItem:      { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: Colors.border },
   personSectionLabel: { fontFamily: AppFont.semiBold, fontSize: 10, color: Colors.muted, textTransform: 'uppercase', letterSpacing: 0.6, paddingHorizontal: 14, paddingVertical: 6, backgroundColor: Colors.surface },
+  showAllBtn: { paddingVertical: 10, paddingHorizontal: 14, alignItems: 'center', borderTopWidth: 1, borderTopColor: Colors.border },
+  showAllText: { fontFamily: AppFont.semiBold, fontSize: 12, color: TEAL },
 });
