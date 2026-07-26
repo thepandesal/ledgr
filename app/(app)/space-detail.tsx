@@ -1173,9 +1173,12 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
       }
       setDeleteProgress(prev => prev && { ...prev, splitBills: true });
 
-      // Step 2: delete recordings
-      await supabase.from('recordings').delete().eq('space_id', spaceId as string);
-      setDeleteProgress(prev => prev && { ...prev, recordings: true });
+    // Step 2: delete recordings (nullify source_recording_id refs first)
+    if (recIds.length > 0) {
+      await supabase.from('recordings').update({ source_recording_id: null }).in('source_recording_id', recIds);
+    }
+    await supabase.from('recordings').delete().eq('space_id', spaceId as string);
+    setDeleteProgress(prev => prev && { ...prev, recordings: true });
 
       // Step 3: delete space
       await supabase.from('spaces').delete().eq('id', spaceId as string);
