@@ -457,10 +457,7 @@ export default function AddRecordingScreen({ inlineProps }: {
                 <Text style={s.headerCloseText}>✕</Text>
               </View>
             </TouchableOpacity>
-          </View>
-
-
-
+          </View>{/* */}
           <View style={s.frozenSection}>
             <TouchableOpacity style={s.frozenRow} onPress={() => setShowTypeModal(true)} activeOpacity={0.8}>
               <Text style={s.frozenLabel}>Type</Text>
