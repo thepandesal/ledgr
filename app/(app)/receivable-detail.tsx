@@ -1,7 +1,7 @@
 import {
   View, Text, StyleSheet, ScrollView, SafeAreaView,
   TouchableOpacity, TextInput, RefreshControl,
-  Animated, Dimensions,
+  Animated, Dimensions, Modal, ActivityIndicator,
 } from 'react-native';
 import { useState, useEffect, useRef } from 'react';
 import { Ionicons } from '@expo/vector-icons';
@@ -35,6 +35,12 @@ export default function ReceivableDetail({ person, onClose, onBack }: Props) {
   const [search, setSearch] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const slideAnim = useRef(new Animated.Value(width)).current;
+  const [mode, setMode] = useState<'choice' | 'view' | 'settle'>('choice');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [settleModal, setSettleModal] = useState(false);
+  const [settleMode, setSettleMode] = useState<'complete' | 'partial'>('complete');
+  const [settleAmount, setSettleAmount] = useState('');
+  const [settling, setSettling] = useState(false);
 
   useEffect(() => {
     Animated.timing(slideAnim, {
@@ -67,7 +73,6 @@ export default function ReceivableDetail({ person, onClose, onBack }: Props) {
       const billMap: Record<string, any> = {};
       (bills ?? []).forEach((b: any) => { billMap[b.id] = b; });
 
-      // Always load recordings linked to this person (debt/due/is_due)
       const { data: personRecs } = await supabase
         .from('recordings')
         .select('id, name, amount, paid_amount, status, type, is_due, transaction_date, space_id')
@@ -193,7 +198,6 @@ export default function ReceivableDetail({ person, onClose, onBack }: Props) {
         paidMap[pay.split_bill_id] = (paidMap[pay.split_bill_id] ?? 0) + Number(pay.amount);
       });
 
-      // Get all bill IDs where this person is involved (from bill_splits OR items)
       const personBillIdsSet = new Set<string>();
       (billSplits ?? []).filter((bs: any) => bs.person_name === person).forEach((bs: any) => personBillIdsSet.add(bs.split_bill_id));
       (items ?? []).forEach((item: any) => {
@@ -213,7 +217,6 @@ export default function ReceivableDetail({ person, onClose, onBack }: Props) {
         return { billId, billName: bill.name, billStatus: bill.status, owed, paid, remaining, isComplete, entryType: isReceivable ? 'receivable' : 'loan' };
       }).filter(Boolean);
 
-      // Deduplicate recordings linked to shown split bills
       const shownBillIds = entries.filter(Boolean).map((e: any) => e.billId);
       const { data: sbrRows } = shownBillIds.length > 0
         ? await supabase.from('split_bill_recordings').select('recording_id').in('split_bill_id', shownBillIds)
@@ -254,99 +257,310 @@ export default function ReceivableDetail({ person, onClose, onBack }: Props) {
        { key: 'loan',       label: 'You Owe',  items: filterItems(data?.completed?.loan ?? []) }];
 
   const hasAny = sections.some(s => s.items.length > 0);
+  const pendingItems = (data?.pending?.receivable ?? []).concat(data?.pending?.loan ?? []);
+  const selectedTotal = [...selectedIds].reduce((sum, id) => {
+    const item = pendingItems.find(i => i.billId === id);
+    return sum + (item ? Number(item.remaining) : 0);
+  }, 0);
+
+  const toggleSelection = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const openSettleModal = () => {
+    setSettleMode('complete');
+    setSettleAmount(selectedTotal.toFixed(2));
+    setSettleModal(true);
+  };
+
+  const confirmSettle = async () => {
+    const amount = parseFloat(settleAmount || '0');
+    if (amount <= 0 || settling) return;
+    setSettling(true);
+    const isComplete = settleMode === 'complete' || amount >= selectedTotal - 0.01;
+    try {
+      for (const billId of selectedIds) {
+        const item = pendingItems.find(i => i.billId === billId);
+        if (!item) continue;
+        let newPaid: number;
+        if (item.billId === billId) {
+          if (item.remaining <= 0) continue;
+          const payAmount = isComplete ? item.remaining : Math.min(amount, item.remaining);
+          newPaid = item.paid + payAmount;
+          const newStatus = newPaid >= item.owed - 0.01 ? 'paid' : 'partial';
+          await supabase.from('recordings').update({ paid_amount: newPaid, status: newStatus }).eq('id', billId);
+        }
+      }
+
+      // Update notification if partial
+      if (!isComplete && amount > 0) {
+        await supabase.from('notifications').insert({
+          user_id: userId, type: 'payment_received',
+          title: `Payment collected from ${person}`,
+          body: `PHP ${amount.toFixed(2)} — remaining: ${(selectedTotal - amount).toFixed(2)}`,
+          message: `PHP ${amount.toFixed(2)} — remaining: ${(selectedTotal - amount).toFixed(2)}`,
+          data: { person },
+          is_read: false, status: 'new',
+        });
+      }
+    } catch (_) {}
+    setSettling(false);
+    setSettleModal(false);
+    setSelectedIds(new Set());
+    setMode('view');
+    queryClient.invalidateQueries({ queryKey: ['receivable-detail', userId, person] });
+  };
+
+  const renderChoice = () => (
+    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: DC.pagePadding, gap: 20 }}>
+      <TouchableOpacity
+        style={{ width: '100%', paddingVertical: 24, borderRadius: Radius.lg, backgroundColor: TEAL + '22', alignItems: 'center', gap: 8 }}
+        activeOpacity={0.8}
+        onPress={() => setMode('settle')}
+      >
+        <Ionicons name="cash-outline" size={32} color={TEAL} />
+        <Text style={{ fontFamily: AppFont.bold, fontSize: 16, color: '#111' }}>Settle Payments</Text>
+        <Text style={{ fontFamily: AppFont.regular, fontSize: 12, color: Colors.muted }}>Mark recordings as paid</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={{ width: '100%', paddingVertical: 24, borderRadius: Radius.lg, backgroundColor: DC.cardBg, alignItems: 'center', gap: 8, borderWidth: 1, borderColor: DC.cardBorder }}
+        activeOpacity={0.8}
+        onPress={() => setMode('view')}
+      >
+        <Ionicons name="list-outline" size={32} color={DC.pageText} />
+        <Text style={{ fontFamily: AppFont.bold, fontSize: 16, color: '#111' }}>View Recording</Text>
+        <Text style={{ fontFamily: AppFont.regular, fontSize: 12, color: Colors.muted }}>Browse recordings and details</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  const renderSettle = () => {
+    const settleItems = pendingItems.filter(i => i.isRecording);
+    return (
+      <>
+        <View style={st.tabRow}>
+          <TouchableOpacity style={[st.tab, st.tabActive]} onPress={() => {}} activeOpacity={1}>
+            <Text style={[st.tabText, st.tabTextActive]}>Select recordings to settle</Text>
+          </TouchableOpacity>
+        </View>
+        <ScrollView
+          contentContainerStyle={st.scroll}
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        >
+          {settleItems.length === 0 ? (
+            <View style={st.empty}><Text style={st.emptyText}>no unpaid recordings</Text></View>
+          ) : (
+            settleItems.map((item, i) => {
+              const checked = selectedIds.has(item.billId);
+              return (
+                <TouchableOpacity
+                  key={item.billId}
+                  style={[st.row, i === settleItems.length - 1 && { borderBottomWidth: 0 }, { opacity: checked ? 1 : 0.7 }]}
+                  activeOpacity={0.7}
+                  onPress={() => toggleSelection(item.billId)}
+                >
+                  <Ionicons name={checked ? 'checkbox' : 'square-outline'} size={20} color={checked ? TEAL : Colors.faint} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={st.rowName} numberOfLines={1}>{item.billName}</Text>
+                    <Text style={st.rowSub}>remaining: {fmt(item.remaining)}</Text>
+                  </View>
+                  <Text style={[st.rowAmount, { color: '#111' }]}>{fmt(item.owed)}</Text>
+                </TouchableOpacity>
+              );
+            })
+          )}
+        </ScrollView>
+        {selectedIds.size > 0 && (
+          <View style={{ padding: DC.pagePadding, borderTopWidth: 1, borderTopColor: Colors.border, backgroundColor: Colors.white }}>
+            <Text style={{ fontFamily: AppFont.regular, fontSize: 12, color: Colors.muted, marginBottom: 8 }}>
+              {selectedIds.size} selected · total: PHP {fmt(selectedTotal)}
+            </Text>
+            <TouchableOpacity
+              style={{ backgroundColor: TEAL, borderRadius: Radius.pill, paddingVertical: 14, alignItems: 'center' }}
+              activeOpacity={0.8}
+              onPress={openSettleModal}
+            >
+              <Text style={{ fontFamily: AppFont.bold, fontSize: 14, color: '#fff' }}>Settle Selected</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </>
+    );
+  };
 
   return (
     <Animated.View style={[StyleSheet.absoluteFill, { transform: [{ translateX: slideAnim }] }]} pointerEvents="box-none">
       <SafeAreaView style={st.root}>
-        <PageHeader title={headerTitle} onBack={handleClose} titleColor={TEAL} />
+        <PageHeader
+          title={headerTitle}
+          onBack={mode === 'choice' ? handleClose : (() => { setMode('choice'); setSelectedIds(new Set()); })}
+          titleColor={TEAL}
+        />
 
-        {/* Tabs */}
-        <View style={st.tabRow}>
-          <TouchableOpacity style={[st.tab, tab === 'pending' && st.tabActive]} onPress={() => setTab('pending')} activeOpacity={0.7}>
-            <Text style={[st.tabText, tab === 'pending' && st.tabTextActive]}>Pending</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[st.tab, tab === 'completed' && st.tabActive]} onPress={() => setTab('completed')} activeOpacity={0.7}>
-            <Text style={[st.tabText, tab === 'completed' && st.tabTextActive]}>Completed</Text>
-          </TouchableOpacity>
-        </View>
+        {mode === 'choice' && !isLoading && hasAny ? renderChoice() : mode === 'choice' && !isLoading ? null : null}
 
-        {/* Search */}
-        <View style={st.searchWrap}>
-          <Ionicons name="search-outline" size={13} color={Colors.faint} />
-          <TextInput
-            style={st.searchInput}
-            placeholder="search recording name..."
-            placeholderTextColor={Colors.faint}
-            value={search}
-            onChangeText={setSearch}
-          />
-          {search.length > 0 && (
-            <TouchableOpacity onPress={() => setSearch('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Ionicons name="close" size={13} color={Colors.faint} />
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {isLoading ? (
+        {mode === 'choice' && isLoading ? (
           <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}><GooeyLoader /></BlurView>
-        ) : !hasAny ? (
-          <View style={st.empty}>
-            <Text style={st.emptyText}>no {tab} items</Text>
-          </View>
-        ) : (
-          <ScrollView
-            contentContainerStyle={st.scroll}
-            showsVerticalScrollIndicator={false}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-          >
-            {sections.filter(s => s.items.length > 0).map(section => {
-              const secOwed = section.items.reduce((s: number, b: any) => s + Number(b.owed), 0);
-              const secPaid = section.items.reduce((s: number, b: any) => s + Number(b.paid), 0);
-              const secRemaining = section.items.reduce((s: number, b: any) => s + Number(b.remaining), 0);
-              const isRed = section.key === 'loan';
-              return (
-                <View key={section.key} style={{ marginBottom: 12 }}>
-                  <Text style={[st.sectionLabel, isRed && { color: '#e74c3c' }]}>{section.label}</Text>
-                  {section.items.map((bill: any, i: number) => (
-                    <TouchableOpacity
-                      key={bill.billId}
-                      style={[st.row, i === section.items.length - 1 && { borderBottomWidth: 0 }]}
-                      activeOpacity={0.7}
-                      onPress={() => bill.isRecording ? openRecording(bill.billId) : openSplitBill(bill.billId, bill.billName)}
-                    >
-                      <View style={{ flex: 1 }}>
-                        <Text style={st.rowName} numberOfLines={1}>{bill.billName}</Text>
-                        {tab === 'pending' ? (
-                          <Text style={st.rowSub}>due: {fmt(bill.remaining)}{bill.paid > 0 ? ` · paid: ${fmt(bill.paid)}` : ''}</Text>
-                        ) : (
-                          <Text style={st.rowSub}>paid: {fmt(bill.paid)} · total: {fmt(bill.owed)}</Text>
-                        )}
+        ) : null}
+
+        {mode === 'choice' && !isLoading && !hasAny ? (
+          <View style={st.empty}><Text style={st.emptyText}>no items for this person</Text></View>
+        ) : null}
+
+        {mode === 'settle' ? renderSettle() : null}
+
+        {mode === 'view' ? (
+          <>
+            <View style={st.tabRow}>
+              <TouchableOpacity style={[st.tab, tab === 'pending' && st.tabActive]} onPress={() => setTab('pending')} activeOpacity={0.7}>
+                <Text style={[st.tabText, tab === 'pending' && st.tabTextActive]}>Pending</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[st.tab, tab === 'completed' && st.tabActive]} onPress={() => setTab('completed')} activeOpacity={0.7}>
+                <Text style={[st.tabText, tab === 'completed' && st.tabTextActive]}>Completed</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={st.searchWrap}>
+              <Ionicons name="search-outline" size={13} color={Colors.faint} />
+              <TextInput
+                style={st.searchInput}
+                placeholder="search recording name..."
+                placeholderTextColor={Colors.faint}
+                value={search}
+                onChangeText={setSearch}
+              />
+              {search.length > 0 && (
+                <TouchableOpacity onPress={() => setSearch('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Ionicons name="close" size={13} color={Colors.faint} />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {isLoading ? (
+              <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}><GooeyLoader /></BlurView>
+            ) : !hasAny ? (
+              <View style={st.empty}><Text style={st.emptyText}>no {tab} items</Text></View>
+            ) : (
+              <ScrollView
+                contentContainerStyle={st.scroll}
+                showsVerticalScrollIndicator={false}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+              >
+                {sections.filter(s => s.items.length > 0).map(section => {
+                  const secOwed = section.items.reduce((s: number, b: any) => s + Number(b.owed), 0);
+                  const secPaid = section.items.reduce((s: number, b: any) => s + Number(b.paid), 0);
+                  const secRemaining = section.items.reduce((s: number, b: any) => s + Number(b.remaining), 0);
+                  const isRed = section.key === 'loan';
+                  return (
+                    <View key={section.key} style={{ marginBottom: 12 }}>
+                      <Text style={[st.sectionLabel, isRed && { color: '#e74c3c' }]}>{section.label}</Text>
+                      {section.items.map((bill: any, i: number) => (
+                        <TouchableOpacity
+                          key={bill.billId}
+                          style={[st.row, i === section.items.length - 1 && { borderBottomWidth: 0 }]}
+                          activeOpacity={0.7}
+                          onPress={() => bill.isRecording ? openRecording(bill.billId) : openSplitBill(bill.billId, bill.billName)}
+                        >
+                          <View style={{ flex: 1 }}>
+                            <Text style={st.rowName} numberOfLines={1}>{bill.billName}</Text>
+                            {tab === 'pending' ? (
+                              <Text style={st.rowSub}>due: {fmt(bill.remaining)}{bill.paid > 0 ? ` · paid: ${fmt(bill.paid)}` : ''}</Text>
+                            ) : (
+                              <Text style={st.rowSub}>paid: {fmt(bill.paid)} · total: {fmt(bill.owed)}</Text>
+                            )}
+                          </View>
+                          <Text style={[st.rowAmount, { color: isRed ? '#e74c3c' : (tab === 'pending' ? TEAL : '#111111') }]}>
+                            {fmt(tab === 'pending' ? bill.owed : bill.paid)}
+                          </Text>
+                          <Ionicons name="chevron-forward" size={13} color={Colors.faint} style={{ marginLeft: 6 }} />
+                        </TouchableOpacity>
+                      ))}
+                      <View style={[st.row, { borderBottomWidth: 0, paddingTop: 4 }]}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={[st.rowName, { fontFamily: AppFont.bold }]}>Total</Text>
+                          {tab === 'pending' ? (
+                            <Text style={st.rowSub}>remaining: {fmt(secRemaining)}{secPaid > 0 ? ` · paid: ${fmt(secPaid)}` : ''}</Text>
+                          ) : (
+                            <Text style={st.rowSub}>collected: {fmt(secPaid)} · total: {fmt(secOwed)}</Text>
+                          )}
+                        </View>
+                        <Text style={[st.rowAmount, { color: isRed ? '#e74c3c' : (tab === 'pending' ? TEAL : '#111111') }]}>
+                          {fmt(tab === 'pending' ? secOwed : secPaid)}
+                        </Text>
                       </View>
-                      <Text style={[st.rowAmount, { color: isRed ? '#e74c3c' : (tab === 'pending' ? TEAL : '#111111') }]}>
-                        {fmt(tab === 'pending' ? bill.owed : bill.paid)}
-                      </Text>
-                      <Ionicons name="chevron-forward" size={13} color={Colors.faint} style={{ marginLeft: 6 }} />
-                    </TouchableOpacity>
-                  ))}
-                  {/* Per-section total */}
-                  <View style={[st.row, { borderBottomWidth: 0, paddingTop: 4 }]}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[st.rowName, { fontFamily: AppFont.bold }]}>Total</Text>
-                      {tab === 'pending' ? (
-                        <Text style={st.rowSub}>remaining: {fmt(secRemaining)}{secPaid > 0 ? ` · paid: ${fmt(secPaid)}` : ''}</Text>
-                      ) : (
-                        <Text style={st.rowSub}>collected: {fmt(secPaid)} · total: {fmt(secOwed)}</Text>
-                      )}
                     </View>
-                    <Text style={[st.rowAmount, { color: isRed ? '#e74c3c' : (tab === 'pending' ? TEAL : '#111111') }]}>
-                      {fmt(tab === 'pending' ? secOwed : secPaid)}
-                    </Text>
-                  </View>
+                  );
+                })}
+              </ScrollView>
+            )}
+          </>
+        ) : null}
+
+        {/* Settle Modal */}
+        <Modal visible={settleModal} transparent animationType="fade" onRequestClose={() => setSettleModal(false)}>
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.4)' }}>
+            <View style={{ width: width * 0.85, backgroundColor: Colors.white, borderRadius: Radius.lg, padding: 24, gap: 16 }}>
+              <Text style={{ fontFamily: AppFont.bold, fontSize: 16, color: '#111' }}>Settle Payment</Text>
+
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <TouchableOpacity
+                  style={{ flex: 1, paddingVertical: 10, borderRadius: Radius.pill, backgroundColor: settleMode === 'complete' ? TEAL : DC.cardBg, alignItems: 'center' }}
+                  onPress={() => { setSettleMode('complete'); setSettleAmount(selectedTotal.toFixed(2)); }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={{ fontFamily: AppFont.bold, fontSize: 13, color: settleMode === 'complete' ? '#fff' : '#111' }}>Complete</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={{ flex: 1, paddingVertical: 10, borderRadius: Radius.pill, backgroundColor: settleMode === 'partial' ? TEAL : DC.cardBg, alignItems: 'center' }}
+                  onPress={() => setSettleMode('partial')}
+                  activeOpacity={0.8}
+                >
+                  <Text style={{ fontFamily: AppFont.bold, fontSize: 13, color: settleMode === 'partial' ? '#fff' : '#111' }}>Partial</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View>
+                <Text style={{ fontFamily: AppFont.regular, fontSize: 11, color: Colors.muted, marginBottom: 4 }}>Amount (max: {fmt(selectedTotal)})</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: DC.cardBorder, borderRadius: Radius.md, paddingHorizontal: 12, paddingVertical: 10 }}>
+                  <Text style={{ fontFamily: AppFont.bold, fontSize: 14, color: Colors.muted, marginRight: 6 }}>PHP</Text>
+                  <TextInput
+                    style={{ flex: 1, fontFamily: AppFont.monoBold, fontSize: 16, color: '#111', padding: 0, margin: 0 }}
+                    value={settleAmount}
+                    onChangeText={t => {
+                      const cleaned = t.replace(/[^0-9.]/g, '');
+                      const num = parseFloat(cleaned || '0');
+                      if (num > selectedTotal) return;
+                      setSettleAmount(cleaned);
+                    }}
+                    keyboardType="decimal-pad"
+                  />
                 </View>
-              );
-            })}
-          </ScrollView>
-        )}
+              </View>
+
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+                <TouchableOpacity
+                  style={{ flex: 1, paddingVertical: 12, borderRadius: Radius.pill, backgroundColor: DC.cardBg, alignItems: 'center', borderWidth: 1, borderColor: DC.cardBorder }}
+                  onPress={() => setSettleModal(false)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: '#111' }}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={{ flex: 1, paddingVertical: 12, borderRadius: Radius.pill, backgroundColor: TEAL, alignItems: 'center' }}
+                  onPress={confirmSettle}
+                  activeOpacity={0.8}
+                >
+                  {settling ? <ActivityIndicator size="small" color="#fff" /> : <Text style={{ fontFamily: AppFont.bold, fontSize: 13, color: '#fff' }}>Confirm</Text>}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </SafeAreaView>
     </Animated.View>
   );
