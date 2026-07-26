@@ -10,16 +10,16 @@ import { Colors, Fonts, Radius } from '../components/ui/theme';
 import { Brand } from '../src/lib/brand';
 
 const DEFAULT_CATEGORIES = [
-  { name: 'Food',          icon: 'fire-outline',          color: '#FFAB91' },
-  { name: 'Transport',     icon: 'navigation-outline',    color: '#80CBC4' },
+  { name: 'Food',          icon: 'flame-outline',         color: '#FFAB91' },
+  { name: 'Transport',     icon: 'navigate-outline',      color: '#80CBC4' },
   { name: 'Utilities',     icon: 'lightning-outline',     color: '#FFE082' },
   { name: 'Rent',          icon: 'home-outline',          color: '#B39DDB' },
   { name: 'Entertainment', icon: 'music-outline',         color: '#F48FB1' },
   { name: 'Health',        icon: 'medkit-outline',        color: '#A5D6A7' },
-  { name: 'Shopping',      icon: 'shopping-bag-outline',  color: '#90CAF9' },
+  { name: 'Shopping',      icon: 'bag-outline',           color: '#90CAF9' },
   { name: 'Subscriptions', icon: 'card-outline',          color: '#FFCC80' },
-  { name: 'Fitness',       icon: 'heartbeat-outline',     color: '#80DEEA' },
-  { name: 'Others',        icon: 'other-1-outline',       color: '#CFD8DC' },
+  { name: 'Fitness',       icon: 'pulse-outline',         color: '#80DEEA' },
+  { name: 'Others',        icon: 'apps-outline',          color: '#CFD8DC' },
 ];
 
 const CURRENCIES = [

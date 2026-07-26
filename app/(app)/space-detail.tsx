@@ -23,10 +23,7 @@ import AddRecordingScreen from './add-recording';
 import BottomNav from '@/components/ui/BottomNav';
 import StatementWebView from '@/components/ui/StatementWebView';
 import { useNav } from '../../src/lib/NavContext';
-
-// ── Module-level pending focus date ─────────────────────────────────────────
-export let pendingFocusDate: string | null = null;
-export function setPendingFocusDate(date: string | null) { pendingFocusDate = date; }
+import { setPendingFocusDate } from '../../src/lib/focusDate';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const { width } = Dimensions.get('window');

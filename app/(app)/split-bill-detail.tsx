@@ -472,12 +472,12 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
     const linkedIds = linkedRecordings.map((lr: any) => lr.recording?.id);
     const { data } = await supabase
       .from('recordings')
-      .select('id, name, amount, type, transaction_date, status')
+      .select('id, name, amount, type, transaction_date, status, is_due')
       .eq('user_id', userId)
       .in('type', ['expense', 'due', 'debt', 'income'])
       .order('transaction_date', { ascending: false })
       .limit(200);
-    setAllRecordings((data ?? []).filter((r: any) => !linkedIds.includes(r.id) && r.type !== 'debt' && r.type !== 'due'));
+    setAllRecordings((data ?? []).filter((r: any) => !linkedIds.includes(r.id) && r.type !== 'debt' && r.type !== 'due' && !r.is_due));
     setRecTab('expense');
     setRecSearch('');
     setRecDays(30);
@@ -532,7 +532,7 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
   });
 
   // receivable / expense = collect from them (+), loan / income / savings = give back (-)
-  const isDeductType = (type: string) => type === 'payable';
+  const isDeductType = (type: string) => type === 'payable' || type === 'debt';
 
   const totalItemsCost = items.reduce((s: number, i: any) => s + Number(i.cost), 0);
 
@@ -1194,10 +1194,9 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
     for (const lr of linkedRecordings) {
       const rec = lr.recording;
       if (!rec) continue;
-      await supabase.from('recordings').update({
-        status: 'paid',
-        is_due: true,
-      }).eq('id', rec.id);
+      if (rec.type === 'expense') {
+        await supabase.from('recordings').update({ is_due: true }).eq('id', rec.id);
+      }
     }
     await supabase.from('split_bills').update({ status: 'closed' }).eq('id', splitBillId);
     setBillStatus('closed');
@@ -1258,7 +1257,9 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
     for (const lr of autoCompleteRecs) {
       const rec = lr.recording;
       if (rec) {
-        await supabase.from('recordings').update({ paid_amount: rec.amount, status: 'paid', is_due: true }).eq('id', rec.id);
+        const updates: any = { paid_amount: rec.amount, status: 'paid' };
+        if (rec.type === 'expense') updates.is_due = true;
+        await supabase.from('recordings').update(updates).eq('id', rec.id);
       }
     }
     setAutoCompleteModal(false);

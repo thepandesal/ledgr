@@ -1,7 +1,7 @@
 ﻿import GooeyLoader from '@/components/ui/GooeyLoader';
 import { BlurView } from 'expo-blur';
 import AddItemModal from './AddItemModal';
-import { setPendingFocusDate } from './space-detail';
+import { setPendingFocusDate } from '../../src/lib/focusDate';
 import { useScreenAnim } from '@/components/ui/ScreenWrapper';
 import PageHeader from '@/components/ui/PageHeader';
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Animated, Dimensions, ScrollView, TextInput, Modal, Platform, Image, Share, Alert, ActivityIndicator } from 'react-native';
@@ -500,6 +500,22 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
       if (recording?.tagged_friend_user_id) {
         await cleanupTaggedDebt(recording.tagged_friend_user_id, recordingId as string, 'deleted');
       }
+      // If deleting a return recording, adjust the parent's paid_amount first
+      if (recording?.type === 'return' && recording?.linked_recording_id) {
+        const { data: parentRec } = await supabase
+          .from('recordings')
+          .select('paid_amount, amount')
+          .eq('id', recording.linked_recording_id)
+          .single();
+        if (parentRec) {
+          const newPaid = Math.max(0, Number(parentRec.paid_amount ?? 0) - Number(recording.amount ?? 0));
+          await supabase.from('recordings').update({
+            paid_amount: newPaid,
+            status: newPaid <= 0 ? 'unpaid' : 'partial',
+          }).eq('id', recording.linked_recording_id);
+        }
+      }
+
       // If force delete all, remove all linked return recordings (collections)
       if (forceDeleteAll) {
         await supabase.from('recordings').delete().eq('linked_recording_id', recordingId).eq('type', 'return');
@@ -547,10 +563,14 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
           supabase.from('accounts').select().eq('user_id', user.id).order('account_name'),
           supabase.from('categories').select().eq('user_id', user.id).order('name'),
           supabase.from('recordings').select('id').eq('linked_recording_id', recordingId).limit(1),
-        ]).then(([{ data: accs }, { data: cats }, { data: linked }]) => {
+          supabase.from('split_items').select('id').eq('recording_id', recordingId).limit(1),
+          supabase.from('split_bill_recordings').select('id').eq('recording_id', recordingId).limit(1),
+        ]).then(([{ data: accs }, { data: cats }, { data: linked }, { data: splitItems }, { data: splitBillRecs }]) => {
           if (accs) setEditAccounts(accs);
           if (cats) setEditCategories(cats);
-          setEditAmountLocked((linked ?? []).length > 0);
+          const hasPayments = (linked ?? []).length > 0;
+          const hasSplitItems = (splitItems ?? []).length > 0 || (splitBillRecs ?? []).length > 0;
+          setEditAmountLocked(hasPayments || hasSplitItems);
         });
       }),
     ]).then(() => loadPaymentData());

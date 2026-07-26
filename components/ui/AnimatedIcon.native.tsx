@@ -1,5 +1,5 @@
 import { WebView } from 'react-native-webview';
-import { Platform } from 'react-native';
+import { Platform, memo } from 'react-native';
 
 type IconSet = 'svg-spinners' | 'line-md' | 'basil' | 'circle-flags' | 'material-symbols';
 
@@ -18,7 +18,7 @@ const iconSets: Record<IconSet, any> = {
   'material-symbols': require('@iconify-json/material-symbols/icons.json'),
 };
 
-export default function AnimatedIcon({ set, icon, size = 24, color = 'currentColor' }: Props) {
+function AnimatedIcon({ set, icon, size = 24, color = 'currentColor' }: Props) {
   const data = iconSets[set];
   const iconData = data?.icons?.[icon];
   if (!iconData) return null;
@@ -46,3 +46,5 @@ export default function AnimatedIcon({ set, icon, size = 24, color = 'currentCol
     />
   );
 }
+
+export default memo(AnimatedIcon);

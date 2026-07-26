@@ -1,3 +1,5 @@
+import { memo } from 'react';
+
 type IconSet = 'svg-spinners' | 'line-md' | 'basil' | 'circle-flags' | 'material-symbols';
 
 interface Props {
@@ -15,7 +17,7 @@ const iconSets: Record<IconSet, any> = {
   'material-symbols': require('@iconify-json/material-symbols/icons.json'),
 };
 
-export default function AnimatedIcon({ set, icon, size = 24, color = 'currentColor' }: Props) {
+function AnimatedIcon({ set, icon, size = 24, color = 'currentColor' }: Props) {
   const data = iconSets[set];
   const iconData = data?.icons?.[icon];
   if (!iconData) return null;
@@ -32,3 +34,5 @@ export default function AnimatedIcon({ set, icon, size = 24, color = 'currentCol
     />
   );
 }
+
+export default memo(AnimatedIcon);

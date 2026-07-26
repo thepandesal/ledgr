@@ -1,4 +1,4 @@
-import { View, TouchableOpacity, Text, StyleSheet, Animated, Dimensions, Platform, SafeAreaView, ScrollView, useWindowDimensions, Clipboard, TextInput, ActivityIndicator, Modal } from 'react-native';
+import { View, TouchableOpacity, Text, StyleSheet, Animated, Platform, SafeAreaView, ScrollView, useWindowDimensions, Clipboard, TextInput, ActivityIndicator, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useRef, memo, useCallback, useEffect }from 'react';
@@ -48,11 +48,9 @@ const HEADER_BG        = Colors.headerBg;
 const HEADER_TEXT      = '#B6E1DE'; // teal text on dark header bg
 const HEADER_TEXT_DIM  = '#B6E1DE99';
 const HEADER_BTN_BG    = '#B6E1DE22';
-const NAV_ACCENT       = DC.navActive; // active nav icon/label
+const NAV_ACCENT       = DC.navActive;
 const NAV_INACTIVE     = DC.navInactive; // inactive nav icon
 const BUBBLE_ACTIVE_BG = '#EEF2FB'; // bubble active item bg
-
-const { width } = Dimensions.get('window');
 
 const MAIN_TABS = [
   { key: 'home',                label: 'Home',          icon: 'home-outline' },
@@ -614,6 +612,8 @@ const NAV_TOUR_IDS: Record<string, string> = {
 export default function TabsLayout() {
   const router = useRouter();
   const { width: W } = useWindowDimensions();
+  const winWidthRef = useRef(W);
+  winWidthRef.current = W;
   const { user, userName } = useUser();
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState('home');
@@ -662,18 +662,18 @@ export default function TabsLayout() {
   const [activeSpaceId,   setActiveSpaceId]   = useState<string | null>(null);
   const [activeSpaceName, setActiveSpaceName] = useState<string | null>(null);
   const [activeSpaceOpenEdit, setActiveSpaceOpenEdit] = useState(false);
-  const spaceSlideAnim = useRef(new Animated.Value(width)).current;
+  const spaceSlideAnim = useRef(new Animated.Value(winWidthRef.current)).current;
 
   const openSpace = useCallback((spaceId: string, name: string, edit = false) => {
     setActiveSpaceId(spaceId);
     setActiveSpaceName(name);
     setActiveSpaceOpenEdit(edit);
-    spaceSlideAnim.setValue(width);
+    spaceSlideAnim.setValue(winWidthRef.current);
     Animated.timing(spaceSlideAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start();
   }, []);
 
   const closeSpace = useCallback(() => {
-    Animated.timing(spaceSlideAnim, { toValue: width, duration: 260, useNativeDriver: true }).start(() => {
+    Animated.timing(spaceSlideAnim, { toValue: winWidthRef.current, duration: 260, useNativeDriver: true }).start(() => {
       setActiveSpaceId(null);
       setActiveSpaceName(null);
       setActiveSpaceOpenEdit(false);
@@ -681,33 +681,33 @@ export default function TabsLayout() {
   }, []);
 
   const [activeRecordingId, setActiveRecordingId] = useState<string | null>(null);
-  const recordingSlideAnim = useRef(new Animated.Value(width)).current;
+  const recordingSlideAnim = useRef(new Animated.Value(winWidthRef.current)).current;
 
   const openRecording = useCallback((recordingId: string) => {
     setActiveRecordingId(recordingId);
-    recordingSlideAnim.setValue(width);
+    recordingSlideAnim.setValue(winWidthRef.current);
     Animated.timing(recordingSlideAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start();
   }, []);
 
   const closeRecording = useCallback(() => {
-    Animated.timing(recordingSlideAnim, { toValue: width, duration: 260, useNativeDriver: true }).start(() => {
+    Animated.timing(recordingSlideAnim, { toValue: winWidthRef.current, duration: 260, useNativeDriver: true }).start(() => {
       setActiveRecordingId(null);
     });
   }, []);
 
   const [activeSplitBillId,   setActiveSplitBillId]   = useState<string | null>(null);
   const [activeSplitBillName, setActiveSplitBillName] = useState<string | null>(null);
-  const splitBillSlideAnim = useRef(new Animated.Value(width)).current;
+  const splitBillSlideAnim = useRef(new Animated.Value(winWidthRef.current)).current;
 
   const openSplitBill = useCallback((splitBillId: string, name: string) => {
     setActiveSplitBillId(splitBillId);
     setActiveSplitBillName(name);
-    splitBillSlideAnim.setValue(width);
+    splitBillSlideAnim.setValue(winWidthRef.current);
     Animated.timing(splitBillSlideAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start();
   }, []);
 
   const closeSplitBill = useCallback(() => {
-    Animated.timing(splitBillSlideAnim, { toValue: width, duration: 260, useNativeDriver: true }).start(() => {
+    Animated.timing(splitBillSlideAnim, { toValue: winWidthRef.current, duration: 260, useNativeDriver: true }).start(() => {
       setActiveSplitBillId(null);
       setActiveSplitBillName(null);
     });
@@ -715,36 +715,36 @@ export default function TabsLayout() {
 
   const [topSpendingOpen, setTopSpendingOpen] = useState(false);
   const topSpendingOpenRef = useRef(false);
-  const topSpendingAnim = useRef(new Animated.Value(width)).current;
+  const topSpendingAnim = useRef(new Animated.Value(winWidthRef.current)).current;
 
   const openTopSpending = useCallback(() => {
     topSpendingOpenRef.current = true;
     setTopSpendingOpen(true);
-    topSpendingAnim.setValue(width);
+    topSpendingAnim.setValue(winWidthRef.current);
     Animated.timing(topSpendingAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start();
   }, []);
 
   const closeTopSpending = useCallback(() => {
     topSpendingOpenRef.current = false;
-    Animated.timing(topSpendingAnim, { toValue: width, duration: 260, useNativeDriver: true }).start(() => {
+    Animated.timing(topSpendingAnim, { toValue: winWidthRef.current, duration: 260, useNativeDriver: true }).start(() => {
       setTopSpendingOpen(false);
     });
   }, []);
 
   const dismissTopSpending = useCallback(() => {
-    topSpendingAnim.setValue(width);
+    topSpendingAnim.setValue(winWidthRef.current);
     setTopSpendingOpen(false);
   }, []);
 
   const [recordingsPanelOpen, setRecordingsPanelOpen] = useState(false);
   const recordingsPanelOpenRef = useRef(false);
-  const recordingsPanelAnim = useRef(new Animated.Value(width)).current;
+  const recordingsPanelAnim = useRef(new Animated.Value(winWidthRef.current)).current;
   const [recordingsPanelOpts, setRecordingsPanelOpts] = useState<{ categoryId?: string; categoryName?: string; spaceId?: string; spaceName?: string }>({});
 
   const openRecordingsPanel = useCallback((opts?: { categoryId?: string; categoryName?: string; spaceId?: string; spaceName?: string }) => {
     recordingsPanelOpenRef.current = true;
     setRecordingsPanelOpts(opts ?? {});
-    recordingsPanelAnim.setValue(width);
+    recordingsPanelAnim.setValue(winWidthRef.current);
     setRecordingsPanelOpen(true);
     requestAnimationFrame(() => {
       Animated.timing(recordingsPanelAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start();
@@ -753,19 +753,19 @@ export default function TabsLayout() {
 
   const closeRecordingsPanel = useCallback(() => {
     recordingsPanelOpenRef.current = false;
-    Animated.timing(recordingsPanelAnim, { toValue: width, duration: 260, useNativeDriver: true }).start(() => {
+    Animated.timing(recordingsPanelAnim, { toValue: winWidthRef.current, duration: 260, useNativeDriver: true }).start(() => {
       setRecordingsPanelOpen(false);
     });
   }, []);
 
   const [spacesPanelOpen, setSpacesPanelOpen] = useState(false);
   const spacesPanelOpenRef = useRef(false);
-  const spacesPanelAnim = useRef(new Animated.Value(width)).current;
+  const spacesPanelAnim = useRef(new Animated.Value(winWidthRef.current)).current;
 
   const openSpacesPanel = useCallback(() => {
     spacesPanelOpenRef.current = true;
     setSpacesPanelOpen(true);
-    spacesPanelAnim.setValue(width);
+    spacesPanelAnim.setValue(winWidthRef.current);
     requestAnimationFrame(() => {
       Animated.timing(spacesPanelAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start();
     });
@@ -773,39 +773,39 @@ export default function TabsLayout() {
 
   const closeSpacesPanel = useCallback(() => {
     spacesPanelOpenRef.current = false;
-    Animated.timing(spacesPanelAnim, { toValue: width, duration: 260, useNativeDriver: true }).start(() => {
+    Animated.timing(spacesPanelAnim, { toValue: winWidthRef.current, duration: 260, useNativeDriver: true }).start(() => {
       setSpacesPanelOpen(false);
     });
   }, []);
 
   const [loansPanelOpen, setLoansPanelOpen] = useState(false);
   const loansPanelOpenRef = useRef(false);
-  const loansPanelAnim = useRef(new Animated.Value(width)).current;
-  const openLoansPanel = useCallback(() => { loansPanelOpenRef.current = true; setLoansPanelOpen(true); loansPanelAnim.setValue(width); requestAnimationFrame(() => { Animated.timing(loansPanelAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start(); }); }, []);
-  const closeLoansPanel = useCallback(() => { loansPanelOpenRef.current = false; Animated.timing(loansPanelAnim, { toValue: width, duration: 260, useNativeDriver: true }).start(() => { setLoansPanelOpen(false); }); }, []);
+  const loansPanelAnim = useRef(new Animated.Value(winWidthRef.current)).current;
+  const openLoansPanel = useCallback(() => { loansPanelOpenRef.current = true; setLoansPanelOpen(true); loansPanelAnim.setValue(winWidthRef.current); requestAnimationFrame(() => { Animated.timing(loansPanelAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start(); }); }, []);
+  const closeLoansPanel = useCallback(() => { loansPanelOpenRef.current = false; Animated.timing(loansPanelAnim, { toValue: winWidthRef.current, duration: 260, useNativeDriver: true }).start(() => { setLoansPanelOpen(false); }); }, []);
 
   const [receivablesPanelOpen, setReceivablesPanelOpen] = useState(false);
   const receivablesPanelOpenRef = useRef(false);
-  const receivablesPanelAnim = useRef(new Animated.Value(width)).current;
+  const receivablesPanelAnim = useRef(new Animated.Value(winWidthRef.current)).current;
   const [receivablesInitialPerson, setReceivablesInitialPerson] = useState<string | null>(null);
-  const openReceivablesPanel = useCallback((person?: string) => { setReceivablesInitialPerson(person ?? null); receivablesPanelOpenRef.current = true; setReceivablesPanelOpen(true); receivablesPanelAnim.setValue(width); requestAnimationFrame(() => { Animated.timing(receivablesPanelAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start(); }); }, []);
-  const closeReceivablesPanel = useCallback(() => { receivablesPanelOpenRef.current = false; setReceivablesInitialPerson(null); Animated.timing(receivablesPanelAnim, { toValue: width, duration: 260, useNativeDriver: true }).start(() => { setReceivablesPanelOpen(false); }); }, []);
+  const openReceivablesPanel = useCallback((person?: string) => { setReceivablesInitialPerson(person ?? null); receivablesPanelOpenRef.current = true; setReceivablesPanelOpen(true); receivablesPanelAnim.setValue(winWidthRef.current); requestAnimationFrame(() => { Animated.timing(receivablesPanelAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start(); }); }, []);
+  const closeReceivablesPanel = useCallback(() => { receivablesPanelOpenRef.current = false; setReceivablesInitialPerson(null); Animated.timing(receivablesPanelAnim, { toValue: winWidthRef.current, duration: 260, useNativeDriver: true }).start(() => { setReceivablesPanelOpen(false); }); }, []);
 
   const [remindersPanelOpen, setRemindersPanelOpen] = useState(false);
   const remindersPanelOpenRef = useRef(false);
-  const remindersPanelAnim = useRef(new Animated.Value(width)).current;
-  const openRemindersPanel = useCallback(() => { remindersPanelOpenRef.current = true; setRemindersPanelOpen(true); remindersPanelAnim.setValue(width); requestAnimationFrame(() => { Animated.timing(remindersPanelAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start(); }); }, []);
-  const closeRemindersPanel = useCallback(() => { remindersPanelOpenRef.current = false; Animated.timing(remindersPanelAnim, { toValue: width, duration: 260, useNativeDriver: true }).start(() => { setRemindersPanelOpen(false); }); }, []);
+  const remindersPanelAnim = useRef(new Animated.Value(winWidthRef.current)).current;
+  const openRemindersPanel = useCallback(() => { remindersPanelOpenRef.current = true; setRemindersPanelOpen(true); remindersPanelAnim.setValue(winWidthRef.current); requestAnimationFrame(() => { Animated.timing(remindersPanelAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start(); }); }, []);
+  const closeRemindersPanel = useCallback(() => { remindersPanelOpenRef.current = false; Animated.timing(remindersPanelAnim, { toValue: winWidthRef.current, duration: 260, useNativeDriver: true }).start(() => { setRemindersPanelOpen(false); }); }, []);
 
   const [contactsPanelOpen, setContactsPanelOpen] = useState(false);
-  const contactsPanelAnim = useRef(new Animated.Value(width)).current;
-  const openContactsPanel = useCallback(() => { setContactsPanelOpen(true); contactsPanelAnim.setValue(width); requestAnimationFrame(() => { Animated.timing(contactsPanelAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start(); }); }, []);
-  const closeContactsPanel = useCallback(() => { Animated.timing(contactsPanelAnim, { toValue: width, duration: 260, useNativeDriver: true }).start(() => { setContactsPanelOpen(false); }); }, []);
+  const contactsPanelAnim = useRef(new Animated.Value(winWidthRef.current)).current;
+  const openContactsPanel = useCallback(() => { setContactsPanelOpen(true); contactsPanelAnim.setValue(winWidthRef.current); requestAnimationFrame(() => { Animated.timing(contactsPanelAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start(); }); }, []);
+  const closeContactsPanel = useCallback(() => { Animated.timing(contactsPanelAnim, { toValue: winWidthRef.current, duration: 260, useNativeDriver: true }).start(() => { setContactsPanelOpen(false); }); }, []);
 
   const [friendsPanelOpen, setFriendsPanelOpen] = useState(false);
-  const friendsPanelAnim = useRef(new Animated.Value(width)).current;
-  const openFriendsPanel = useCallback(() => { setFriendsPanelOpen(true); friendsPanelAnim.setValue(width); requestAnimationFrame(() => { Animated.timing(friendsPanelAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start(); }); }, []);
-  const closeFriendsPanel = useCallback(() => { Animated.timing(friendsPanelAnim, { toValue: width, duration: 260, useNativeDriver: true }).start(() => { setFriendsPanelOpen(false); }); }, []);
+  const friendsPanelAnim = useRef(new Animated.Value(winWidthRef.current)).current;
+  const openFriendsPanel = useCallback(() => { setFriendsPanelOpen(true); friendsPanelAnim.setValue(winWidthRef.current); requestAnimationFrame(() => { Animated.timing(friendsPanelAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start(); }); }, []);
+  const closeFriendsPanel = useCallback(() => { Animated.timing(friendsPanelAnim, { toValue: winWidthRef.current, duration: 260, useNativeDriver: true }).start(() => { setFriendsPanelOpen(false); }); }, []);
 
   const fetchUnread = useCallback(async () => {
     if (!userId) return;
@@ -836,10 +836,31 @@ export default function TabsLayout() {
   }, [userId, fetchUnread]);
 
   const slideAnims = useRef<Record<string, Animated.Value>>(
-    Object.fromEntries(SLIDE_KEYS.map((k) => [k, new Animated.Value(k === 'home' ? 0 : width)]))
+    Object.fromEntries(SLIDE_KEYS.map((k) => [k, new Animated.Value(k === 'home' ? 0 : winWidthRef.current)]))
   ).current;
 
   // Notification slide anim — no longer needed (notifications-page is in SLIDE_KEYS)
+
+  // ── Reposition off-screen panels when window resizes ──
+  useEffect(() => {
+    const updateHidden = (anim: Animated.Value | undefined) => {
+      if (anim && (anim as any).__getValue() !== 0) {
+        anim.setValue(W);
+      }
+    };
+    SLIDE_KEYS.forEach(key => { if (key !== 'home') updateHidden(slideAnims[key]); });
+    updateHidden(spaceSlideAnim);
+    updateHidden(recordingSlideAnim);
+    updateHidden(splitBillSlideAnim);
+    updateHidden(topSpendingAnim);
+    updateHidden(recordingsPanelAnim);
+    updateHidden(spacesPanelAnim);
+    updateHidden(loansPanelAnim);
+    updateHidden(receivablesPanelAnim);
+    updateHidden(remindersPanelAnim);
+    updateHidden(contactsPanelAnim);
+    updateHidden(friendsPanelAnim);
+  }, [W]);
 
   // Per-tab navigation stack cache (Instagram-style)
   const tabStacks = useRef<Record<string, { spaceId: string | null; spaceName: string | null; recordingId: string | null; topSpendingOpen: boolean; recordingsPanelOpen: boolean; spacesPanelOpen: boolean; loansPanelOpen: boolean; receivablesPanelOpen: boolean; remindersPanelOpen: boolean }>>({});
@@ -865,19 +886,19 @@ export default function TabsLayout() {
     setActiveSpaceId(null);
     setActiveSpaceName(null);
     setActiveRecordingId(null);
-    spaceSlideAnim.setValue(width);
-    recordingSlideAnim.setValue(width);
+    spaceSlideAnim.setValue(winWidthRef.current);
+    recordingSlideAnim.setValue(winWidthRef.current);
     topSpendingOpenRef.current = topSpendingOpenRef.current; // preserve — panel stays mounted
-    topSpendingAnim.setValue(width); // hide off-screen while on other tab
+    topSpendingAnim.setValue(winWidthRef.current); // hide off-screen while on other tab
     recordingsPanelOpenRef.current = recordingsPanelOpenRef.current;
-    recordingsPanelAnim.setValue(width);
+    recordingsPanelAnim.setValue(winWidthRef.current);
     spacesPanelOpenRef.current = spacesPanelOpenRef.current;
-    spacesPanelAnim.setValue(width);
-    loansPanelAnim.setValue(width);
-    receivablesPanelAnim.setValue(width);
-    remindersPanelAnim.setValue(width);
-    contactsPanelAnim.setValue(width);
-    friendsPanelAnim.setValue(width);
+    spacesPanelAnim.setValue(winWidthRef.current);
+    loansPanelAnim.setValue(winWidthRef.current);
+    receivablesPanelAnim.setValue(winWidthRef.current);
+    remindersPanelAnim.setValue(winWidthRef.current);
+    contactsPanelAnim.setValue(winWidthRef.current);
+    friendsPanelAnim.setValue(winWidthRef.current);
     // Hide conditional panels and reset refs
     loansPanelOpenRef.current = false;
     setLoansPanelOpen(false);
@@ -894,7 +915,7 @@ export default function TabsLayout() {
     const outgoing = slideAnims[prev];
 
     // Instant swap — no animation between different tabs
-    outgoing?.setValue(width);
+    outgoing?.setValue(winWidthRef.current);
     incoming?.setValue(0);
 
     // Restore saved panel state for the incoming tab

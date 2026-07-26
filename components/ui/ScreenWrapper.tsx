@@ -15,7 +15,7 @@
  *   }
  *
  * For a custom back action (e.g. with pending state):
- *   <ScreenWrapper onBack={() => { setPendingFocusDate(date); }}>
+ *   <ScreenWrapper onBack={() => { handleFocusDate(); }}>
  */
 
 import { Animated, Dimensions, StyleSheet, View } from 'react-native';

@@ -16,7 +16,7 @@ import { useEffect, useState, useRef } from 'react';
 import { supabase } from '../../src/lib/supabase';
 import * as ImagePicker from 'expo-image-picker';
 import { compressImage, uploadReceiptPhoto } from '../../src/lib/receiptUpload';
-import { setPendingFocusDate } from './space-detail';
+import { setPendingFocusDate } from '../../src/lib/focusDate';
 import { DC } from '../../src/lib/design';
 import { AppFont } from '../../src/lib/fonts';
 

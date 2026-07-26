@@ -20,6 +20,19 @@ import { isReminderDueToday, reminderFrequencyLabel } from '../../../src/lib/rem
 import { useState, useMemo, useEffect, useRef } from 'react';
 
 const TEAL = '#5dc4bb';
+const abbrNum = (n: number) => {
+  if (n === 0) return '0';
+  const abs = Math.abs(n);
+  const sign = n < 0 ? '-' : '';
+  const units = [{ v: 1e9, s: 'B' }, { v: 1e6, s: 'M' }, { v: 1e3, s: 'k' }];
+  for (const u of units) {
+    if (abs >= u.v) {
+      const val = n / u.v;
+      return sign + (val < 100 ? parseFloat(val.toFixed(val < 10 ? 2 : 1)) : Math.round(val)) + u.s;
+    }
+  }
+  return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const YEARS = Array.from({ length: 21 }, (_, i) => 2020 + i);
@@ -45,6 +58,8 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
   const [draftFromYear, setDraftFromYear] = useState(new Date().getFullYear());
 
   const [refreshing, setRefreshing] = useState(false);
+  const scrollRef = useRef<any>(null);
+  const peopleScrollRef = useRef<any>(null);
 
   const { from: monthFrom, to: monthTo, label: monthLabel } = useMemo(() => {
     if (dateMode === 'monthly') {
@@ -116,7 +131,7 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
       data.forEach((r: any) => {
         const cat = Array.isArray(r.categories) ? r.categories[0] : r.categories;
         const key = r.category_id ?? '__none__';
-        if (!map[key]) map[key] = { name: cat?.name ?? 'Uncategorized', icon: cat?.icon ?? 'other-1-outline', total: 0, categoryId: r.category_id ?? null };
+        if (!map[key]) map[key] = { name: cat?.name ?? 'Uncategorized', icon: cat?.icon ?? 'apps-outline', total: 0, categoryId: r.category_id ?? null };
         map[key].total += Number(r.amount);
       });
       const all = Object.values(map).sort((a, b) => b.total - a.total);
@@ -143,7 +158,7 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
     const rest = allCats.slice(4);
     if (rest.length > 0) {
       const othersTotal = rest.reduce((s, c) => s + c.total, 0);
-      top4.push({ name: 'Others', icon: 'other-1-outline', total: othersTotal, categoryId: null });
+      top4.push({ name: 'Others', icon: 'apps-outline', total: othersTotal, categoryId: null });
     }
     return top4;
   }, [allCats]);
@@ -368,29 +383,40 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
         .lte('transaction_date', to);
 
       const spentMap: Record<string, number> = {};
+      const monthNetMap: Record<string, number> = {};
       const savedMap: Record<string, number> = {};
       (recs ?? []).forEach((r: any) => {
         if (r.type === 'expense' || r.type === 'debt') {
           spentMap[r.space_id] = (spentMap[r.space_id] ?? 0) + Number(r.amount);
         }
+        if (r.type === 'income' || r.type === 'due') {
+          monthNetMap[r.space_id] = (monthNetMap[r.space_id] ?? 0) + Number(r.amount);
+        }
+        if (r.type === 'expense' || r.type === 'debt') {
+          monthNetMap[r.space_id] = (monthNetMap[r.space_id] ?? 0) - Number(r.amount);
+        }
       });
 
-      const { data: savingsRecs } = await supabase
+      const { data: allTimeRecs } = await supabase
         .from('recordings')
         .select('space_id, amount, type')
         .in('space_id', ids)
         .neq('status', 'voided')
         .lte('transaction_date', to);
 
-      (savingsRecs ?? []).forEach((r: any) => {
+      (allTimeRecs ?? []).forEach((r: any) => {
         if (r.type === 'income' || r.type === 'due') {
           savedMap[r.space_id] = (savedMap[r.space_id] ?? 0) + Number(r.amount);
+        }
+        if (r.type === 'expense' || r.type === 'debt') {
+          savedMap[r.space_id] = (savedMap[r.space_id] ?? 0) - Number(r.amount);
         }
       });
 
       return allSpaces.map((s: any) => ({
         ...s,
         spent: s.space_type === 'savings' ? (savedMap[s.id] ?? 0) : (spentMap[s.id] ?? 0),
+        monthNet: s.space_type === 'savings' ? (monthNetMap[s.id] ?? 0) : undefined,
       }));
     },
     enabled: !!userId,
@@ -481,30 +507,33 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
             ) : (
               <View style={s.topSpendingRow}>
                 <View style={s.pieColumn}>
-                  <Animated.View style={{ opacity: pieFadeAnim }}>
-                    <Pressable onPress={(e) => {
-                      const { locationX, locationY } = e.nativeEvent;
-                      const dx = locationX - 60;
-                      const dy = locationY - 60;
-                      const dist = Math.sqrt(dx * dx + dy * dy);
-                      if (dist < 25) { selectPie(null); return; }
-                      let angle = Math.atan2(dy, dx) + Math.PI / 2;
-                      if (angle < 0) angle += 2 * Math.PI;
-                      const totalPct = angle / (2 * Math.PI);
-                      let cum = 0;
-                      for (const seg of pieSegments) {
-                        cum += seg.pct;
-                        if (totalPct <= cum) { selectPie(seg.index); return; }
-                      }
-                    }}>
+                  <Pressable onPress={(e) => {
+                    const ev = e.nativeEvent as any;
+                    const x = ev.offsetX ?? ev.locationX;
+                    const y = ev.offsetY ?? ev.locationY;
+                    if (x == null) return;
+                    const dx = x - 60;
+                    const dy = y - 60;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist < 25) { selectPie(null); return; }
+                    let angle = Math.atan2(dy, dx) + Math.PI / 2;
+                    if (angle < 0) angle += 2 * Math.PI;
+                    const totalPct = angle / (2 * Math.PI);
+                    let cum = 0;
+                    for (const seg of pieSegments) {
+                      cum += seg.pct;
+                      if (totalPct <= cum) { selectPie(seg.index === selectedPieCat ? null : seg.index); return; }
+                    }
+                  }}>
+                    <View>
                       <Svg width={120} height={120} viewBox="0 0 120 120">
                         {pieSegments.map((seg, i) => (
                           <Path key={i} d={seg.path} fill={seg.color} opacity={selectedPieCat === null || selectedPieCat === seg.index ? 1 : 0.3} />
                         ))}
                         <Path d={`M60,35 A25,25 0 1,1 59.9,35 Z`} fill="#ffffff" />
                       </Svg>
-                    </Pressable>
-                  </Animated.View>
+                    </View>
+                  </Pressable>
                   <View style={s.pieLabel}>
                     {selectedPieCat !== null ? (
                       <>
@@ -538,22 +567,48 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
             {spaces.length === 0 ? (
               <EmptyRow label="no spaces" />
             ) : (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.spaceAlbum} decelerationRate="fast" snapToInterval={90} snapToAlignment="start">
-                {spaces.map((sp: any) => (
-                  <TouchableOpacity key={sp.id} style={s.spaceCard} activeOpacity={0.7} onPress={() => setSpaceChoice({ id: sp.id, name: sp.name })}>
-                    <AnimatedIcon set="basil" icon={sp.space_type === 'shared' ? 'folder-user-solid' : 'folder-solid'} size={80} color="#e8e8e8" />
-                    <Text style={s.spaceCardName} numberOfLines={1}>{sp.name}</Text>
-                    <Text style={s.spaceCardAmount}>{fmt(sp.spent)}</Text>
-                    {sp.budget && <Text style={s.spaceCardSub}>{fmt(sp.budget)}</Text>}
-                  </TouchableOpacity>
-                ))}
-                {totalCounts.spaces > spaces.length && (
-                  <TouchableOpacity style={s.spaceCard} activeOpacity={0.7} onPress={openSpacesPanel}>
-                    <AnimatedIcon set="basil" icon="folder-solid" size={80} color="#e8e8e8" />
-                    <Text style={s.spaceCardName}>+{totalCounts.spaces - spaces.length} more</Text>
-                  </TouchableOpacity>
-                )}
-              </ScrollView>
+              <View
+                ref={scrollRef}
+                style={{ overflow: 'hidden', flexDirection: 'row', cursor: 'grab' } as any}
+                onMouseDown={(e) => {
+                  const el = scrollRef.current as unknown as HTMLElement;
+                  if (!el) return;
+                  const startX = (e as any).nativeEvent.pageX ?? (e as any).pageX;
+                  const scrollLeft = el.scrollLeft;
+                  const onMove = (ev: MouseEvent) => {
+                    const dx = ev.pageX - startX;
+                    el.scrollLeft = scrollLeft - dx;
+                  };
+                  const onUp = () => {
+                    document.removeEventListener('mousemove', onMove);
+                    document.removeEventListener('mouseup', onUp);
+                    el.style.cursor = 'grab';
+                  };
+                  el.style.cursor = 'grabbing';
+                  document.addEventListener('mousemove', onMove);
+                  document.addEventListener('mouseup', onUp);
+                }}
+              >
+                <View style={{ flexDirection: 'row', gap: 10, paddingBottom: 4 }}>
+                  {spaces.map((sp: any) => (
+                    <TouchableOpacity key={sp.id} style={s.spaceCard} activeOpacity={0.7} onPress={() => setSpaceChoice({ id: sp.id, name: sp.name })}>
+                      <AnimatedIcon set="line-md" icon="folder-twotone" size={80} color={sp.space_type === 'shared' ? '#e8e8e8' : sp.space_type === 'savings' ? '#bcd2c2' : '#fee1d3'} />
+                      <Text style={s.spaceCardName} numberOfLines={1}>{sp.name}</Text>
+                      <Text style={s.spaceCardAmount}>{fmt(sp.monthNet ?? sp.spent)}</Text>
+                      {sp.space_type === 'savings' && (
+                        <Text style={s.spaceCardAllTime}>{abbrNum(sp.spent)}{sp.budget ? <Text style={s.spaceCardGoal}> / {abbrNum(sp.budget)}</Text> : null}</Text>
+                      )}
+                      {sp.budget && sp.space_type !== 'savings' && <Text style={s.spaceCardSub}>{fmt(sp.budget)}</Text>}
+                    </TouchableOpacity>
+                  ))}
+                  {totalCounts.spaces > spaces.length && (
+                    <TouchableOpacity style={s.spaceCard} activeOpacity={0.7} onPress={openSpacesPanel}>
+                      <AnimatedIcon set="line-md" icon="folder-twotone" size={80} color="#e8e8e8" />
+                      <Text style={s.spaceCardName}>+{totalCounts.spaces - spaces.length} more</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
             )}
 
             {/* ── Latest Recordings ── */}
@@ -603,7 +658,29 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
             {peopleSummary.length === 0 ? (
               <EmptyRow label="no people with balances" />
             ) : (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.spaceAlbum} decelerationRate="fast" snapToInterval={90} snapToAlignment="start">
+              <View
+                ref={peopleScrollRef}
+                style={{ overflow: 'hidden', flexDirection: 'row', cursor: 'grab' } as any}
+                onMouseDown={(e) => {
+                  const el = peopleScrollRef.current as unknown as HTMLElement;
+                  if (!el) return;
+                  const startX = (e as any).nativeEvent.pageX ?? (e as any).pageX;
+                  const scrollLeft = el.scrollLeft;
+                  const onMove = (ev: MouseEvent) => {
+                    const dx = ev.pageX - startX;
+                    el.scrollLeft = scrollLeft - dx;
+                  };
+                  const onUp = () => {
+                    document.removeEventListener('mousemove', onMove);
+                    document.removeEventListener('mouseup', onUp);
+                    el.style.cursor = 'grab';
+                  };
+                  el.style.cursor = 'grabbing';
+                  document.addEventListener('mousemove', onMove);
+                  document.addEventListener('mouseup', onUp);
+                }}
+              >
+                <View style={{ flexDirection: 'row', gap: 10, paddingBottom: 4 }}>
                 {peopleSummary.map((p: any) => {
                   const isNegative = p.net < 0;
                   const absNet = Math.abs(p.net);
@@ -618,7 +695,8 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
                     </TouchableOpacity>
                   );
                 })}
-              </ScrollView>
+                </View>
+              </View>
             )}
           </>
       </ScrollView>
@@ -797,6 +875,8 @@ const s = StyleSheet.create({
   spaceCardName: { fontFamily: 'Poppins-Bold', fontSize: 10, color: '#111111', textAlign: 'center', marginTop: -6 },
   spaceCardAmount: { fontFamily: 'Poppins-Bold', fontSize: 11, color: '#111111', textAlign: 'center', lineHeight: 14 },
   spaceCardSub: { fontFamily: 'Poppins-Regular', fontSize: 9, color: '#999999', textAlign: 'center', lineHeight: 12 },
+  spaceCardAllTime: { fontFamily: 'Poppins-Regular', fontSize: 9, color: '#555555', textAlign: 'center', fontStyle: 'italic', lineHeight: 12 },
+  spaceCardGoal: { fontFamily: 'Poppins-Regular', fontSize: 9, color: '#bbbbbb', textAlign: 'center', fontStyle: 'italic', lineHeight: 12 },
   receivableName: { fontFamily: 'Poppins-Regular', fontSize: 12, color: '#111111', textAlign: 'center', marginTop: 4 },
   receivableAmount: { fontFamily: 'Poppins-Bold', fontSize: 11, color: '#111111', textAlign: 'center', lineHeight: 14 },
   receivableUnpaid: { fontFamily: 'Poppins-Regular', fontSize: 9, color: '#999999', textAlign: 'center', fontStyle: 'italic', lineHeight: 12 },
