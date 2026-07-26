@@ -2275,28 +2275,28 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
             <Ionicons name="chevron-forward" size={14} color={Colors.faint} />
           </TouchableOpacity>
         )}
-        {!isOwner && (
+        {!isOwner && recording?.status === 'paid' && (
           <TouchableOpacity style={rd.choiceRow} activeOpacity={0.8} onPress={() => { setShowAddChoice(false); router.push({ pathname: '/(app)/add-recording', params: { name: recording?.name, amount: String(recording?.amount ?? ''), spaceId: recording?.space_id, date: recording?.transaction_date, type: 'expense' } } as any); }}>
             <View style={[rd.choiceIcon, { backgroundColor: DC.accent1 + '22' }]}><Ionicons name="download-outline" size={20} color={DC.accent1} /></View>
             <View style={{ flex: 1 }}><Text style={rd.choiceTitle}>Save to My Account</Text><Text style={rd.choiceSub}>Create an expense in your own space</Text></View>
             <Ionicons name="chevron-forward" size={14} color={Colors.faint} />
           </TouchableOpacity>
         )}
-        {recording?.type === 'expense' && !linkedPayable && !linkedReceivable && !recording?.is_due && !recording?.person_name && !linkedSplitBill && (
+        {isOwner && recording?.type === 'expense' && !linkedPayable && !linkedReceivable && !recording?.is_due && !recording?.person_name && !linkedSplitBill && (
           <TouchableOpacity style={rd.choiceRow} activeOpacity={0.8} onPress={() => { setShowAddChoice(false); setReceivableMode('full'); setReceivableManualAmount(''); setReceivableSelectedPeople([]); setReceivableModal(true); }}>
             <View style={[rd.choiceIcon, { backgroundColor: DC.accent1 + '22' }]}><Ionicons name="arrow-undo-outline" size={20} color={DC.accent1} /></View>
             <View style={{ flex: 1 }}><Text style={rd.choiceTitle}>Tag as Due</Text><Text style={rd.choiceSub}>Mark this expense as collectible</Text></View>
             <Ionicons name="chevron-forward" size={14} color={Colors.faint} />
           </TouchableOpacity>
         )}
-        {recording?.type === 'expense' && recording?.is_due && !recording?.tagged_friend_user_id && (recording?.shared_with ?? []).length === 0 && existingTags.length === 0 && (
+        {isOwner && recording?.type === 'expense' && recording?.is_due && !recording?.tagged_friend_user_id && (recording?.shared_with ?? []).length === 0 && existingTags.length === 0 && (
           <TouchableOpacity style={rd.choiceRow} activeOpacity={0.8} onPress={() => { setShowAddChoice(false); openTagFriendModal(); }}>
             <View style={[rd.choiceIcon, { backgroundColor: DC.accent1 + '22' }]}><Ionicons name="person-add-outline" size={20} color={DC.accent1} /></View>
             <View style={{ flex: 1 }}><Text style={rd.choiceTitle}>Tag a Friend</Text><Text style={rd.choiceSub}>Send a debt request to a friend</Text></View>
             <Ionicons name="chevron-forward" size={14} color={Colors.faint} />
           </TouchableOpacity>
         )}
-        {recording?.type === 'expense' && recording?.is_due && (() => {
+        {isOwner && recording?.type === 'expense' && recording?.is_due && (() => {
           const paid = Number(recording.paid_amount ?? 0);
           const total = Number(recording.amount ?? 0);
           if (paid >= total - 0.01) return null;
@@ -2308,21 +2308,21 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
             </TouchableOpacity>
           );
         })()}
-        {recording?.type === 'debt' && recording?.status !== 'paid' && !recording?.is_tagged && (
+        {isOwner && recording?.type === 'debt' && recording?.status !== 'paid' && !recording?.is_tagged && (
           <TouchableOpacity style={rd.choiceRow} activeOpacity={0.8} onPress={() => { setShowAddChoice(false); openPayModal(); }}>
             <View style={[rd.choiceIcon, { backgroundColor: DC.accent1 + '22' }]}><Ionicons name="cash-outline" size={20} color={DC.accent1} /></View>
             <View style={{ flex: 1 }}><Text style={rd.choiceTitle}>Pay Debt</Text><Text style={rd.choiceSub}>Record a payment for this debt</Text></View>
             <Ionicons name="chevron-forward" size={14} color={Colors.faint} />
           </TouchableOpacity>
         )}
-        {recording?.type === 'due' && recording?.status !== 'paid' && (
+        {isOwner && recording?.type === 'due' && recording?.status !== 'paid' && (
           <TouchableOpacity style={rd.choiceRow} activeOpacity={0.8} onPress={() => { setShowAddChoice(false); openCollectModal(); }}>
             <View style={[rd.choiceIcon, { backgroundColor: DC.accent1 + '22' }]}><Ionicons name="arrow-down-circle-outline" size={20} color={DC.accent1} /></View>
             <View style={{ flex: 1 }}><Text style={rd.choiceTitle}>Collect</Text><Text style={rd.choiceSub}>Record a collection for this due</Text></View>
             <Ionicons name="chevron-forward" size={14} color={Colors.faint} />
           </TouchableOpacity>
         )}
-        {(() => {
+        {isOwner && (() => {
           const isWriteOffable = (recording?.type === 'due' || recording?.type === 'debt' || (recording?.type === 'expense' && recording?.is_due)) && recording?.status !== 'paid';
           const remaining = Math.max(0, Number(recording?.amount ?? 0) - Number(recording?.paid_amount ?? 0));
           if (!isWriteOffable || remaining <= 0) return null;
