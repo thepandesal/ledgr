@@ -1133,16 +1133,16 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
     setShowEditSpaceName(false);
     queryClient.invalidateQueries({ queryKey: ['space-budget', spaceId] });
     queryClient.invalidateQueries({ queryKey: ['spaces-panel'] });
-    queryClient.invalidateQueries({ queryKey: ['spaces'] });
-    queryClient.invalidateQueries({ queryKey: ['home-spaces'] });
+    queryClient.invalidateQueries({ queryKey: ['spaces', userId] });
+    queryClient.invalidateQueries({ queryKey: ['home-spaces', userId] });
   };
 
   const handleArchiveSpace = async () => {
     await supabase.from('spaces').update({ is_active: false }).eq('id', spaceId as string);
     setShowSpaceActions(false);
     queryClient.invalidateQueries({ queryKey: ['spaces-panel'] });
-    queryClient.invalidateQueries({ queryKey: ['spaces'] });
-    queryClient.invalidateQueries({ queryKey: ['home-spaces'] });
+    queryClient.invalidateQueries({ queryKey: ['spaces', userId] });
+    queryClient.invalidateQueries({ queryKey: ['home-spaces', userId] });
     handleBack();
   };
 
@@ -1154,8 +1154,9 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
     setDeletingSpace(false);
     setShowDeleteSpaceConfirm(false);
     queryClient.invalidateQueries({ queryKey: ['spaces-panel'] });
-    queryClient.invalidateQueries({ queryKey: ['spaces'] });
-    queryClient.invalidateQueries({ queryKey: ['home-spaces'] });
+    queryClient.invalidateQueries({ queryKey: ['spaces', userId] });
+    queryClient.invalidateQueries({ queryKey: ['home-spaces', userId] });
+    await queryClient.refetchQueries({ queryKey: ['home-spaces', userId] });
     handleBack();
   };
 
