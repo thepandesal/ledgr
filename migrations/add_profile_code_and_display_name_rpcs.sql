@@ -27,7 +27,8 @@ SECURITY DEFINER
 AS $$
 BEGIN
   INSERT INTO friendships (requester_id, receiver_id, status)
-    VALUES (requester_id, receiver_id, 'pending');
+    VALUES (requester_id, receiver_id, 'pending')
+    ON CONFLICT (requester_id, receiver_id) DO UPDATE SET status = 'pending', updated_at = now();
   INSERT INTO notifications (user_id, type, title, body, message, data, is_read, status)
     VALUES (receiver_id, 'friend_request', requester_name || ' sent you a friend request', 'tap to accept or decline', 'tap to accept or decline', jsonb_build_object('requesterId', requester_id), false, 'new');
 END;
@@ -42,7 +43,7 @@ AS $$
 DECLARE
   requester_id uuid;
 BEGIN
-  UPDATE friendships SET status = CASE WHEN accepted THEN 'accepted' ELSE 'declined' END WHERE id = friendship_id RETURNING requester_id INTO requester_id;
+  UPDATE friendships f SET status = CASE WHEN accepted THEN 'accepted' ELSE 'declined' END WHERE f.id = friendship_id RETURNING f.requester_id INTO requester_id;
   IF accepted THEN
     INSERT INTO notifications (user_id, type, title, body, message, data, is_read, status)
       VALUES (requester_id, 'friend_request_accepted', responder_name || ' accepted your friend request', 'you are now friends on Ledgr', 'you are now friends on Ledgr', jsonb_build_object('friendId', responder_id), false, 'new');

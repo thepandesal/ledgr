@@ -18,7 +18,7 @@ const TEAL = '#9cd7d2';
 interface Props { onClose: () => void; }
 
 export default function FriendsPanel({ onClose }: Props) {
-  const { userId } = useUser();
+  const { userId, userName } = useUser();
   const [refreshing, setRefreshing] = useState(false);
   const [friends, setFriends] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
@@ -74,7 +74,7 @@ export default function FriendsPanel({ onClose }: Props) {
     if (!verifiedUser) return;
     setSending(true);
     try {
-      await supabase.from('friendships').insert({ requester_id: userId, receiver_id: verifiedUser.id, status: 'pending' });
+      await supabase.rpc('send_friend_request', { requester_id: userId, receiver_id: verifiedUser.id, requester_name: userName });
       setSendSuccess(true);
       setVerifiedUser(null);
       setAddCode('');
