@@ -88,8 +88,9 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
       queryClient.invalidateQueries({ queryKey: ['home-spaces', userId] });
       queryClient.invalidateQueries({ queryKey: ['home-totals', userId] });
     };
+    const id = `${userId}-${Date.now()}`;
     const channel = supabase
-      .channel(`home-live-${userId}`)
+      .channel(`home-live-${id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'recordings', filter: `user_id=eq.${userId}` }, () => invalidateAll())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'spaces', filter: `user_id=eq.${userId}` }, () => invalidateAll())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'split_bills', filter: `user_id=eq.${userId}` }, () => invalidateAll())

@@ -103,7 +103,7 @@ export default function NotificationsScreen({ isActive }: { isActive?: boolean }
     if (!userId) return;
 
     const channel = supabase
-      .channel(`notifications-live-${userId}`)
+      .channel(`notifications-live-${userId}-${Date.now()}`)
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',

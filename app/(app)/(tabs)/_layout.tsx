@@ -821,7 +821,7 @@ export default function TabsLayout() {
     if (!userId) return;
     // Realtime subscription — badge updates live on new notification
     const channel = supabase
-      .channel('notifications-badge')
+      .channel(`notifications-badge-${Date.now()}`)
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
