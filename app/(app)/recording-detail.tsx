@@ -187,18 +187,19 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
 
   // ── Helper: clean up B's share when A cancels/removes/deletes ──────────
   const cleanupTaggedDebt = async (friendUserId: string, sourceRecId: string, reason: 'removed' | 'cancelled' | 'deleted') => {
-    // Remove friend from shared_with array
-    const { data: rec } = await supabase
-      .from('recordings')
-      .select('shared_with')
-      .eq('id', sourceRecId)
-      .single();
-    if (rec) {
-      const sharedWith: string[] = (rec.shared_with as string[]) ?? [];
-      await supabase.from('recordings').update({
-        shared_with: sharedWith.filter((id: string) => id !== friendUserId),
-      }).eq('id', sourceRecId);
-    }
+    try {
+      const { data: rec } = await supabase
+        .from('recordings')
+        .select('shared_with')
+        .eq('id', sourceRecId)
+        .single();
+      if (rec) {
+        const sharedWith: string[] = (rec.shared_with as string[]) ?? [];
+        await supabase.from('recordings').update({
+          shared_with: sharedWith.filter((id: string) => id !== friendUserId),
+        }).eq('id', sourceRecId);
+      }
+    } catch {}
     // Cancel any pending expense_tag notifications
     await supabase.from('notifications')
       .update({ status: 'opened' })
@@ -1528,9 +1529,8 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
     if (data) {
       const owned = data.user_id === userId;
       setIsOwner(owned);
-      if (!owned) {
-        const sharedWith: string[] = (data.shared_with as string[]) ?? [];
-        if (!sharedWith.includes(userId)) { handleBack(); return; }
+      if (!owned && Array.isArray(data.shared_with) && !data.shared_with.includes(userId)) {
+        handleBack(); return;
       }
       setRecording({
         ...data,
