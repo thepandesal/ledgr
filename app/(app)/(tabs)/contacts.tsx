@@ -82,7 +82,7 @@ export default function ContactsScreen({ isActive }: { isActive?: boolean }) {
       const { data } = await supabase.from('friendships').select('id, receiver_id').eq('requester_id', userId).eq('status', 'pending');
       if (!data || data.length === 0) return [];
       const ids = data.map((r: any) => r.receiver_id);
-      const { data: settings } = await supabase.from('user_settings').select('user_id, profile_code').in('user_id', ids);
+      const { data: settings } = await supabase.rpc('get_profile_codes', { user_ids: ids });
       const names = await Promise.all(ids.map((id: string) =>
         supabase.rpc('get_user_display_name', { user_id: id }).then(({ data: n }) => ({ id, name: n ?? 'unknown' }))
       ));
@@ -107,7 +107,7 @@ export default function ContactsScreen({ isActive }: { isActive?: boolean }) {
       const { data } = await supabase.from('friendships').select('id, requester_id, receiver_id').eq('status', 'accepted').or(`requester_id.eq.${userId},receiver_id.eq.${userId}`);
       if (!data || data.length === 0) return [];
       const friendIds = data.map((r: any) => r.requester_id === userId ? r.receiver_id : r.requester_id);
-      const { data: settings } = await supabase.from('user_settings').select('user_id, profile_code').in('user_id', friendIds);
+      const { data: settings } = await supabase.rpc('get_profile_codes', { user_ids: friendIds });
       const names = await Promise.all(friendIds.map((id: string) =>
         supabase.rpc('get_user_display_name', { user_id: id }).then(({ data: n }) => ({ id, name: n ?? 'unknown user' }))
       ));
@@ -127,7 +127,7 @@ export default function ContactsScreen({ isActive }: { isActive?: boolean }) {
       const { data } = await supabase.from('friendships').select('id, requester_id').eq('receiver_id', userId).eq('status', 'pending');
       if (!data || data.length === 0) return [];
       const ids = data.map((r: any) => r.requester_id);
-      const { data: settings } = await supabase.from('user_settings').select('user_id, profile_code').in('user_id', ids);
+      const { data: settings } = await supabase.rpc('get_profile_codes', { user_ids: ids });
       const names = await Promise.all(ids.map((id: string) =>
         supabase.rpc('get_user_display_name', { user_id: id }).then(({ data: n }) => ({ id, name: n ?? 'unknown user' }))
       ));
@@ -142,18 +142,7 @@ export default function ContactsScreen({ isActive }: { isActive?: boolean }) {
 
   const handleRespond = async (friendshipId: string, accept: boolean) => {
     setResponding(friendshipId);
-    const req = incoming.find(r => r.id === friendshipId);
-    await supabase.from('friendships').update({ status: accept ? 'accepted' : 'declined' }).eq('id', friendshipId);
-    if (accept && req) {
-      await supabase.from('notifications').insert({
-        user_id: req.requester_id, type: 'friend_request_accepted',
-        title: `${userName} accepted your friend request`,
-        body: 'you are now friends on Ledgr',
-        message: 'you are now friends on Ledgr',
-        data: { friendId: userId },
-        is_read: false, status: 'new',
-      });
-    }
+    await supabase.rpc('respond_to_friend_request', { friendship_id: friendshipId, accepted: accept, responder_name: userName, responder_id: userId });
     queryClient.invalidateQueries({ queryKey: ['friend-requests-incoming', userId] });
     queryClient.invalidateQueries({ queryKey: ['friends', userId] });
     setResponding(null);
