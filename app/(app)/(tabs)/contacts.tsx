@@ -235,8 +235,8 @@ export default function ContactsScreen({ isActive }: { isActive?: boolean }) {
               <Text style={s.name}>{req.receiver_name}</Text>
               <Text style={s.code}>{req.receiver_code} · pending</Text>
             </View>
-            <TouchableOpacity onPress={() => cancelRequest(req.id)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-              <Ionicons name="close-circle-outline" size={16} color={Colors.muted} />
+            <TouchableOpacity onPress={() => cancelRequest(req.id)} style={s.cancelBtn}>
+              <Text style={s.cancelBtnText}>Cancel</Text>
             </TouchableOpacity>
           </View>
         ))}
@@ -366,6 +366,6 @@ const s = StyleSheet.create({
   modalHint:     { fontFamily: Fonts.mono, fontSize: 12, color: Colors.muted, marginBottom: 16 },
   deleteBtn:     { backgroundColor: Colors.expense + '18', borderRadius: Radius.pill, paddingVertical: 14, alignItems: 'center', borderWidth: 1, borderColor: Colors.expense + '66' },
   deleteBtnText: { fontFamily: Brand.font.monoBold, fontSize: 14, color: Colors.expense },
-  cancelBtn:     { backgroundColor: Colors.surface, borderRadius: Radius.pill, paddingVertical: 14, alignItems: 'center', marginTop: 8 },
-  cancelBtnText: { fontFamily: Brand.font.monoBold, fontSize: 14, color: Colors.muted },
+  cancelBtn:     { paddingHorizontal: 12, paddingVertical: 6, borderRadius: Radius.pill, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.borderMid },
+  cancelBtnText: { fontFamily: Brand.font.monoBold, fontSize: 11, color: Colors.muted },
 });
