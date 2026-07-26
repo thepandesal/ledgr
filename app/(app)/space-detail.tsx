@@ -1134,6 +1134,7 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
     queryClient.invalidateQueries({ queryKey: ['space-budget', spaceId] });
     queryClient.invalidateQueries({ queryKey: ['spaces-panel'] });
     queryClient.invalidateQueries({ queryKey: ['spaces'] });
+    queryClient.invalidateQueries({ queryKey: ['home-spaces'] });
   };
 
   const handleArchiveSpace = async () => {
@@ -1141,6 +1142,7 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
     setShowSpaceActions(false);
     queryClient.invalidateQueries({ queryKey: ['spaces-panel'] });
     queryClient.invalidateQueries({ queryKey: ['spaces'] });
+    queryClient.invalidateQueries({ queryKey: ['home-spaces'] });
     handleBack();
   };
 
@@ -1153,6 +1155,7 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
     setShowDeleteSpaceConfirm(false);
     queryClient.invalidateQueries({ queryKey: ['spaces-panel'] });
     queryClient.invalidateQueries({ queryKey: ['spaces'] });
+    queryClient.invalidateQueries({ queryKey: ['home-spaces'] });
     handleBack();
   };
 
