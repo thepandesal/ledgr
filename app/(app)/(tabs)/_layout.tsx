@@ -137,7 +137,7 @@ const CURRENCIES = [
 function ProfileScreen() {
   const router = useRouter();
   const { switchTab, openContactsPanel, openFriendsPanel } = useNav();
-  const { user, userName, profileCode, defaultCurrency, setDefaultCurrency } = useUser();
+  const { user, userId, userName, profileCode, defaultCurrency, setDefaultCurrency } = useUser();
   const [codeCopied, setCodeCopied] = useState(false);
   const [showCurrencyModal, setShowCurrencyModal] = useState(false);
   const [currencySearch, setCurrencySearch] = useState('');
@@ -203,7 +203,7 @@ function ProfileScreen() {
 
   const respondToRequest = async (id: string, accept: boolean) => {
     setRespondingId(id);
-    await supabase.from('friendships').update({ status: accept ? 'accepted' : 'rejected' }).eq('id', id);
+    await supabase.rpc('respond_to_friend_request', { friendship_id: id, accepted: accept, responder_name: userName, responder_id: userId });
     setFriendRequests(prev => prev.filter(r => r.id !== id));
     if (accept) {
       const req = friendRequests.find(r => r.id === id);
@@ -224,7 +224,7 @@ function ProfileScreen() {
       const { data: existing } = await supabase.from('friendships')
         .select('id, status').or(`and(requester_id.eq.${userId},receiver_id.eq.${target}),and(requester_id.eq.${target},receiver_id.eq.${userId})`).maybeSingle();
       if (existing) { setAddFriendError(existing.status === 'accepted' ? 'already friends' : 'request already sent'); return; }
-      await supabase.from('friendships').insert({ requester_id: userId, receiver_id: target, status: 'pending' });
+      await supabase.rpc('send_friend_request', { requester_id: userId, receiver_id: target, requester_name: userName });
       const { data: n } = await supabase.rpc('get_user_display_name', { user_id: target });
       setOutgoingRequests(prev => [...prev, { id: '', name: n ?? 'unknown', receiverId: target }]);
       setShowAddFriend(false); setAddFriendCode('');
