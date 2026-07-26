@@ -570,24 +570,8 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
               <View
                 ref={scrollRef}
                 style={{ overflow: 'hidden', flexDirection: 'row', cursor: 'grab' } as any}
-                onMouseDown={(e) => {
-                  const el = scrollRef.current as unknown as HTMLElement;
-                  if (!el) return;
-                  const startX = (e as any).nativeEvent.pageX ?? (e as any).pageX;
-                  const scrollLeft = el.scrollLeft;
-                  const onMove = (ev: MouseEvent) => {
-                    const dx = ev.pageX - startX;
-                    el.scrollLeft = scrollLeft - dx;
-                  };
-                  const onUp = () => {
-                    document.removeEventListener('mousemove', onMove);
-                    document.removeEventListener('mouseup', onUp);
-                    el.style.cursor = 'grab';
-                  };
-                  el.style.cursor = 'grabbing';
-                  document.addEventListener('mousemove', onMove);
-                  document.addEventListener('mouseup', onUp);
-                }}
+                onMouseDown={makeScrollDragHandler(scrollRef)}
+                onTouchStart={makeScrollDragHandler(scrollRef)}
               >
                 <View style={{ flexDirection: 'row', gap: 10, paddingBottom: 4 }}>
                   {spaces.map((sp: any) => (
@@ -661,24 +645,8 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
               <View
                 ref={peopleScrollRef}
                 style={{ overflow: 'hidden', flexDirection: 'row', cursor: 'grab' } as any}
-                onMouseDown={(e) => {
-                  const el = peopleScrollRef.current as unknown as HTMLElement;
-                  if (!el) return;
-                  const startX = (e as any).nativeEvent.pageX ?? (e as any).pageX;
-                  const scrollLeft = el.scrollLeft;
-                  const onMove = (ev: MouseEvent) => {
-                    const dx = ev.pageX - startX;
-                    el.scrollLeft = scrollLeft - dx;
-                  };
-                  const onUp = () => {
-                    document.removeEventListener('mousemove', onMove);
-                    document.removeEventListener('mouseup', onUp);
-                    el.style.cursor = 'grab';
-                  };
-                  el.style.cursor = 'grabbing';
-                  document.addEventListener('mousemove', onMove);
-                  document.addEventListener('mouseup', onUp);
-                }}
+                onMouseDown={makeScrollDragHandler(peopleScrollRef)}
+                onTouchStart={makeScrollDragHandler(peopleScrollRef)}
               >
                 <View style={{ flexDirection: 'row', gap: 10, paddingBottom: 4 }}>
                 {peopleSummary.map((p: any) => {
@@ -837,6 +805,32 @@ function SeeMore({ total, shown, onPress, alwaysShow }: { total: number; shown: 
       <Text style={s.seeMoreText}>{label}</Text>
     </TouchableOpacity>
   );
+}
+
+function makeScrollDragHandler(ref: React.RefObject<any>) {
+  return (e: any) => {
+    const el = ref.current as unknown as HTMLElement;
+    if (!el) return;
+    const startX = e.nativeEvent?.pageX ?? e.pageX ?? e.changedTouches?.[0]?.pageX;
+    if (startX == null) return;
+    const scrollLeft = el.scrollLeft;
+    const onMove = (ev: MouseEvent | TouchEvent) => {
+      const pageX = 'changedTouches' in ev ? ev.changedTouches[0].pageX : (ev as MouseEvent).pageX;
+      el.scrollLeft = scrollLeft - (pageX - startX);
+    };
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove as any);
+      document.removeEventListener('mouseup', onUp);
+      document.removeEventListener('touchmove', onMove as any);
+      document.removeEventListener('touchend', onUp);
+      el.style.cursor = 'grab';
+    };
+    el.style.cursor = 'grabbing';
+    document.addEventListener('mousemove', onMove as any);
+    document.addEventListener('mouseup', onUp);
+    document.addEventListener('touchmove', onMove as any, { passive: true } as any);
+    document.addEventListener('touchend', onUp);
+  };
 }
 
 function EmptyRow({ label, onPress }: { label: string; onPress?: () => void }) {
