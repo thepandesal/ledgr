@@ -24,7 +24,7 @@ interface Props { onClose: () => void; }
 
 export default function SpacesPanel({ onClose }: Props) {
   const { userId, defaultCurrency } = useUser();
-  const { openRecordingsPanel, openSpace } = useNav();
+  const { openRecordingsPanel, openSpace, switchTab } = useNav();
   const { convert } = useExchangeRates();
   const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
@@ -178,6 +178,9 @@ export default function SpacesPanel({ onClose }: Props) {
         </TouchableOpacity>
         <TouchableOpacity style={[st.filterBtn, activeFilter === 'inactive' && st.filterBtnActive]} onPress={() => setActiveFilter('inactive')} activeOpacity={0.7}>
           <Text style={[st.filterBtnText, activeFilter === 'inactive' && st.filterBtnTextActive]}>Inactive</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[st.filterBtn, { paddingHorizontal: 8 }]} onPress={() => switchTab('spaces')} activeOpacity={0.7}>
+          <Ionicons name="add-outline" size={18} color={DC.pageActionText} />
         </TouchableOpacity>
       </View>
 
