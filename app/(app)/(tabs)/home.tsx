@@ -285,7 +285,7 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
         const remaining = Number(r.amount) - paid;
         if (remaining <= 0.01) return;
         if (!details[r.person_name]) details[r.person_name] = { owedToMe: 0, iOwe: 0 };
-        if (r.type === 'due') { details[r.person_name].owedToMe += remaining; net[r.person_name] = (net[r.person_name] ?? 0) + remaining; }
+        if (r.type === 'due' || r.is_due) { details[r.person_name].owedToMe += remaining; net[r.person_name] = (net[r.person_name] ?? 0) + remaining; }
         else { details[r.person_name].iOwe += remaining; net[r.person_name] = (net[r.person_name] ?? 0) - remaining; }
       });
 

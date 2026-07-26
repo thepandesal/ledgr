@@ -13,6 +13,7 @@ import { BlurView } from 'expo-blur';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../src/lib/supabase';
 import * as ImagePicker from 'expo-image-picker';
 import { compressImage, uploadReceiptPhoto } from '../../src/lib/receiptUpload';
@@ -193,6 +194,7 @@ export default function AddRecordingScreen({ inlineProps }: {
   const [receivableIsExpense, setReceivableIsExpense] = useState(false);
   const selectedType = (TYPES.find(t => t.key === type) ?? TYPES[0]) as { key: string; label: string; color: string; icon: string };
 
+  const queryClient = useQueryClient();
   const savingRef = useRef(false);
 
   // --- Lifecycle ---------------------------------------------------------
@@ -397,6 +399,9 @@ export default function AddRecordingScreen({ inlineProps }: {
           }
         }
       }
+      queryClient.invalidateQueries({ queryKey: ['home-people', user.id] });
+      queryClient.invalidateQueries({ queryKey: ['home-spaces', user.id] });
+      queryClient.invalidateQueries({ queryKey: ['home-recent', user.id] });
       setPendingFocusDate(date);
       handleClose();
     } catch (e: any) {
