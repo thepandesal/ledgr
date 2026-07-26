@@ -202,7 +202,7 @@ function ProfileScreen() {
 
   const respondToRequest = async (id: string, accept: boolean) => {
     setRespondingId(id);
-    await supabase.rpc('respond_to_friend_request', { friendship_id: id, accepted: accept, responder_name: userName, responder_id: userId });
+    await supabase.rpc('respond_to_friend_request', { p_friendship_id: id, p_accepted: accept, p_responder_name: userName, p_responder_id: userId });
     setFriendRequests(prev => prev.filter(r => r.id !== id));
     if (accept) {
       const req = friendRequests.find(r => r.id === id);

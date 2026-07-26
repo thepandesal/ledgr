@@ -35,7 +35,7 @@ END;
 $$;
 
 -- Respond to friend request: update friendship status + send notification (bypasses RLS)
-CREATE OR REPLACE FUNCTION respond_to_friend_request(friendship_id uuid, accepted boolean, responder_name text, responder_id uuid)
+CREATE OR REPLACE FUNCTION respond_to_friend_request(p_friendship_id uuid, p_accepted boolean, p_responder_name text, p_responder_id uuid)
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -43,10 +43,10 @@ AS $$
 DECLARE
   requester_id uuid;
 BEGIN
-  UPDATE friendships f SET status = CASE WHEN accepted THEN 'accepted' ELSE 'declined' END WHERE f.id = friendship_id RETURNING f.requester_id INTO requester_id;
-  IF accepted THEN
+  UPDATE friendships f SET status = CASE WHEN p_accepted THEN 'accepted' ELSE 'declined' END WHERE f.id = p_friendship_id RETURNING f.requester_id INTO requester_id;
+  IF p_accepted THEN
     INSERT INTO notifications (user_id, type, title, body, message, data, is_read, status)
-      VALUES (requester_id, 'friend_request_accepted', responder_name || ' accepted your friend request', 'you are now friends on Ledgr', 'you are now friends on Ledgr', jsonb_build_object('friendId', responder_id), false, 'new');
+      VALUES (requester_id, 'friend_request_accepted', p_responder_name || ' accepted your friend request', 'you are now friends on Ledgr', 'you are now friends on Ledgr', jsonb_build_object('friendId', p_responder_id), false, 'new');
   END IF;
 END;
 $$;

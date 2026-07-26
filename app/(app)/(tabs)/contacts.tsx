@@ -142,7 +142,7 @@ export default function ContactsScreen({ isActive }: { isActive?: boolean }) {
 
   const handleRespond = async (friendshipId: string, accept: boolean) => {
     setResponding(friendshipId);
-    await supabase.rpc('respond_to_friend_request', { friendship_id: friendshipId, accepted: accept, responder_name: userName, responder_id: userId });
+    await supabase.rpc('respond_to_friend_request', { p_friendship_id: friendshipId, p_accepted: accept, p_responder_name: userName, p_responder_id: userId });
     queryClient.invalidateQueries({ queryKey: ['friend-requests-incoming', userId] });
     queryClient.invalidateQueries({ queryKey: ['friends', userId] });
     setResponding(null);
