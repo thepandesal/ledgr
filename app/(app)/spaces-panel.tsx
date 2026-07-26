@@ -1,13 +1,13 @@
 import {
   View, Text, StyleSheet, ScrollView, SafeAreaView,
-  TouchableOpacity, RefreshControl, Alert,
+  TouchableOpacity, RefreshControl, Alert, TextInput, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useUser } from '../../src/hooks/useUser';
 import { supabase } from '../../src/lib/supabase';
-import { Colors } from '@/components/ui/theme';
+import { Colors, Radius } from '@/components/ui/theme';
 import { AppFont } from '../../src/lib/fonts';
 import { DC } from '../../src/lib/design';
 import PageHeader from '@/components/ui/PageHeader';
@@ -30,6 +30,39 @@ export default function SpacesPanel({ onClose }: Props) {
   const [refreshing, setRefreshing] = useState(false);
   const [monthOffset, setMonthOffset] = useState(0);
   const [activeFilter, setActiveFilter] = useState<'active' | 'inactive'>('active');
+
+  const [createModal, setCreateModal] = useState(false);
+  const [spaceName, setSpaceName] = useState('');
+  const [spaceBudget, setSpaceBudget] = useState('');
+  const [spaceBudgetCurrency, setSpaceBudgetCurrency] = useState(defaultCurrency);
+  const [spaceType, setSpaceType] = useState<'expense' | 'savings'>('expense');
+  const [spaceTargetDate, setSpaceTargetDate] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState('');
+
+  const openCreate = () => {
+    setSpaceName(''); setCreateError(''); setSpaceBudget('');
+    setSpaceBudgetCurrency(defaultCurrency);
+    setSpaceType('expense'); setSpaceTargetDate('');
+    setCreateModal(true);
+  };
+
+  const handleCreateSpace = async () => {
+    if (!spaceName.trim()) { setCreateError('name is required.'); return; }
+    setCreating(true);
+    const { error } = await supabase.from('spaces').insert({
+      user_id: userId, name: spaceName.trim(), color: TEAL, icon: 'grid',
+      budget: spaceBudget.trim() ? parseFloat(spaceBudget) : null,
+      budget_currency: spaceBudgetCurrency,
+      space_type: spaceType,
+      savings_target_date: spaceType === 'savings' && spaceTargetDate.trim() ? spaceTargetDate.trim() : null,
+    });
+    if (error) { setCreateError(error.message); setCreating(false); return; }
+    setCreating(false);
+    setCreateModal(false);
+    queryClient.invalidateQueries({ queryKey: ['spaces-panel', userId] });
+    queryClient.invalidateQueries({ queryKey: ['spaces', userId] });
+  };
 
   const { from, to, label } = useMemo(() => {
     const now = new Date();
@@ -179,7 +212,7 @@ export default function SpacesPanel({ onClose }: Props) {
         <TouchableOpacity style={[st.filterBtn, activeFilter === 'inactive' && st.filterBtnActive]} onPress={() => setActiveFilter('inactive')} activeOpacity={0.7}>
           <Text style={[st.filterBtnText, activeFilter === 'inactive' && st.filterBtnTextActive]}>Inactive</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[st.filterBtn, { paddingHorizontal: 8 }]} onPress={() => switchTab('spaces')} activeOpacity={0.7}>
+        <TouchableOpacity style={[st.filterBtn, { paddingHorizontal: 8 }]} onPress={openCreate} activeOpacity={0.7}>
           <Ionicons name="add-outline" size={18} color={DC.pageActionText} />
         </TouchableOpacity>
       </View>
@@ -238,6 +271,37 @@ export default function SpacesPanel({ onClose }: Props) {
           <Ionicons name="trash-outline" size={14} color="#FF5757" />
         </TouchableOpacity>
       </BottomSheet>
+
+      {/* Create space modal */}
+      <BottomSheet visible={createModal} onClose={() => setCreateModal(false)} title="new space" height="50%">
+        {createError ? <Text style={{ fontFamily: AppFont.regular, fontSize: 12, color: '#FF5757', marginBottom: 8 }}>{createError}</Text> : null}
+        <Text style={st.label}>type</Text>
+        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
+          {(['expense', 'savings'] as const).map(t => (
+            <TouchableOpacity key={t} style={[st.typeBtn, spaceType === t && st.typeBtnActive]} onPress={() => setSpaceType(t)} activeOpacity={0.75}>
+              <Text style={[st.typeBtnText, spaceType === t && st.typeBtnTextActive]}>{t} tracker</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <Text style={st.label}>name</Text>
+        <TextInput style={st.input} placeholder="e.g. household" placeholderTextColor={Colors.faint} value={spaceName} onChangeText={v => { setSpaceName(v.slice(0, 20)); setCreateError(''); }} maxLength={20} autoFocus />
+        <Text style={st.label}>{spaceType === 'expense' ? 'budget' : 'target goal'} <Text style={{ color: Colors.muted }}>(optional)</Text></Text>
+        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 16 }}>
+          <TextInput style={[st.input, { flex: 1 }]} placeholder="e.g. 10000" placeholderTextColor={Colors.faint} value={spaceBudget} onChangeText={setSpaceBudget} keyboardType="decimal-pad" />
+          <View style={{ paddingHorizontal: 12, paddingVertical: 12, borderRadius: Radius.lg, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.borderMid }}>
+            <Text style={{ fontFamily: AppFont.bold, fontSize: 13, color: Colors.text }}>{spaceBudgetCurrency}</Text>
+          </View>
+        </View>
+        {spaceType === 'savings' && (
+          <>
+            <Text style={st.label}>target date <Text style={{ color: Colors.muted }}>(optional)</Text></Text>
+            <TextInput style={st.input} placeholder="YYYY-MM-DD" placeholderTextColor={Colors.faint} value={spaceTargetDate} onChangeText={setSpaceTargetDate} />
+          </>
+        )}
+        <TouchableOpacity style={[st.saveBtn, (!spaceName.trim() || creating) && { opacity: 0.4 }]} onPress={handleCreateSpace} disabled={creating || !spaceName.trim()} activeOpacity={0.8}>
+          {creating ? <ActivityIndicator color={Colors.white} /> : <Text style={st.saveBtnText}>create space</Text>}
+        </TouchableOpacity>
+      </BottomSheet>
     </SafeAreaView>
   );
 }
@@ -266,4 +330,13 @@ const st = StyleSheet.create({
   choiceRow:  { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: Colors.border },
   choiceTitle:{ fontFamily: AppFont.semiBold, fontSize: 14, color: '#111111' },
   choiceSub:  { fontFamily: AppFont.regular, fontSize: 11, color: Colors.muted, marginTop: 2 },
+
+  label:      { fontFamily: AppFont.semiBold, fontSize: 11, color: DC.pageTextMuted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8 },
+  typeBtn:       { flex: 1, paddingVertical: 10, borderRadius: Radius.pill, borderWidth: 1, borderColor: Colors.borderMid, alignItems: 'center' },
+  typeBtnActive: { backgroundColor: '#111111', borderColor: '#111111' },
+  typeBtnText:   { fontFamily: AppFont.semiBold, fontSize: 12, color: Colors.muted },
+  typeBtnTextActive: { color: Colors.white },
+  input:      { fontFamily: AppFont.regular, fontSize: 16, color: DC.pageText, backgroundColor: Colors.surface, borderRadius: Radius.lg, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1, borderColor: Colors.borderMid, marginBottom: 16 },
+  saveBtn:    { paddingVertical: 14, borderRadius: Radius.pill, backgroundColor: '#111111', alignItems: 'center', justifyContent: 'center', marginTop: 8 },
+  saveBtnText:{ fontFamily: AppFont.semiBold, fontSize: 14, color: Colors.white },
 });
