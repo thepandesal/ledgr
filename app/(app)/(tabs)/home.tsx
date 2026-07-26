@@ -278,6 +278,23 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
         (r: any) => r.type === 'debt' || r.type === 'due' || r.is_due
       );
 
+      // Shared recordings (expenses shared with me) — shown as debts I owe to the sharer
+      const { data: sharedRecs } = await supabase
+        .from('recordings')
+        .select('id, user_id, name, amount, status')
+        .filter('shared_with', 'cs', `["${userId}"]`)
+        .neq('status', 'voided');
+      const sharedMap: Record<string, { name: string; total: number }> = {};
+      for (const sr of (sharedRecs ?? [])) {
+        if (sr.status === 'paid') continue;
+        const ownerId = sr.user_id;
+        if (!sharedMap[ownerId]) {
+          const { data: ownerName } = await supabase.rpc('get_user_display_name', { user_id: ownerId });
+          sharedMap[ownerId] = { name: ownerName ?? 'unknown', total: 0 };
+        }
+        sharedMap[ownerId].total += Number(sr.amount ?? 0);
+      }
+
       // Scope split data to user's bills
       const { data: userBills } = await supabase
         .from('split_bills')
@@ -337,6 +354,14 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
       (payments ?? []).forEach((pay: any) => {
         net[pay.person_name] = (net[pay.person_name] ?? 0) - Number(pay.amount);
         if (details[pay.person_name]) details[pay.person_name].owedToMe -= Number(pay.amount);
+      });
+
+      // Shared recordings — I owe the owner
+      Object.entries(sharedMap).forEach(([ownerId, data]) => {
+        const name = data.name;
+        if (!details[name]) details[name] = { owedToMe: 0, iOwe: 0 };
+        details[name].iOwe += data.total;
+        net[name] = (net[name] ?? 0) - data.total;
       });
 
       const people = Object.entries(details)

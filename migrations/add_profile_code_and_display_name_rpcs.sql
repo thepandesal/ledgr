@@ -60,3 +60,21 @@ SECURITY DEFINER
 AS $$
   SELECT user_id, profile_code FROM user_settings WHERE user_id = ANY(user_ids);
 $$;
+
+-- Share recording with a user: append to shared_with + send notification (bypasses RLS)
+CREATE OR REPLACE FUNCTION share_recording(p_recording_id uuid, p_shared_with_user_id uuid, p_owner_name text, p_recording_name text, p_amount numeric)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  shared jsonb;
+BEGIN
+  SELECT shared_with INTO shared FROM recordings WHERE id = p_recording_id;
+  IF NOT shared @> to_jsonb(ARRAY[p_shared_with_user_id]) THEN
+    UPDATE recordings SET shared_with = shared || to_jsonb(p_shared_with_user_id) WHERE id = p_recording_id;
+  END IF;
+  INSERT INTO notifications (user_id, type, title, body, message, data, is_read, status)
+    VALUES (p_shared_with_user_id, 'expense_tag', p_owner_name || ' shared an expense with you', p_recording_name || ' — PHP ' || p_amount::text, p_recording_name || ' — PHP ' || p_amount::text, jsonb_build_object('recordingId', p_recording_id, 'recordingName', p_recording_name, 'amount', p_amount), false, 'new');
+END;
+$$;

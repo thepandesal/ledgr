@@ -72,6 +72,23 @@ export default function PeoplePanel({ onClose, initialPerson }: Props) {
         (r: any) => r.type === 'debt' || r.type === 'due' || r.is_due
       );
 
+      // Shared recordings — I owe the sharer
+      const { data: sharedRecs } = await supabase
+        .from('recordings')
+        .select('id, user_id, name, amount, status')
+        .filter('shared_with', 'cs', `["${userId}"]`)
+        .neq('status', 'voided');
+      const sharedMap: Record<string, { name: string; total: number }> = {};
+      for (const sr of (sharedRecs ?? [])) {
+        if (sr.status === 'paid') continue;
+        const ownerId = sr.user_id;
+        if (!sharedMap[ownerId]) {
+          const { data: ownerName } = await supabase.rpc('get_user_display_name', { user_id: ownerId });
+          sharedMap[ownerId] = { name: ownerName ?? 'unknown', total: 0 };
+        }
+        sharedMap[ownerId].total += Number(sr.amount ?? 0);
+      }
+
       // 6. Get split bill payments scoped to user's bills
       const { data: payments } = billIds.length > 0
         ? await supabase.from('split_bill_payments').select('person_name, amount, status').in('split_bill_id', billIds)
@@ -119,6 +136,14 @@ export default function PeoplePanel({ onClose, initialPerson }: Props) {
         balances[pay.person_name].owedToMe -= Number(pay.amount ?? 0);
       });
 
+      // Shared recordings — I owe the owner
+      Object.entries(sharedMap).forEach(([ownerId, data]) => {
+        const name = data.name;
+        peopleSet.add(name);
+        if (!balances[name]) balances[name] = { owedToMe: 0, iOwe: 0, bills: 0 };
+        balances[name].iOwe += data.total;
+      });
+
       // Count visible entries (matches what ReceivableDetail shows)
       const txCount: Record<string, number> = {};
       // Unique recordings per person
@@ -128,6 +153,10 @@ export default function PeoplePanel({ onClose, initialPerson }: Props) {
           countedRecs.add(r.id);
           txCount[r.person_name] = (txCount[r.person_name] ?? 0) + 1;
         }
+      });
+      // Shared recordings count toward the owner
+      Object.values(sharedMap).forEach(data => {
+        txCount[data.name] = (txCount[data.name] ?? 0) + 1;
       });
 
 

@@ -86,7 +86,7 @@ export default function AddRecordingScreen({ inlineProps }: {
   const editId    = params.editId;
   const receiptId = params.receiptId;
   const handleClose = inlineProps?.onClose ?? (() => router.back());
-  const { defaultCurrency, userId } = useUser();
+  const { defaultCurrency, userId, userName } = useUser();
   const [currency, setCurrency] = useState(defaultCurrency);
   const [showCurrencyModal, setShowCurrencyModal] = useState(false);
 
@@ -397,20 +397,16 @@ export default function AddRecordingScreen({ inlineProps }: {
               }
             }
           }
-          // Auto-tag friend: share recording directly (no request needed)
+          // Auto-share with tagged friend + send notification
           if (newRec?.id && effectivePersonId) {
             try {
-              const { data: rec } = await supabase
-                .from('recordings')
-                .select('shared_with')
-                .eq('id', newRec.id)
-                .single();
-              const sharedWith: string[] = (rec?.shared_with as string[]) ?? [];
-              if (!sharedWith.includes(effectivePersonId)) {
-                await supabase.from('recordings').update({
-                  shared_with: [...sharedWith, effectivePersonId],
-                }).eq('id', newRec.id);
-              }
+              await supabase.rpc('share_recording', {
+                p_recording_id: newRec.id,
+                p_shared_with_user_id: effectivePersonId,
+                p_owner_name: userName,
+                p_recording_name: it.name.trim(),
+                p_amount: parseFloat(it.amount),
+              });
             } catch {}
           }
         }
