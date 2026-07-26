@@ -47,22 +47,18 @@ export default function ContactsScreen({ isActive }: { isActive?: boolean }) {
     setAddError('');
     setAddResult(null);
     setAddSuccess(false);
-    const { data: setting } = await supabase
-      .from('user_settings')
-      .select('user_id, profile_code')
-      .eq('profile_code', code)
-      .maybeSingle();
-    if (!setting) { setAddError('no user found with that code'); setAddSearching(false); return; }
-    if (setting.user_id === userId) { setAddError('that\'s your own code'); setAddSearching(false); return; }
+    const { data: target } = await supabase.rpc('get_user_by_profile_code', { code });
+    if (!target) { setAddError('no user found with that code'); setAddSearching(false); return; }
+    if (target === userId) { setAddError('that\'s your own code'); setAddSearching(false); return; }
     const { data: existing } = await supabase
       .from('friendships')
       .select('id, status')
-      .or(`and(requester_id.eq.${userId},receiver_id.eq.${setting.user_id}),and(requester_id.eq.${setting.user_id},receiver_id.eq.${userId})`)
+      .or(`and(requester_id.eq.${userId},receiver_id.eq.${target}),and(requester_id.eq.${target},receiver_id.eq.${userId})`)
       .maybeSingle();
     if (existing?.status === 'accepted') { setAddError('you are already friends'); setAddSearching(false); return; }
     if (existing?.status === 'pending') { setAddError('friend request already sent'); setAddSearching(false); return; }
-    const { data: nameData } = await supabase.rpc('get_user_display_name', { user_id: setting.user_id });
-    setAddResult({ id: setting.user_id, name: nameData ?? 'unknown user', code });
+    const { data: nameData } = await supabase.rpc('get_user_display_name', { user_id: target });
+    setAddResult({ id: target, name: nameData ?? 'unknown user', code });
     setAddSearching(false);
   };
 
