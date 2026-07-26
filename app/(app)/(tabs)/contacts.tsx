@@ -15,7 +15,7 @@ const ACCENT      = Brand.color.accent;
 const ACCENT_DARK = Brand.color.accentDark;
 
 export default function ContactsScreen({ isActive }: { isActive?: boolean }) {
-  const { userId } = useUser();
+  const { userId, userName } = useUser();
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -65,15 +65,7 @@ export default function ContactsScreen({ isActive }: { isActive?: boolean }) {
   const sendRequest = async () => {
     if (!addResult) return;
     setAddSending(true);
-    await supabase.from('friendships').insert({ requester_id: userId, receiver_id: addResult.id, status: 'pending' });
-    await supabase.from('notifications').insert({
-      user_id: addResult.id, type: 'friend_request',
-      title: `${userName} sent you a friend request`,
-      body: 'tap to accept or decline',
-      message: 'tap to accept or decline',
-      data: { requesterId: userId },
-      is_read: false, status: 'new',
-    });
+    await supabase.rpc('send_friend_request', { requester_id: userId, receiver_id: addResult.id, requester_name: userName });
     setAddSending(false);
     setAddSuccess(true);
     setAddResult(null);
