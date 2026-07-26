@@ -163,7 +163,8 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
   const [markCompleteAmount, setMarkCompleteAmount] = useState('');
   const [markCompleteLoading, setMarkCompleteLoading] = useState(false);
 
-  const [isOwner, setIsOwner] = useState(true);
+  // isOwner derived from recording data (not state — avoids timing issues)
+  const isOwner = !!recording && recording.user_id === userId;
 
   // Cancel due state
   const [cancelDueConfirm, setCancelDueConfirm] = useState(false);
@@ -1527,7 +1528,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
       .select('*, categories:category_id(name, color, icon), account:account_id(account_name, bank)')
       .eq('id', recordingId).single();
     if (data) {
-      setIsOwner(data.user_id === userId);
       setRecording({
         ...data,
         categories: Array.isArray(data.categories) ? data.categories[0] : data.categories,
