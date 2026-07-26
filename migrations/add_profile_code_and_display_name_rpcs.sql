@@ -20,17 +20,17 @@ AS $$
 $$;
 
 -- Friend request: insert friendship + notification (bypasses RLS on both tables)
-CREATE OR REPLACE FUNCTION send_friend_request(requester_id uuid, receiver_id uuid, requester_name text)
+CREATE OR REPLACE FUNCTION send_friend_request(p_requester_id uuid, p_receiver_id uuid, p_requester_name text)
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 BEGIN
   INSERT INTO friendships (requester_id, receiver_id, status)
-    VALUES (requester_id, receiver_id, 'pending')
-    ON CONFLICT (requester_id, receiver_id) DO UPDATE SET status = 'pending', updated_at = now();
+    VALUES (p_requester_id, p_receiver_id, 'pending')
+    ON CONFLICT (requester_id, receiver_id) DO UPDATE SET status = 'pending';
   INSERT INTO notifications (user_id, type, title, body, message, data, is_read, status)
-    VALUES (receiver_id, 'friend_request', requester_name || ' sent you a friend request', 'tap to accept or decline', 'tap to accept or decline', jsonb_build_object('requesterId', requester_id), false, 'new');
+    VALUES (p_receiver_id, 'friend_request', p_requester_name || ' sent you a friend request', 'tap to accept or decline', 'tap to accept or decline', jsonb_build_object('requesterId', p_requester_id), false, 'new');
 END;
 $$;
 

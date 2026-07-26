@@ -74,7 +74,7 @@ export default function FriendsPanel({ onClose }: Props) {
     if (!verifiedUser) return;
     setSending(true);
     try {
-      await supabase.rpc('send_friend_request', { requester_id: userId, receiver_id: verifiedUser.id, requester_name: userName });
+      await supabase.rpc('send_friend_request', { p_requester_id: userId, p_receiver_id: verifiedUser.id, p_requester_name: userName });
       setSendSuccess(true);
       setVerifiedUser(null);
       setAddCode('');

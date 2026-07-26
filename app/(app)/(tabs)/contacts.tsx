@@ -65,7 +65,7 @@ export default function ContactsScreen({ isActive }: { isActive?: boolean }) {
   const sendRequest = async () => {
     if (!addResult) return;
     setAddSending(true);
-    await supabase.rpc('send_friend_request', { requester_id: userId, receiver_id: addResult.id, requester_name: userName });
+    await supabase.rpc('send_friend_request', { p_requester_id: userId, p_receiver_id: addResult.id, p_requester_name: userName });
     setAddSending(false);
     setAddSuccess(true);
     setAddResult(null);

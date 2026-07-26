@@ -223,7 +223,7 @@ function ProfileScreen() {
       const { data: existing } = await supabase.from('friendships')
         .select('id, status').or(`and(requester_id.eq.${userId},receiver_id.eq.${target}),and(requester_id.eq.${target},receiver_id.eq.${userId})`).maybeSingle();
       if (existing) { setAddFriendError(existing.status === 'accepted' ? 'already friends' : 'request already sent'); return; }
-      await supabase.rpc('send_friend_request', { requester_id: userId, receiver_id: target, requester_name: userName });
+      await supabase.rpc('send_friend_request', { p_requester_id: userId, p_receiver_id: target, p_requester_name: userName });
       const { data: n } = await supabase.rpc('get_user_display_name', { user_id: target });
       setOutgoingRequests(prev => [...prev, { id: '', name: n ?? 'unknown', receiverId: target }]);
       setShowAddFriend(false); setAddFriendCode('');
