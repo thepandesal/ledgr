@@ -1527,11 +1527,7 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
       .select('*, categories:category_id(name, color, icon), account:account_id(account_name, bank)')
       .eq('id', recordingId).single();
     if (data) {
-      const owned = data.user_id === userId;
-      setIsOwner(owned);
-      if (!owned && Array.isArray(data.shared_with) && !data.shared_with.includes(userId)) {
-        handleBack(); return;
-      }
+      setIsOwner(data.user_id === userId);
       setRecording({
         ...data,
         categories: Array.isArray(data.categories) ? data.categories[0] : data.categories,

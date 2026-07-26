@@ -211,13 +211,13 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
   });
 
   // ── Shared recordings ───────────────────────────────────────────────
-  const { data: shared = [], isLoading: loadingShared } = useQuery({
+  const { data: shared = [] } = useQuery({
     queryKey: ['home-shared', userId],
     queryFn: async () => {
       try {
         const { data } = await supabase
           .from('recordings')
-          .select('id, name, type, amount, paid_amount, status, user_id, transaction_date, shared_with')
+          .select('id, name, type, amount, paid_amount, status, user_id, transaction_date')
           .neq('status', 'voided')
           .contains('shared_with', [userId])
           .order('created_at', { ascending: false });
