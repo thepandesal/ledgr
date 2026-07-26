@@ -63,11 +63,39 @@ export default function ReceivableDetail({ person, onClose, onBack }: Props) {
         .select('id, name, status')
         .eq('user_id', userId);
 
-      if (!bills || bills.length === 0) return { pending: { receivable: [], loan: [] }, completed: { receivable: [], loan: [] } };
-
-      const billIds = bills.map((b: any) => b.id);
+      const billIds = (bills ?? []).map((b: any) => b.id);
       const billMap: Record<string, any> = {};
-      bills.forEach((b: any) => { billMap[b.id] = b; });
+      (bills ?? []).forEach((b: any) => { billMap[b.id] = b; });
+
+      // Always load recordings linked to this person (debt/due/is_due)
+      const { data: personRecs } = await supabase
+        .from('recordings')
+        .select('id, name, amount, paid_amount, status, type, is_due, transaction_date, space_id')
+        .eq('user_id', userId)
+        .ilike('person_name', person)
+        .neq('status', 'voided')
+        .order('transaction_date', { ascending: false });
+
+      const recEntries = (personRecs ?? []).map((r: any) => {
+        const owed = Number(r.amount);
+        const paid = Number(r.paid_amount ?? 0);
+        const remaining = Math.max(0, owed - paid);
+        const isComplete = r.status === 'paid' || (owed > 0 && paid >= owed - 0.01);
+        const isReceivable = r.type === 'due' || r.is_due;
+        return {
+          billId: r.id, billName: r.name, billStatus: r.status,
+          owed, paid, remaining, isComplete, isRecording: true,
+          entryType: isReceivable ? 'receivable' : 'loan',
+          transaction_date: r.transaction_date, space_id: r.space_id,
+        };
+      });
+
+      if (!bills || bills.length === 0) {
+        return {
+          pending: { receivable: recEntries.filter(r => !r.isComplete && r.entryType === 'receivable'), loan: recEntries.filter(r => !r.isComplete && r.entryType === 'loan') },
+          completed: { receivable: recEntries.filter(r => r.isComplete && r.entryType === 'receivable'), loan: recEntries.filter(r => r.isComplete && r.entryType === 'loan') },
+        };
+      }
 
       if (isUnassigned) {
         const [{ data: billSplits }, { data: items }] = await Promise.all([
@@ -185,30 +213,7 @@ export default function ReceivableDetail({ person, onClose, onBack }: Props) {
         return { billId, billName: bill.name, billStatus: bill.status, owed, paid, remaining, isComplete, entryType: isReceivable ? 'receivable' : 'loan' };
       }).filter(Boolean);
 
-      // Also load recordings linked to this person (debt/due/is_due)
-      const { data: personRecs } = await supabase
-        .from('recordings')
-        .select('id, name, amount, paid_amount, status, type, is_due, transaction_date, space_id')
-        .eq('user_id', userId)
-        .ilike('person_name', person)
-        .neq('status', 'voided')
-        .order('transaction_date', { ascending: false });
-
-      const recEntries = (personRecs ?? []).map((r: any) => {
-        const owed = Number(r.amount);
-        const paid = Number(r.paid_amount ?? 0);
-        const remaining = Math.max(0, owed - paid);
-        const isComplete = r.status === 'paid' || (owed > 0 && paid >= owed - 0.01);
-        const isReceivable = r.type === 'due' || r.is_due;
-        return {
-          billId: r.id, billName: r.name, billStatus: r.status,
-          owed, paid, remaining, isComplete, isRecording: true,
-          entryType: isReceivable ? 'receivable' : 'loan',
-          transaction_date: r.transaction_date, space_id: r.space_id,
-        };
-      });
-
-      // Find which recordings are linked to shown split bills (deduplicate)
+      // Deduplicate recordings linked to shown split bills
       const shownBillIds = entries.filter(Boolean).map((e: any) => e.billId);
       const { data: sbrRows } = shownBillIds.length > 0
         ? await supabase.from('split_bill_recordings').select('recording_id').in('split_bill_id', shownBillIds)

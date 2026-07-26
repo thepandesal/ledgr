@@ -163,6 +163,8 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
   const [markCompleteAmount, setMarkCompleteAmount] = useState('');
   const [markCompleteLoading, setMarkCompleteLoading] = useState(false);
 
+  const [isOwner, setIsOwner] = useState(true);
+
   // Cancel due state
   const [cancelDueConfirm, setCancelDueConfirm] = useState(false);
   const [cancelDueLoading, setCancelDueLoading] = useState(false);
@@ -183,22 +185,19 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
   const [owesYouSearch, setOwesYouSearch] = useState('');
   const [owesYouLoading, setOwesYouLoading] = useState(false);
 
-  // ── Helper: clean up B's debt when A cancels/removes/deletes ──────────────
+  // ── Helper: clean up B's share when A cancels/removes/deletes ──────────
   const cleanupTaggedDebt = async (friendUserId: string, sourceRecId: string, reason: 'removed' | 'cancelled' | 'deleted') => {
-    // Find B's debt
-    const { data: debt } = await supabase
+    // Remove friend from shared_with array
+    const { data: rec } = await supabase
       .from('recordings')
-      .select('id, paid_amount')
-      .eq('source_recording_id', sourceRecId)
-      .eq('type', 'debt')
-      .maybeSingle();
-    if (debt) {
-      // Delete linked expenses on B's side
-      await supabase.from('recordings').delete()
-        .eq('linked_recording_id', debt.id)
-        .eq('type', 'expense');
-      // Delete B's debt
-      await supabase.from('recordings').delete().eq('id', debt.id);
+      .select('shared_with')
+      .eq('id', sourceRecId)
+      .single();
+    if (rec) {
+      const sharedWith: string[] = (rec.shared_with as string[]) ?? [];
+      await supabase.from('recordings').update({
+        shared_with: sharedWith.filter((id: string) => id !== friendUserId),
+      }).eq('id', sourceRecId);
     }
     // Cancel any pending expense_tag notifications
     await supabase.from('notifications')
@@ -226,18 +225,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
 
   // ── Helper: settle B's debt (write-off / mark complete) ───────────────────
   const settleTaggedDebt = async (friendUserId: string, sourceRecId: string, reason: 'written_off' | 'completed') => {
-    const { data: debt } = await supabase
-      .from('recordings')
-      .select('id, amount')
-      .eq('source_recording_id', sourceRecId)
-      .eq('type', 'debt')
-      .maybeSingle();
-    if (debt) {
-      await supabase.from('recordings').update({
-        status: 'paid',
-        paid_amount: Number(debt.amount),
-      }).eq('id', debt.id);
-    }
     const bodyMap = {
       written_off: `"${recording?.name}" — the debt has been written off. you're cleared.`,
       completed: `"${recording?.name}" — the expense has been marked as complete. you're cleared.`,
@@ -1538,11 +1525,19 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
     const { data } = await supabase.from('recordings')
       .select('*, categories:category_id(name, color, icon), account:account_id(account_name, bank)')
       .eq('id', recordingId).single();
-    if (data) setRecording({
-      ...data,
-      categories: Array.isArray(data.categories) ? data.categories[0] : data.categories,
-      account: Array.isArray(data.account) ? data.account[0] : data.account,
-    });
+    if (data) {
+      const owned = data.user_id === userId;
+      setIsOwner(owned);
+      if (!owned) {
+        const sharedWith: string[] = (data.shared_with as string[]) ?? [];
+        if (!sharedWith.includes(userId)) { handleBack(); return; }
+      }
+      setRecording({
+        ...data,
+        categories: Array.isArray(data.categories) ? data.categories[0] : data.categories,
+        account: Array.isArray(data.account) ? data.account[0] : data.account,
+      });
+    }
   };
 
   const loadAvailableSpaces = async () => {
@@ -2293,11 +2288,19 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
 
       {/* Actions bottom sheet */}
       <BottomSheet visible={showAddChoice} onClose={() => setShowAddChoice(false)} title="actions">
-        <TouchableOpacity style={rd.choiceRow} activeOpacity={0.8} onPress={() => { setShowAddChoice(false); openEditModal(); }}>
-          <View style={[rd.choiceIcon, { backgroundColor: DC.accent1 + '22' }]}><Ionicons name="create-outline" size={20} color={DC.accent1} /></View>
-          <View style={{ flex: 1 }}><Text style={rd.choiceTitle}>Edit Recording</Text><Text style={rd.choiceSub}>Change name, date, amount, category</Text></View>
-          <Ionicons name="chevron-forward" size={14} color={Colors.faint} />
-        </TouchableOpacity>
+        {isOwner ? (
+          <TouchableOpacity style={rd.choiceRow} activeOpacity={0.8} onPress={() => { setShowAddChoice(false); openEditModal(); }}>
+            <View style={[rd.choiceIcon, { backgroundColor: DC.accent1 + '22' }]}><Ionicons name="create-outline" size={20} color={DC.accent1} /></View>
+            <View style={{ flex: 1 }}><Text style={rd.choiceTitle}>Edit Recording</Text><Text style={rd.choiceSub}>Change name, date, amount, category</Text></View>
+            <Ionicons name="chevron-forward" size={14} color={Colors.faint} />
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity style={rd.choiceRow} activeOpacity={0.8} onPress={() => { setShowAddChoice(false); router.push({ pathname: '/(app)/add-recording', params: { name: recording?.name, amount: String(recording?.amount ?? ''), spaceId: recording?.space_id, date: recording?.transaction_date, type: 'expense' } } as any); }}>
+            <View style={[rd.choiceIcon, { backgroundColor: DC.accent1 + '22' }]}><Ionicons name="download-outline" size={20} color={DC.accent1} /></View>
+            <View style={{ flex: 1 }}><Text style={rd.choiceTitle}>Save to My Account</Text><Text style={rd.choiceSub}>Create an expense in your own space</Text></View>
+            <Ionicons name="chevron-forward" size={14} color={Colors.faint} />
+          </TouchableOpacity>
+        )}
         {recording?.type === 'expense' && !linkedPayable && !linkedReceivable && !recording?.is_due && !recording?.person_name && !linkedSplitBill && (
           <TouchableOpacity style={rd.choiceRow} activeOpacity={0.8} onPress={() => { setShowAddChoice(false); setReceivableMode('full'); setReceivableManualAmount(''); setReceivableSelectedPeople([]); setReceivableModal(true); }}>
             <View style={[rd.choiceIcon, { backgroundColor: DC.accent1 + '22' }]}><Ionicons name="arrow-undo-outline" size={20} color={DC.accent1} /></View>
@@ -2350,10 +2353,12 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
             </TouchableOpacity>
           );
         })()}
-        <TouchableOpacity style={rd.choiceRow} activeOpacity={0.8} onPress={() => { setShowAddChoice(false); setDeleteConfirm(true); }}>
-          <View style={[rd.choiceIcon, { backgroundColor: Colors.dangerBg }]}><Ionicons name="trash-outline" size={20} color={Colors.danger} /></View>
-          <View style={{ flex: 1 }}><Text style={[rd.choiceTitle, { color: Colors.danger }]}>Delete</Text><Text style={rd.choiceSub}>Permanently remove this recording</Text></View>
-        </TouchableOpacity>
+        {isOwner && (
+          <TouchableOpacity style={rd.choiceRow} activeOpacity={0.8} onPress={() => { setShowAddChoice(false); setDeleteConfirm(true); }}>
+            <View style={[rd.choiceIcon, { backgroundColor: Colors.dangerBg }]}><Ionicons name="trash-outline" size={20} color={Colors.danger} /></View>
+            <View style={{ flex: 1 }}><Text style={[rd.choiceTitle, { color: Colors.danger }]}>Delete</Text><Text style={rd.choiceSub}>Permanently remove this recording</Text></View>
+          </TouchableOpacity>
+        )}
       </BottomSheet>
       <BottomSheet visible={splitBillModal} onClose={() => setSplitBillModal(false)} title="split bill">
         <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: Colors.muted, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.6 }}>split bill name</Text>

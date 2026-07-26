@@ -86,7 +86,7 @@ export default function AddRecordingScreen({ inlineProps }: {
   const editId    = params.editId;
   const receiptId = params.receiptId;
   const handleClose = inlineProps?.onClose ?? (() => router.back());
-  const { defaultCurrency, userId } = useUser();
+  const { defaultCurrency, userId, userName } = useUser();
   const [currency, setCurrency] = useState(defaultCurrency);
   const [showCurrencyModal, setShowCurrencyModal] = useState(false);
 
@@ -395,6 +395,40 @@ export default function AddRecordingScreen({ inlineProps }: {
                   throw uploadErr;
                 }
               }
+            }
+          }
+          // Auto-tag friend: share recording + notification
+          if (newRec?.id && effectivePersonId) {
+            const { data: rec } = await supabase
+              .from('recordings')
+              .select('shared_with')
+              .eq('id', newRec.id)
+              .single();
+            const sharedWith: string[] = (rec?.shared_with as string[]) ?? [];
+            if (!sharedWith.includes(effectivePersonId)) {
+              await supabase.from('recordings').update({
+                shared_with: [...sharedWith, effectivePersonId],
+              }).eq('id', newRec.id);
+              await supabase.from('notifications').insert({
+                user_id: effectivePersonId,
+                type: 'expense_tag',
+                title: `${userName || 'Someone'} tagged you in an expense`,
+                body: `"${it.name.trim()}" — shared with you.`,
+                message: `"${it.name.trim()}" — shared with you.`,
+                data: {
+                  sourceRecordingId: newRec.id,
+                  taggerUserId: userId,
+                  taggerName: userName,
+                  friendId: effectivePersonId,
+                  amount: parseFloat(it.amount),
+                  recordingName: it.name.trim(),
+                  transactionDate: date,
+                  currency,
+                  categoryId: it.category?.id ?? null,
+                },
+                status: 'new',
+                is_read: false,
+              });
             }
           }
         }

@@ -210,6 +210,28 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
     enabled: !!userId,
   });
 
+  // ── Shared recordings ───────────────────────────────────────────────
+  const { data: shared = [], isLoading: loadingShared } = useQuery({
+    queryKey: ['home-shared', userId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('recordings')
+        .select('id, name, type, amount, paid_amount, status, user_id, transaction_date, shared_with')
+        .neq('status', 'voided')
+        .contains('shared_with', [userId])
+        .order('created_at', { ascending: false });
+      if (!data) return [];
+      const ownerIds = [...new Set(data.map((r: any) => r.user_id).filter(Boolean))];
+      const ownerNames: Record<string, string> = {};
+      await Promise.all(ownerIds.map(async (id: string) => {
+        const { data: n } = await supabase.rpc('get_user_display_name', { user_id: id });
+        if (n) ownerNames[id] = n as string;
+      }));
+      return data.map((r: any) => ({ ...r, ownerName: ownerNames[r.user_id] ?? 'Someone' }));
+    },
+    enabled: !!userId,
+  });
+
   // ── Reminders ─────────────────────────────────────────────────────────
   const { data: reminders = [], isLoading: loadingReminders } = useQuery({
     queryKey: ['home-reminders', userId],
@@ -636,6 +658,27 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
                         <Text style={{ fontFamily: 'Poppins-SemiBold', fontSize: 11, color: TEAL }}>due today</Text>
                       )}
                     </View>
+                  );
+                })}
+              </View>
+            )}
+
+            {/* ── Shared Recordings ── */}
+            <SectionHeader title="Shared" />
+            {shared.length === 0 ? (
+              <EmptyRow label="no shared recordings" />
+            ) : (
+              <View style={s.list}>
+                {shared.map((r: any, i: number) => {
+                  const isPaid = r.status === 'paid' || (Number(r.amount) > 0 && Number(r.paid_amount ?? 0) >= Number(r.amount) - 0.01);
+                  return (
+                    <TouchableOpacity key={r.id} style={[s.row, i === shared.length - 1 && s.rowLast]} activeOpacity={0.7} onPress={() => openRecording(r.id)}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={s.rowName} numberOfLines={1}>{r.ownerName}{r.name ? `: ${r.name}` : ''}</Text>
+                        <Text style={s.rowSub}>{isPaid ? 'paid' : `you owe ${r.ownerName}`}</Text>
+                      </View>
+                      <Text style={[s.rowValueBold, { color: isPaid ? '#2A7A6F' : '#e74c3c' }]}>{fmt(Number(r.amount))}</Text>
+                    </TouchableOpacity>
                   );
                 })}
               </View>
