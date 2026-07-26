@@ -23,6 +23,7 @@ import AddRecordingScreen from './add-recording';
 import BottomNav from '@/components/ui/BottomNav';
 import StatementWebView from '@/components/ui/StatementWebView';
 import { useNav } from '../../src/lib/NavContext';
+import AnimatedIcon from '@/components/ui/AnimatedIcon';
 import { setPendingFocusDate } from '../../src/lib/focusDate';
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -1124,6 +1125,8 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
   const [showDeleteSpaceConfirm, setShowDeleteSpaceConfirm] = useState(false);
   const [deleteSpaceConfirmText, setDeleteSpaceConfirmText] = useState('');
   const [deletingSpace, setDeletingSpace] = useState(false);
+  const [deleteProgress, setDeleteProgress] = useState<{splitBills: boolean; recordings: boolean; space: boolean} | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const handleEditSpaceName = async () => {
     if (!editSpaceName.trim()) return;
@@ -1149,15 +1152,47 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
   const handleDeleteSpace = async () => {
     if (deleteSpaceConfirmText.toLowerCase() !== 'delete') return;
     setDeletingSpace(true);
-    await supabase.from('recordings').delete().eq('space_id', spaceId as string);
-    await supabase.from('spaces').delete().eq('id', spaceId as string);
-    setDeletingSpace(false);
-    setShowDeleteSpaceConfirm(false);
-    queryClient.invalidateQueries({ queryKey: ['spaces-panel'] });
-    queryClient.invalidateQueries({ queryKey: ['spaces', userId] });
-    queryClient.invalidateQueries({ queryKey: ['home-spaces', userId] });
-    await queryClient.refetchQueries({ queryKey: ['home-spaces', userId] });
-    handleBack();
+    setDeleteProgress({ splitBills: false, recordings: false, space: false });
+    setDeleteError(null);
+
+    try {
+      // Step 1: delete split bills linked to this space
+      const { data: sRecs } = await supabase.from('recordings').select('id').eq('space_id', spaceId);
+      const recIds = (sRecs ?? []).map((r: any) => r.id);
+      if (recIds.length > 0) {
+        const { data: sbrRows } = await supabase
+          .from('split_bill_recordings')
+          .select('split_bill_id')
+          .in('recording_id', recIds);
+        const billIds = [...new Set((sbrRows ?? []).map((r: any) => r.split_bill_id))];
+        if (billIds.length > 0) {
+          await supabase.from('split_bill_payments').delete().in('split_bill_id', billIds);
+          await supabase.from('split_bill_recordings').delete().in('split_bill_id', billIds);
+          await supabase.from('split_bills').delete().in('id', billIds);
+        }
+      }
+      setDeleteProgress(prev => prev && { ...prev, splitBills: true });
+
+      // Step 2: delete recordings
+      await supabase.from('recordings').delete().eq('space_id', spaceId as string);
+      setDeleteProgress(prev => prev && { ...prev, recordings: true });
+
+      // Step 3: delete space
+      await supabase.from('spaces').delete().eq('id', spaceId as string);
+      setDeleteProgress(prev => prev && { ...prev, space: true });
+
+      setDeletingSpace(false);
+      setShowDeleteSpaceConfirm(false);
+      setDeleteProgress(null);
+      queryClient.invalidateQueries({ queryKey: ['spaces-panel'] });
+      queryClient.invalidateQueries({ queryKey: ['spaces', userId] });
+      queryClient.invalidateQueries({ queryKey: ['home-spaces', userId] });
+      await queryClient.refetchQueries({ queryKey: ['home-spaces', userId] });
+      handleBack();
+    } catch (e: any) {
+      setDeleteError(e?.message ?? 'Unknown error');
+      setDeletingSpace(false);
+    }
   };
 
   const [membersModal, setMembersModal] = useState(false);
@@ -2020,37 +2055,68 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
         </TouchableOpacity>
       </BottomSheet>
 
-      {/* Delete space confirmation overlay */}
+      {/* Delete space confirmation / progress overlay */}
       {showDeleteSpaceConfirm && (
         <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 24, zIndex: 999 }}>
           <View style={{ backgroundColor: Colors.white, borderRadius: Radius.xl, padding: 24, width: '100%' }}>
-            <Text style={{ fontFamily: AppFont.bold, fontSize: 16, color: '#111111', marginBottom: 8 }}>Delete "{name}"?</Text>
-            <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.muted, lineHeight: 20, marginBottom: 16 }}>
-              ⚠️ This will permanently delete the space and ALL recordings under it. This cannot be undone.{' '}We recommend archiving instead to keep your data.
-            </Text>
-            <Text style={{ fontFamily: AppFont.semiBold, fontSize: 11, color: DC.pageTextMuted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8 }}>Type "delete" to confirm</Text>
-            <TextInput
-              style={{ fontFamily: AppFont.regular, fontSize: 16, color: DC.pageText, backgroundColor: Colors.surface, borderRadius: Radius.lg, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1, borderColor: Colors.borderMid, marginBottom: 16 }}
-              value={deleteSpaceConfirmText}
-              onChangeText={setDeleteSpaceConfirmText}
-              placeholder="delete"
-              placeholderTextColor={Colors.faint}
-              autoCapitalize="none"
-              autoFocus
-            />
-            <View style={{ flexDirection: 'row', gap: 10 }}>
-              <TouchableOpacity style={[s.saveBtn, { flex: 1, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border }]} onPress={() => setShowDeleteSpaceConfirm(false)} activeOpacity={0.8}>
-                <Text style={[s.saveBtnText, { color: Colors.muted }]}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[s.saveBtn, { flex: 1, backgroundColor: '#FF5757', opacity: (deleteSpaceConfirmText.toLowerCase() !== 'delete' || deletingSpace) ? 0.4 : 1 }]}
-                onPress={handleDeleteSpace}
-                disabled={deleteSpaceConfirmText.toLowerCase() !== 'delete' || deletingSpace}
-                activeOpacity={0.8}
-              >
-                <Text style={[s.saveBtnText, { color: '#ffffff' }]}>{deletingSpace ? 'Deleting...' : 'Delete'}</Text>
-              </TouchableOpacity>
-            </View>
+            {deletingSpace && deleteProgress ? (
+              <View style={{ alignItems: 'center' }}>
+                <AnimatedIcon set="line-md" icon="document-delete" size={48} color="#FF5757" loop />
+                <Text style={{ fontFamily: AppFont.bold, fontSize: 16, color: '#111111', marginTop: 16, marginBottom: 20 }}>Deleting "{name}"…</Text>
+                {[
+                  { key: 'splitBills', label: 'Deleting split bills' },
+                  { key: 'recordings', label: 'Deleting records' },
+                  { key: 'space', label: 'Deleting space' },
+                ].map(({ key, label }) => (
+                  <View key={key} style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'stretch', paddingVertical: 6 }}>
+                    {deleteProgress[key as keyof typeof deleteProgress] ? (
+                      <AnimatedIcon set="lets-icons" icon="check-fill" size={18} color={Colors.green ?? '#2ECC71'} />
+                    ) : (
+                      <View style={{ width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: Colors.borderMid }} />
+                    )}
+                    <Text style={{ fontFamily: AppFont.regular, fontSize: 14, color: deleteProgress[key as keyof typeof deleteProgress] ? '#111111' : Colors.muted, marginLeft: 10 }}>{label}</Text>
+                  </View>
+                ))}
+                {deleteError && (
+                  <View style={{ backgroundColor: '#FFF0F0', borderRadius: Radius.lg, padding: 12, marginTop: 16, alignSelf: 'stretch' }}>
+                    <Text style={{ fontFamily: AppFont.regular, fontSize: 12, color: '#E74C3C', lineHeight: 18 }}>Error: {deleteError}</Text>
+                    <TouchableOpacity style={{ marginTop: 8 }} onPress={() => { setShowDeleteSpaceConfirm(false); setDeleteProgress(null); setDeleteError(null); }}>
+                      <Text style={{ fontFamily: AppFont.semiBold, fontSize: 13, color: '#E74C3C' }}>Close</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+            ) : (
+              <>
+                <Text style={{ fontFamily: AppFont.bold, fontSize: 16, color: '#111111', marginBottom: 8 }}>Delete "{name}"?</Text>
+                <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.muted, lineHeight: 20, marginBottom: 16 }}>
+                  ⚠️ This will permanently delete the space and ALL recordings under it. This cannot be undone.{' '}We recommend archiving instead to keep your data.
+                </Text>
+                <Text style={{ fontFamily: AppFont.semiBold, fontSize: 11, color: DC.pageTextMuted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8 }}>Type "delete" to confirm</Text>
+                <TextInput
+                  style={{ fontFamily: AppFont.regular, fontSize: 16, color: DC.pageText, backgroundColor: Colors.surface, borderRadius: Radius.lg, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1, borderColor: Colors.borderMid, marginBottom: 16 }}
+                  value={deleteSpaceConfirmText}
+                  onChangeText={setDeleteSpaceConfirmText}
+                  placeholder="delete"
+                  placeholderTextColor={Colors.faint}
+                  autoCapitalize="none"
+                  autoFocus
+                />
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  <TouchableOpacity style={[s.saveBtn, { flex: 1, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border }]} onPress={() => setShowDeleteSpaceConfirm(false)} activeOpacity={0.8}>
+                    <Text style={[s.saveBtnText, { color: Colors.muted }]}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[s.saveBtn, { flex: 1, backgroundColor: '#FF5757', opacity: (deleteSpaceConfirmText.toLowerCase() !== 'delete' || deletingSpace) ? 0.4 : 1 }]}
+                    onPress={handleDeleteSpace}
+                    disabled={deleteSpaceConfirmText.toLowerCase() !== 'delete' || deletingSpace}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[s.saveBtnText, { color: '#ffffff' }]}>{deletingSpace ? 'Deleting...' : 'Delete'}</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
           </View>
         </View>
       )}

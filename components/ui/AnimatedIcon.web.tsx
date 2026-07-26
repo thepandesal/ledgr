@@ -1,12 +1,13 @@
 import { memo } from 'react';
 
-type IconSet = 'svg-spinners' | 'line-md' | 'basil' | 'circle-flags' | 'material-symbols';
+type IconSet = 'svg-spinners' | 'line-md' | 'basil' | 'circle-flags' | 'material-symbols' | 'lets-icons';
 
 interface Props {
   set: IconSet;
   icon: string;
   size?: number;
   color?: string;
+  loop?: boolean;
 }
 
 const iconSets: Record<IconSet, any> = {
@@ -15,15 +16,19 @@ const iconSets: Record<IconSet, any> = {
   'basil': require('@iconify-json/basil/icons.json'),
   'circle-flags': require('@iconify-json/circle-flags/icons.json'),
   'material-symbols': require('@iconify-json/material-symbols/icons.json'),
+  'lets-icons': require('@iconify-json/lets-icons/icons.json'),
 };
 
-function AnimatedIcon({ set, icon, size = 24, color = 'currentColor' }: Props) {
+function AnimatedIcon({ set, icon, size = 24, color = 'currentColor', loop }: Props) {
   const data = iconSets[set];
   const iconData = data?.icons?.[icon];
   if (!iconData) return null;
 
   const { width = 24, height = 24 } = data;
-  const body = iconData.body.replace(/currentColor/g, color);
+  let body = iconData.body.replace(/currentColor/g, color);
+  if (loop) {
+    body = body.replace(/<animate /g, '<animate repeatCount="indefinite" ');
+  }
 
   return (
     <span
