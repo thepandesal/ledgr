@@ -160,7 +160,6 @@ function ProfileScreen() {
   const [toastVisible, setToastVisible] = useState(false);
   const toastAnim = useRef(new Animated.Value(0)).current;
   const email = user?.email ?? '';
-  const userId = user?.id ?? '';
 
   useEffect(() => {
     if (!userId) return;
