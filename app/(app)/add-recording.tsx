@@ -397,7 +397,7 @@ export default function AddRecordingScreen({ inlineProps }: {
               }
             }
           }
-          // Auto-tag friend: share recording + notification
+          // Auto-tag friend: share recording directly (no request needed)
           if (newRec?.id && effectivePersonId) {
             try {
               const { data: rec } = await supabase
@@ -410,26 +410,6 @@ export default function AddRecordingScreen({ inlineProps }: {
                 await supabase.from('recordings').update({
                   shared_with: [...sharedWith, effectivePersonId],
                 }).eq('id', newRec.id);
-                await supabase.from('notifications').insert({
-                  user_id: effectivePersonId,
-                  type: 'expense_tag',
-                  title: `${userName || 'Someone'} tagged you in an expense`,
-                  body: `"${it.name.trim()}" — shared with you.`,
-                  message: `"${it.name.trim()}" — shared with you.`,
-                  data: {
-                    sourceRecordingId: newRec.id,
-                    taggerUserId: userId,
-                    taggerName: userName,
-                    friendId: effectivePersonId,
-                    amount: parseFloat(it.amount),
-                    recordingName: it.name.trim(),
-                    transactionDate: date,
-                    currency,
-                    categoryId: it.category?.id ?? null,
-                  },
-                  status: 'new',
-                  is_read: false,
-                });
               }
             } catch {}
           }

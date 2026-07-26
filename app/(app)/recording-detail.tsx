@@ -1345,8 +1345,9 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
       const { data: n } = await supabase.rpc('get_user_display_name', { user_id: id });
       return { id, name: n ?? 'unknown' };
     }));
-    setTagFriends(names);
-    // check which friends already have a pending/accepted tag notification
+    // Filter out friends already shared with
+    const sharedWith: string[] = (recording?.shared_with as string[]) ?? [];
+    setTagFriends(names.filter(f => !sharedWith.includes(f.id) && !existingTags.some(t => t.data?.friendId === f.id)));
     const { data: existing } = await supabase
       .from('notifications')
       .select('data')
@@ -1367,37 +1368,20 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
     try {
       const amount = parseFloat(tagAmount);
       if (isNaN(amount) || amount <= 0) { setTagError('enter a valid amount'); setTagLoading(false); return; }
-      const alreadyTagged = existingTags.some((t: any) => t.data?.friendId === tagSelectedFriend.id);
-      if (alreadyTagged) { setTagError('this friend is already tagged'); setTagLoading(false); return; }
-      const { error } = await supabase.from('notifications').insert({
-        user_id: tagSelectedFriend.id,
-        type: 'expense_tag',
-        title: `${userName || 'Someone'} tagged you in an expense`,
-        body: `"${recording.name}" — tap to accept or decline.`,
-        message: `"${recording.name}" — tap to accept or decline.`,
-        data: {
-          sourceRecordingId: recordingId,
-          taggerUserId: userId,
-          taggerName: userName,
-          friendId: tagSelectedFriend.id,
-          amount,
-          recordingName: recording.name,
-          transactionDate: recording.transaction_date,
-          currency: recording.currency ?? defaultCurrency,
-          categoryId: recording.category_id ?? null,
-        },
-        status: 'new',
-        is_read: false,
-      });
-      if (error) { setTagError(error.message); setTagLoading(false); return; }
+      // Share directly — no request/accept needed
+      const { data: rec } = await supabase
+        .from('recordings')
+        .select('shared_with')
+        .eq('id', recordingId)
+        .single();
+      const sharedWith: string[] = (rec?.shared_with as string[]) ?? [];
+      if (!sharedWith.includes(tagSelectedFriend.id)) {
+        await supabase.from('recordings').update({
+          shared_with: [...sharedWith, tagSelectedFriend.id],
+        }).eq('id', recordingId);
+      }
       setTagFriendModal(false);
-      const { data: existing } = await supabase
-        .from('notifications')
-        .select('data')
-        .eq('type', 'expense_tag')
-        .eq('data->>sourceRecordingId', recordingId)
-        .in('status', ['new', 'saw']);
-      setExistingTags(existing ?? []);
+      setExistingTags([...existingTags, { data: { friendId: tagSelectedFriend.id } }]);
     } catch (e: any) { setTagError(e.message ?? 'something went wrong'); }
     finally { setTagLoading(false); }
   };
@@ -2305,7 +2289,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
             <Ionicons name="chevron-forward" size={14} color={Colors.faint} />
           </TouchableOpacity>
         )}
-        {recording?.type === 'expense' && recording?.is_due && !recording?.tagged_friend_user_id && existingTags.length === 0 && (
+        {recording?.type === 'expense' && recording?.is_due && !recording?.tagged_friend_user_id && (recording?.shared_with ?? []).length === 0 && existingTags.length === 0 && (
           <TouchableOpacity style={rd.choiceRow} activeOpacity={0.8} onPress={() => { setShowAddChoice(false); openTagFriendModal(); }}>
             <View style={[rd.choiceIcon, { backgroundColor: DC.accent1 + '22' }]}><Ionicons name="person-add-outline" size={20} color={DC.accent1} /></View>
             <View style={{ flex: 1 }}><Text style={rd.choiceTitle}>Tag a Friend</Text><Text style={rd.choiceSub}>Send a debt request to a friend</Text></View>
