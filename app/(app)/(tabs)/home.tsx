@@ -591,6 +591,10 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
                       <Text style={s.spaceCardName}>+{totalCounts.spaces - spaces.length} more</Text>
                     </TouchableOpacity>
                   )}
+                  <TouchableOpacity style={[s.spaceCard, { borderWidth: 1.5, borderColor: '#e0e0e0', borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' }]} activeOpacity={0.7} onPress={() => switchTab('spaces')}>
+                    <Ionicons name="add-outline" size={28} color="#bbb" style={{ marginTop: 8 }} />
+                    <Text style={[s.spaceCardName, { color: '#bbb', marginTop: -2 }]}>Add Space</Text>
+                  </TouchableOpacity>
                 </View>
               </View>
             )}
