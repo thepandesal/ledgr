@@ -219,7 +219,7 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
           .from('recordings')
           .select('id, name, type, amount, paid_amount, status, user_id, transaction_date')
           .neq('status', 'voided')
-          .filter('shared_with', '?', userId)
+          .filter('shared_with', 'cs', `["${userId}"]`)
           .order('created_at', { ascending: false });
         if (!data) return [];
         const ownerIds = [...new Set(data.map((r: any) => r.user_id).filter(Boolean))];

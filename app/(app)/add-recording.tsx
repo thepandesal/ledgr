@@ -86,7 +86,7 @@ export default function AddRecordingScreen({ inlineProps }: {
   const editId    = params.editId;
   const receiptId = params.receiptId;
   const handleClose = inlineProps?.onClose ?? (() => router.back());
-  const { defaultCurrency, userId, userName } = useUser();
+  const { defaultCurrency, userId } = useUser();
   const [currency, setCurrency] = useState(defaultCurrency);
   const [showCurrencyModal, setShowCurrencyModal] = useState(false);
 
@@ -659,6 +659,26 @@ export default function AddRecordingScreen({ inlineProps }: {
       </TouchableOpacity>
 
       {/* Save button */}
+      {editId && (
+        <TouchableOpacity
+          style={[s.saveBtn, { backgroundColor: Colors.dangerBg, marginTop: 12, marginBottom: 4, borderWidth: 1, borderColor: Colors.danger }]}
+          onPress={async () => {
+            if (loading) return;
+            setLoading(true);
+            try {
+              await supabase.from('recordings').delete().eq('id', editId);
+              queryClient.invalidateQueries({ queryKey: ['home-recent', userId] });
+              queryClient.invalidateQueries({ queryKey: ['home-people', userId] });
+              queryClient.invalidateQueries({ queryKey: ['home-spaces', userId] });
+              handleClose();
+            } catch (e: any) { setError(e.message); }
+            finally { setLoading(false); }
+          }}
+          activeOpacity={0.8}
+        >
+          <Text style={[s.saveBtnText, { color: Colors.danger }]}>Delete Recording</Text>
+        </TouchableOpacity>
+      )}
       <TouchableOpacity
         style={[s.saveBtn, items.some(it => !it.name.trim() || !it.amount) && s.saveBtnDisabled]}
         onPress={handleSave}
@@ -938,11 +958,11 @@ const s = StyleSheet.create({
 
   // ── Item cards ──────────────────────────────────────────────────────────
   itemCard:        { borderWidth: DC.cardBorderWidth, borderColor: DC.cardBorder, borderRadius: DC.cardRadius / 2, marginBottom: DC.cardGap / 2, overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.6)', paddingTop: DC.modalRowPadding / 2, paddingBottom: DC.modalRowPadding / 2 },
-  itemCardHeader:  { display: 'none' as any },
-  itemCardNum:     { display: 'none' as any },
+  itemCardHeader:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: DC.modalPadding / 2, paddingBottom: 4 },
+  itemCardNum:     { fontFamily: AppFont.semiBold, fontSize: 11, color: DC.pageTextMuted, letterSpacing: 0.4, textTransform: 'uppercase' },
   itemRow:         { flexDirection: 'row', alignItems: 'center', paddingHorizontal: DC.modalPadding / 2, paddingVertical: DC.modalRowPadding / 2, gap: DC.modalPadding / 2 },
   itemLabel:       { fontFamily: AppFont.semiBold, fontSize: DC.rowLabelSize - 1, color: DC.pageTextMuted, width: 80 },
-  itemInput:       { flex: 1, minWidth: 0, fontFamily: AppFont.regular, fontSize: DC.inputFontSize - 1, color: DC.inputTextColor, textAlign: 'right', backgroundColor: DC.inputBg, borderRadius: DC.inputRadius, borderWidth: DC.inputBorderWidth, borderColor: DC.inputBorder, paddingHorizontal: DC.inputPaddingH, paddingVertical: DC.inputPaddingV / 2 },
+  itemInput:       { flex: 1, minWidth: 0, fontFamily: AppFont.regular, fontSize: DC.inputFontSize, color: DC.inputTextColor, textAlign: 'right', backgroundColor: DC.inputBg, borderRadius: DC.inputRadius, borderWidth: DC.inputBorderWidth, borderColor: DC.inputBorder, paddingHorizontal: DC.inputPaddingH, paddingVertical: DC.inputPaddingV / 2 },
   itemPill:        { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: DC.chipBg, borderRadius: DC.chipRadius, borderWidth: DC.cardBorderWidth, borderColor: DC.chipBorder, paddingHorizontal: DC.chipPaddingH, paddingVertical: DC.chipPaddingV },
   itemPillText:    { fontFamily: AppFont.regular, fontSize: DC.chipFontSize, color: DC.chipInactiveText },
   currencyPill:    { backgroundColor: DC.chipBg, borderRadius: DC.chipRadius, borderWidth: DC.cardBorderWidth, borderColor: DC.chipBorder, paddingHorizontal: DC.chipPaddingH - 4, paddingVertical: DC.chipPaddingV },
