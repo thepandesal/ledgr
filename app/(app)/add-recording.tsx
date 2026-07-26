@@ -54,7 +54,7 @@ const TYPE_GROUPS = [
     ],
   },
   {
-    label: 'receivable',
+    label: 'does someone owe you this expense?',
     types: [
       { key: 'due', label: 'Receivable', color: Colors.text, icon: 'arrow-undo-outline' },
     ],
@@ -477,7 +477,7 @@ export default function AddRecordingScreen({ inlineProps }: {
                 </View>
               </TouchableOpacity>
             )}
-            {(isLoanType || isReceivableType) && (
+            {(isLoanType || isReceivableType || (type === 'expense' && singularPerson)) && (
               <TouchableOpacity style={s.frozenRow} onPress={() => { setActivePickerItemId('singular'); setShowPersonModal(true); }} activeOpacity={0.8}>
                 <Text style={s.frozenLabel}>{isLoanType ? 'Paying' : 'Owes You'}</Text>
                 <View style={s.frozenPill}>
@@ -580,10 +580,10 @@ export default function AddRecordingScreen({ inlineProps }: {
             </TouchableOpacity>
           )}
 
-          {/* Receivable per item + Owes You - removed, now a top-level type */}
+          {/* Receivable per item + Owes You */}
           {type === 'expense' && (
             <View style={s.itemRow}>
-              <Text style={s.itemLabel}>Receivable? <Text style={{ color: '#FF5757' }}>*</Text></Text>
+              <Text style={s.itemLabel}>Does someone owe you this expense? <Text style={{ color: '#FF5757' }}>*</Text></Text>
               <View style={[s.yesNoRow, { flex: 1 }]}>
                 <TouchableOpacity style={[s.yesNoBtn, item.isReceivable && s.yesNoBtnActive]} onPress={() => updateItem(item.id, { isReceivable: true })} activeOpacity={0.8}>
                   <Text style={[s.yesNoBtnText, item.isReceivable && s.yesNoBtnTextActive]}>Yes</Text>
@@ -595,7 +595,7 @@ export default function AddRecordingScreen({ inlineProps }: {
             </View>
           )}
           {/* Person - loan/receivable types */}
-          {(isLoanType || isReceivableType) && !useSingularPerson && (
+          {(isLoanType || isReceivableType || (type === 'expense' && item.isReceivable)) && !useSingularPerson && (
             <TouchableOpacity style={s.itemRow} onPress={() => { setActivePickerItemId(item.id); setShowPersonModal(true); }} activeOpacity={0.8}>
               <Text style={s.itemLabel}>{isLoanType ? 'Paying' : 'Owes You'} <Text style={{ color: Colors.muted, fontSize: 9, fontFamily: AppFont.regular }}>(optional)</Text></Text>
               <View style={s.itemPill}>
