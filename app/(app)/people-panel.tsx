@@ -95,7 +95,7 @@ export default function PeoplePanel({ onClose, initialPerson }: Props) {
         if (!balances[r.person_name]) balances[r.person_name] = { owedToMe: 0, iOwe: 0, bills: 0 };
         const paid = Number(r.paid_amount ?? 0);
         const net = Number(r.amount) - paid;
-        if (r.type === 'due') balances[r.person_name].owedToMe += net;
+        if (r.type === 'due' || r.is_due) balances[r.person_name].owedToMe += net;
         else balances[r.person_name].iOwe += net;
       });
 
