@@ -28,6 +28,7 @@ export default function PeoplePanel({ onClose, initialPerson }: Props) {
   const [refreshing, setRefreshing] = useState(false);
   const [detailPerson, setDetailPerson] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [section, setSection] = useState<'ongoing' | 'completed'>('ongoing');
 
   const initialPersonSet = useRef(false);
   useEffect(() => {
@@ -72,48 +73,68 @@ export default function PeoplePanel({ onClose, initialPerson }: Props) {
         (r: any) => r.type === 'debt' || r.type === 'due' || r.is_due
       );
 
-      // Shared recordings — I owe the sharer
-      const { data: sharedRecs } = await supabase
-        .from('recordings')
-        .select('id, user_id, name, amount, status')
-        .filter('shared_with', 'cs', `["${userId}"]`)
-        .neq('status', 'voided');
-      const sharedMap: Record<string, { name: string; total: number }> = {};
-      for (const sr of (sharedRecs ?? [])) {
-        if (sr.status === 'paid') continue;
-        const ownerId = sr.user_id;
-        if (!sharedMap[ownerId]) {
-          const { data: ownerName } = await supabase.rpc('get_user_display_name', { user_id: ownerId });
-          sharedMap[ownerId] = { name: ownerName ?? 'unknown', total: 0 };
-        }
-        sharedMap[ownerId].total += Number(sr.amount ?? 0);
-      }
-
       // 6. Get split bill payments scoped to user's bills
       const { data: payments } = billIds.length > 0
         ? await supabase.from('split_bill_payments').select('person_name, amount, status').in('split_bill_id', billIds)
         : { data: [] };
 
-      // Build set of all unique people (only those with actual transactions)
-      const peopleSet = new Set<string>();
-      (contacts ?? []).forEach((c: any) => peopleSet.add(c.name));
-      (recs ?? []).forEach((r: any) => r.person_name && peopleSet.add(r.person_name));
-      (payments ?? []).forEach((p: any) => peopleSet.add(p.person_name));
-      (oldItems ?? []).forEach((item: any) => {
-        if (item.people?.length) item.people.forEach((p: string) => peopleSet.add(p));
-      });
+      // 7. Shared recordings — I owe the sharer (for balance + status tracking)
+      const { data: sharedRecs } = await supabase
+        .from('recordings')
+        .select('id, user_id, name, amount, status, paid_amount')
+        .filter('shared_with', 'cs', `["${userId}"]`)
+        .neq('status', 'voided');
 
-      // Calculate per-person balances
-      const balances: Record<string, { owedToMe: number; iOwe: number; bills: number }> = {};
+      // Look up my debt recordings for these shared items to get accurate status
+      const sharedByIds = [...new Set((sharedRecs ?? []).map((r: any) => r.id).filter(Boolean))] as string[];
+      const { data: myDebts } = sharedByIds.length > 0
+        ? await supabase.from('recordings').select('id, amount, paid_amount, status, source_recording_id').eq('user_id', userId).eq('is_tagged', true).in('source_recording_id', sharedByIds)
+        : { data: [] };
+      const debtMap: Record<string, any> = {};
+      (myDebts ?? []).forEach((d: any) => { debtMap[d.source_recording_id] = d; });
 
-      // From debt recordings (I owe them)
+      const sharedMap: Record<string, { name: string; total: number; ongoing: number; completed: number }> = {};
+      for (const sr of (sharedRecs ?? [])) {
+        if (sr.status === 'paid') continue;
+        const ownerId = sr.user_id;
+        if (ownerId === userId) continue;
+        if (!sharedMap[ownerId]) {
+          const { data: ownerName } = await supabase.rpc('get_user_display_name', { user_id: ownerId });
+          sharedMap[ownerId] = { name: ownerName ?? 'unknown', total: 0, ongoing: 0, completed: 0 };
+        }
+        const debt = debtMap[sr.id];
+        const myStatus = debt ? debt.status : sr.status;
+        const myPaid = debt ? Number(debt.paid_amount ?? 0) : Number(sr.paid_amount ?? 0);
+        const myAmount = debt ? Number(debt.amount) : Number(sr.amount);
+        const isComplete = myStatus === 'paid' || (myAmount > 0 && myPaid >= myAmount - 0.01);
+        if (isComplete) {
+          sharedMap[ownerId].completed += myAmount;
+        } else {
+          sharedMap[ownerId].total += myAmount;
+          sharedMap[ownerId].ongoing += 1;
+        }
+      }
+
+      // Build per-person data
+      const peopleMap: Record<string, {
+        ongoingCount: number; completedCount: number;
+        owedToMe: number; iOwe: number;
+      }> = {};
+
+      // From debt recordings
       (recs ?? []).forEach((r: any) => {
         if (!r.person_name) return;
-        if (!balances[r.person_name]) balances[r.person_name] = { owedToMe: 0, iOwe: 0, bills: 0 };
+        if (!peopleMap[r.person_name]) peopleMap[r.person_name] = { ongoingCount: 0, completedCount: 0, owedToMe: 0, iOwe: 0 };
         const paid = Number(r.paid_amount ?? 0);
-        const net = Number(r.amount) - paid;
-        if (r.type === 'due' || r.is_due) balances[r.person_name].owedToMe += net;
-        else balances[r.person_name].iOwe += net;
+        const remaining = Number(r.amount) - paid;
+        const isComplete = r.status === 'paid' || (Number(r.amount) > 0 && paid >= Number(r.amount) - 0.01);
+        if (isComplete) {
+          peopleMap[r.person_name].completedCount += 1;
+        } else {
+          peopleMap[r.person_name].ongoingCount += 1;
+          if (r.type === 'due' || r.is_due) peopleMap[r.person_name].owedToMe += remaining;
+          else peopleMap[r.person_name].iOwe += remaining;
+        }
       });
 
       // From old schema split items
@@ -122,55 +143,53 @@ export default function PeoplePanel({ onClose, initialPerson }: Props) {
         const pp = Number(item.cost) / item.people.length;
         const isDeduct = item.recording_type === 'payable';
         item.people.forEach((p: string) => {
-          if (!balances[p]) balances[p] = { owedToMe: 0, iOwe: 0, bills: 0 };
-          if (isDeduct) balances[p].iOwe += pp;
-          else balances[p].owedToMe += pp;
+          if (!peopleMap[p]) peopleMap[p] = { ongoingCount: 0, completedCount: 0, owedToMe: 0, iOwe: 0 };
+          peopleMap[p].ongoingCount += 1;
+          if (isDeduct) peopleMap[p].iOwe += pp;
+          else peopleMap[p].owedToMe += pp;
         });
       });
 
       // From payments
       (payments ?? []).forEach((pay: any) => {
         if (pay.status === 'cancelled') return;
-        if (!balances[pay.person_name]) balances[pay.person_name] = { owedToMe: 0, iOwe: 0, bills: 0 };
-        // payments reduce what they owe
-        balances[pay.person_name].owedToMe -= Number(pay.amount ?? 0);
+        if (!peopleMap[pay.person_name]) peopleMap[pay.person_name] = { ongoingCount: 0, completedCount: 0, owedToMe: 0, iOwe: 0 };
+        peopleMap[pay.person_name].owedToMe -= Number(pay.amount ?? 0);
       });
 
       // Shared recordings — I owe the owner
       Object.entries(sharedMap).forEach(([ownerId, data]) => {
         const name = data.name;
-        peopleSet.add(name);
-        if (!balances[name]) balances[name] = { owedToMe: 0, iOwe: 0, bills: 0 };
-        balances[name].iOwe += data.total;
+        if (!peopleMap[name]) peopleMap[name] = { ongoingCount: 0, completedCount: 0, owedToMe: 0, iOwe: 0 };
+        peopleMap[name].iOwe += data.total;
+        peopleMap[name].ongoingCount += data.ongoing;
+        peopleMap[name].completedCount += data.completed;
       });
 
-      // Count visible entries (matches what ReceivableDetail shows)
-      const txCount: Record<string, number> = {};
-      // Unique recordings per person
-      const countedRecs = new Set<string>();
-      (allRecsWithPerson ?? []).forEach((r: any) => {
-        if (r.person_name && !countedRecs.has(r.id)) {
-          countedRecs.add(r.id);
-          txCount[r.person_name] = (txCount[r.person_name] ?? 0) + 1;
+      // Include contacts
+      (contacts ?? []).forEach((c: any) => {
+        if (!peopleMap[c.name]) peopleMap[c.name] = { ongoingCount: 0, completedCount: 0, owedToMe: 0, iOwe: 0 };
+      });
+
+      const ongoing: any[] = [];
+      const completed: any[] = [];
+
+      Object.entries(peopleMap).forEach(([name, d]) => {
+        const net = d.owedToMe - d.iOwe;
+        const owesDirection = net > 0.01 ? 'owes_you' : (net < -0.01 ? 'you_owe' : 'settled');
+        const entry = { name, ...d, net, owesDirection };
+
+        if (d.ongoingCount > 0) {
+          ongoing.push(entry);
+        } else {
+          completed.push(entry);
         }
       });
-      // Shared recordings count toward the owner
-      Object.values(sharedMap).forEach(data => {
-        txCount[data.name] = (txCount[data.name] ?? 0) + 1;
-      });
 
+      ongoing.sort((a, b) => Math.abs(b.net) - Math.abs(a.net));
+      completed.sort((a, b) => b.completedCount - a.completedCount);
 
-      const people = [...peopleSet].map(name => {
-        const b = balances[name] ?? { owedToMe: 0, iOwe: 0, bills: 0 };
-        const net = b.owedToMe - b.iOwe;
-        return { name, net, owedToMe: b.owedToMe, iOwe: b.iOwe, txCount: txCount[name] ?? 0 };
-      });
-
-      const owedToMe = people.filter(p => p.net > 0.01).sort((a, b) => b.net - a.net);
-      const iOwe = people.filter(p => p.net < -0.01).sort((a, b) => a.net - b.net);
-      const neutral = people.filter(p => Math.abs(p.net) <= 0.01).sort((a, b) => b.txCount - a.txCount);
-
-      return { owedToMe, iOwe, neutral };
+      return { ongoing, completed };
     },
     enabled: !!userId,
   });
@@ -180,6 +199,24 @@ export default function PeoplePanel({ onClose, initialPerson }: Props) {
     await queryClient.invalidateQueries({ queryKey: ['people-panel', userId] });
     setRefreshing(false);
   };
+
+  useEffect(() => {
+    if (!userId) return;
+    const channel = supabase
+      .channel(`people-shared-live-${userId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'recordings' }, (payload: any) => {
+        const checkShared = (data: any) => {
+          if (!data?.shared_with) return false;
+          const arr = typeof data.shared_with === 'string' ? JSON.parse(data.shared_with) : data.shared_with;
+          return Array.isArray(arr) && (arr.includes(userId) || data.user_id === userId);
+        };
+        if (checkShared(payload.new) || checkShared(payload.old)) {
+          queryClient.invalidateQueries({ queryKey: ['people-panel', userId] });
+        }
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [userId, queryClient]);
 
   if (detailPerson) {
     return (
@@ -191,13 +228,10 @@ export default function PeoplePanel({ onClose, initialPerson }: Props) {
     );
   }
 
-  const filteredOwedToMe = (data?.owedToMe ?? []).filter(p =>
+  const filteredOngoing = (data?.ongoing ?? []).filter(p =>
     !search || p.name.toLowerCase().includes(search.toLowerCase())
   );
-  const filteredIOwe = (data?.iOwe ?? []).filter(p =>
-    !search || p.name.toLowerCase().includes(search.toLowerCase())
-  );
-  const filteredNeutral = (data?.neutral ?? []).filter(p =>
+  const filteredCompleted = (data?.completed ?? []).filter(p =>
     !search || p.name.toLowerCase().includes(search.toLowerCase())
   );
 
@@ -222,6 +256,18 @@ export default function PeoplePanel({ onClose, initialPerson }: Props) {
         )}
       </View>
 
+      {/* Section tabs */}
+      <View style={s.tabRow}>
+        <TouchableOpacity style={[s.tab, section === 'ongoing' && s.tabActive]} onPress={() => setSection('ongoing')} activeOpacity={0.7}>
+          <Text style={[s.tabText, section === 'ongoing' && s.tabTextActive]}>Ongoing</Text>
+          {filteredOngoing.length > 0 && <Text style={s.tabCount}>{filteredOngoing.length}</Text>}
+        </TouchableOpacity>
+        <TouchableOpacity style={[s.tab, section === 'completed' && s.tabActive]} onPress={() => setSection('completed')} activeOpacity={0.7}>
+          <Text style={[s.tabText, section === 'completed' && s.tabTextActive]}>Completed</Text>
+          {filteredCompleted.length > 0 && <Text style={s.tabCount}>{filteredCompleted.length}</Text>}
+        </TouchableOpacity>
+      </View>
+
       <ScrollView
         contentContainerStyle={s.scroll}
         showsVerticalScrollIndicator={false}
@@ -233,98 +279,82 @@ export default function PeoplePanel({ onClose, initialPerson }: Props) {
           </BlurView>
         ) : (
           <>
-            {/* Owed to me */}
-            {filteredOwedToMe.length > 0 && (
+            {section === 'ongoing' && (
               <>
-                <Text style={s.sectionLabel}>owed to you</Text>
-                <View style={s.list}>
-                  {filteredOwedToMe.map((p, i) => (
-                    <TouchableOpacity
-                      key={p.name}
-                      style={[s.row, i === filteredOwedToMe.length - 1 && s.rowLast]}
-                      activeOpacity={0.7}
-                      onPress={() => setDetailPerson(p.name)}
-                    >
-                      <View style={s.avatar}>
-                        <Text style={s.avatarText}>{p.name[0].toUpperCase()}</Text>
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={s.rowName} numberOfLines={1}>{p.name}</Text>
-                        <Text style={s.rowSub}>
-                          {p.owedToMe > 0.01 ? `${fmt(p.owedToMe)} owed` : ''}
-                          {p.owedToMe > 0.01 && p.iOwe > 0.01 ? ` · ` : ''}
-                          {p.iOwe > 0.01 ? `you owe ${fmt(p.iOwe)}` : ''}
-                        </Text>
-                      </View>
-                      <Text style={s.rowValuePositive}>{fmt(p.net)}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
+                {filteredOngoing.length > 0 ? (
+                  <View style={s.list}>
+                    {filteredOngoing.map((p, i) => {
+                      const isOwedToMe = p.owesDirection === 'owes_you';
+                      const totalAmount = Math.abs(p.net);
+                      return (
+                        <TouchableOpacity
+                          key={p.name}
+                          style={[s.row, i === filteredOngoing.length - 1 && s.rowLast]}
+                          activeOpacity={0.7}
+                          onPress={() => setDetailPerson(p.name)}
+                        >
+                          <View style={s.avatar}>
+                            <Text style={s.avatarText}>{p.name[0].toUpperCase()}</Text>
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={s.rowName} numberOfLines={1}>{p.name}</Text>
+                            <Text style={s.rowSub}>
+                              {p.ongoingCount} ongoing {p.ongoingCount === 1 ? 'transaction' : 'transactions'}
+                            </Text>
+                            <Text style={[s.rowSub, { fontStyle: 'italic', color: isOwedToMe ? '#2A7A6F' : '#e74c3c' }]}>
+                              {isOwedToMe ? 'Owes You' : 'You Owe'}
+                            </Text>
+                          </View>
+                          <Text style={[s.rowAmount, { color: '#111111' }]}>{fmt(totalAmount)}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                ) : (
+                  <View style={{ alignItems: 'center', paddingVertical: 48, gap: 12 }}>
+                    <Ionicons name="people-outline" size={32} color={Colors.faint} />
+                    <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.muted }}>
+                      {search ? 'no people match your search' : 'no ongoing transactions'}
+                    </Text>
+                  </View>
+                )}
               </>
             )}
 
-            {/* I owe */}
-            {filteredIOwe.length > 0 && (
+            {section === 'completed' && (
               <>
-                <Text style={s.sectionLabel}>you owe</Text>
-                <View style={s.list}>
-                  {filteredIOwe.map((p, i) => (
-                    <TouchableOpacity
-                      key={p.name}
-                      style={[s.row, i === filteredIOwe.length - 1 && s.rowLast]}
-                      activeOpacity={0.7}
-                      onPress={() => setDetailPerson(p.name)}
-                    >
-                      <View style={s.avatar}>
-                        <Text style={s.avatarText}>{p.name[0].toUpperCase()}</Text>
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={s.rowName} numberOfLines={1}>{p.name}</Text>
-                        <Text style={s.rowSub}>
-                          {p.owedToMe > 0.01 ? `${fmt(p.owedToMe)} owed · ` : ''}
-                          owe {fmt(p.iOwe)}
-                        </Text>
-                      </View>
-                      <Text style={s.rowValueNegative}>-{fmt(Math.abs(p.net))}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
+                {filteredCompleted.length > 0 ? (
+                  <View style={s.list}>
+                    {filteredCompleted.map((p, i) => (
+                      <TouchableOpacity
+                        key={p.name}
+                        style={[s.row, i === filteredCompleted.length - 1 && s.rowLast]}
+                        activeOpacity={0.7}
+                        onPress={() => setDetailPerson(p.name)}
+                      >
+                        <View style={[s.avatar, { backgroundColor: '#e8e8e8' }]}>
+                          <Text style={[s.avatarText, { color: '#8a8a8a' }]}>{p.name[0].toUpperCase()}</Text>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={s.rowName} numberOfLines={1}>{p.name}</Text>
+                          <Text style={s.rowSub}>
+                            {p.completedCount > 0 ? `${p.completedCount} completed ${p.completedCount === 1 ? 'transaction' : 'transactions'}` : 'no transactions'}
+                          </Text>
+                          <Text style={[s.rowSub, { fontStyle: 'italic', color: '#999999' }]}>Completed</Text>
+                        </View>
+                        <Text style={[s.rowAmount, { color: Colors.muted }]}>0.00</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                ) : (
+                  <View style={{ alignItems: 'center', paddingVertical: 48, gap: 12 }}>
+                    <Ionicons name="checkmark-circle-outline" size={32} color={Colors.faint} />
+                    <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.muted }}>
+                      {search ? 'no people match your search' : 'no completed transactions'}
+                    </Text>
+                  </View>
+                )}
               </>
-            )}
-
-            {/* Neutral (contacts with no financial relationship) */}
-            {filteredNeutral.length > 0 && (
-              <>
-                <Text style={s.sectionLabel}>contacts</Text>
-                <View style={s.list}>
-                  {filteredNeutral.map((p, i) => (
-                    <TouchableOpacity
-                      key={p.name}
-                      style={[s.row, i === filteredNeutral.length - 1 && s.rowLast]}
-                      activeOpacity={0.7}
-                      onPress={() => setDetailPerson(p.name)}
-                    >
-                      <View style={[s.avatar, { backgroundColor: '#e8e8e8' }]}>
-                        <Text style={[s.avatarText, { color: '#8a8a8a' }]}>{p.name[0].toUpperCase()}</Text>
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={s.rowName} numberOfLines={1}>{p.name}</Text>
-                        <Text style={s.rowSub}>{p.txCount} transaction{p.txCount !== 1 ? 's' : ''}</Text>
-                      </View>
-                      <Text style={[s.rowValuePositive, { color: Colors.muted }]}>0.00</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </>
-            )}
-
-            {!isLoading && filteredOwedToMe.length === 0 && filteredIOwe.length === 0 && filteredNeutral.length === 0 && (
-              <View style={{ alignItems: 'center', paddingVertical: 48, gap: 12 }}>
-                <Ionicons name="people-outline" size={32} color={Colors.faint} />
-                <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.muted }}>
-                  {search ? 'no people match your search' : 'no people found — add contacts or create a split bill'}
-                </Text>
-              </View>
             )}
           </>
         )}
@@ -336,7 +366,7 @@ export default function PeoplePanel({ onClose, initialPerson }: Props) {
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.white },
-  scroll: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 40 },
+  scroll: { paddingHorizontal: 20, paddingTop: 4, paddingBottom: 40 },
   searchRow: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     marginHorizontal: 20, marginTop: 12, marginBottom: 8,
@@ -363,6 +393,20 @@ const s = StyleSheet.create({
   avatarText: { fontFamily: AppFont.bold, fontSize: 13, color: '#2A7A6F' },
   rowName: { fontFamily: AppFont.semiBold, fontSize: 14, color: Colors.text },
   rowSub: { fontFamily: AppFont.regular, fontSize: 10, color: Colors.muted, marginTop: 1 },
-  rowValuePositive: { fontFamily: AppFont.bold, fontSize: 14, color: '#2A7A6F' },
-  rowValueNegative: { fontFamily: AppFont.bold, fontSize: 14, color: '#e74c3c' },
+  rowAmount: { fontFamily: AppFont.bold, fontSize: 14, color: '#111111' },
+  tabRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 20, paddingVertical: 8 },
+  tab: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    paddingVertical: 10, borderRadius: Radius.pill, backgroundColor: Colors.surface,
+    borderWidth: 1, borderColor: Colors.borderMid,
+  },
+  tabActive: { backgroundColor: '#111111', borderColor: '#111111' },
+  tabText: { fontFamily: AppFont.regular, fontSize: 13, color: '#666666' },
+  tabTextActive: { fontFamily: AppFont.semiBold, fontSize: 13, color: '#ffffff' },
+  tabCount: {
+    fontFamily: AppFont.bold, fontSize: 10, color: '#ffffff',
+    backgroundColor: '#9cd7d2', borderRadius: 99,
+    paddingHorizontal: 6, paddingVertical: 1,
+    overflow: 'hidden',
+  },
 });

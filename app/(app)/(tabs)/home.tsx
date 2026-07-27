@@ -87,6 +87,7 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
       queryClient.invalidateQueries({ queryKey: ['home-people', userId] });
       queryClient.invalidateQueries({ queryKey: ['home-spaces', userId] });
       queryClient.invalidateQueries({ queryKey: ['home-totals', userId] });
+      queryClient.invalidateQueries({ queryKey: ['home-shared', userId] });
     };
     const id = `${userId}-${Date.now()}`;
     const channel = supabase
@@ -98,7 +99,20 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
         queryClient.invalidateQueries({ queryKey: ['home-reminders', userId] })
       )
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    const sharedChannel = supabase
+      .channel(`home-shared-live-${id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'recordings' }, (payload: any) => {
+        const checkShared = (data: any) => {
+          if (!data?.shared_with) return false;
+          const arr = typeof data.shared_with === 'string' ? JSON.parse(data.shared_with) : data.shared_with;
+          return Array.isArray(arr) && (arr.includes(userId) || data.user_id === userId);
+        };
+        if (checkShared(payload.new) || checkShared(payload.old)) {
+          queryClient.invalidateQueries({ queryKey: ['home-shared', userId] });
+        }
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); supabase.removeChannel(sharedChannel); };
   }, [userId, queryClient]);
 
   const onRefresh = async () => {
@@ -216,20 +230,95 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
     queryKey: ['home-shared', userId],
     queryFn: async () => {
       try {
-        const { data } = await supabase
+        // Recordings shared with me by others
+        const { data: sharedWithMe } = await supabase
           .from('recordings')
-          .select('id, name, type, amount, paid_amount, status, user_id, transaction_date')
+          .select('id, name, type, amount, paid_amount, status, user_id, transaction_date, shared_with')
           .neq('status', 'voided')
           .filter('shared_with', 'cs', `["${userId}"]`)
           .order('created_at', { ascending: false });
-        if (!data) return [];
-        const ownerIds = [...new Set(data.map((r: any) => r.user_id).filter(Boolean))];
-        const ownerNames: Record<string, string> = {};
-        await Promise.all(ownerIds.map(async (id: string) => {
+
+        // My recordings that I shared with others
+        const { data: myShared } = await supabase
+          .from('recordings')
+          .select('id, name, type, amount, paid_amount, status, user_id, transaction_date, shared_with')
+          .eq('user_id', userId)
+          .neq('shared_with', '[]')
+          .not('shared_with', 'is', null)
+          .neq('status', 'voided')
+          .order('created_at', { ascending: false });
+
+        const allIds = [...new Set([
+          ...(sharedWithMe ?? []).map((r: any) => r.user_id),
+          ...(myShared ?? []).flatMap((r: any) => {
+            const sw = typeof r.shared_with === 'string' ? JSON.parse(r.shared_with) : (r.shared_with ?? []);
+            return Array.isArray(sw) ? sw : [];
+          }),
+        ].filter(Boolean))] as string[];
+
+        const displayNames: Record<string, string> = {};
+        await Promise.all(allIds.map(async (id: string) => {
           const { data: n } = await supabase.rpc('get_user_display_name', { user_id: id });
-          if (n) ownerNames[id] = n as string;
+          if (n) displayNames[id] = n as string;
         }));
-        return data.map((r: any) => ({ ...r, ownerName: ownerNames[r.user_id] ?? 'Someone' }));
+
+        // Look up my debt recordings for items shared with me
+        const sharedByIds = [...new Set((sharedWithMe ?? []).map((r: any) => r.id).filter(Boolean))] as string[];
+        const { data: myDebts } = sharedByIds.length > 0
+          ? await supabase.from('recordings').select('id, amount, paid_amount, status, source_recording_id').eq('user_id', userId).eq('is_tagged', true).in('source_recording_id', sharedByIds)
+          : { data: [] };
+        const debtMap: Record<string, any> = {};
+        (myDebts ?? []).forEach((d: any) => { debtMap[d.source_recording_id] = d; });
+
+        const items: any[] = [];
+
+        // Items shared with me → I owe the owner
+        (sharedWithMe ?? []).forEach((r: any) => {
+          const isOwner = r.user_id === userId;
+          const debt = debtMap[r.id];
+          const myPaid = debt ? Number(debt.paid_amount ?? 0) : Number(r.paid_amount ?? 0);
+          const myAmount = debt ? Number(debt.amount) : Number(r.amount);
+          const myStatus = debt ? debt.status : r.status;
+          const isPaid = myStatus === 'paid' || (myAmount > 0 && myPaid >= myAmount - 0.01);
+          items.push({
+            id: r.id,
+            name: r.name,
+            amount: myAmount,
+            paidAmount: myPaid,
+            status: myStatus,
+            isPaid,
+            isOwner,
+            counterpartyId: r.user_id,
+            counterpartyName: displayNames[r.user_id] ?? 'Someone',
+            perspective: isOwner ? 'shared_to' : 'shared_with',
+          });
+        });
+
+        // My recordings that I shared with others
+        (myShared ?? []).forEach((r: any) => {
+          if (r.user_id === userId && (sharedWithMe ?? []).some((s: any) => s.id === r.id)) return;
+          const sw = typeof r.shared_with === 'string' ? JSON.parse(r.shared_with) : (r.shared_with ?? []);
+          const ids = Array.isArray(sw) ? sw : [];
+          ids.forEach((friendId: string) => {
+            const friendName = displayNames[friendId] ?? 'Someone';
+            const paid = Number(r.paid_amount ?? 0);
+            const isPaid = r.status === 'paid' || (Number(r.amount) > 0 && paid >= Number(r.amount) - 0.01);
+            items.push({
+              id: r.id + '_' + friendId,
+              name: r.name,
+              amount: Number(r.amount),
+              paidAmount: paid,
+              status: r.status,
+              isPaid,
+              isOwner: true,
+              counterpartyId: friendId,
+              counterpartyName: friendName,
+              perspective: 'shared_to',
+            });
+          });
+        });
+
+        return items;
       } catch { return []; }
     },
     enabled: !!userId,
@@ -698,14 +787,16 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
             ) : (
               <View style={s.list}>
                 {shared.map((r: any, i: number) => {
-                  const isPaid = r.status === 'paid' || (Number(r.amount) > 0 && Number(r.paid_amount ?? 0) >= Number(r.amount) - 0.01);
+                  const statusLabel = r.isPaid ? 'Closed' : (r.status === 'partial' ? 'Partial' : 'Pending');
+                  const counterpartyLabel = r.isOwner ? r.counterpartyName : 'Your Transaction';
                   return (
                     <TouchableOpacity key={r.id} style={[s.row, i === shared.length - 1 && s.rowLast]} activeOpacity={0.7} onPress={() => openRecording(r.id)}>
                       <View style={{ flex: 1 }}>
-                        <Text style={s.rowName} numberOfLines={1}>{r.ownerName}{r.name ? `: ${r.name}` : ''}</Text>
-                        <Text style={s.rowSub}>{isPaid ? 'paid' : `you owe ${r.ownerName}`}</Text>
+                        <Text style={s.rowName} numberOfLines={1}>{r.name}</Text>
+                        <Text style={s.rowSub} numberOfLines={1}>{counterpartyLabel}</Text>
+                        <Text style={[s.rowSub, { fontStyle: 'italic' }]}>{statusLabel}</Text>
                       </View>
-                      <Text style={[s.rowValueBold, { color: isPaid ? '#2A7A6F' : '#e74c3c' }]}>{fmt(Number(r.amount))}</Text>
+                      <Text style={s.rowValueBold}>{fmt(r.amount)}</Text>
                     </TouchableOpacity>
                   );
                 })}

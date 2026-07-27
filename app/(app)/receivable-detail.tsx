@@ -32,6 +32,7 @@ export default function ReceivableDetail({ person, onClose, onBack }: Props) {
   const { openSplitBill, openRecording } = useNav();
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<'pending' | 'completed'>('pending');
+  const tabLabel = tab === 'pending' ? 'Ongoing' : 'Completed';
   const [search, setSearch] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const slideAnim = useRef(new Animated.Value(width)).current;
@@ -284,6 +285,24 @@ export default function ReceivableDetail({ person, onClose, onBack }: Props) {
     setRefreshing(false);
   };
 
+  useEffect(() => {
+    if (!userId) return;
+    const channel = supabase
+      .channel(`receivable-shared-live-${userId}-${person}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'recordings' }, (payload: any) => {
+        const checkShared = (data: any) => {
+          if (!data?.shared_with) return false;
+          const arr = typeof data.shared_with === 'string' ? JSON.parse(data.shared_with) : data.shared_with;
+          return Array.isArray(arr) && arr.includes(userId);
+        };
+        if (checkShared(payload.new) || checkShared(payload.old)) {
+          queryClient.invalidateQueries({ queryKey: ['receivable-detail', userId, person] });
+        }
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [userId, person, queryClient]);
+
   const filterItems = (items: any[]) =>
     items.filter((b: any) => !search.trim() || b.billName.toLowerCase().includes(search.toLowerCase()));
 
@@ -465,7 +484,7 @@ export default function ReceivableDetail({ person, onClose, onBack }: Props) {
           <>
             <View style={st.tabRow}>
               <TouchableOpacity style={[st.tab, tab === 'pending' && st.tabActive]} onPress={() => setTab('pending')} activeOpacity={0.7}>
-                <Text style={[st.tabText, tab === 'pending' && st.tabTextActive]}>Pending</Text>
+                <Text style={[st.tabText, tab === 'pending' && st.tabTextActive]}>Ongoing</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[st.tab, tab === 'completed' && st.tabActive]} onPress={() => setTab('completed')} activeOpacity={0.7}>
                 <Text style={[st.tabText, tab === 'completed' && st.tabTextActive]}>Completed</Text>
@@ -476,7 +495,7 @@ export default function ReceivableDetail({ person, onClose, onBack }: Props) {
               <Ionicons name="search-outline" size={13} color={Colors.faint} />
               <TextInput
                 style={st.searchInput}
-                placeholder="search recording name..."
+                placeholder="search transactions..."
                 placeholderTextColor={Colors.faint}
                 value={search}
                 onChangeText={setSearch}
@@ -491,7 +510,7 @@ export default function ReceivableDetail({ person, onClose, onBack }: Props) {
             {isLoading ? (
               <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}><GooeyLoader /></BlurView>
             ) : !hasAny ? (
-              <View style={st.empty}><Text style={st.emptyText}>no {tab} items</Text></View>
+              <View style={st.empty}><Text style={st.emptyText}>no {tabLabel.toLowerCase()} transactions</Text></View>
             ) : (
               <ScrollView
                 contentContainerStyle={st.scroll}
