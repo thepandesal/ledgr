@@ -400,17 +400,18 @@ export default function AddRecordingScreen({ inlineProps }: {
           // Auto-tag friend + create debt recording
           if (newRec?.id && effectivePersonId) {
             try {
-              await supabase.rpc('tag_friend_auto', {
+              const rpcParams: Record<string, any> = {
                 p_recording_id: newRec.id,
                 p_owner_id: user.id,
                 p_owner_name: userName,
                 p_friend_user_id: effectivePersonId,
                 p_recording_name: it.name.trim(),
                 p_amount: parseFloat(it.amount),
-                p_currency: currency ?? defaultCurrency,
-                p_transaction_date: date || null,
-                p_category_id: it.category?.id || null,
-              });
+              };
+              if (currency) rpcParams.p_currency = currency;
+              if (date) rpcParams.p_transaction_date = date;
+              if (it.category?.id) rpcParams.p_category_id = it.category.id;
+              await supabase.rpc('tag_friend_auto', rpcParams);
             } catch {}
           }
         }
