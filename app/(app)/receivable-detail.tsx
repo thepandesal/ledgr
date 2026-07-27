@@ -536,7 +536,7 @@ export default function ReceivableDetail({ person, onClose, onBack }: Props) {
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={{ flex: 1, paddingVertical: 10, borderRadius: Radius.pill, backgroundColor: settleMode === 'partial' ? TEAL : DC.cardBg, alignItems: 'center', opacity: selectedIds.size > 1 ? 0.4 : 1 }}
-                  onPress={() => { if (selectedIds.size === 1) setSettleMode('partial'); }}
+                  onPress={() => { if (selectedIds.size === 1) { setSettleMode('partial'); setSettleAmount(''); } }}
                   activeOpacity={0.8}
                 >
                   <Text style={{ fontFamily: AppFont.bold, fontSize: 13, color: settleMode === 'partial' ? '#fff' : '#111' }}>Partial</Text>
@@ -548,15 +548,17 @@ export default function ReceivableDetail({ person, onClose, onBack }: Props) {
                 <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: DC.cardBorder, borderRadius: Radius.md, paddingHorizontal: 12, paddingVertical: 10 }}>
                   <Text style={{ fontFamily: AppFont.bold, fontSize: 14, color: Colors.muted, marginRight: 6 }}>PHP</Text>
                   <TextInput
-                    style={{ flex: 1, fontFamily: AppFont.monoBold, fontSize: 16, color: '#111', padding: 0, margin: 0 }}
+                    style={{ flex: 1, fontFamily: AppFont.monoBold, fontSize: 16, color: settleMode === 'complete' ? Colors.muted : '#111', padding: 0, margin: 0 }}
                     value={settleAmount}
                     onChangeText={t => {
+                      if (settleMode === 'complete') return;
                       const cleaned = t.replace(/[^0-9.]/g, '');
                       const num = parseFloat(cleaned || '0');
                       if (num > selectedTotal) return;
                       setSettleAmount(cleaned);
                     }}
                     keyboardType="decimal-pad"
+                    editable={settleMode === 'partial'}
                   />
                 </View>
               </View>
