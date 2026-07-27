@@ -383,7 +383,7 @@ export default function ReceivableDetail({ person, onClose, onBack }: Props) {
                   activeOpacity={0.7}
                   onPress={() => toggleSelection(item.billId)}
                 >
-                  <Ionicons name={checked ? 'checkbox' : 'square-outline'} size={20} color={checked ? TEAL : Colors.faint} />
+                  <Ionicons name={checked ? 'radio-button-on' : 'radio-button-off'} size={20} color={checked ? TEAL : Colors.faint} />
                   <View style={{ flex: 1 }}>
                     <Text style={st.rowName} numberOfLines={1}>{item.billName}</Text>
                     <Text style={st.rowSub}>remaining: {fmt(item.remaining)}</Text>
@@ -543,25 +543,25 @@ export default function ReceivableDetail({ person, onClose, onBack }: Props) {
                 </TouchableOpacity>
               </View>
 
-              <View>
-                <Text style={{ fontFamily: AppFont.regular, fontSize: 11, color: Colors.muted, marginBottom: 4 }}>Amount (max: {fmt(selectedTotal)})</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: DC.cardBorder, borderRadius: Radius.md, paddingHorizontal: 12, paddingVertical: 10 }}>
-                  <Text style={{ fontFamily: AppFont.bold, fontSize: 14, color: Colors.muted, marginRight: 6 }}>PHP</Text>
-                  <TextInput
-                    style={{ flex: 1, fontFamily: AppFont.monoBold, fontSize: 16, color: settleMode === 'complete' ? Colors.muted : '#111', padding: 0, margin: 0 }}
-                    value={settleAmount}
-                    onChangeText={t => {
-                      if (settleMode === 'complete') return;
-                      const cleaned = t.replace(/[^0-9.]/g, '');
-                      const num = parseFloat(cleaned || '0');
-                      if (num > selectedTotal) return;
-                      setSettleAmount(cleaned);
-                    }}
-                    keyboardType="decimal-pad"
-                    editable={settleMode === 'partial'}
-                  />
+              {settleMode === 'partial' && (
+                <View>
+                  <Text style={{ fontFamily: AppFont.regular, fontSize: 11, color: Colors.muted, marginBottom: 4 }}>Amount (max: {fmt(selectedTotal)})</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: DC.cardBorder, borderRadius: Radius.md, paddingHorizontal: 12, paddingVertical: 10 }}>
+                    <Text style={{ fontFamily: AppFont.bold, fontSize: 14, color: Colors.muted, marginRight: 6 }}>PHP</Text>
+                    <TextInput
+                      style={{ flex: 1, fontFamily: AppFont.monoBold, fontSize: 16, color: '#111', padding: 0, margin: 0 }}
+                      value={settleAmount}
+                      onChangeText={t => {
+                        const cleaned = t.replace(/[^0-9.]/g, '');
+                        const num = parseFloat(cleaned || '0');
+                        if (num > selectedTotal) return;
+                        setSettleAmount(cleaned);
+                      }}
+                      keyboardType="decimal-pad"
+                    />
+                  </View>
                 </View>
-              </View>
+              )}
 
               <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
                 <TouchableOpacity
