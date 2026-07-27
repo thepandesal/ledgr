@@ -339,7 +339,7 @@ const s = StyleSheet.create({
   scroll: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 40 },
   searchRow: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    marginHorizontal: 20, marginBottom: 8,
+    marginHorizontal: 20, marginTop: 12, marginBottom: 8,
     paddingHorizontal: 12, paddingVertical: 8,
     borderRadius: Radius.md, backgroundColor: Colors.surface,
     borderWidth: 1, borderColor: Colors.borderMid,

@@ -108,9 +108,21 @@ export default function ReceivableDetail({ person, onClose, onBack }: Props) {
           const owed = Number(sr.amount);
           const paid = Number(sr.paid_amount ?? 0);
           const remaining = Math.max(0, owed - paid);
+          // Use B's debt recording if it exists, otherwise use original
+          const { data: debtRec } = await supabase
+            .from('recordings')
+            .select('id, paid_amount, status')
+            .eq('source_recording_id', sr.id)
+            .eq('user_id', userId)
+            .eq('type', 'debt')
+            .maybeSingle();
+          const billId = debtRec?.id ?? sr.id;
+          const debtPaid = Number(debtRec?.paid_amount ?? paid);
+          const debtRemaining = Math.max(0, owed - debtPaid);
           sharedByPerson.push({
-            billId: sr.id, billName: sr.name, billStatus: sr.status,
-            owed, paid, remaining, isComplete: sr.status === 'paid' || (owed > 0 && paid >= owed - 0.01),
+            billId, billName: sr.name, billStatus: debtRec?.status ?? sr.status,
+            owed, paid: debtPaid, remaining: debtRemaining,
+            isComplete: (debtRec?.status === 'paid') || (owed > 0 && debtPaid >= owed - 0.01),
             isRecording: true, entryType: 'loan',
             transaction_date: sr.transaction_date, space_id: null,
           });
