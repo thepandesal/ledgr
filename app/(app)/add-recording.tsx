@@ -356,8 +356,8 @@ export default function AddRecordingScreen({ inlineProps }: {
       } else {
         for (const it of items) {
           const effectiveAccount = useSingularAccount ? singularAccount : it.account;
-          const effectivePerson  = useSingularPerson  ? singularPerson  : it.person;
-          const effectivePersonId = useSingularPerson ? singularPersonUserId : it.personUserId;
+          const effectivePerson  = useSingularPerson  ? singularPerson  : (it.person || singularPerson);
+          const effectivePersonId = useSingularPerson ? singularPersonUserId : (it.personUserId || singularPersonUserId);
           // expense + isReceivable = expense with is_due
           // due + receivableIsExpense = expense with is_due
           const isDue = (type === 'expense' && it.isReceivable) || (type === 'due' && receivableIsExpense);
