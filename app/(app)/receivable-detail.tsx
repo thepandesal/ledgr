@@ -366,11 +366,6 @@ export default function ReceivableDetail({ person, onClose, onBack }: Props) {
     const settleItems = pendingItems.filter(i => i.isRecording);
     return (
       <View style={{ flex: 1 }}>
-        <View style={st.tabRow}>
-          <TouchableOpacity style={[st.tab, st.tabActive]} onPress={() => {}} activeOpacity={1}>
-            <Text style={[st.tabText, st.tabTextActive]}>Select recordings to settle</Text>
-          </TouchableOpacity>
-        </View>
         {settleItems.length === 0 ? (
           <View style={st.empty}><Text style={st.emptyText}>no unpaid recordings</Text></View>
         ) : (
@@ -400,7 +395,7 @@ export default function ReceivableDetail({ person, onClose, onBack }: Props) {
           </ScrollView>
         )}
         {selectedIds.size > 0 && (
-          <View style={{ padding: DC.pagePadding, borderTopWidth: 1, borderTopColor: Colors.border, backgroundColor: Colors.white }}>
+          <View style={{ padding: DC.pagePadding, paddingBottom: 100, borderTopWidth: 1, borderTopColor: Colors.border, backgroundColor: Colors.white }}>
             <Text style={{ fontFamily: AppFont.regular, fontSize: 12, color: Colors.muted, marginBottom: 8 }}>
               {selectedIds.size} selected · total: PHP {fmt(selectedTotal)}
             </Text>
@@ -540,8 +535,8 @@ export default function ReceivableDetail({ person, onClose, onBack }: Props) {
                   <Text style={{ fontFamily: AppFont.bold, fontSize: 13, color: settleMode === 'complete' ? '#fff' : '#111' }}>Complete</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={{ flex: 1, paddingVertical: 10, borderRadius: Radius.pill, backgroundColor: settleMode === 'partial' ? TEAL : DC.cardBg, alignItems: 'center' }}
-                  onPress={() => setSettleMode('partial')}
+                  style={{ flex: 1, paddingVertical: 10, borderRadius: Radius.pill, backgroundColor: settleMode === 'partial' ? TEAL : DC.cardBg, alignItems: 'center', opacity: selectedIds.size > 1 ? 0.4 : 1 }}
+                  onPress={() => { if (selectedIds.size === 1) setSettleMode('partial'); }}
                   activeOpacity={0.8}
                 >
                   <Text style={{ fontFamily: AppFont.bold, fontSize: 13, color: settleMode === 'partial' ? '#fff' : '#111' }}>Partial</Text>
