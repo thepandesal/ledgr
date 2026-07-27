@@ -89,7 +89,8 @@ CREATE OR REPLACE FUNCTION tag_friend_auto(
   p_amount numeric,
   p_currency text DEFAULT 'PHP',
   p_transaction_date text DEFAULT NULL,
-  p_category_id uuid DEFAULT NULL
+  p_category_id uuid DEFAULT NULL,
+  p_type text DEFAULT 'expense'
 )
 RETURNS uuid
 LANGUAGE plpgsql
@@ -98,7 +99,16 @@ AS $$
 DECLARE
   v_debt_id uuid;
   shared jsonb;
+  v_label text;
+  v_currency_display text;
 BEGIN
+  -- Friendly label for the recording type
+  v_label := CASE p_type
+    WHEN 'due' THEN 'dues'
+    ELSE 'expense'
+  END;
+  v_currency_display := COALESCE(NULLIF(p_currency, ''), 'PHP');
+
   -- 1. Add friend to shared_with
   SELECT shared_with INTO shared FROM recordings WHERE id = p_recording_id;
   IF NOT shared @> to_jsonb(ARRAY[p_friend_user_id]) THEN
@@ -132,14 +142,14 @@ BEGIN
     false
   ) RETURNING id INTO v_debt_id;
 
-  -- 4. Send informational notification
+  -- 4. Send notification — NOT "cancelled", just a plain tag notification
   INSERT INTO notifications (user_id, type, title, body, message, data, is_read, status)
   VALUES (
     p_friend_user_id,
     'expense_tag',
-    p_owner_name || ' tagged you in an expense',
-    p_recording_name || ' — PHP ' || p_amount::text,
-    p_recording_name || ' — PHP ' || p_amount::text,
+    p_owner_name || ' tagged you in an ' || v_label,
+    p_recording_name || ' — ' || v_currency_display || ' ' || p_amount::text,
+    p_recording_name || ' — ' || v_currency_display || ' ' || p_amount::text,
     jsonb_build_object(
       'recordingId', p_recording_id,
       'sourceRecordingId', p_recording_id,

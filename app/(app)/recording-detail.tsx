@@ -245,22 +245,26 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
     setFriendDebtAccepted(false);
     setFriendTagDeclined(false);
     setTagsLoaded(false);
-    if (friendUserId && friendUserId !== prevFriendId) {
-      try {
-        const rpcParams: Record<string, any> = {
-          p_recording_id: recordingId,
-          p_owner_id: userId,
-          p_owner_name: userName,
-          p_friend_user_id: friendUserId,
-          p_recording_name: recording.name,
-          p_amount: Number(recording.amount),
-        };
-        if (recording.currency) rpcParams.p_currency = recording.currency;
-        if (recording.transaction_date) rpcParams.p_transaction_date = recording.transaction_date;
-        if (recording.category_id) rpcParams.p_category_id = recording.category_id;
-        await supabase.rpc('tag_friend_auto', rpcParams);
-      } catch {}
-    }
+      if (friendUserId && friendUserId !== prevFriendId) {
+        try {
+          const rpcParams: Record<string, any> = {
+            p_recording_id: recordingId,
+            p_owner_id: userId,
+            p_owner_name: userName,
+            p_friend_user_id: friendUserId,
+            p_recording_name: recording.name,
+            p_amount: Number(recording.amount),
+            p_type: recording.type ?? 'expense',
+          };
+          if (recording.currency) rpcParams.p_currency = recording.currency;
+          if (recording.transaction_date) rpcParams.p_transaction_date = recording.transaction_date;
+          if (recording.category_id) rpcParams.p_category_id = recording.category_id;
+          await supabase.rpc('tag_friend_auto', rpcParams);
+        } catch {}
+      }
+    queryClient.invalidateQueries({ queryKey: ['home-shared', userId] });
+    queryClient.invalidateQueries({ queryKey: ['home-recent', userId] });
+    queryClient.invalidateQueries({ queryKey: ['home-people', userId] });
     setOwesYouEditModal(false);
   };
 

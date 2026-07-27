@@ -407,6 +407,7 @@ export default function AddRecordingScreen({ inlineProps }: {
                 p_friend_user_id: effectivePersonId,
                 p_recording_name: it.name.trim(),
                 p_amount: parseFloat(it.amount),
+                p_type: type,
               };
               if (currency) rpcParams.p_currency = currency;
               if (date) rpcParams.p_transaction_date = date;
@@ -419,6 +420,7 @@ export default function AddRecordingScreen({ inlineProps }: {
       queryClient.invalidateQueries({ queryKey: ['home-people', user.id] });
       queryClient.invalidateQueries({ queryKey: ['home-spaces', user.id] });
       queryClient.invalidateQueries({ queryKey: ['home-recent', user.id] });
+      queryClient.invalidateQueries({ queryKey: ['home-shared', user.id] });
       setPendingFocusDate(date);
       handleClose();
     } catch (e: any) {
