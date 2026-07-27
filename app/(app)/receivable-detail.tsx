@@ -75,7 +75,7 @@ export default function ReceivableDetail({ person, onClose, onBack }: Props) {
 
       const { data: personRecs } = await supabase
         .from('recordings')
-        .select('id, name, amount, paid_amount, status, type, is_due, transaction_date, space_id')
+        .select('id, user_id, name, amount, paid_amount, status, type, is_due, transaction_date, space_id')
         .eq('user_id', userId)
         .ilike('person_name', person)
         .neq('status', 'voided')
@@ -92,6 +92,7 @@ export default function ReceivableDetail({ person, onClose, onBack }: Props) {
           owed, paid, remaining, isComplete, isRecording: true,
           entryType: isReceivable ? 'receivable' : 'loan',
           transaction_date: r.transaction_date, space_id: r.space_id,
+          createdBy: r.user_id === userId ? 'me' : person,
         };
       });
 
@@ -124,7 +125,7 @@ export default function ReceivableDetail({ person, onClose, onBack }: Props) {
             owed, paid: debtPaid, remaining: debtRemaining,
             isComplete: (debtRec?.status === 'paid') || (owed > 0 && debtPaid >= owed - 0.01),
             isRecording: true, entryType: 'loan',
-            transaction_date: sr.transaction_date, space_id: null,
+            transaction_date: sr.transaction_date, space_id: null, createdBy: ownerName,
           });
         }
       }
@@ -187,7 +188,7 @@ export default function ReceivableDetail({ person, onClose, onBack }: Props) {
           billId: r.id, billName: r.name, billStatus: r.status,
           owed: Number(r.amount), paid: Number(r.paid_amount ?? 0),
           remaining: Math.max(0, Number(r.amount) - Number(r.paid_amount ?? 0)),
-          isComplete: false, isRecording: true,
+          isComplete: false, isRecording: true, createdBy: 'me',
           entryType: r.is_due ? 'receivable' : 'loan',
         }));
         const pendingBillEntries = pendingBills.map((b: any) => ({
@@ -375,10 +376,14 @@ export default function ReceivableDetail({ person, onClose, onBack }: Props) {
   );
 
   const renderSettle = () => {
-    const settleItems = pendingItems.filter(i => i.isRecording);
+    const settleSections = [
+      { key: 'receivable', label: 'Owes You', items: (data?.pending?.receivable ?? []).filter((i: any) => i.isRecording) },
+      { key: 'loan',       label: 'You Owe',  items: (data?.pending?.loan ?? []).filter((i: any) => i.isRecording) },
+    ].filter(s => s.items.length > 0);
+    const hasSettleItems = settleSections.some(s => s.items.length > 0);
     return (
       <View style={{ flex: 1 }}>
-        {settleItems.length === 0 ? (
+        {!hasSettleItems ? (
           <View style={st.empty}><Text style={st.emptyText}>no unpaid recordings</Text></View>
         ) : (
           <ScrollView
@@ -386,24 +391,35 @@ export default function ReceivableDetail({ person, onClose, onBack }: Props) {
             showsVerticalScrollIndicator={false}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
           >
-            {settleItems.map((item, i) => {
-              const checked = selectedIds.has(item.billId);
-              return (
-                <TouchableOpacity
-                  key={item.billId}
-                  style={[st.row, i === settleItems.length - 1 && { borderBottomWidth: 0 }, { opacity: checked ? 1 : 0.7 }]}
-                  activeOpacity={0.7}
-                  onPress={() => toggleSelection(item.billId)}
-                >
-                  <Ionicons name={checked ? 'radio-button-on' : 'radio-button-off'} size={20} color={checked ? TEAL : Colors.faint} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={st.rowName} numberOfLines={1}>{item.billName}</Text>
-                    <Text style={st.rowSub}>remaining: {fmt(item.remaining)}</Text>
-                  </View>
-                  <Text style={[st.rowAmount, { color: '#111' }]}>{fmt(item.owed)}</Text>
-                </TouchableOpacity>
-              );
-            })}
+            {settleSections.map(section => (
+              <View key={section.key} style={{ marginBottom: 16 }}>
+                <Text style={[st.sectionLabel, section.key === 'loan' && { color: '#e74c3c' }]}>{section.label}</Text>
+                {section.items.map((item: any, i: number) => {
+                  const checked = selectedIds.has(item.billId);
+                  const isMe = item.createdBy === 'me';
+                  return (
+                    <TouchableOpacity
+                      key={item.billId}
+                      style={[st.row, i === section.items.length - 1 && { borderBottomWidth: 0 }, { opacity: checked ? 1 : 0.7 }]}
+                      activeOpacity={0.7}
+                      onPress={() => toggleSelection(item.billId)}
+                    >
+                      <Ionicons name={checked ? 'radio-button-on' : 'radio-button-off'} size={20} color={checked ? TEAL : Colors.faint} />
+                      <View style={{ flex: 1 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <Text style={st.rowName} numberOfLines={1}>{item.billName}</Text>
+                          <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: isMe ? '#4caf50' : '#ff9800' }}>
+                            <Text style={{ fontFamily: AppFont.bold, fontSize: 9, color: '#fff' }}>{isMe ? 'Me' : person}</Text>
+                          </View>
+                        </View>
+                        <Text style={st.rowSub}>remaining: {fmt(item.remaining)}</Text>
+                      </View>
+                      <Text style={[st.rowAmount, { color: '#111' }]}>{fmt(item.owed)}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            ))}
           </ScrollView>
         )}
         {selectedIds.size > 0 && (
