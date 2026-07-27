@@ -407,7 +407,7 @@ export default function AddRecordingScreen({ inlineProps }: {
                 p_friend_user_id: effectivePersonId,
                 p_recording_name: it.name.trim(),
                 p_amount: parseFloat(it.amount),
-                p_type: type,
+                p_type: isDue ? 'due' : type,
               };
               if (currency) rpcParams.p_currency = currency;
               if (date) rpcParams.p_transaction_date = date;

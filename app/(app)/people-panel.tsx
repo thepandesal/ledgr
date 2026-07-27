@@ -127,7 +127,7 @@ export default function PeoplePanel({ onClose, initialPerson }: Props) {
         if (!peopleMap[r.person_name]) peopleMap[r.person_name] = { ongoingCount: 0, completedCount: 0, owedToMe: 0, iOwe: 0 };
         const paid = Number(r.paid_amount ?? 0);
         const remaining = Number(r.amount) - paid;
-        const isComplete = r.status === 'paid' || (Number(r.amount) > 0 && paid >= Number(r.amount) - 0.01);
+        const isComplete = r.status === 'paid' || r.status === 'closed' || (Number(r.amount) > 0 && paid >= Number(r.amount) - 0.01);
         if (isComplete) {
           peopleMap[r.person_name].completedCount += 1;
         } else {

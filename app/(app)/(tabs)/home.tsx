@@ -794,7 +794,7 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
                       <View style={{ flex: 1 }}>
                         <Text style={s.rowName} numberOfLines={1}>{r.name}</Text>
                         <Text style={s.rowSub} numberOfLines={1}>{counterpartyLabel}</Text>
-                        <Text style={[s.rowSub, { fontStyle: 'italic' }]}>{statusLabel}</Text>
+                        <Text style={[s.rowSub, { fontStyle: 'italic', color: r.isPaid ? '#2A7A6F' : r.status === 'partial' ? '#e67e22' : '#999999' }]}>{statusLabel}</Text>
                       </View>
                       <Text style={s.rowValueBold}>{fmt(r.amount)}</Text>
                     </TouchableOpacity>
@@ -822,9 +822,7 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
                     <TouchableOpacity key={p.person} style={s.spaceCard} activeOpacity={0.7} onPress={() => openReceivablesPanel(p.person)}>
                       <AnimatedIcon set="material-symbols" icon="person-rounded" size={80} color={p.isFriend ? '#9cd7d2' : '#e8e8e8'} />
                       <Text style={s.spaceCardName} numberOfLines={1}>{p.person}</Text>
-                      <Text style={[s.spaceCardAmount, { color: isNegative ? '#e74c3c' : '#2A7A6F' }]}>
-                        {isNegative ? '-' : ''}{fmt(absNet)}
-                      </Text>
+                      <Text style={[s.spaceCardAmount, { color: '#111111' }]}>{fmt(absNet)}</Text>
                       <Text style={s.spaceCardSub}>{isNegative ? 'you owe' : 'owes you'}</Text>
                     </TouchableOpacity>
                   );

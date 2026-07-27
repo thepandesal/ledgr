@@ -36,7 +36,7 @@ export default function ReceivableDetail({ person, onClose, onBack }: Props) {
   const [search, setSearch] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const slideAnim = useRef(new Animated.Value(width)).current;
-  const [mode, setMode] = useState<'choice' | 'view' | 'settle'>('choice');
+  const [mode, setMode] = useState<'choice' | 'view' | 'settle'>('view');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [settleModal, setSettleModal] = useState(false);
   const [settleMode, setSettleMode] = useState<'complete' | 'partial'>('complete');
@@ -86,7 +86,7 @@ export default function ReceivableDetail({ person, onClose, onBack }: Props) {
         const owed = Number(r.amount);
         const paid = Number(r.paid_amount ?? 0);
         const remaining = Math.max(0, owed - paid);
-        const isComplete = r.status === 'paid' || (owed > 0 && paid >= owed - 0.01);
+        const isComplete = r.status === 'paid' || r.status === 'closed' || (owed > 0 && paid >= owed - 0.01);
         const isReceivable = r.type === 'due' || r.is_due;
         return {
           billId: r.id, billName: r.name, billStatus: r.status,
