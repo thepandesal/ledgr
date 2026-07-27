@@ -175,10 +175,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
   const [writeOffReason, setWriteOffReason] = useState('');
   const [writeOffLoading, setWriteOffLoading] = useState(false);
 
-  // Overpayment state
-  const [overpaymentModal, setOverpaymentModal] = useState(false);
-  const [overpaymentAmount, setOverpaymentAmount] = useState(0);
-
   // Owes-you edit state
   const [owesYouEditModal, setOwesYouEditModal] = useState(false);
   const [owesYouFriends, setOwesYouFriends] = useState<{ id: string; name: string }[]>([]);
@@ -186,43 +182,14 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
   const [owesYouSearch, setOwesYouSearch] = useState('');
   const [owesYouLoading, setOwesYouLoading] = useState(false);
 
-  // ── Helper: clean up B's share when A cancels/removes/deletes ──────────
   const cleanupTaggedDebt = async (friendUserId: string, sourceRecId: string, reason: 'removed' | 'cancelled' | 'deleted') => {
     try {
-      const { data: rec } = await supabase
-        .from('recordings')
-        .select('shared_with')
-        .eq('id', sourceRecId)
-        .single();
-      if (rec) {
-        const sharedWith: string[] = (rec.shared_with as string[]) ?? [];
-        await supabase.from('recordings').update({
-          shared_with: sharedWith.filter((id: string) => id !== friendUserId),
-        }).eq('id', sourceRecId);
-      }
+      await supabase.rpc('untag_friend', {
+        p_recording_id: sourceRecId,
+        p_friend_user_id: friendUserId,
+        p_recording_name: recording?.name ?? 'expense',
+      });
     } catch {}
-    // Cancel any pending expense_tag notifications
-    await supabase.from('notifications')
-      .update({ status: 'opened' })
-      .eq('type', 'expense_tag')
-      .eq('data->>sourceRecordingId', sourceRecId)
-      .in('status', ['new', 'saw']);
-    // Notify B
-    const bodyMap = {
-      removed: `"${recording?.name}" — the sender removed you from this expense.`,
-      cancelled: `"${recording?.name}" — the expense tag was cancelled.`,
-      deleted: `"${recording?.name}" — the expense was deleted by the sender.`,
-    };
-    await supabase.from('notifications').insert({
-      user_id: friendUserId,
-      type: 'tag_declined',
-      title: 'expense tag was cancelled',
-      body: bodyMap[reason],
-      message: bodyMap[reason],
-      data: { sourceRecordingId: sourceRecId },
-      status: 'new',
-      is_read: false,
-    });
   };
 
   // ── Helper: settle B's debt (write-off / mark complete) ───────────────────
@@ -241,21 +208,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
       status: 'new',
       is_read: false,
     });
-  };
-
-  const confirmOverpaymentIncome = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    await supabase.from('recordings').insert({
-      user_id: user.id,
-      space_id: recording?.space_id ?? null,
-      name: `${recording?.name ?? 'recording'} · overpayment`,
-      type: 'income',
-      amount: overpaymentAmount,
-      transaction_date: new Date().toISOString().split('T')[0],
-      status: 'received',
-    });
-    setOverpaymentModal(false);
   };
 
   const openOwesYouEdit = async () => {
@@ -281,9 +233,7 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
   const saveOwesYouPerson = async (name: string, friendUserId: string | null) => {
     const prevFriendId = recording?.tagged_friend_user_id;
     const hasPaid = Number(recording?.paid_amount ?? 0) > 0;
-    // Block change if payments collected
     if (hasPaid && prevFriendId) return;
-    // Clean up old friend (cancel pending + delete accepted debt)
     if (prevFriendId && prevFriendId !== friendUserId) {
       await cleanupTaggedDebt(prevFriendId, recordingId as string, 'removed');
     }
@@ -292,32 +242,23 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
       tagged_friend_user_id: friendUserId,
     }).eq('id', recordingId);
     setRecording((prev: any) => ({ ...prev, person_name: name, tagged_friend_user_id: friendUserId }));
-    // Reset tag states for new person
     setFriendDebtAccepted(false);
     setFriendTagDeclined(false);
     setTagsLoaded(false);
-    // Send tag request to new friend
     if (friendUserId && friendUserId !== prevFriendId) {
-      await supabase.from('notifications').insert({
-        user_id: friendUserId,
-        type: 'expense_tag',
-        title: `${userName || 'Someone'} tagged you in an expense`,
-        body: `"${recording.name}" — tap to accept or decline.`,
-        message: `"${recording.name}" — tap to accept or decline.`,
-        data: {
-          sourceRecordingId: recordingId,
-          taggerUserId: userId,
-          taggerName: userName,
-          friendId: friendUserId,
-          amount: Number(recording.amount),
-          recordingName: recording.name,
-          transactionDate: recording.transaction_date,
-          currency: recording.currency ?? defaultCurrency,
-          categoryId: recording.category_id ?? null,
-        },
-        status: 'new',
-        is_read: false,
-      });
+      try {
+        await supabase.rpc('tag_friend_auto', {
+          p_recording_id: recordingId,
+          p_owner_id: userId,
+          p_owner_name: userName,
+          p_friend_user_id: friendUserId,
+          p_recording_name: recording.name,
+          p_amount: Number(recording.amount),
+          p_currency: recording.currency ?? defaultCurrency,
+          p_transaction_date: recording.transaction_date ?? null,
+          p_category_id: recording.category_id ?? null,
+        });
+      } catch {}
     }
     setOwesYouEditModal(false);
   };
@@ -948,10 +889,8 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
           });
         }
       }
-      setCollectDueModal(false);
-      loadPaymentData();
+      // Record overpayment as income on A's side (no approval needed)
       if (isOverpayment) {
-        // Always record overpayment as income on A's side immediately
         await supabase.from('recordings').insert({
           user_id: user.id,
           space_id: recording.space_id ?? null,
@@ -962,36 +901,19 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
           status: 'received',
           currency: recording.currency ?? defaultCurrency,
         });
-        // Notify B to accept/decline — only affects B's expense record
-        if (recording.tagged_friend_user_id) {
-          const { data: bDebt } = await supabase
-            .from('recordings')
-            .select('id')
-            .eq('source_recording_id', recordingId)
-            .eq('type', 'debt')
-            .maybeSingle();
-          await supabase.from('notifications').insert({
-            user_id: recording.tagged_friend_user_id,
-            type: 'overpayment_request',
-            title: 'overpayment — action required',
-            body: `"${recording.name}" — ${amount.toLocaleString('en-US', { minimumFractionDigits: 2 })} was collected, ${excess.toLocaleString('en-US', { minimumFractionDigits: 2 })} over your debt. accept to update your expense, or decline to keep it at the original amount.`,
-            message: '',
-            data: {
-              sourceRecordingId: recordingId,
-              taggerUserId: userId,
-              taggerName: userName,
-              debtRecordingId: bDebt?.id ?? null,
-              originalAmount: total,
-              collectedAmount: amount,
-              overpaymentAmount: Math.round(excess * 100) / 100,
-              recordingName: recording.name,
-              currency: recording.currency ?? defaultCurrency,
-            },
-            status: 'new',
-            is_read: false,
-          });
-        }
+        await supabase.from('notifications').insert({
+          user_id: user.id,
+          type: 'tag_payment_update',
+          title: 'overpayment detected',
+          body: `"${recording.name}" — ${Math.round(excess * 100) / 100} over the amount. recorded as income.`,
+          message: '',
+          data: { sourceRecordingId: recordingId },
+          status: 'new',
+          is_read: false,
+        });
       }
+      setCollectDueModal(false);
+      loadPaymentData();
     } catch (e) { /* collect due failed silently */ }
     finally { setCollectDueLoading(false); }
   };
@@ -2869,22 +2791,6 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
 
         </SafeAreaView>
       </Modal>
-
-      {/* Overpayment modal */}
-      <BottomSheet visible={overpaymentModal} onClose={() => setOverpaymentModal(false)} title="overpayment detected">
-        <Text style={{ fontFamily: Brand.font.mono, fontSize: 13, color: Colors.text, marginBottom: 4 }}>
-          {overpaymentAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })} was paid over the full amount.
-        </Text>
-        <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: Colors.muted, marginBottom: 16 }}>
-          the recording has been marked as fully paid. what would you like to do with the excess?
-        </Text>
-        <TouchableOpacity style={rd.doneBtn} onPress={confirmOverpaymentIncome}>
-          <Text style={rd.doneBtnText}>record as income</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[rd.doneBtn, { backgroundColor: Colors.surface, marginTop: 8 }]} onPress={() => setOverpaymentModal(false)}>
-          <Text style={[rd.doneBtnText, { color: Colors.muted }]}>ignore</Text>
-        </TouchableOpacity>
-      </BottomSheet>
 
       {/* Tag friend modal */}
       <BottomSheet visible={tagFriendModal} onClose={() => { setTagFriendModal(false); setTagError(''); }} title="tag a friend">

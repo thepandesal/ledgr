@@ -95,10 +95,34 @@ export default function ReceivableDetail({ person, onClose, onBack }: Props) {
         };
       });
 
+      // Shared recordings where the sharer's name matches this person
+      const { data: sharedRecs } = await supabase
+        .from('recordings')
+        .select('id, user_id, name, amount, paid_amount, status, transaction_date')
+        .filter('shared_with', 'cs', `["${userId}"]`)
+        .neq('status', 'voided');
+      const sharedByPerson: any[] = [];
+      for (const sr of (sharedRecs ?? [])) {
+        const { data: ownerName } = await supabase.rpc('get_user_display_name', { user_id: sr.user_id });
+        if (ownerName && ownerName.toLowerCase() === person.toLowerCase()) {
+          const owed = Number(sr.amount);
+          const paid = Number(sr.paid_amount ?? 0);
+          const remaining = Math.max(0, owed - paid);
+          sharedByPerson.push({
+            billId: sr.id, billName: sr.name, billStatus: sr.status,
+            owed, paid, remaining, isComplete: sr.status === 'paid' || (owed > 0 && paid >= owed - 0.01),
+            isRecording: true, entryType: 'loan',
+            transaction_date: sr.transaction_date, space_id: null,
+          });
+        }
+      }
+
+      const allRecEntries = [...recEntries, ...sharedByPerson];
+
       if (!bills || bills.length === 0) {
         return {
-          pending: { receivable: recEntries.filter(r => !r.isComplete && r.entryType === 'receivable'), loan: recEntries.filter(r => !r.isComplete && r.entryType === 'loan') },
-          completed: { receivable: recEntries.filter(r => r.isComplete && r.entryType === 'receivable'), loan: recEntries.filter(r => r.isComplete && r.entryType === 'loan') },
+          pending: { receivable: allRecEntries.filter(r => !r.isComplete && r.entryType === 'receivable'), loan: allRecEntries.filter(r => !r.isComplete && r.entryType === 'loan') },
+          completed: { receivable: allRecEntries.filter(r => r.isComplete && r.entryType === 'receivable'), loan: allRecEntries.filter(r => r.isComplete && r.entryType === 'loan') },
         };
       }
 
@@ -223,7 +247,7 @@ export default function ReceivableDetail({ person, onClose, onBack }: Props) {
         : { data: [] };
       const linkedRecordingIds = new Set((sbrRows ?? []).map((r: any) => r.recording_id));
 
-      const newRecEntries = recEntries.filter((r: any) => !linkedRecordingIds.has(r.billId));
+      const newRecEntries = allRecEntries.filter((r: any) => !linkedRecordingIds.has(r.billId));
 
       const all = [...entries.filter(Boolean), ...newRecEntries];
 
@@ -341,21 +365,21 @@ export default function ReceivableDetail({ person, onClose, onBack }: Props) {
   const renderSettle = () => {
     const settleItems = pendingItems.filter(i => i.isRecording);
     return (
-      <>
+      <View style={{ flex: 1 }}>
         <View style={st.tabRow}>
           <TouchableOpacity style={[st.tab, st.tabActive]} onPress={() => {}} activeOpacity={1}>
             <Text style={[st.tabText, st.tabTextActive]}>Select recordings to settle</Text>
           </TouchableOpacity>
         </View>
-        <ScrollView
-          contentContainerStyle={st.scroll}
-          showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        >
-          {settleItems.length === 0 ? (
-            <View style={st.empty}><Text style={st.emptyText}>no unpaid recordings</Text></View>
-          ) : (
-            settleItems.map((item, i) => {
+        {settleItems.length === 0 ? (
+          <View style={st.empty}><Text style={st.emptyText}>no unpaid recordings</Text></View>
+        ) : (
+          <ScrollView
+            contentContainerStyle={st.scroll}
+            showsVerticalScrollIndicator={false}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          >
+            {settleItems.map((item, i) => {
               const checked = selectedIds.has(item.billId);
               return (
                 <TouchableOpacity
@@ -372,9 +396,9 @@ export default function ReceivableDetail({ person, onClose, onBack }: Props) {
                   <Text style={[st.rowAmount, { color: '#111' }]}>{fmt(item.owed)}</Text>
                 </TouchableOpacity>
               );
-            })
-          )}
-        </ScrollView>
+            })}
+          </ScrollView>
+        )}
         {selectedIds.size > 0 && (
           <View style={{ padding: DC.pagePadding, borderTopWidth: 1, borderTopColor: Colors.border, backgroundColor: Colors.white }}>
             <Text style={{ fontFamily: AppFont.regular, fontSize: 12, color: Colors.muted, marginBottom: 8 }}>
@@ -389,7 +413,7 @@ export default function ReceivableDetail({ person, onClose, onBack }: Props) {
             </TouchableOpacity>
           </View>
         )}
-      </>
+      </View>
     );
   };
 

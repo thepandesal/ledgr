@@ -10,6 +10,8 @@ interface UseUserResult {
   profileCode: string;
   defaultCurrency: string;
   setDefaultCurrency: (currency: string) => Promise<void>;
+  requireTagApproval: boolean;
+  setRequireTagApproval: (value: boolean) => Promise<void>;
   loading: boolean;
 }
 
@@ -54,7 +56,7 @@ export function useUser(): UseUserResult {
     queryFn: async () => {
       const { data } = await supabase
         .from('user_settings')
-        .select('profile_code, default_currency')
+        .select('profile_code, default_currency, require_tag_approval')
         .eq('user_id', user!.id)
         .maybeSingle();
       if (!data?.profile_code) {
@@ -80,6 +82,15 @@ export function useUser(): UseUserResult {
     );
   };
 
+  const setRequireTagApproval = async (value: boolean) => {
+    if (!user?.id) return;
+    queryClient.setQueryData(['user-settings', user.id], (old: any) => ({ ...old, require_tag_approval: value }));
+    await supabase.from('user_settings').upsert(
+      { user_id: user.id, require_tag_approval: value, updated_at: new Date().toISOString() },
+      { onConflict: 'user_id' }
+    );
+  };
+
   return {
     user,
     userId: user?.id ?? '',
@@ -87,6 +98,8 @@ export function useUser(): UseUserResult {
     profileCode: settings?.profile_code ?? '',
     defaultCurrency: settings?.default_currency ?? 'PHP',
     setDefaultCurrency,
+    requireTagApproval: settings?.require_tag_approval ?? false,
+    setRequireTagApproval,
     loading,
   };
 }

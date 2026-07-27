@@ -1,6 +1,9 @@
 -- Migration: add default_currency to user_settings
 ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS default_currency text NOT NULL DEFAULT 'PHP';
 
+-- Migration: add require_tag_approval to user_settings
+ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS require_tag_approval boolean NOT NULL DEFAULT false;
+
 -- Function: delete_user_data
 -- Deletes ALL data for a given user_id, then deletes the auth user.
 -- Must be called with service role (from an Edge Function or trusted server).

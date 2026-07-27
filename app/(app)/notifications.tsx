@@ -9,7 +9,6 @@ import { supabase } from '../../src/lib/supabase';
 import { useUser } from '../../src/hooks/useUser';
 import { Colors, Fonts } from '@/components/ui/theme';
 import { Brand } from '../../src/lib/brand';
-import TagRequestsScreen from './tag-request';
 
 const ACCENT      = Brand.color.accent;
 const ACCENT_DARK = Brand.color.accentDark;
@@ -36,7 +35,6 @@ const TYPE_ICON: Record<string, string> = {
   tag_declined:            'close-circle-outline',
   tag_cancelled:           'close-circle-outline',
   tag_payment_update:      'cash-outline',
-  overpayment_request:     'alert-circle-outline',
   default:                 'notifications-outline',
 };
 
@@ -53,21 +51,8 @@ function smartGroup(dateStr: string): string {
 export default function NotificationsScreen({ isActive }: { isActive?: boolean }) {
   const router = useRouter();
   const { userId } = useUser();
-  const [activeTab, setActiveTab] = useState<'notifications' | 'requests'>('notifications');
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [pendingCount, setPendingCount] = useState(0);
-
-  const fetchPendingCount = useCallback(async () => {
-    if (!userId) return;
-    const { count } = await supabase
-      .from('notifications')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', userId)
-      .in('type', ['expense_tag', 'overpayment_request'])
-      .eq('status', 'new');
-    setPendingCount(count ?? 0);
-  }, [userId]);
 
   const loadNotifications = useCallback(async () => {
     if (!userId) return;
@@ -78,27 +63,23 @@ export default function NotificationsScreen({ isActive }: { isActive?: boolean }
       .order('created_at', { ascending: false });
     setNotifications(data ?? []);
     setLoading(false);
-    fetchPendingCount();
-    const hasNew = (data ?? []).some((n: any) => n.status === 'new' && n.type !== 'expense_tag');
+    const hasNew = (data ?? []).some((n: any) => n.status === 'new');
     if (hasNew) {
       await supabase
         .from('notifications')
         .update({ status: 'saw', is_read: true, read: true })
         .eq('user_id', userId)
-        .eq('status', 'new')
-        .neq('type', 'expense_tag');
+        .eq('status', 'new');
       setNotifications(prev => prev.map(n =>
-        n.status === 'new' && n.type !== 'expense_tag' ? { ...n, status: 'saw' } : n
+        n.status === 'new' ? { ...n, status: 'saw' } : n
       ));
     }
-  }, [userId, fetchPendingCount]);
+  }, [userId]);
 
-  // Re-fetch whenever this tab becomes active
   useEffect(() => {
     if (isActive && userId) loadNotifications();
   }, [isActive, userId]);
 
-  // Realtime channel — live inserts and updates while screen is mounted
   useEffect(() => {
     if (!userId) return;
 
@@ -112,12 +93,8 @@ export default function NotificationsScreen({ isActive }: { isActive?: boolean }
         const n = payload.new as any;
         if (n.user_id !== userId) return;
         setNotifications(prev => [n, ...prev]);
-        if (n.type === 'expense_tag') {
-          fetchPendingCount();
-        } else {
-          await supabase.from('notifications').update({ status: 'saw', is_read: true, read: true }).eq('id', n.id);
-          setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, status: 'saw' } : x));
-        }
+        await supabase.from('notifications').update({ status: 'saw', is_read: true, read: true }).eq('id', n.id);
+        setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, status: 'saw' } : x));
       })
       .on('postgres_changes', {
         event: 'UPDATE',
@@ -127,17 +104,16 @@ export default function NotificationsScreen({ isActive }: { isActive?: boolean }
         const n = payload.new as any;
         if (n.user_id !== userId) return;
         setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, ...n } : x));
-        if (n.type === 'expense_tag') fetchPendingCount();
       })
       .subscribe((status) => {
         console.log('[notifications] realtime status:', status);
       });
 
     return () => { supabase.removeChannel(channel); };
-  }, [userId, fetchPendingCount]);
+  }, [userId]);
 
   const handleTap = async (n: any) => {
-    if (n.status !== 'opened' && n.type !== 'expense_tag') {
+    if (n.status !== 'opened') {
       await supabase.from('notifications').update({ status: 'opened' }).eq('id', n.id);
       setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, status: 'opened' } : x));
     }
@@ -146,25 +122,10 @@ export default function NotificationsScreen({ isActive }: { isActive?: boolean }
       router.push('/(app)/(tabs)/contacts' as any); return;
     }
     if (n.type === 'expense_tag') {
-      setActiveTab('requests'); return;
+      if (data.sourceRecordingId) router.push({ pathname: '/(app)/recording-detail', params: { recordingId: data.sourceRecordingId } } as any);
+      return;
     }
     if (n.type === 'tag_accepted' || n.type === 'tag_declined' || n.type === 'tag_payment_update') {
-      // If A receives overpayment response from B, record income if accepted
-      if (n.type === 'tag_payment_update' && data.overpaymentAmount && data.accepted === true) {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user && data.sourceRecordingId) {
-          const { data: sourceRec } = await supabase.from('recordings').select('name, space_id').eq('id', data.sourceRecordingId).maybeSingle();
-          await supabase.from('recordings').insert({
-            user_id: user.id,
-            space_id: sourceRec?.space_id ?? null,
-            name: `${sourceRec?.name ?? 'recording'} · overpayment`,
-            type: 'income',
-            amount: data.overpaymentAmount,
-            transaction_date: new Date().toISOString().split('T')[0],
-            status: 'received',
-          });
-        }
-      }
       if (data.sourceRecordingId) router.push({ pathname: '/(app)/recording-detail', params: { recordingId: data.sourceRecordingId } } as any);
       return;
     }
@@ -199,40 +160,7 @@ export default function NotificationsScreen({ isActive }: { isActive?: boolean }
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white }}>
-      {/* Sub-tabs */}
-      <View style={s.tabRow}>
-        <TouchableOpacity
-          style={[s.tab, activeTab === 'notifications' && s.tabActive]}
-          onPress={() => setActiveTab('notifications')}
-          activeOpacity={0.75}
-        >
-          <Text style={[s.tabText, activeTab === 'notifications' && s.tabTextActive]}>notifications</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[s.tab, activeTab === 'requests' && s.tabActive]}
-          onPress={async () => {
-            setActiveTab('requests');
-            setPendingCount(0);
-            await supabase.from('notifications')
-              .update({ status: 'saw', is_read: true, read: true })
-              .eq('user_id', userId)
-              .in('type', ['expense_tag', 'overpayment_request'])
-              .eq('status', 'new');
-          }}
-          activeOpacity={0.75}
-        >
-          <Text style={[s.tabText, activeTab === 'requests' && s.tabTextActive]}>requests</Text>
-          {pendingCount > 0 && (
-            <View style={s.badge}>
-              <Text style={s.badgeText}>{pendingCount > 9 ? '9+' : String(pendingCount)}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-      </View>
-
-      {activeTab === 'requests' ? (
-        <TagRequestsScreen />
-      ) : loading ? (
+      {loading ? (
         <ActivityIndicator color={ACCENT_DARK} style={{ marginTop: 40 }} />
       ) : notifications.length === 0 ? (
         <View style={s.emptyWrap}>
@@ -280,13 +208,6 @@ export default function NotificationsScreen({ isActive }: { isActive?: boolean }
 }
 
 const s = StyleSheet.create({
-  tabRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: Colors.border, paddingHorizontal: PAGE },
-  tab: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 12, paddingHorizontal: 4, marginRight: 24, borderBottomWidth: 2, borderBottomColor: 'transparent' },
-  tabActive:     { borderBottomColor: ACCENT_DARK },
-  tabText:       { fontFamily: Fonts.mono, fontSize: 13, color: Colors.muted },
-  tabTextActive: { fontFamily: Fonts.monoBold, fontSize: 13, color: ACCENT_DARK },
-  badge:     { minWidth: 18, height: 18, borderRadius: 9, backgroundColor: '#ed6a6a', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
-  badgeText: { fontFamily: Fonts.monoBold, fontSize: 10, color: Colors.white },
   scroll:    { paddingBottom: 60 },
   emptyWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, paddingTop: 80 },
   emptyText: { fontFamily: Brand.font.mono, fontSize: 13, color: Colors.muted },

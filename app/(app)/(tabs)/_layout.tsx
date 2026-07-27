@@ -1,4 +1,4 @@
-import { View, TouchableOpacity, Text, StyleSheet, Animated, Platform, SafeAreaView, ScrollView, useWindowDimensions, Clipboard, TextInput, ActivityIndicator, Modal } from 'react-native';
+import { View, TouchableOpacity, Text, StyleSheet, Animated, Platform, SafeAreaView, ScrollView, useWindowDimensions, Clipboard, TextInput, ActivityIndicator, Modal, Switch } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useRef, memo, useCallback, useEffect }from 'react';
@@ -137,7 +137,7 @@ const CURRENCIES = [
 function ProfileScreen() {
   const router = useRouter();
   const { switchTab, openContactsPanel, openFriendsPanel } = useNav();
-  const { user, userId, userName, profileCode, defaultCurrency, setDefaultCurrency } = useUser();
+  const { user, userId, userName, profileCode, defaultCurrency, setDefaultCurrency, requireTagApproval, setRequireTagApproval } = useUser();
   const [codeCopied, setCodeCopied] = useState(false);
   const [showCurrencyModal, setShowCurrencyModal] = useState(false);
   const [currencySearch, setCurrencySearch] = useState('');
@@ -341,6 +341,21 @@ function ProfileScreen() {
             </View>
             <Ionicons name="chevron-forward" size={16} color={Colors.faint} />
           </TouchableOpacity>
+          <View style={p.divider} />
+          {/* Require Tag Approval */}
+          <View style={p.row}>
+            <View style={p.rowIcon}><AnimatedIcon set="basil" icon="shield-solid" size={16} color={Colors.muted} /></View>
+            <View style={p.rowBody}>
+              <Text style={p.rowLabel}>Require Approval Before Tagging</Text>
+              <Text style={[p.rowValue, { fontSize: 10, color: Colors.faint }]}>when OFF, friends can tag you automatically</Text>
+            </View>
+            <Switch
+              value={requireTagApproval}
+              onValueChange={setRequireTagApproval}
+              trackColor={{ false: Colors.border, true: HEADER_BG + '66' }}
+              thumbColor={requireTagApproval ? HEADER_BG : Colors.faint}
+            />
+          </View>
         </View>
 
         {/* Friends */}
@@ -987,8 +1002,7 @@ export default function TabsLayout() {
       supabase.from('notifications')
         .update({ status: 'saw', is_read: true, read: true })
         .eq('user_id', userId)
-        .in('status', ['new'])
-        .neq('type', 'expense_tag');
+        .in('status', ['new']);
       return;
     }
     switchTab(key);
