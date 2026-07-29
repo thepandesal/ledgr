@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView,
+import { View, Text, Image, StyleSheet, TouchableOpacity, ScrollView,
   SafeAreaView, ActivityIndicator, RefreshControl,
   TextInput, KeyboardAvoidingView, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -134,7 +134,7 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
     queryFn: async () => {
       const { data } = await supabase
         .from('recordings')
-        .select('id, name, type, amount, transaction_date')
+        .select('id, name, type, amount, transaction_date, space_id, category_id, categories:category_id(icon), space:space_id(name)')
         .eq('user_id', userId)
         .neq('status', 'voided')
         .neq('is_tagged', true)
@@ -572,6 +572,10 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
   const [accLoading, setAccLoading] = useState(false);
 
   const fmt = (n: number | undefined | null) => (n ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const formatDateLabel = (d: string) => {
+    const date = new Date(d + 'T00:00:00');
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
   const isLoading = loadingRecent || loadingPeople || loadingSpaces || loadingReminders;
 
   const { setHomeDateLabel } = useNav();
@@ -593,28 +597,31 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-            {/* ── RECORDS ── */}
-            <SectionHeader title="RECORDS" onArrowRight={() => openRecordingsPanel()} />
+            {/* ── RECENT TRANSACTIONS ── */}
+            <SectionHeader title="Recent Transactions" onArrowRight={() => openRecordingsPanel()} />
             {recent.length === 0 ? (
               <EmptyRow label="no recordings" />
             ) : (
               <View style={s.list}>
                 {recent.slice(0, 3).map((r: any, i: number) => {
-                  const typeColor = r.type === 'expense' ? '#f96262' : r.type === 'income' ? '#2bac5a' : '#2a2a26';
+                  const sign = r.type === 'expense' ? '- ' : '';
                   return (
-                    <TouchableOpacity key={r.id} style={[s.recRow, i === Math.min(recent.length, 3) - 1 && s.rowLast]} activeOpacity={0.7} onPress={() => openRecording(r.id)}>
-                      <Text style={s.recRowName} numberOfLines={1}>{r.name.charAt(0).toUpperCase() + r.name.slice(1)}</Text>
-                      <Text style={[s.recRowAmount, { color: typeColor }]}>{fmt(Number(r.amount))}</Text>
+                    <TouchableOpacity key={r.id} style={[s.recRow, i === Math.min(recent.length, 3) - 1 && { borderBottomWidth: 0 }]} activeOpacity={0.7} onPress={() => openRecording(r.id)}>
+                      <View style={s.recIconCircle}>
+                        <Ionicons name={r.categories?.icon ?? 'ellipse-outline'} size={16} color="#888583" />
+                      </View>
+                      <View style={{ flex: 1, marginLeft: 10 }}>
+                        <Text style={s.recRowName} numberOfLines={1}>{r.name.charAt(0).toUpperCase() + r.name.slice(1)}</Text>
+                        <Text style={s.recRowSub}>{formatDateLabel(r.transaction_date)}{r.space ? ` · ${r.space.name}` : ''}</Text>
+                      </View>
+                      <Text style={s.recRowAmount}>{sign}{fmt(Number(r.amount))}</Text>
                     </TouchableOpacity>
                   );
                 })}
-                {totalCounts.recordings > 3 && (
-                  <TouchableOpacity onPress={() => openRecordingsPanel()} activeOpacity={0.7} style={s.recMoreRow}>
-                    <Text style={s.recMoreText}>+ {totalCounts.recordings - 3} more</Text>
-                  </TouchableOpacity>
-                )}
               </View>
             )}
+
+            <View style={s.divider} />
 
             {/* ── Reminders ── */}
             <SectionHeader title="Reminders" onArrowRight={() => openRemindersPanel()} />
@@ -631,8 +638,10 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
               </View>
             )}
 
+            <View style={s.divider} />
+
             {/* ── FOLDERS ── */}
-            <SectionHeader title="FOLDERS" onArrowRight={openSpacesPanel} />
+            <SectionHeader title="Folders" onArrowRight={openSpacesPanel} />
             {spaces.length === 0 ? (
               <EmptyRow label="no folders" />
             ) : (
@@ -652,8 +661,14 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
                                   <Text style={s.folderCardName} numberOfLines={1}>{sp.name}</Text>
                                   <View style={s.savingsBadge}><Text style={s.savingsBadgeText}>SAVINGS</Text></View>
                                 </View>
-                                  <Text style={[s.folderCardLabel, { color: '#3a3a34' }]}>Monthly Saved</Text>
-                                  <Text style={[s.folderCardMeta, { color: '#3a3a34' }]}>{abbrNum(sp.spent ?? 0)} | <Text style={[s.folderCardMetaBold, { color: '#3a3a34' }]}>{abbrNum(sp.budget ?? 0)}</Text></Text>
+                                <View style={s.folderLabelRow}>
+                                  <Text style={s.folderCardLabel}>Monthly Saved</Text>
+                                  <Text style={s.folderCardValue}>{abbrNum(sp.spent ?? 0)}</Text>
+                                </View>
+                                <View style={s.folderLabelRow}>
+                                  <Text style={s.folderCardLabel}>Up to Date</Text>
+                                  <Text style={s.folderCardValue}>{abbrNum(sp.monthNet ?? 0)} | {abbrNum(sp.budget ?? 0)}</Text>
+                                </View>
                               </TouchableOpacity>
                             ))}
                           </ScrollView>
@@ -667,11 +682,17 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
                              {expenseSpaces.map((sp: any) => (
                               <TouchableOpacity key={sp.id} style={s.expenseCard} activeOpacity={0.7} onPress={() => setSpaceChoice({ id: sp.id, name: sp.name })}>
                                 <View style={s.folderCardHeader}>
-                                  <Text style={[s.folderCardName, { color: '#ffffff' }]} numberOfLines={1}>{sp.name}</Text>
+                                  <Text style={s.folderCardName} numberOfLines={1}>{sp.name}</Text>
                                   <View style={s.expenseBadge}><Text style={s.expenseBadgeText}>EXPENSE</Text></View>
                                 </View>
-                                  <Text style={[s.folderCardLabel, { color: '#cccccc' }]}>Monthly Expense</Text>
-                                  <Text style={[s.folderCardMeta, { color: '#aaaaaa' }]}>{abbrNum(sp.spent ?? 0)} | <Text style={[s.folderCardMetaBold, { color: '#aaaaaa' }]}>{abbrNum(sp.budget ?? 0)}</Text></Text>
+                                <View style={s.folderLabelRow}>
+                                  <Text style={s.folderCardLabel}>Monthly Expense</Text>
+                                  <Text style={s.folderCardValue}>{abbrNum(sp.spent ?? 0)}</Text>
+                                </View>
+                                <View style={s.folderLabelRow}>
+                                  <Text style={s.folderCardLabel}>Used Budget</Text>
+                                  <Text style={s.folderCardValue}>{abbrNum(sp.spent ?? 0)} | {abbrNum(sp.budget ?? 0)}</Text>
+                                </View>
                               </TouchableOpacity>
                             ))}
                           </ScrollView>
@@ -683,34 +704,10 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
               </>
             )}
 
-            {/* ── Actions ── */}
-            <SectionHeader title="Actions" />
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -6, paddingBottom: 4 }}>
-              {[
-                { icon: 'chat-filled', label: 'CREATE', sub: 'RECORDING', onPress: () => router.push({ pathname: '/(app)/add-recording', params: {} } as any), tourId: 'tour-create-recording' },
-                { icon: 'folder-twotone', label: 'CREATE', sub: 'FOLDER', onPress: () => switchTab('spaces'), tourId: 'tour-create-folder' },
-                { icon: 'briefcase-twotone', label: 'ADD', sub: 'ACCOUNT', onPress: () => setAddAccountSheet(true) },
-                { icon: 'paint-drop-half-filled-twotone', label: 'ADD', sub: 'CATEGORY', onPress: () => switchTab('categories') },
-                { icon: 'person-twotone', label: 'ADD A', sub: 'CONTACT', onPress: () => setAddContactSheet(true) },
-                { icon: 'watch-twotone', label: 'VIEW', sub: 'LOANS', onPress: () => openReceivablesPanel() },
-                { icon: 'folder-twotone', label: 'VIEW', sub: 'FOLDER', onPress: openSpacesPanel },
-              ].map((action: any, i) => (
-                <View key={i} style={{ width: '33.33%', padding: 4 }}>
-                  <TourTarget id={action.tourId ?? `action-${i}`}>
-                    <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, paddingHorizontal: 8, backgroundColor: DC.pageActionBg, borderRadius: 10 }} activeOpacity={0.7} onPress={action.onPress}>
-                      <AnimatedIcon set="line-md" icon={action.icon} size={20} color={TEAL} />
-                      <View style={{ flexShrink: 1 }}>
-                        <Text style={{ fontFamily: AppFont.regular, fontSize: 8, textTransform: 'uppercase', color: '#111111' }}>{action.label}</Text>
-                        <Text style={{ fontFamily: AppFont.regular, fontSize: 8, textTransform: 'uppercase', color: '#111111' }}>{action.sub}</Text>
-                      </View>
-                    </TouchableOpacity>
-                  </TourTarget>
-                </View>
-              ))}
-            </View>
+            <View style={s.divider} />
 
             {/* ── Loans ── */}
-            <SectionHeader title="Loans" onSeeMore={() => openReceivablesPanel()} seeMoreLabel="all loans" />
+            <SectionHeader title="Loans" onArrowRight={() => openReceivablesPanel()} />
             {peopleSummary.length === 0 ? (
               <EmptyRow label="no active loans" />
             ) : (
@@ -724,10 +721,11 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
                 {peopleSummary.map((p: any) => {
                   const isNegative = p.net < 0;
                   const absNet = Math.abs(p.net);
+                  const faceIndex = p.person.split('').reduce((a: number, c: string) => a + c.charCodeAt(0), 0) % 49;
                   return (
                     <TouchableOpacity key={p.person} style={s.spaceCard} activeOpacity={0.7} onPress={() => openReceivablesPanel(p.person)}>
-                      <AnimatedIcon set="material-symbols" icon="person-rounded" size={52} color={isNegative ? '#fee1d3' : '#bcd2c2'} />
-                      <Text style={s.spaceCardName} numberOfLines={1}>{p.person}</Text>
+                      <Image source={FACE_IMAGES[faceIndex]} style={{ width: 52, height: 52, borderRadius: 26 }} />
+                      <Text style={[s.spaceCardName, { fontFamily: 'Inter-Bold' }]} numberOfLines={1}>{p.person}</Text>
                       <Text style={[s.spaceCardAmount, { color: '#111111' }]}>{fmt(absNet)}</Text>
                       <Text style={s.spaceCardSub}>{isNegative ? 'you owe' : 'owes you'}</Text>
                     </TouchableOpacity>
@@ -910,7 +908,7 @@ function SectionHeader({ title, onSeeMore, seeMoreLabel, onArrowRight, onAdd, ti
         )}
         {onArrowRight && (
           <TouchableOpacity onPress={onArrowRight} activeOpacity={0.7} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="arrow-forward" size={18} color="#000000" />
+            <Text style={{ fontFamily: 'Inter-Bold', fontSize: 8, color: '#3a3a34', letterSpacing: 1.5, textTransform: 'uppercase' }}>VIEW ALL</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -964,30 +962,33 @@ function EmptyRow({ label, onPress }: { label: string; onPress?: () => void }) {
 }
 
 const s = StyleSheet.create({
-  root:   { flex: 1, backgroundColor: '#fdfdfd' },
-  scroll: { paddingHorizontal: 28, paddingTop: 8, paddingBottom: 80 },
+  root:   { flex: 1, backgroundColor: '#fffffd' },
+  scroll: { paddingHorizontal: 28, paddingTop: 20, paddingBottom: 80 },
 
   // Section header
-  sectionRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 24, marginBottom: 10 },
-  sectionTitle:{ fontFamily: AppFont.semiBold, fontSize: 20, color: '#2a2a26', textTransform: 'uppercase', letterSpacing: 0.8 },
+  sectionRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 0, marginBottom: 20 },
+  sectionTitle:{ fontFamily: 'Aujournuit-Regular', fontSize: 20, color: '#000000', letterSpacing: 0.4 },
+  divider:     { height: 1, backgroundColor: '#d2d2d2', marginTop: 20, marginBottom: 20 },
   seeMoreRow:  { paddingHorizontal: 12, paddingVertical: 7, borderRadius: DC.pageActionRadius, backgroundColor: '#ebf7f6' },
   seeMoreText: { fontFamily: AppFont.regular, fontSize: 11, color: '#4f9289' },
 
   // RECORDS rows
-  recRow:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
-  recRowName:  { fontFamily: AppFont.semiBold, fontSize: 11, color: '#2a2a26', flex: 1 },
-  recRowAmount:{ fontFamily: AppFont.semiBold, fontSize: 11 },
+  recRow:      { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#d2d2d2', borderStyle: 'dotted' },
+  recIconCircle:{ width: 32, height: 32, borderRadius: 16, borderWidth: 1, borderColor: '#c9c7c3', alignItems: 'center', justifyContent: 'center' },
+  recRowName:  { fontFamily: 'Inter-SemiBold', fontSize: 11, color: '#3a3a34' },
+  recRowSub:   { fontFamily: 'Inter-Regular', fontSize: 9, color: '#b5b4a4', marginTop: 4 },
+  recRowAmount:{ fontFamily: 'Inter-Regular', fontSize: 11, color: '#3a3a34', letterSpacing: 0.3 },
   recMoreRow:  { paddingVertical: 6 },
   recMoreText: { fontFamily: AppFont.regular, fontSize: 11, color: '#2a2a26' },
 
   // Reminder pill
-  reminderPill:       { width: 120, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 100, borderWidth: 1, borderColor: '#d2d2d2', backgroundColor: 'transparent', alignItems: 'center' },
-  reminderPillName:   { fontFamily: AppFont.regular, fontSize: 11, color: '#2a2a26', letterSpacing: 0.3 },
-  reminderPillType:   { fontFamily: AppFont.regular, fontSize: 10, color: '#2a2a26', fontStyle: 'italic' },
+  reminderPill:       { width: 120, paddingHorizontal: 14, paddingVertical: 16, borderRadius: 100, borderWidth: 1, borderColor: '#d2d2d2', backgroundColor: 'transparent', alignItems: 'center', gap: 4 },
+  reminderPillName:   { fontFamily: AppFont.regular, fontSize: 11, color: '#2a2a26', letterSpacing: 0.5 },
+  reminderPillType:   { fontFamily: AppFont.regular, fontSize: 9, color: '#2a2a26', fontStyle: 'italic' },
 
   // Empty
   emptyRow:  { paddingVertical: 12 },
-  emptyText: { fontFamily: 'Poppins-Regular', fontSize: 12, color: Colors.faint },
+  emptyText: { fontFamily: 'Inter-Regular', fontSize: 12, color: Colors.faint },
 
   // Spaces album
   spaceAlbum: { gap: 10, paddingBottom: 4 },
@@ -996,45 +997,47 @@ const s = StyleSheet.create({
     alignItems: 'center',
     gap: 1,
   },
-  spaceCardName: { fontFamily: 'Poppins-Bold', fontSize: 10, color: '#111111', textAlign: 'center', marginTop: -6 },
-  spaceCardAmount: { fontFamily: 'Poppins-Bold', fontSize: 11, color: '#111111', textAlign: 'center', lineHeight: 14 },
-  spaceCardSub: { fontFamily: 'Poppins-Regular', fontSize: 9, color: '#999999', textAlign: 'center', lineHeight: 12 },
-  spaceCardAllTime: { fontFamily: 'Poppins-Regular', fontSize: 9, color: '#555555', textAlign: 'center', fontStyle: 'italic', lineHeight: 12 },
-  spaceCardGoal: { fontFamily: 'Poppins-Regular', fontSize: 9, color: '#bbbbbb', textAlign: 'center', fontStyle: 'italic', lineHeight: 12 },
+  spaceCardName: { fontFamily: 'Inter-Bold', fontSize: 10, color: '#111111', textAlign: 'center', marginTop: -6 },
+  spaceCardAmount: { fontFamily: 'Inter-Bold', fontSize: 11, color: '#111111', textAlign: 'center', lineHeight: 14 },
+  spaceCardSub: { fontFamily: 'Inter-Regular', fontSize: 9, color: '#999999', textAlign: 'center', lineHeight: 12 },
+  spaceCardAllTime: { fontFamily: 'Inter-Regular', fontSize: 9, color: '#555555', textAlign: 'center', fontStyle: 'italic', lineHeight: 12 },
+  spaceCardGoal: { fontFamily: 'Inter-Regular', fontSize: 9, color: '#bbbbbb', textAlign: 'center', fontStyle: 'italic', lineHeight: 12 },
 
   // Folder cards
-  folderSubtitle: { fontFamily: 'Poppins-Medium', fontSize: 10, color: '#b5b4a4', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
+  folderSubtitle: { fontFamily: 'Inter-Medium', fontSize: 10, color: '#b5b4a4', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 20 },
   savingsCard: {
     width: 200,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: 'transparent',
     borderWidth: 1,
     borderColor: '#d2d2d2',
-    borderRadius: 6,
+    borderRadius: 10,
     paddingHorizontal: 18,
     paddingVertical: 14,
     gap: 0,
   },
   expenseCard: {
     width: 200,
-    backgroundColor: '#3a3a34',
-    borderRadius: 6,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#d2d2d2',
+    borderRadius: 10,
     paddingHorizontal: 18,
     paddingVertical: 14,
     gap: 0,
   },
-  folderCardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
-  folderCardName: { fontFamily: 'Poppins-Bold', fontSize: 13, color: '#000000', flex: 1, textTransform: 'uppercase', letterSpacing: 0.3 },
+  folderCardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  folderCardName: { fontFamily: 'Inter-Bold', fontSize: 12, color: '#000000', flex: 1, letterSpacing: 0.3, textTransform: 'uppercase' },
+  folderLabelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
+  folderCardLabel: { fontFamily: 'Inter-Regular', fontSize: 9, color: '#888888', letterSpacing: 0.3 },
+  folderCardValue: { fontFamily: 'Inter-SemiBold', fontSize: 10, color: '#3a3a34', letterSpacing: 0.3 },
   savingsBadge: { backgroundColor: '#e5f5e8', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 100 },
-  savingsBadgeText: { fontFamily: 'Poppins-Medium', fontSize: 9, color: '#0a550f' },
+  savingsBadgeText: { fontFamily: 'Inter-Medium', fontSize: 9, color: '#0a550f' },
   expenseBadge: { backgroundColor: '#f9f0ec', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 100 },
-  expenseBadgeText: { fontFamily: 'Poppins-Medium', fontSize: 9, color: '#ff5757' },
-  folderCardLabel: { fontFamily: 'Poppins-Regular', fontSize: 10, color: '#555555', letterSpacing: 0.3 },
-  folderCardMeta: { fontFamily: 'Poppins-Regular', fontSize: 10, color: '#888888', letterSpacing: 0.3 },
-  folderCardMetaBold: { fontFamily: 'Poppins-SemiBold', fontSize: 10, color: '#888888', letterSpacing: 0.3 },
+  expenseBadgeText: { fontFamily: 'Inter-Medium', fontSize: 9, color: '#ff5757' },
 
-  receivableName: { fontFamily: 'Poppins-Regular', fontSize: 12, color: '#111111', textAlign: 'center', marginTop: 4 },
-  receivableAmount: { fontFamily: 'Poppins-Bold', fontSize: 11, color: '#111111', textAlign: 'center', lineHeight: 14 },
-  receivableUnpaid: { fontFamily: 'Poppins-Regular', fontSize: 9, color: '#999999', textAlign: 'center', fontStyle: 'italic', lineHeight: 12 },
+  receivableName: { fontFamily: 'Inter-Regular', fontSize: 12, color: '#111111', textAlign: 'center', marginTop: 4 },
+  receivableAmount: { fontFamily: 'Inter-Bold', fontSize: 11, color: '#111111', textAlign: 'center', lineHeight: 14 },
+  receivableUnpaid: { fontFamily: 'Inter-Regular', fontSize: 9, color: '#999999', textAlign: 'center', fontStyle: 'italic', lineHeight: 12 },
 
   // Shared list rows
   list: { gap: 0 },
@@ -1046,11 +1049,11 @@ const s = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
-  rowName:      { fontFamily: 'Poppins-Regular', fontSize: 12, color: '#111111' },
-  rowSub:       { fontFamily: 'Poppins-Regular', fontSize: 10, color: '#999999' },
-  rowValue:     { fontFamily: 'Poppins-Bold', fontSize: 11, color: '#111111' },
+  rowName:      { fontFamily: 'Inter-Regular', fontSize: 12, color: '#111111' },
+  rowSub:       { fontFamily: 'Inter-Regular', fontSize: 10, color: '#999999' },
+  rowValue:     { fontFamily: 'Inter-Bold', fontSize: 11, color: '#111111' },
   rowLast:     { borderBottomWidth: 0 },
-  rowValueBold: { fontFamily: 'Poppins-Bold', fontSize: 12, color: '#111111' },
+  rowValueBold: { fontFamily: 'Inter-Bold', fontSize: 12, color: '#111111' },
   choiceRow:   { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
   choiceTitle: { fontFamily: AppFont.semiBold, fontSize: 14, color: '#111111' },
   choiceSub:   { fontFamily: AppFont.regular, fontSize: 11, color: '#999999', marginTop: 2 },

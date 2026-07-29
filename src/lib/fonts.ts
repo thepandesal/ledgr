@@ -9,10 +9,10 @@
  */
 
 export const AppFont = {
-  regular:    'Poppins-Regular',
-  medium:     'Poppins-Medium',
-  semiBold:   'Poppins-SemiBold',
-  bold:       'Poppins-Bold',
+  regular:    'Inter-Regular',
+  medium:     'Inter-Medium',
+  semiBold:   'Inter-SemiBold',
+  bold:       'Inter-Bold',
   brand:      'MuseoModerno_Black',
   brandLight: 'MuseoModerno_Regular',
   brandMedium:'MuseoModerno_Medium',

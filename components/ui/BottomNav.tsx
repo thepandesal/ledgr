@@ -7,7 +7,7 @@ import { useNav } from '@/src/lib/NavContext';
 
 const TABS = [
   { key: 'home',              label: 'Home',          icon: 'home-outline' },
-  { key: 'profile',           label: 'Profile',       icon: 'person-outline' },
+  { key: 'accounts',           label: 'Accounts',      icon: 'wallet-outline' },
   { key: 'bill-split',        label: 'Split Bill',    icon: 'people-outline' },
   { key: 'notifications-tab', label: 'Notifications', icon: 'notifications-outline' },
   { key: 'others',            label: 'Others',        icon: 'apps-outline' },

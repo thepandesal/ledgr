@@ -84,7 +84,6 @@ const OTHERS_ITEMS = [
   { key: 'reminders',   label: 'Reminders',   icon: 'alarm-outline',         route: null },
   { key: 'loans',       label: 'Loans',       icon: 'cash-outline',          route: '/(app)/loans' },
   { key: 'receivables', label: 'Receivables', icon: 'arrow-undo-outline',    route: '/(app)/receivables' },
-  { key: 'profile',     label: 'Profile',     icon: 'person-outline',        route: null },
 ];
 
 const SLIDE_KEYS = ['home', 'accounts', 'dashboard', 'categories', 'receipts', 'bill-split', 'contacts', 'notifications-page', 'reminders', 'profile'];
@@ -1088,15 +1087,21 @@ export default function TabsLayout() {
       <View style={[s.waveBg, { paddingTop: insets.top + 28 }]}>
         {activeTab === 'home' ? (
           <View style={s.homeHeaderRow}>
-            <Image source={FACE_IMAGES[user?.user_metadata?.avatar_index ?? 0]} style={{ width: 48, height: 48, borderRadius: 24 }} />
+            <TouchableOpacity onPress={() => switchTab('profile')} activeOpacity={0.7} style={{ marginTop: 4 }}>
+              <View style={s.faceCircle}>
+                <Image source={FACE_IMAGES[user?.user_metadata?.avatar_index ?? 0]} style={{ width: 48, height: 48, borderRadius: 24 }} />
+              </View>
+            </TouchableOpacity>
             <View style={s.homeHeaderTextCol}>
-              <Text style={s.homeHeaderGreeting}>Hello, <Text style={s.homeHeaderName}>{userName?.split(' ')[0] || 'there'}</Text>!</Text>
-              <TouchableOpacity onPress={triggerHomeDateEdit} activeOpacity={0.7} style={s.homeDateRow}>
-                <Text style={s.homeDateLabel}>Previewing for: </Text>
-                <Text style={s.homeDateValue}>{homeDateLabel}</Text>
-                <Ionicons name="pencil" size={12} color={DC.pageText} />
+              <Text style={s.homeHeaderGreeting}>Hello, <Text style={s.homeHeaderName}>{userName?.split(' ')[0]?.charAt(0).toUpperCase() + userName?.split(' ')[0]?.slice(1) || 'There'}</Text></Text>
+              <TouchableOpacity onPress={triggerHomeDateEdit} activeOpacity={0.7} style={s.homeDateRow} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Text style={s.homeDateValue}>{homeDateLabel.toUpperCase()}</Text>
+                <Ionicons name="chevron-down" size={10} color="#b5b4a4" />
               </TouchableOpacity>
             </View>
+            <TouchableOpacity onPress={() => switchTab('notifications-page')} activeOpacity={0.7} style={{ marginLeft: 'auto' }}>
+              <AnimatedIcon set="line-md" icon="bell" size={26} color="#464646" />
+            </TouchableOpacity>
           </View>
         ) : (
           <Animated.View style={{ opacity: titleAnim }}>
@@ -1312,16 +1317,17 @@ const s = StyleSheet.create({
   panel:     { bottom: 0 },
 
   // ── Shared header
-  waveBg:       { backgroundColor: Colors.white, paddingHorizontal: DC.pagePadding, paddingBottom: 14, zIndex: 10, alignItems: 'flex-start' },
+  waveBg:       { backgroundColor: Colors.white, paddingHorizontal: DC.pagePadding, paddingBottom: 14, zIndex: 10, alignItems: 'flex-start', borderBottomWidth: 1, borderBottomColor: '#e8e8e8' },
   appLabelText: { fontFamily: AppFont.brandLight, fontSize: 16, color: DC.pageText, letterSpacing: 0.5 },
   pageTitle:    { fontFamily: AppFont.bold, fontSize: 18, color: DC.pageText, letterSpacing: 0.3 },
-  homeHeaderRow:       { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  homeHeaderTextCol:   { flex: 1 },
-  homeHeaderGreeting:  { fontFamily: AppFont.regular, fontSize: 15, color: '#2a2a26' },
-  homeHeaderName:      { fontFamily: AppFont.bold, fontSize: 15, color: '#2a2a26' },
-  homeDateRow:         { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 1 },
-  homeDateLabel:       { fontFamily: AppFont.regular, fontSize: 13, color: '#999999' },
-  homeDateValue:       { fontFamily: AppFont.semiBold, fontSize: 13, color: '#2a2a26' },
+  homeHeaderRow:       { flexDirection: 'row', alignItems: 'center', gap: 10, width: '100%' },
+  homeHeaderTextCol:   { flex: 1, justifyContent: 'center' },
+  faceCircle:          { width: 60, height: 60, borderRadius: 30, borderWidth: 3, borderColor: '#c9c7c3', alignItems: 'center', justifyContent: 'center' },
+  homeHeaderGreeting:  { fontFamily: 'Aujournuit-Regular', fontSize: 22, color: '#000000' },
+  homeHeaderName:      { fontFamily: 'Aujournuit-Regular', fontSize: 22, color: '#000000' },
+  homeDateRow:         { flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: 4 },
+  homeDateLabel:       { fontFamily: 'Inter-Bold', fontSize: 11, color: '#b5b4a4' },
+  homeDateValue:       { fontFamily: 'Inter-Bold', fontSize: 10, color: '#b5b4a4', textTransform: 'uppercase', letterSpacing: 1.5 },
   pageSubtitle: { display: 'none' as any },
   waveTitleRow: { alignItems: 'center' },
   wave:         { display: 'none' as any },

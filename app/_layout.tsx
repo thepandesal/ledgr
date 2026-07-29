@@ -21,13 +21,16 @@ const queryClient = new QueryClient({
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
-    'Poppins-Regular':  require('../assets/Poppins-Regular.ttf'),
-    'Poppins-Medium':   require('../assets/Poppins-Medium.ttf'),
-    'Poppins-SemiBold': require('../assets/Poppins-SemiBold.ttf'),
-    'Poppins-Bold':     require('../assets/Poppins-Bold.ttf'),
-    MuseoModerno_Black:   require('../assets/MuseoModerno-Black.ttf'),
-    MuseoModerno_Medium:  require('../assets/MuseoModerno-Medium.ttf'),
-    MuseoModerno_Regular: require('../assets/MuseoModerno-Regular.ttf'),
+    'Inter-Regular':   require('../assets/Inter_18pt-Regular.ttf'),
+    'Inter-Medium':    require('../assets/Inter_18pt-Medium.ttf'),
+    'Inter-SemiBold':  require('../assets/Inter_18pt-SemiBold.ttf'),
+    'Inter-Bold':      require('../assets/Inter_18pt-Bold.ttf'),
+    'MuseoModerno-Black':   require('../assets/MuseoModerno-Black.ttf'),
+    'MuseoModerno-Medium':  require('../assets/MuseoModerno-Medium.ttf'),
+    'MuseoModerno-Regular': require('../assets/MuseoModerno-Regular.ttf'),
+    'CormorantGaramond-Regular': require('../assets/CormorantGaramond-Regular.ttf'),
+    'CormorantGaramond-Bold':    require('../assets/CormorantGaramond-Bold.ttf'),
+    'Aujournuit-Regular':     require('../assets/Aujournuit-Regular.ttf'),
   });
 
   const router = useRouter();

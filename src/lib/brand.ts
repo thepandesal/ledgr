@@ -51,13 +51,13 @@ export const BrandColors = {
 // ─── Fonts ───────────────────────────────────────────────────────────────────
 
 export const BrandFonts = {
-  display:        'Poppins-Bold',
+  display:        'Inter-Bold',
   appLabel:       'MuseoModerno_Black',
-  heading:        'Poppins-SemiBold',
-  headingBold:    'Poppins-Bold',
-  body:           'Poppins-Regular',
-  mono:           'Poppins-Regular',
-  monoBold:       'Poppins-Bold',
+  heading:        'Inter-SemiBold',
+  headingBold:    'Inter-Bold',
+  body:           'Inter-Regular',
+  mono:           'Inter-Regular',
+  monoBold:       'Inter-Bold',
 } as const;
 
 // ─── Typography ──────────────────────────────────────────────────────────────

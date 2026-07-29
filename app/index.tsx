@@ -113,32 +113,24 @@ export default function LoginScreen() {
   };
 
   const renderLogo = () => {
-    if (Platform.OS === 'web') {
-      return (
-        <img
-          src={SVG_DATA_URI}
-          style={{ width: '80%', maxWidth: 360, height: 'auto' } as any}
-          alt="ledgr"
-        />
-      );
-    }
-    // Native: use WebView to render the animated SVG
-    const WebView = require('react-native-webview').WebView;
-    return (
-      <WebView
-        source={{ uri: `file:///android_asset/ledgr-logo-animated.svg` }}
-        style={{ width: width * 0.8, height: width * 0.8 * 0.5, backgroundColor: 'transparent' }}
-        scrollEnabled={false}
-        pointerEvents="none"
-        originWhitelist={['*']}
-        injectedJavaScript={`
-          document.body.style.background = 'transparent';
-          document.documentElement.style.background = 'transparent';
-          true;
-        `}
-      />
-    );
+    return null; // rendered inline below
   };
+
+  // Decode data URI to get raw SVG markup for inline rendering (required for Safari animation support)
+  const svgMarkup = Platform.OS === 'web'
+    ? (() => {
+        try {
+          const raw = SVG_DATA_URI;
+          if (raw.startsWith('data:image/svg+xml;base64,')) {
+            return atob(raw.split(',')[1]);
+          }
+          if (raw.startsWith('data:image/svg+xml;utf8,') || raw.startsWith('data:image/svg+xml;charset=utf-8,')) {
+            return decodeURIComponent(raw.split(',')[1]);
+          }
+          return raw; // fallback: treat as plain SVG string
+        } catch { return ''; }
+      })()
+    : '';
 
   return (
     <SafeAreaView style={s.container} edges={['bottom']}>
@@ -147,13 +139,10 @@ export default function LoginScreen() {
         {/* Animated logo */}
         <Animated.View style={[s.logoWrap, logoStyle]}>
           {Platform.OS === 'web' ? (
-            <div style={{ width: '80%', maxWidth: 360 } as any}>
-              <img
-                src={SVG_DATA_URI}
-                style={{ width: '100%', height: 'auto' } as any}
-                alt="ledgr"
-              />
-            </div>
+            <div
+              dangerouslySetInnerHTML={{ __html: svgMarkup }}
+              style={{ width: '80%', maxWidth: 360 } as any}
+            />
           ) : (
             (() => {
               const WebView = require('react-native-webview').WebView;
