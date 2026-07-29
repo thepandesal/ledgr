@@ -13,9 +13,9 @@ const TABS = [
   { key: 'others',            label: 'Others',        icon: 'apps-outline' },
 ];
 
-const NAV_BG       = '#111111';
-const NAV_ACTIVE   = '#ffffff';
-const NAV_INACTIVE = 'rgba(255,255,255,0.45)';
+const NAV_BG       = '#fffffd';
+const NAV_ACTIVE   = '#000000';
+const NAV_INACTIVE = 'rgba(0,0,0,0.35)';
 
 export default function BottomNav() {
   const insets = useSafeAreaInsets();
@@ -78,11 +78,16 @@ const s = StyleSheet.create({
   pill: {
     flexDirection: 'row',
     backgroundColor: NAV_BG,
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
+    borderTopLeftRadius: 36,
+    borderTopRightRadius: 36,
     paddingVertical: 10,
     paddingHorizontal: 8,
     alignItems: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 10,
   },
   item: {
     flex: 1,

@@ -33,7 +33,7 @@ const abbrNum = (n: number) => {
       return sign + (val < 100 ? parseFloat(val.toFixed(val < 10 ? 2 : 1)) : Math.round(val)) + u.s;
     }
   }
-  return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return Math.round(n).toLocaleString('en-US');
 };
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -672,7 +672,7 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
                               </TouchableOpacity>
                             ))}
                           </ScrollView>
-                          <View style={{ height: 8 }} />
+                          <View style={{ height: 20 }} />
                         </>
                       )}
                       {expenseSpaces.length > 0 && (
@@ -1004,15 +1004,15 @@ const s = StyleSheet.create({
   spaceCardGoal: { fontFamily: 'Inter-Regular', fontSize: 9, color: '#bbbbbb', textAlign: 'center', fontStyle: 'italic', lineHeight: 12 },
 
   // Folder cards
-  folderSubtitle: { fontFamily: 'Inter-Medium', fontSize: 10, color: '#b5b4a4', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 20 },
+  folderSubtitle: { fontFamily: 'CormorantGaramond-Bold', fontSize: 10, color: '#3a3a34', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 20 },
   savingsCard: {
     width: 200,
     backgroundColor: 'transparent',
     borderWidth: 1,
     borderColor: '#d2d2d2',
-    borderRadius: 10,
-    paddingHorizontal: 18,
-    paddingVertical: 14,
+    borderRadius: 14,
+    paddingHorizontal: 22,
+    paddingVertical: 18,
     gap: 0,
   },
   expenseCard: {
@@ -1020,13 +1020,13 @@ const s = StyleSheet.create({
     backgroundColor: 'transparent',
     borderWidth: 1,
     borderColor: '#d2d2d2',
-    borderRadius: 10,
-    paddingHorizontal: 18,
-    paddingVertical: 14,
+    borderRadius: 14,
+    paddingHorizontal: 22,
+    paddingVertical: 18,
     gap: 0,
   },
   folderCardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  folderCardName: { fontFamily: 'Inter-Bold', fontSize: 12, color: '#000000', flex: 1, letterSpacing: 0.3, textTransform: 'uppercase' },
+  folderCardName: { fontFamily: 'CormorantGaramond-Bold', fontSize: 11, color: '#3a3a34', flex: 1, letterSpacing: 0.3, textTransform: 'uppercase' },
   folderLabelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
   folderCardLabel: { fontFamily: 'Inter-Regular', fontSize: 9, color: '#888888', letterSpacing: 0.3 },
   folderCardValue: { fontFamily: 'Inter-SemiBold', fontSize: 10, color: '#3a3a34', letterSpacing: 0.3 },
