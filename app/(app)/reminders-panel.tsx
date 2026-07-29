@@ -25,7 +25,7 @@ interface Props { onClose: () => void; }
 
 export default function RemindersPanel({ onClose }: Props) {
   const { userId } = useUser();
-  const { openRecording } = useNav();
+  const { openRecording, switchTab } = useNav();
   const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'paused'>('all');
@@ -264,7 +264,11 @@ export default function RemindersPanel({ onClose }: Props) {
 
   return (
     <SafeAreaView style={st.root}>
-      <PageHeader title="Reminders" onBack={onClose} titleColor={TEAL} />
+      <PageHeader title="Reminders" onBack={onClose} titleColor={TEAL} right={
+        <TouchableOpacity onPress={() => { switchTab('reminders'); onClose(); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Ionicons name="add" size={22} color={TEAL} />
+        </TouchableOpacity>
+      } />
 
       <View style={st.filterRow}>
         {(['all', 'active', 'paused'] as const).map(f => (

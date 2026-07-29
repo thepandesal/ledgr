@@ -92,6 +92,8 @@ export default function RecordingsPanel({ onClose, categoryId, categoryName, spa
         .select('id, name, type, amount, transaction_date, created_at, currency, space_id, spaces:space_id(name), is_due, paid_amount, status')
         .eq('user_id', userId)
         .neq('status', 'voided')
+        .neq('is_tagged', true)
+        .neq('is_system_generated', true)
         .gte('transaction_date', from)
         .lte('transaction_date', to)
         .order('transaction_date', { ascending: false })

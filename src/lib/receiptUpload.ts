@@ -131,11 +131,11 @@ export const uploadReceiptPhoto = async (
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
-  // Enforce monthly free limit
-  const monthlyCount = await getMonthlyReceiptCount(user.id);
-  if (monthlyCount >= FREE_RECEIPT_LIMIT) {
-    throw new Error('RECEIPT_LIMIT_REACHED');
-  }
+  // // Enforce monthly free limit
+  // const monthlyCount = await getMonthlyReceiptCount(user.id);
+  // if (monthlyCount >= FREE_RECEIPT_LIMIT) {
+  //   throw new Error('RECEIPT_LIMIT_REACHED');
+  // }
 
   const fileName = `${user.id}/${entryId}/${Date.now()}_${Math.random().toString(36).slice(2)}.jpg`;
 

@@ -65,6 +65,7 @@ export default function CategoriesPanel({ onClose }: Props) {
 
   const handleDeleteCategory = async () => {
     if (!selectedCat?.id) return;
+    if (selectedCat.name === 'Loans') return;
     setDeletingCat(true);
     await supabase.from('recordings').update({ category_id: null }).eq('category_id', selectedCat.id);
     await supabase.from('categories').delete().eq('id', selectedCat.id);

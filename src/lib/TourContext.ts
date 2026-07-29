@@ -14,6 +14,22 @@ export type TargetLayout = { x: number; y: number; width: number; height: number
 
 export const APP_TOUR_STEPS: TourStep[] = [
   {
+    id: 'create-recording',
+    targetId: 'tour-create-recording',
+    tab: 'home',
+    title: 'create a recording',
+    description: 'Tap here to log an expense, income, savings, or any financial entry. This is the core of Ledgr.',
+    padding: 8,
+  },
+  {
+    id: 'create-folder',
+    targetId: 'tour-create-folder',
+    tab: 'home',
+    title: 'create a folder',
+    description: 'Organize your recordings into folders — like "Groceries", "Travel", or "Monthly Bills".',
+    padding: 8,
+  },
+  {
     id: 'spaces-tab',
     targetId: 'tour-nav-spaces',
     tab: 'spaces',

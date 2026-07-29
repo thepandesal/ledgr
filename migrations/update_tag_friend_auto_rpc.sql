@@ -56,7 +56,7 @@ BEGIN
     'debt',
     p_amount,
     p_currency,
-    COALESCE(p_transaction_date, CURRENT_DATE::text),
+    COALESCE(p_transaction_date::date, CURRENT_DATE),
     'unpaid',
     true,
     p_owner_id,

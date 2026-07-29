@@ -9,6 +9,7 @@ import { supabase } from '../../src/lib/supabase';
 import { useUser } from '../../src/hooks/useUser';
 import { Colors, Fonts } from '@/components/ui/theme';
 import { Brand } from '../../src/lib/brand';
+import { useNav } from '../../src/lib/NavContext';
 
 const ACCENT      = Brand.color.accent;
 const ACCENT_DARK = Brand.color.accentDark;
@@ -51,6 +52,7 @@ function smartGroup(dateStr: string): string {
 export default function NotificationsScreen({ isActive }: { isActive?: boolean }) {
   const router = useRouter();
   const { userId } = useUser();
+  const { openReceivablesPanel } = useNav();
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -126,6 +128,7 @@ export default function NotificationsScreen({ isActive }: { isActive?: boolean }
       return;
     }
     if (n.type === 'tag_accepted' || n.type === 'tag_declined' || n.type === 'tag_payment_update') {
+      if (data.person) { openReceivablesPanel(data.person); return; }
       if (data.sourceRecordingId) router.push({ pathname: '/(app)/recording-detail', params: { recordingId: data.sourceRecordingId } } as any);
       return;
     }

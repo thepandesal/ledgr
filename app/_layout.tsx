@@ -90,7 +90,7 @@ export default function RootLayout() {
       if (!session) {
         setIsAuthenticated(false);
         setReady(true);
-      } else if (!session.user.user_metadata?.full_name) {
+      } else if (session?.user?.user_metadata?.onboarding_completed !== true) {
         setIsAuthenticated(true);
         setReady(true);
         router.replace('/onboarding');

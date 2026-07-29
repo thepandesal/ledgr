@@ -121,6 +121,17 @@ export default function LoansScreen() {
     else grouped.push({ label, items: [r] });
   });
 
+  useEffect(() => {
+    if (!userId) return;
+    const channel = supabase
+      .channel(`loans-live-${userId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'recordings', filter: `user_id=eq.${userId}` }, () => {
+        queryClient.invalidateQueries({ queryKey: ['loans', userId] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [userId, queryClient]);
+
   return (
     <Animated.View style={[{ flex: 1, backgroundColor: Colors.white }, { transform: [{ translateX: slideAnim }] }]}>
       <SafeAreaView style={{ flex: 1 }}>

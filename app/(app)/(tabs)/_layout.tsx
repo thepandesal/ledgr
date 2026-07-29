@@ -1,4 +1,4 @@
-import { View, TouchableOpacity, Text, StyleSheet, Animated, Platform, SafeAreaView, ScrollView, useWindowDimensions, Clipboard, TextInput, ActivityIndicator, Modal, Switch } from 'react-native';
+import { View, TouchableOpacity, Text, StyleSheet, Animated, Platform, SafeAreaView, ScrollView, useWindowDimensions, Clipboard, TextInput, ActivityIndicator, Modal, Switch, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useRef, memo, useCallback, useEffect }from 'react';
@@ -29,6 +29,7 @@ import { Colors, Fonts, Radius, Spacing } from '@/components/ui/theme';
 import BottomNav from '@/components/ui/BottomNav';
 import { AppFont } from '../../../src/lib/fonts';
 import { DC } from '../../../src/lib/design';
+import { FACE_IMAGES } from '../../../src/lib/faceImages';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../../src/lib/supabase';
 import { useUser } from '../../../src/hooks/useUser';
@@ -36,7 +37,7 @@ import TourTarget from '@/components/TourTarget';
 import AppTourOverlay from '@/components/AppTourOverlay';
 import { TourContext, APP_TOUR_STEPS } from '../../../src/lib/TourContext';
 import { NavContext } from '../../../src/lib/NavContext';
-import { consumePendingTabGlobal, useNav } from '../../../src/lib/NavContext';
+import { consumePendingTabGlobal, useNav, triggerHomeDateEdit } from '../../../src/lib/NavContext';
 import type { RefObject } from 'react';
 import type { View as RNView } from 'react-native';
 
@@ -821,6 +822,8 @@ export default function TabsLayout() {
   const openFriendsPanel = useCallback(() => { setFriendsPanelOpen(true); friendsPanelAnim.setValue(winWidthRef.current); requestAnimationFrame(() => { Animated.timing(friendsPanelAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start(); }); }, []);
   const closeFriendsPanel = useCallback(() => { Animated.timing(friendsPanelAnim, { toValue: winWidthRef.current, duration: 260, useNativeDriver: true }).start(() => { setFriendsPanelOpen(false); }); }, []);
 
+  const [homeDateLabel, setHomeDateLabel] = useState('');
+
   const fetchUnread = useCallback(async () => {
     if (!userId) return;
     const { count } = await supabase
@@ -1035,17 +1038,16 @@ export default function TabsLayout() {
   const isNotifTabActive = activeTab === 'notifications-page';
 
   useEffect(() => {
-    const checkTour = (pending?: boolean) => {
-      if (pending === true) {
+    supabase.auth.getUser().then(({ data: { user: u } }) => {
+      if (!u) return;
+      const meta = u.user_metadata ?? {};
+      const shouldShowTour = meta.onboarding_pending === true || meta.onboarding_completed !== true;
+      if (shouldShowTour) {
         setTourVisible(true);
         setTourStep(0);
       }
-    };
-    checkTour(user?.user_metadata?.onboarding_pending === true);
-    supabase.auth.getUser().then(({ data: { user: u } }) => {
-      checkTour(u?.user_metadata?.onboarding_pending === true);
     });
-  }, [user?.user_metadata?.onboarding_pending]);
+  }, []);
 
   useEffect(() => {
     if (!tourVisible) return;
@@ -1079,15 +1081,28 @@ export default function TabsLayout() {
   return (
     <TourContext.Provider value={{ register: registerTourTarget, unregister: unregisterTourTarget }}>
     <BlurContext.Provider value={{ setBlur, registerAdd, unregisterAdd, activeTab, __hasProvider: true }}>
-    <NavContext.Provider value={{ activeTab, switchTab, handleNavPress, unreadCount, pendingTab, setPendingTab, openSpace, closeSpace, activeSpaceId, activeSpaceName, openRecording, closeRecording, activeRecordingId, openSplitBill, closeSplitBill, activeSplitBillId, activeSplitBillName, openTopSpending, closeTopSpending, openRecordingsPanel, closeRecordingsPanel, openSpacesPanel, closeSpacesPanel, openLoansPanel, closeLoansPanel, openReceivablesPanel, closeReceivablesPanel, openRemindersPanel, closeRemindersPanel, openContactsPanel, closeContactsPanel, openFriendsPanel, closeFriendsPanel }}>
+    <NavContext.Provider value={{ activeTab, switchTab, handleNavPress, unreadCount, pendingTab, setPendingTab, openSpace, closeSpace, activeSpaceId, activeSpaceName, openRecording, closeRecording, activeRecordingId, openSplitBill, closeSplitBill, activeSplitBillId, activeSplitBillName, openTopSpending, closeTopSpending, openRecordingsPanel, closeRecordingsPanel, openSpacesPanel, closeSpacesPanel, openLoansPanel, closeLoansPanel, openReceivablesPanel, closeReceivablesPanel, openRemindersPanel, closeRemindersPanel, openContactsPanel, closeContactsPanel, openFriendsPanel, closeFriendsPanel, homeDateLabel, setHomeDateLabel, onHomeDateEdit: triggerHomeDateEdit }}>
     <View style={s.container}>
 
       {/* ── Shared flat header ── */}
-      <View style={[s.waveBg, { paddingTop: insets.top + 20 }]}>
-        <Text style={s.appLabelText}>LEDGR</Text>
-        <Animated.View style={{ opacity: titleAnim }}>
-          <Text style={s.pageTitle}>Hi, {userName?.split(' ')[0] || 'there'}!</Text>
-        </Animated.View>
+      <View style={[s.waveBg, { paddingTop: insets.top + 28 }]}>
+        {activeTab === 'home' ? (
+          <View style={s.homeHeaderRow}>
+            <Image source={FACE_IMAGES[user?.user_metadata?.avatar_index ?? 0]} style={{ width: 48, height: 48, borderRadius: 24 }} />
+            <View style={s.homeHeaderTextCol}>
+              <Text style={s.homeHeaderGreeting}>Hello, <Text style={s.homeHeaderName}>{userName?.split(' ')[0] || 'there'}</Text>!</Text>
+              <TouchableOpacity onPress={triggerHomeDateEdit} activeOpacity={0.7} style={s.homeDateRow}>
+                <Text style={s.homeDateLabel}>Previewing for: </Text>
+                <Text style={s.homeDateValue}>{homeDateLabel}</Text>
+                <Ionicons name="pencil" size={12} color={DC.pageText} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : (
+          <Animated.View style={{ opacity: titleAnim }}>
+            <Text style={s.pageTitle}>Hi, {userName?.split(' ')[0] || 'there'}!</Text>
+          </Animated.View>
+        )}
       </View>
 
       <View style={s.content}>
@@ -1300,6 +1315,13 @@ const s = StyleSheet.create({
   waveBg:       { backgroundColor: Colors.white, paddingHorizontal: DC.pagePadding, paddingBottom: 14, zIndex: 10, alignItems: 'flex-start' },
   appLabelText: { fontFamily: AppFont.brandLight, fontSize: 16, color: DC.pageText, letterSpacing: 0.5 },
   pageTitle:    { fontFamily: AppFont.bold, fontSize: 18, color: DC.pageText, letterSpacing: 0.3 },
+  homeHeaderRow:       { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  homeHeaderTextCol:   { flex: 1 },
+  homeHeaderGreeting:  { fontFamily: AppFont.regular, fontSize: 15, color: '#2a2a26' },
+  homeHeaderName:      { fontFamily: AppFont.bold, fontSize: 15, color: '#2a2a26' },
+  homeDateRow:         { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 1 },
+  homeDateLabel:       { fontFamily: AppFont.regular, fontSize: 13, color: '#999999' },
+  homeDateValue:       { fontFamily: AppFont.semiBold, fontSize: 13, color: '#2a2a26' },
   pageSubtitle: { display: 'none' as any },
   waveTitleRow: { alignItems: 'center' },
   wave:         { display: 'none' as any },

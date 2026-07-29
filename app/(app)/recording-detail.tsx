@@ -13,6 +13,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { compressImage, uploadReceiptPhoto } from '../../src/lib/receiptUpload';
 import BottomSheet from '@/components/ui/BottomSheet';
 import ConfirmModal from '@/components/ui/ConfirmModal';
+import * as Clipboard from 'expo-clipboard';
 import PayModal from '@/components/modals/PayModal';
 import CollectModal from '@/components/modals/CollectModal';
 import CollectDueModal from '@/components/modals/CollectDueModal';
@@ -21,6 +22,7 @@ import ReceivableModal from '@/components/modals/ReceivableModal';
 import MiniNavBar from '@/components/ui/MiniNavBar';
 import formStyles from '@/components/ui/formStyles';
 import { Colors, Radius } from '@/components/ui/theme';
+import AnimatedIcon from '@/components/ui/AnimatedIcon';
 import { Brand } from '../../src/lib/brand';
 import { DC } from '../../src/lib/design';
 import { AppFont } from '../../src/lib/fonts';
@@ -82,6 +84,11 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
   const [addReceiptModal, setAddReceiptModal] = useState(false);
   const [linkedReceipt, setLinkedReceipt] = useState<any>(null);
   const [receiptPhotos, setReceiptPhotos] = useState<{ id: string; url: string }[]>([]);
+  const [editNewPhotoUris, setEditNewPhotoUris] = useState<string[]>([]);
+  const [editPhotoUploadState, setEditPhotoUploadState] = useState<'uploading' | 'success' | 'error' | null>(null);
+  const [editPhotoError, setEditPhotoError] = useState('');
+  const [savedEntryId, setSavedEntryId] = useState<string | null>(null);
+  const [creatorName, setCreatorName] = useState('');
   const [linkReceiptModal, setLinkReceiptModal] = useState(false);
   const [linkReceiptEntries, setLinkReceiptEntries] = useState<any[]>([]);
   const [captureHtml, setCaptureHtml] = useState<string | null>(null);
@@ -98,6 +105,8 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
   const [editAmount, setEditAmount] = useState('');
   const [editAmountLocked, setEditAmountLocked] = useState(false);
   const [editError, setEditError] = useState('');
+  const [editSpaceId, setEditSpaceId] = useState<string | null>(null);
+  const [showEditSpaceModal, setShowEditSpaceModal] = useState(false);
   const [showEditCategoryModal, setShowEditCategoryModal] = useState(false);
   const [copiedToast, setCopiedToast] = useState(false);
   const [tooltip, setTooltip] = useState<{ name: string } | null>(null);
@@ -122,6 +131,7 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
   const [linkedPayments, setLinkedPayments] = useState<any[]>([]);
   const [linkedPayable, setLinkedPayable] = useState<any>(null);
   const [linkedReceivable, setLinkedReceivable] = useState<any>(null);
+  const [trackingExpense, setTrackingExpense] = useState<any>(null);
   const [splitBillPayments, setSplitBillPayments] = useState<any[]>([]);
   const [payablePerPerson, setPayablePerPerson] = useState<{ map: Record<string, number>; paidFor: string[] }>({ map: {}, paidFor: [] });
   const [personPayStatus, setPersonPayStatus] = useState<{ person: string; paid: number; total: number }[]>([]);
@@ -164,7 +174,17 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
   const [markCompleteLoading, setMarkCompleteLoading] = useState(false);
 
   // isOwner derived from recording data (not state — avoids timing issues)
-  const isOwner = !!recording && recording.user_id === userId;
+  const isOwner = !!recording && recording.user_id === userId && !recording.is_tagged;
+  const isTaggedViewer = !!recording && recording.is_tagged && recording.tagged_by_user_id !== userId;
+  // Person B = owes on this recording: shared due not owned, or has a tagged debt copy
+  const canPayAsPersonB = !isOwner && !isTaggedViewer && (
+    ((recording?.shared_with ?? []).includes(userId) && recording?.is_due)
+  );
+
+  // Delete payment state (Person B)
+  const [deletePaymentConfirm, setDeletePaymentConfirm] = useState<string | null>(null);
+  const [deletePaymentLoading, setDeletePaymentLoading] = useState(false);
+  const [deletePaymentListModal, setDeletePaymentListModal] = useState(false);
 
   // Cancel due state
   const [cancelDueConfirm, setCancelDueConfirm] = useState(false);
@@ -183,13 +203,25 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
   const [owesYouLoading, setOwesYouLoading] = useState(false);
 
   const cleanupTaggedDebt = async (friendUserId: string, sourceRecId: string, reason: 'removed' | 'cancelled' | 'deleted') => {
-    try {
-      await supabase.rpc('untag_friend', {
-        p_recording_id: sourceRecId,
-        p_friend_user_id: friendUserId,
-        p_recording_name: recording?.name ?? 'expense',
-      });
-    } catch {}
+    const { error: rpcErr } = await supabase.rpc('untag_friend', {
+      p_recording_id: sourceRecId,
+      p_friend_user_id: friendUserId,
+      p_recording_name: recording?.name ?? 'expense',
+    });
+    if (rpcErr) {
+      const { error: delErr } = await supabase.from('recordings').delete()
+        .eq('source_recording_id', sourceRecId)
+        .eq('user_id', friendUserId)
+        .eq('is_tagged', true);
+      if (!delErr) {
+        const { data: rec } = await supabase.from('recordings')
+          .select('shared_with').eq('id', sourceRecId).single();
+        if (rec?.shared_with) {
+          const shared = Array.isArray(rec.shared_with) ? rec.shared_with.filter((id: string) => id !== friendUserId) : [];
+          await supabase.from('recordings').update({ shared_with: shared }).eq('id', sourceRecId);
+        }
+      }
+    }
   };
 
   // ── Helper: settle B's debt (write-off / mark complete) ───────────────────
@@ -414,13 +446,23 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
   };
 
   const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [markClosedConfirm, setMarkClosedConfirm] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleteDots, setDeleteDots] = useState('');
+
+  useEffect(() => {
+    if (!deleteLoading) { setDeleteDots(''); return; }
+    const i = setInterval(() => setDeleteDots(p => p.length >= 3 ? '' : p + '.'), 400);
+    return () => clearInterval(i);
+  }, [deleteLoading]);
   const [showAddChoice, setShowAddChoice] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [photoDeleteConfirm, setPhotoDeleteConfirm] = useState(false);
 
   const confirmDelete = async (keepLinked: boolean, deleteReceipt = false, deletePayable = false, forceDeleteAll = false) => {
     setDeleteLoading(true);
+    setDeleteError(null);
     try {
       const recordingDate = recording?.transaction_date ?? null;
       if (deleteReceipt && linkedReceipt) {
@@ -437,17 +479,35 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
       }
       // If deleting a return recording, adjust the parent's paid_amount first
       if (recording?.type === 'return' && recording?.linked_recording_id) {
+        const returnAmount = Number(recording.amount ?? 0);
         const { data: parentRec } = await supabase
           .from('recordings')
           .select('paid_amount, amount')
           .eq('id', recording.linked_recording_id)
           .single();
         if (parentRec) {
-          const newPaid = Math.max(0, Number(parentRec.paid_amount ?? 0) - Number(recording.amount ?? 0));
+          const newPaid = Math.max(0, Number(parentRec.paid_amount ?? 0) - returnAmount);
           await supabase.from('recordings').update({
             paid_amount: newPaid,
             status: newPaid <= 0 ? 'unpaid' : 'partial',
           }).eq('id', recording.linked_recording_id);
+        }
+        // Reduce Person B's linked expense by the deleted return amount
+        const { data: bExpense } = await supabase
+          .from('recordings')
+          .select('id, amount')
+          .eq('type', 'expense')
+          .eq('is_system_generated', true)
+          .eq('payment_to', recording.linked_recording_id)
+          .neq('status', 'voided')
+          .maybeSingle();
+        if (bExpense) {
+          const newExpenseAmount = Math.max(0, Number(bExpense.amount) - returnAmount);
+          if (newExpenseAmount <= 0) {
+            await supabase.from('recordings').update({ status: 'voided' }).eq('id', bExpense.id);
+          } else {
+            await supabase.from('recordings').update({ amount: newExpenseAmount }).eq('id', bExpense.id);
+          }
         }
       }
 
@@ -455,15 +515,20 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
       if (forceDeleteAll) {
         await supabase.from('recordings').delete().eq('linked_recording_id', recordingId).eq('type', 'return');
       }
-      await supabase.from('recordings').delete().eq('id', recordingId);
+      // Nullify source_recording_id on any recordings referencing this one
+      await supabase.from('recordings').update({ source_recording_id: null }).eq('source_recording_id', recordingId);
+      const { error: deleteErr } = await supabase.from('recordings').delete().eq('id', recordingId).eq('user_id', userId);
+      if (deleteErr) throw new Error(deleteErr.message);
       if (deletePayable && linkedPayable) {
-        await supabase.from('recordings').delete().eq('id', linkedPayable.id);
+        const { error: dpErr } = await supabase.from('recordings').delete().eq('id', linkedPayable.id).eq('user_id', userId);
+        if (dpErr) throw new Error(dpErr.message);
       } else if (!keepLinked && linkedPayable) {
         const revertPaid = Math.max(0, Number(linkedPayable.paid_amount ?? 0) - Number(recording?.amount ?? 0));
-        await supabase.from('recordings').update({
+        const { error: rpErr } = await supabase.from('recordings').update({
           paid_amount: revertPaid,
           status: revertPaid <= 0 ? 'unpaid' : 'partial',
         }).eq('id', linkedPayable.id);
+        if (rpErr) throw new Error(rpErr.message);
       }
       if (recordingDate) setPendingFocusDate(recordingDate);
       queryClient.invalidateQueries({ queryKey: ['recordings-panel', userId] });
@@ -474,9 +539,73 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
       queryClient.invalidateQueries({ queryKey: ['home-spaces', userId] });
       queryClient.invalidateQueries({ queryKey: ['home-totals', userId] });
       queryClient.invalidateQueries({ queryKey: ['spaces-panel', userId] });
+      queryClient.invalidateQueries({ queryKey: ['home-people', userId] });
+      queryClient.invalidateQueries({ queryKey: ['people-panel', userId] });
+      queryClient.invalidateQueries({ queryKey: ['receivable-detail'] });
       handleBack();
-    } catch (e) { /* delete failed silently */ }
-    finally { setDeleteLoading(false); }
+    } catch (e: any) {
+      setDeleteError(e?.message ?? e ?? 'unknown error');
+    }
+  };
+
+  const confirmMarkClosed = async () => {
+    setMarkClosedConfirm(false);
+    const { error } = await supabase.from('recordings').update({ status: 'paid', closed_by: userName }).eq('id', recordingId).eq('user_id', userId);
+    if (error) return;
+    setRecording((prev: any) => ({ ...prev, status: 'paid', closed_by: userName }));
+    queryClient.invalidateQueries({ queryKey: ['recordings-panel', userId] });
+    queryClient.invalidateQueries({ queryKey: ['home-summary-v2', userId] });
+    queryClient.invalidateQueries({ queryKey: ['home-recent', userId] });
+    queryClient.invalidateQueries({ queryKey: ['home-loans', userId] });
+    queryClient.invalidateQueries({ queryKey: ['home-receivables', userId] });
+    queryClient.invalidateQueries({ queryKey: ['home-spaces', userId] });
+    queryClient.invalidateQueries({ queryKey: ['home-totals', userId] });
+    queryClient.invalidateQueries({ queryKey: ['home-people', userId] });
+    queryClient.invalidateQueries({ queryKey: ['receivable-detail'] });
+  };
+
+  const confirmDeletePayment = async (paymentId: string) => {
+    setDeletePaymentLoading(true);
+    try {
+      const { data: payment } = await supabase.from('recordings').select('amount, user_id, payment_to, linked_recording_id').eq('id', paymentId).single();
+      if (!payment) return;
+      const returnAmt = Number(payment.amount);
+      const parentId = payment.linked_recording_id;
+      const borrowerId = payment.payment_to;
+      // Deduct from parent's paid_amount
+      const { data: parent } = await supabase.from('recordings').select('paid_amount, amount').eq('id', parentId).single();
+      if (parent) {
+        const newPaid = Math.max(0, Number(parent.paid_amount ?? 0) - returnAmt);
+        const newStatus = newPaid <= 0 ? 'unpaid' : 'partial';
+        await supabase.from('recordings').update({ paid_amount: newPaid, status: newStatus }).eq('id', parentId);
+      }
+      // Delete the return
+      await supabase.from('recordings').delete().eq('id', paymentId);
+      // Update tracking expense amount (or void if 0)
+      if (borrowerId && parent) {
+        const newPaid = Math.max(0, Number(parent.paid_amount ?? 0) - returnAmt);
+        if (newPaid <= 0) {
+          await supabase.from('recordings').update({ status: 'voided', amount: 0 })
+            .eq('user_id', borrowerId).eq('linked_recording_id', parentId).eq('type', 'expense').eq('is_system_generated', true);
+        } else {
+          await supabase.from('recordings').update({ amount: newPaid })
+            .eq('user_id', borrowerId).eq('linked_recording_id', parentId).eq('type', 'expense').eq('is_system_generated', true);
+        }
+      }
+      queryClient.invalidateQueries({ queryKey: ['recordings-panel', userId] });
+      queryClient.invalidateQueries({ queryKey: ['home-summary-v2', userId] });
+      queryClient.invalidateQueries({ queryKey: ['home-recent', userId] });
+      queryClient.invalidateQueries({ queryKey: ['home-loans', userId] });
+      queryClient.invalidateQueries({ queryKey: ['home-receivables', userId] });
+      queryClient.invalidateQueries({ queryKey: ['home-spaces', userId] });
+      queryClient.invalidateQueries({ queryKey: ['home-totals', userId] });
+      queryClient.invalidateQueries({ queryKey: ['home-people', userId] });
+      queryClient.invalidateQueries({ queryKey: ['receivable-detail'] });
+      setDeletePaymentConfirm(null);
+      loadPaymentData();
+      loadTrackingExpense();
+    } catch (e) { /* delete payment failed silently */ }
+    finally { setDeletePaymentLoading(false); }
   };
 
   useEffect(() => {
@@ -485,7 +614,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
       loadContacts(),
       loadPeople(),
       loadItems(),
-      loadLinkedReceipt(),
       loadLinkedSplitBill(),
       loadRelatedSplitBillPayments(),
       loadAvailableSpaces(),
@@ -508,15 +636,16 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
           setEditAmountLocked(hasPayments || hasSplitItems);
         });
       }),
-    ]).then(() => loadPaymentData());
+    ]).then(() => { loadPaymentData(); loadTrackingExpense(); });
   }, []);
 
   useFocusEffect(useCallback(() => {
     loadRecording();
     loadPaymentData();
+    loadTrackingExpense();
     if (recordingId && userId) {
       Promise.all([
-        supabase.from('recordings').select('id').eq('source_recording_id', recordingId).eq('type', 'debt').maybeSingle(),
+        supabase.from('recordings').select('id').eq('source_recording_id', recordingId).maybeSingle(),
         supabase.from('notifications').select('data').eq('type', 'expense_tag').eq('data->>sourceRecordingId', recordingId).in('status', ['new', 'saw']),
       ]).then(([{ data: debt }, { data: pending }]) => {
         const accepted = !!debt;
@@ -589,9 +718,34 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
     return () => { supabase.removeChannel(channel); };
   }, [recordingId, userId]);
 
+  // Realtime listener for the current recording — auto-refresh on update, go back on delete
+  useEffect(() => {
+    if (!recordingId) return;
+    const channel = supabase
+      .channel(`recording-live-${recordingId}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'recordings',
+        filter: `id=eq.${recordingId}`,
+      }, () => {
+        loadRecording();
+      })
+      .on('postgres_changes', {
+        event: 'DELETE',
+        schema: 'public',
+        table: 'recordings',
+        filter: `id=eq.${recordingId}`,
+      }, () => {
+        handleBack();
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [recordingId]);
+
   const loadPaymentData = async () => {
     if (!recordingId) return;
-    const { data: rec } = await supabase.from('recordings').select('type, linked_recording_id').eq('id', recordingId).single();
+    const { data: rec } = await supabase.from('recordings').select('type, linked_recording_id, source_recording_id').eq('id', recordingId).single();
     if (!rec) return;
 
     // Always load split bill payments if this recording is linked to a split bill
@@ -612,16 +766,36 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
     }
 
     if (rec.type === 'debt' || rec.type === 'due') {
-      const paymentType = rec.type === 'debt' ? 'expense' : 'return';
+      const paymentTypes = ['return'];
       const { data: payments } = await supabase.from('recordings')
-        .select('id, name, amount, transaction_date, is_write_off, payment_to, payment_from_account_id, accounts:payment_from_account_id(account_name, bank)')
-        .eq('linked_recording_id', recordingId).eq('type', paymentType).order('transaction_date', { ascending: false });
+        .select('id, name, amount, transaction_date, is_write_off, payment_to, user_id, person_name, payment_from_account_id, accounts:payment_from_account_id(account_name, bank)')
+        .eq('linked_recording_id', recordingId)        .in('type', paymentTypes).order('transaction_date', { ascending: false }).order('created_at', { ascending: false });
       const { data: writeOffPayments } = await supabase.from('recordings')
-        .select('id, name, amount, transaction_date, is_write_off')
+        .select('id, name, amount, transaction_date, is_write_off, user_id')
         .eq('linked_recording_id', recordingId).eq('is_write_off', true)
-        .order('transaction_date', { ascending: false });
-      const allPayments = [...(payments ?? []), ...(writeOffPayments ?? [])]
-        .sort((a, b) => (b.transaction_date ?? '').localeCompare(a.transaction_date ?? ''));
+        .order('transaction_date', { ascending: false }).order('created_at', { ascending: false });
+      // Also fetch creator's payments linked to the original (for tagged copies)
+      let creatorPayments: any[] = [];
+      let originalId = rec.source_recording_id;
+      if (!originalId && (recording as any)?.is_tagged) {
+        const creatorId = (recording as any)?.tagged_by_user_id;
+        if (creatorId) {
+          const { data: orig } = await supabase.from('recordings')
+            .select('id').eq('user_id', creatorId).eq('name', (recording as any)?.name).eq('amount', (recording as any)?.amount).eq('type', 'debt').maybeSingle();
+          if (orig) originalId = orig.id;
+        }
+      }
+      if (originalId) {
+        const { data: cp } = await supabase.from('recordings')
+          .select('id, name, amount, transaction_date, is_write_off, payment_to, user_id, person_name, payment_from_account_id, accounts:payment_from_account_id(account_name, bank)')
+          .eq('linked_recording_id', originalId)
+          .in('type', ['return'])
+          .order('transaction_date', { ascending: false }).order('created_at', { ascending: false });
+        if (cp) creatorPayments = cp;
+      }
+      const merged = new Map<string, any>();
+      [...(payments ?? []), ...(writeOffPayments ?? []), ...creatorPayments].forEach(p => merged.set(p.id, p));
+      const allPayments = [...merged.values()].sort((a, b) => (b.transaction_date ?? '').localeCompare(a.transaction_date ?? ''));
       if (allPayments.length > 0) {
         setLinkedPayments(allPayments);
         // Load breakdowns for all payment records to build per-person status
@@ -682,7 +856,7 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
       }
     } else if (rec.type === 'expense') {
       const { data: returnPayments } = await supabase.from('recordings')
-        .select('id, name, amount, transaction_date, is_write_off, payment_to, payment_from_account_id, accounts:payment_from_account_id(account_name, bank)')
+        .select('id, name, amount, transaction_date, is_write_off, payment_to, user_id, person_name, payment_from_account_id, accounts:payment_from_account_id(account_name, bank)')
         .eq('linked_recording_id', recordingId).eq('type', 'return').order('transaction_date', { ascending: false });
       const { data: writeOffPayments } = await supabase.from('recordings')
         .select('id, name, amount, transaction_date, is_write_off')
@@ -698,6 +872,18 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
       const { data: recv } = await supabase.from('recordings').select('id, name').eq('linked_recording_id', recordingId).eq('type', 'due').maybeSingle();
       if (recv) setLinkedReceivable(recv);
     }
+  };
+
+  const loadTrackingExpense = async () => {
+    if (!recordingId || !userId) return;
+    const { data } = await supabase.from('recordings')
+      .select('id, name, amount, status, transaction_date, space_id, category_id')
+      .eq('linked_recording_id', recordingId)
+      .eq('user_id', userId)
+      .eq('type', 'expense')
+      .eq('is_system_generated', true)
+      .maybeSingle();
+    setTrackingExpense(data ?? null);
   };
 
   const openMarkCompleteModal = () => {
@@ -727,15 +913,15 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
           linked_recording_id: recordingId,
           category_id: recording.category_id ?? null,
         });
-        await supabase.from('recordings').update({ paid_amount: overrideAmt, status: 'paid' }).eq('id', recordingId);
-        setRecording((prev: any) => ({ ...prev, paid_amount: overrideAmt, status: 'paid' }));
+        await supabase.from('recordings').update({ paid_amount: overrideAmt, status: 'paid', closed_by: userName }).eq('id', recordingId).eq('user_id', recording?.user_id ?? userId);
+        setRecording((prev: any) => ({ ...prev, paid_amount: overrideAmt, status: 'paid', closed_by: userName }));
       } else if (markCompleteMode === 'full') {
-        await supabase.from('recordings').update({ paid_amount: total, status: 'paid' }).eq('id', recordingId);
-        setRecording((prev: any) => ({ ...prev, paid_amount: total, status: 'paid' }));
+        await supabase.from('recordings').update({ paid_amount: total, status: 'paid', closed_by: userName }).eq('id', recordingId).eq('user_id', recording?.user_id ?? userId);
+        setRecording((prev: any) => ({ ...prev, paid_amount: total, status: 'paid', closed_by: userName }));
       } else {
         // as-is: keep paid_amount, just mark paid
-        await supabase.from('recordings').update({ status: 'paid' }).eq('id', recordingId);
-        setRecording((prev: any) => ({ ...prev, status: 'paid' }));
+        await supabase.from('recordings').update({ status: 'paid', closed_by: userName }).eq('id', recordingId).eq('user_id', recording?.user_id ?? userId);
+        setRecording((prev: any) => ({ ...prev, status: 'paid', closed_by: userName }));
       }
       setMarkCompleteModal(false);
       // Settle B's debt if tagged
@@ -783,21 +969,8 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
       const excess = newPaid - total;
       const isOverpayment = excess > 0.01;
       const newStatus = collectDueComplete || isOverpayment ? 'paid' : 'partial';
-      // Create or increment the return recording for the collection
-      const { data: existingReturn } = await supabase
-        .from('recordings')
-        .select('id, amount')
-        .eq('linked_recording_id', recordingId)
-        .eq('type', 'return')
-        .eq('user_id', user.id)
-        .maybeSingle();
-      if (existingReturn) {
-        await supabase.from('recordings').update({
-          amount: Number(existingReturn.amount) + amount,
-          transaction_date: collectDueDate,
-        }).eq('id', existingReturn.id);
-      } else {
-        await supabase.from('recordings').insert({
+      // Create the return recording for the collection
+      await supabase.from('recordings').insert({
           user_id: user.id,
           space_id: collectDueSpaceId ?? recording.space_id,
           name: recording.name,
@@ -807,9 +980,9 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
           status: 'received',
           linked_recording_id: recordingId,
           category_id: recording.category_id ?? null,
+          ...(recording.tagged_friend_user_id ? { shared_with: [recording.tagged_friend_user_id] } : {}),
         });
-      }
-      await supabase.from('recordings').update({ paid_amount: cappedPaid, status: newStatus }).eq('id', recordingId);
+      await supabase.from('recordings').update({ paid_amount: cappedPaid, status: newStatus }).eq('id', recordingId).eq('user_id', recording?.user_id ?? userId);
       setRecording((prev: any) => ({ ...prev, paid_amount: cappedPaid, status: newStatus }));
 
       // Sync to friend's payable if this recording has a tagged friend
@@ -818,7 +991,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
           .from('recordings')
           .select('id, paid_amount, amount, space_id')
           .eq('source_recording_id', recordingId)
-          .eq('type', 'debt')
           .maybeSingle();
         if (friendPayable) {
           const fPrevPaid = Number(friendPayable.paid_amount ?? 0);
@@ -828,14 +1000,11 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
           const fNewPaid = Math.min(fPrevPaid + cappedAmount, fTotal);
           const fNewStatus = fNewPaid >= fTotal - 0.01 ? 'paid' : fNewPaid > 0 ? 'partial' : 'unpaid';
           await supabase.from('recordings').update({ paid_amount: fNewPaid, status: fNewStatus }).eq('id', friendPayable.id);
-          const { data: existingExpense } = await supabase
-            .from('recordings')
-            .select('id, amount')
-            .eq('linked_recording_id', friendPayable.id)
-            .eq('type', 'expense')
-            .maybeSingle();
-          if (existingExpense) {
-            await supabase.from('recordings').update({ amount: Number(existingExpense.amount) + cappedAmount }).eq('id', existingExpense.id);
+          const { data: existingExp } = await supabase.from('recordings')
+            .select('id, amount').eq('user_id', recording.tagged_friend_user_id).eq('type', 'expense')
+            .eq('is_system_generated', true).eq('payment_to', recordingId).neq('status', 'voided').maybeSingle();
+          if (existingExp) {
+            await supabase.from('recordings').update({ amount: Number(existingExp.amount) + cappedAmount }).eq('id', existingExp.id);
           } else {
             await supabase.from('recordings').insert({
               user_id: recording.tagged_friend_user_id,
@@ -845,8 +1014,9 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
               amount: cappedAmount,
               transaction_date: collectDueDate,
               status: 'paid',
-              linked_recording_id: friendPayable.id,
+              payment_to: recordingId,
               category_id: recording.category_id ?? null,
+              is_system_generated: true,
             });
           }
           // Notify B
@@ -869,30 +1039,18 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
       // Charge to space
       if (collectDueChargeToSpace && collectDueChargeSpaceId) {
         const today = collectDueDate;
-        const { data: existingArr } = await supabase
-          .from('recordings')
-          .select('id, amount')
-          .eq('linked_recording_id', recordingId)
-          .eq('space_id', collectDueChargeSpaceId)
-          .eq('type', 'expense')
-          .limit(1);
-        const existing = existingArr?.[0] ?? null;
-        if (existing) {
-          await supabase.from('recordings').update({ amount: Number(existing.amount) + amount, transaction_date: today }).eq('id', existing.id);
-        } else {
-          await supabase.from('recordings').insert({
-            user_id: user.id,
-            space_id: collectDueChargeSpaceId,
-            name: recording.name,
-            type: 'expense',
-            amount,
-            transaction_date: today,
-            status: 'paid',
-            linked_recording_id: recordingId,
-            account_id: collectDueChargeAccountId || null,
-            category_id: collectDueChargeCategoryId || null,
-          });
-        }
+        await supabase.from('recordings').insert({
+          user_id: user.id,
+          space_id: collectDueChargeSpaceId,
+          name: recording.name,
+          type: 'expense',
+          amount,
+          transaction_date: today,
+          status: 'paid',
+          linked_recording_id: recordingId,
+          account_id: collectDueChargeAccountId || null,
+          category_id: collectDueChargeCategoryId || null,
+        });
       }
       // Record overpayment as income on A's side (no approval needed)
       if (isOverpayment) {
@@ -934,7 +1092,7 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
       await supabase.from('recordings').update({
         is_due: false, paid_amount: 0, status: 'paid',
         tagged_friend_user_id: null, person_name: null,
-      }).eq('id', recordingId);
+      }).eq('id', recordingId).eq('user_id', userId);
       setRecording((prev: any) => ({ ...prev, is_due: false, paid_amount: 0, status: 'paid', tagged_friend_user_id: null, person_name: null }));
       setCancelDueConfirm(false);
     } catch (e) { /* cancel due failed silently */ }
@@ -1051,11 +1209,13 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
       const newPaid = prevPaid + amount;
       const cappedPaid = Math.min(newPaid, total);
       const excess = newPaid - total;
+      const newStatus = collectComplete ? 'paid' : 'partial';
       await supabase.from('recordings').update({
-        status: collectComplete ? 'paid' : 'partial',
+        status: newStatus,
         paid_amount: cappedPaid,
-      }).eq('id', recordingId);
-      setRecording((prev: any) => ({ ...prev, status: collectComplete ? 'paid' : 'partial', paid_amount: cappedPaid }));
+        ...(collectComplete ? { closed_by: userName } : {}),
+      }).eq('id', recordingId).eq('user_id', recording?.user_id ?? userId);
+      setRecording((prev: any) => ({ ...prev, status: newStatus, paid_amount: cappedPaid, ...(collectComplete ? { closed_by: userName } : {}) }));
 
       // Sync to friend's payable if this recording has a tagged friend
       if (recording.tagged_friend_user_id) {
@@ -1063,7 +1223,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
           .from('recordings')
           .select('id, paid_amount, amount, space_id')
           .eq('source_recording_id', recordingId)
-          .eq('type', 'debt')
           .maybeSingle();
         if (friendPayable) {
           const fPrevPaid = Number(friendPayable.paid_amount ?? 0);
@@ -1071,25 +1230,20 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
           const fNewPaid = Math.min(fPrevPaid + amount, fTotal);
           const fNewStatus = collectComplete ? 'paid' : fNewPaid > 0 ? 'partial' : 'unpaid';
           await supabase.from('recordings').update({ paid_amount: fNewPaid, status: fNewStatus }).eq('id', friendPayable.id);
-          const { data: existingExpense } = await supabase
-            .from('recordings')
-            .select('id, amount')
-            .eq('linked_recording_id', friendPayable.id)
-            .eq('type', 'expense')
-            .maybeSingle();
-          if (existingExpense) {
-            await supabase.from('recordings').update({ amount: Number(existingExpense.amount) + amount }).eq('id', existingExpense.id);
+          // Upsert B's cumulative expense linked to the canonical due recording
+          const { data: existingBExp } = await supabase.from('recordings')
+            .select('id, amount').eq('user_id', recording.tagged_friend_user_id).eq('type', 'expense')
+            .eq('is_system_generated', true).eq('payment_to', recordingId).neq('status', 'voided').maybeSingle();
+          if (existingBExp) {
+            await supabase.from('recordings').update({ amount: Number(existingBExp.amount) + amount }).eq('id', existingBExp.id);
           } else {
+            const loansCatId = await (await import('../../src/lib/loansCategory')).getOrCreateLoansCategory(recording.tagged_friend_user_id);
             await supabase.from('recordings').insert({
-              user_id: recording.tagged_friend_user_id,
-              space_id: friendPayable.space_id ?? null,
-              name: recording.name,
-              type: 'expense',
-              amount,
-              transaction_date: collectDate,
-              status: 'paid',
-              linked_recording_id: friendPayable.id,
-              category_id: recording.category_id ?? null,
+              user_id: recording.tagged_friend_user_id, space_id: null,
+              name: recording.name, type: 'expense', amount,
+              transaction_date: collectDate, status: 'paid',
+              payment_to: recordingId,
+              category_id: loansCatId, is_system_generated: true,
             });
           }
           // Notify B of the collection
@@ -1209,11 +1363,22 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
       const newPaid = prevPaid + amount;
       const cappedPaid = Math.min(newPaid, total);
       const excess = newPaid - total;
+      const payNewStatus = payComplete ? 'paid' : 'partial';
       await supabase.from('recordings').update({
-        status: payComplete ? 'paid' : 'partial',
+        status: payNewStatus,
         paid_amount: cappedPaid,
-      }).eq('id', recordingId);
-      setRecording((prev: any) => ({ ...prev, status: payComplete ? 'paid' : 'partial', paid_amount: cappedPaid }));
+        ...(payComplete ? { closed_by: userName } : {}),
+      }).eq('id', recordingId).eq('user_id', recording?.user_id ?? userId);
+      const { data: taggedCopies } = await supabase.from('recordings')
+        .select('id, paid_amount, amount').eq('source_recording_id', recordingId).neq('status', 'voided');
+      if (taggedCopies?.length) {
+        await Promise.all(taggedCopies.map(c => {
+          const copyPaid = Math.min(Number(c.paid_amount ?? 0) + amount, Number(c.amount));
+          const copyStatus = copyPaid >= Number(c.amount) - 0.01 ? 'paid' : 'partial';
+          return supabase.from('recordings').update({ paid_amount: copyPaid, status: copyStatus, ...(copyPaid >= Number(c.amount) - 0.01 ? { closed_by: userName } : {}) }).eq('id', c.id);
+        }));
+      }
+      setRecording((prev: any) => ({ ...prev, status: payNewStatus, paid_amount: cappedPaid, ...(payComplete ? { closed_by: userName } : {}) }));
       setPayModal(false);
       loadPaymentData();
       if (excess > 0.01) {
@@ -1319,7 +1484,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
     Promise.all([
       supabase.from('recordings').select('id')
         .eq('source_recording_id', recordingId)
-        .eq('type', 'debt')
         .maybeSingle(),
       supabase.from('notifications').select('data')
         .eq('type', 'expense_tag')
@@ -1404,10 +1568,17 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
 
   const loadLinkedReceipt = async () => {
     if (!recordingId) return;
+    let entryId: string | null = null;
     const { data: entry } = await supabase.from('receipt_entries').select('id, note, created_at').eq('recording_id', recordingId).maybeSingle();
-    if (!entry) return;
-    setLinkedReceipt(entry);
-    const { data: photos } = await supabase.from('receipt_photos').select('id, storage_path, url').eq('entry_id', entry.id).order('created_at').limit(5);
+    if (entry) {
+      entryId = entry.id;
+      setLinkedReceipt(entry);
+    } else if (recording?.source_recording_id) {
+      const { data: srcEntry } = await supabase.from('receipt_entries').select('id, note, created_at').eq('recording_id', recording.source_recording_id).maybeSingle();
+      if (srcEntry) entryId = srcEntry.id;
+    }
+    if (!entryId) return;
+    const { data: photos } = await supabase.from('receipt_photos').select('id, storage_path, url').eq('entry_id', entryId).order('created_at').limit(5);
     if (photos) {
       const resolved = await Promise.all(photos.map(async (p: any) => {
         if (p.url) return { id: p.id, url: p.url };
@@ -1444,6 +1615,39 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
         categories: Array.isArray(data.categories) ? data.categories[0] : data.categories,
         account: Array.isArray(data.account) ? data.account[0] : data.account,
       });
+      const receiptRecId = data.source_recording_id || data.id;
+      let entryId = data.receipt_entry_id || savedEntryId;
+      if (!entryId && data.source_recording_id) {
+        const { data: src } = await supabase.from('recordings').select('receipt_entry_id').eq('id', data.source_recording_id).maybeSingle();
+        if (src?.receipt_entry_id) entryId = src.receipt_entry_id;
+      }
+      if (!entryId) {
+        const recId = data.source_recording_id || data.id;
+        const { data: entry } = await supabase.from('receipt_entries').select('id').eq('recording_id', recId).maybeSingle();
+        if (entry) entryId = entry.id;
+      }
+      if (entryId) {
+        const { data: photos } = await supabase.from('receipt_photos').select('id, storage_path, url').eq('entry_id', entryId).order('created_at').limit(5);
+        if (photos) {
+          const resolved = await Promise.all(photos.map(async (p: any) => {
+            if (p.url) return { id: p.id, url: p.url };
+            const { data: signed } = await supabase.storage.from('receipts').createSignedUrl(p.storage_path, 3600);
+            return { id: p.id, url: signed?.signedUrl ?? '' };
+          }));
+          setReceiptPhotos(resolved.filter(p => p.url));
+        }
+      }
+      if (data) {
+        if (data.is_system_generated) {
+          setCreatorName('System');
+        } else {
+          const uid = data.tagged_by_user_id || data.user_id;
+          if (uid) {
+            const { data: n } = await supabase.rpc('get_user_display_name', { user_id: uid });
+            setCreatorName(n ?? '');
+          }
+        }
+      }
     }
   };
 
@@ -1695,7 +1899,10 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
     setEditCategoryId(recording?.category_id ?? null);
     setEditAmount(String(recording?.amount ?? ''));
     setEditError('');
+    setEditNewPhotoUris([]);
+    setEditSpaceId(recording?.space_id ?? null);
     setEditModal(true);
+    loadAvailableSpaces();
   };
 
   const saveEdit = async () => {
@@ -1707,14 +1914,58 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
       account_id: editAccountId || null,
       category_id: editCategoryId || null,
       notes: editNotes.trim() || null,
+      space_id: editSpaceId || null,
     };
     if (!editAmountLocked && editAmount && parseFloat(editAmount) > 0) {
       updates.amount = parseFloat(editAmount);
     }
-    const { error } = await supabase.from('recordings').update(updates).eq('id', recordingId);
+    const { error } = await supabase.from('recordings').update(updates).eq('id', recordingId).eq('user_id', userId);
     if (error) { setEditError(error.message); return; }
-    setEditModal(false);
-    loadRecording();
+    if (editNewPhotoUris.length === 0) {
+      setEditModal(false);
+      loadRecording();
+      return;
+    }
+    setEditPhotoUploadState('uploading');
+    setEditPhotoError('');
+    try {
+      let entryId = linkedReceipt?.id;
+      if (!entryId) {
+        const receiptRecId = (recording as any)?.source_recording_id || recordingId;
+        const { data: existingEntry } = await supabase.from('receipt_entries').select('id').eq('recording_id', receiptRecId).maybeSingle();
+        if (existingEntry) {
+          entryId = existingEntry.id;
+        } else {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            const note = recording?.transaction_date && recording?.name
+              ? `${new Date(recording.transaction_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}: ${recording.name}`
+              : recording?.name ?? '';
+            const { data: entry, error: entryErr } = await supabase.from('receipt_entries').insert({ user_id: user.id, note, recording_id: receiptRecId }).select().maybeSingle();
+            if (entryErr) { setEditPhotoError(entryErr.message); setEditPhotoUploadState('error'); return; }
+            entryId = entry?.id;
+            if (entryId) setSavedEntryId(entryId);
+          }
+        }
+      }
+      if (!entryId) { setEditPhotoError('Could not create receipt entry'); setEditPhotoUploadState('error'); return; }
+      await supabase.from('recordings').update({ receipt_entry_id: entryId }).eq('id', recordingId);
+      const newPhotos: { id: string; url: string }[] = [];
+      for (const uri of editNewPhotoUris) {
+        const compressed = await compressImage(uri);
+        const result = await uploadReceiptPhoto(compressed, entryId);
+        if (result) newPhotos.push({ id: result.id, url: result.url });
+      }
+      setEditNewPhotoUris([]);
+      if (newPhotos.length > 0) {
+        setReceiptPhotos(prev => [...prev, ...newPhotos]);
+      }
+      setEditPhotoUploadState('success');
+      loadRecording();
+    } catch (e: any) {
+      setEditPhotoError(e?.message || 'Unknown error');
+      setEditPhotoUploadState('error');
+    }
   };
 
   const openPeopleModal = () => {
@@ -1990,65 +2241,94 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
         <ScrollView contentContainerStyle={rd.scroll} showsVerticalScrollIndicator={false} style={{ backgroundColor: Colors.white }}>
           <View style={{ height: 8 }} />
 
-          {/* Info card */}
-          <View style={rd.infoCard}>
-            <View style={rd.amountRow}>
-              <Text style={[rd.amountValue, { color: amountColor() }]}>
-                {Number(recording?.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-              </Text>
-              <TouchableOpacity style={rd.actionsBtn} onPress={() => setShowAddChoice(true)} activeOpacity={0.8}>
+          {/* Actions row */}
+          <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 8, paddingHorizontal: DC.pagePadding, marginBottom: 8 }}>
+            <TouchableOpacity style={rd.actionBtn} onPress={() => { if (recordingId) Clipboard.setStringAsync(recordingId); }} activeOpacity={0.8}>
+              <Ionicons name="copy-outline" size={16} color="#111111" />
+            </TouchableOpacity>
+            {isOwner && (recording?.closed_by || recording?.status === 'closed') && (
+              <TouchableOpacity style={rd.actionBtn} onPress={async () => { await supabase.from('recordings').update({ closed_by: null }).eq('id', recordingId); setRecording((prev: any) => prev ? { ...prev, closed_by: null } : prev); }} activeOpacity={0.8}>
+                <Ionicons name="refresh-outline" size={16} color="#111111" />
+              </TouchableOpacity>
+            )}
+            {isOwner && (
+              <TouchableOpacity style={rd.actionBtn} onPress={() => setShowAddChoice(true)} activeOpacity={0.8}>
                 <Ionicons name="ellipsis-horizontal" size={16} color="#111111" />
               </TouchableOpacity>
-            </View>
-
-            <View style={rd.infoGrid}>
-              <View style={rd.infoCell}>
-                <Text style={rd.infoCellLabel}>Date</Text>
-                <Text style={rd.infoCellValue}>{formatDate(recording?.transaction_date)}</Text>
-              </View>
-              <View style={rd.infoCell}>
-                <Text style={rd.infoCellLabel}>Category</Text>
-                <Text style={rd.infoCellValue} numberOfLines={1}>{recording?.categories?.name ?? '—'}</Text>
-              </View>
-              <View style={rd.infoCell}>
-                <Text style={rd.infoCellLabel}>Type</Text>
-                {(() => {
-                  const label = typeLabel(recording?.type ?? '', recording?.status ?? '');
-                  const isOut = ['expense', 'debt', 'payment'].includes(recording?.type ?? '');
-                  const badgeColor = isOut ? '#FFAB91' : '#9cd7d2';
-                  return (
-                    <View style={[rd.typeBadge, { backgroundColor: badgeColor + '22' }]}>
-                      <Text style={[rd.typeBadgeText, { color: badgeColor }]}>{label}</Text>
-                    </View>
-                  );
-                })()}
-              </View>
-              <View style={rd.infoCell}>
-                <Text style={rd.infoCellLabel}>Status</Text>
-                <Text style={rd.infoCellValue}>{displayStatus()}</Text>
-              </View>
-              <View style={rd.infoCell}>
-                <Text style={rd.infoCellLabel}>Account</Text>
-                <Text style={rd.infoCellValue} numberOfLines={1}>{recording?.account?.account_name ?? '—'}</Text>
-              </View>
-              <View style={rd.infoCell}>
-                <Text style={rd.infoCellLabel}>Owes You</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <Text style={rd.infoCellValue} numberOfLines={1}>{recording?.person_name ?? '—'}</Text>
-                  {linkedSplitBill && <Ionicons name="lock-closed-outline" size={10} color={Colors.muted} />}
-                </View>
-              </View>
-            </View>
-
-            {(recording?.notes ?? '').trim() ? (
-              <View style={rd.notesBlock}>
-                <Text style={rd.notesLabel}>Notes</Text>
-                <Text style={rd.notesValue}>{recording?.notes}</Text>
-              </View>
-            ) : null}
+            )}
           </View>
 
-          {/* SPLIT BILL section — disabled for manual due/owes recordings */}
+          {/* Info card */}
+          <View style={rd.infoCard}>
+            <View style={rd.tagInfoRow}>
+              <Text style={rd.tagInfoLabel}>Transaction Name</Text>
+              <Text style={rd.tagInfoValue}>{recording?.name ?? '—'}</Text>
+            </View>
+            <View style={rd.tagInfoRow}>
+              <Text style={rd.tagInfoLabel}>Date</Text>
+              <Text style={rd.tagInfoValue}>{recording ? formatDate(recording.transaction_date) : '—'}</Text>
+            </View>
+            <View style={rd.tagInfoRow}>
+              <Text style={rd.tagInfoLabel}>Amount</Text>
+              <Text style={rd.tagInfoValue}>
+                {Number(recording?.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              </Text>
+            </View>
+            <View style={rd.tagInfoRow}>
+              <Text style={rd.tagInfoLabel}>Payment Status</Text>
+              <Text style={rd.tagInfoValue}>
+                {!recording ? '—' : recording.status === 'paid' ? 'Fully Paid' : recording.status === 'partial' ? 'Partially Paid' : recording.status === 'unpaid' ? 'Unpaid' : recording.status ?? '—'}
+              </Text>
+            </View>
+            <View style={rd.tagInfoRow}>
+              <Text style={rd.tagInfoLabel}>Recording Status</Text>
+              <Text style={rd.tagInfoValue}>{recording?.closed_by || recording?.status === 'closed' ? 'Closed' : 'Open'}</Text>
+            </View>
+            <View style={rd.tagInfoRow}>
+              <Text style={rd.tagInfoLabel}>Created By</Text>
+              <Text style={rd.tagInfoValue}>{creatorName || (isTaggedViewer ? (recording as any)?.tagged_by_user_id : recording?.user_id) || '—'}</Text>
+            </View>
+            {recording?.person_name && (
+            <View style={rd.tagInfoRow}>
+              <Text style={rd.tagInfoLabel}>Loaner</Text>
+              <Text style={rd.tagInfoValue}>{recording.person_name}</Text>
+            </View>
+            )}
+            <View style={rd.tagInfoRow}>
+              <Text style={rd.tagInfoLabel}>Payments Made</Text>
+              <Text style={rd.tagInfoValue}>{linkedPayments.length}</Text>
+            </View>
+            {recording?.closed_by && (
+              <View style={rd.tagInfoRow}>
+                <Text style={rd.tagInfoLabel}>Closed By</Text>
+                <Text style={rd.tagInfoValue}>{recording.closed_by}</Text>
+              </View>
+            )}
+          </View>
+
+          {/* Related Records section */}
+          {trackingExpense && (
+            <>
+              <View style={rd.sectionDivider} />
+              <View style={rd.sectionRow}>
+                <Text style={rd.sectionLabel}>Related Records</Text>
+              </View>
+              <View style={{ paddingHorizontal: DC.pagePadding }}>
+                <TouchableOpacity style={rd.recRow} onPress={() => openRecording(trackingExpense.id)} activeOpacity={0.7}>
+                  <View style={rd.recIconWrap}><Ionicons name="receipt-outline" size={14} color={DC.pageText} /></View>
+                  <View style={rd.recMid}>
+                    <Text style={rd.recName} numberOfLines={1}>{trackingExpense.name}</Text>
+                    <Text style={rd.recDate}>{new Date(trackingExpense.transaction_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</Text>
+                  </View>
+                  <Text style={{ fontFamily: AppFont.semiBold, fontSize: 13, color: DC.accent1 }}>
+                    {Number(trackingExpense.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
+
+          {/* SPLIT BILL section */}
           {!((recording?.type === 'debt' || recording?.type === 'due' || recording?.is_due) && !linkedSplitBill) && (
             <View style={rd.sectionDivider} />
           )}
@@ -2064,61 +2344,64 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
           {/* RECEIPTS section */}
           <View style={rd.sectionRow}>
             <Text style={rd.sectionLabel}>Receipts</Text>
-            <TouchableOpacity style={rd.sectionBtn} onPress={() => receiptPhotos.length > 0 ? (setPhotoModalIndex(0), setPhotoModal(true)) : setAddReceiptModal(true)} activeOpacity={0.8}>
-              <Text style={rd.sectionBtnText}>{receiptPhotos.length > 0 ? `View (${receiptPhotos.length})` : 'Add'}</Text>
-            </TouchableOpacity>
           </View>
+          {receiptPhotos.length > 0 ? (
+            <View style={{ paddingHorizontal: DC.pagePadding }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+                {receiptPhotos.slice(0, 2).map((p, i) => (
+                  <TouchableOpacity key={p.id} onPress={() => { setPhotoModalIndex(i); setPhotoModal(true); }} activeOpacity={0.8}>
+                    <Image source={{ uri: p.url }} style={{ width: 80, height: 80, borderRadius: 8 }} resizeMode="cover" />
+                  </TouchableOpacity>
+                ))}
+                {receiptPhotos.length > 2 && (
+                  <TouchableOpacity onPress={() => { setPhotoModalIndex(0); setPhotoModal(true); }} activeOpacity={0.8}>
+                    <View style={{ width: 80, height: 80, borderRadius: 8, backgroundColor: '#F0F0F0', alignItems: 'center', justifyContent: 'center' }}>
+                      <Text style={{ fontFamily: AppFont.semiBold, fontSize: 14, color: '#666' }}>+{receiptPhotos.length - 2} more</Text>
+                    </View>
+                  </TouchableOpacity>
+                )}
+              </ScrollView>
+            </View>
+          ) : (
+            <View style={{ paddingHorizontal: DC.pagePadding }}>
+              <Text style={{ fontFamily: AppFont.regular, fontSize: 12, color: Colors.muted }}>none</Text>
+            </View>
+          )}
 
           {/* section divider */}
 
           {/* Payments / Collections */}
-          {(recording?.type === 'debt' || recording?.type === 'due' || (recording?.type === 'expense' && linkedPayments.length > 0)) && linkedPayments.length > 0 && (
-            <>
-              <View style={rd.sectionDivider} />
-              <View style={rd.sectionRow}>
-                <Text style={rd.sectionLabel}>Collections</Text>
-              </View>
-              <View style={{ paddingHorizontal: DC.pagePadding }}>
-                {linkedPayments.map((p: any, i: number) => (
-                  <TouchableOpacity key={p.id} style={[rd.recRow, p.is_write_off && { opacity: 0.6 }]} onPress={() => !p.is_write_off && openRecording(p.id)}>
-                    <View style={[rd.recIconWrap, p.is_write_off && { backgroundColor: DC.cardBg }]}>
-                      <Ionicons name={p.is_write_off ? 'close-circle-outline' : 'cash-outline'} size={14} color={DC.pageText} />
-                    </View>
-                    <View style={rd.recMid}>
-                      <Text style={[rd.recName, p.is_write_off && { color: Colors.muted }]}>{Number(p.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
-                      <Text style={rd.recDate}>{formatDate(p.transaction_date)}{p.accounts?.account_name ? ` · ${p.accounts.account_name}` : ''}</Text>
-                      {p.is_write_off && <Text style={{ fontFamily: AppFont.regular, fontSize: 9, color: DC.pageTextMuted }}>write-off</Text>}
-                      {p.payment_to && !p.is_write_off && <Text style={[rd.recDate, { color: DC.accent1 }]}>{p.payment_to}</Text>}
-                    </View>
-                    {!p.is_write_off && <Ionicons name="chevron-forward" size={13} color={Colors.muted} />}
-                  </TouchableOpacity>
-                ))}
-              </View>
-              {personPayStatus.length > 0 && (
-                <>
-                  <View style={rd.sectionRow}>
-                    <Text style={rd.sectionLabel}>Per Person Status</Text>
+          <View style={rd.sectionDivider} />
+          <View style={rd.sectionRow}>
+            <Text style={rd.sectionLabel}>Payment</Text>
+          </View>
+          {linkedPayments.length > 0 ? (
+            <View style={{ paddingHorizontal: DC.pagePadding }}>
+              {[...linkedPayments].reverse().map((p: any, i: number) => (
+                <TouchableOpacity key={p.id} style={[rdTag.payRow, i === linkedPayments.length - 1 && { borderBottomWidth: 0 }]} onPress={() => !p.is_write_off && openRecording(p.id)} activeOpacity={0.7}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={rdTag.payRowName} numberOfLines={1}>
+                      Payment {linkedPayments.length - i}
+                    </Text>
+                    <Text style={rdTag.payRowDate}>{formatDate(p.transaction_date)}</Text>
+                    <Text style={rdTag.payRowDate}>{p.person_name || (p.user_id === userId ? 'You' : (p.payment_to ?? 'Someone'))}</Text>
                   </View>
-                  <View style={{ paddingHorizontal: DC.pagePadding }}>
-                    {personPayStatus.map((s, i) => {
-                      const fullyPaid = s.total > 0 && s.paid >= s.total - 0.01;
-                      const partial = s.paid > 0 && !fullyPaid;
-                      const statusColor = fullyPaid ? ACCENT_DARK : partial ? ACCENT_DARK : Colors.muted;
-                      return (
-                        <View key={s.person} style={rd.recRow}>
-                          <Ionicons name={fullyPaid ? 'checkmark-circle' : partial ? 'ellipse' : 'ellipse-outline'} size={16} color={statusColor} />
-                          <View style={rd.recMid}>
-                            <Text style={rd.recName}>{s.person}</Text>
-                            <Text style={rd.recDate}>{s.paid > 0 ? `${s.paid.toLocaleString('en-US', { minimumFractionDigits: 2 })} of ${s.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : `owes ${s.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}</Text>
-                          </View>
-                          <Text style={{ fontFamily: AppFont.semiBold, fontSize: 11, color: statusColor }}>{fullyPaid ? 'paid' : partial ? 'partial' : 'unpaid'}</Text>
-                        </View>
-                      );
-                    })}
-                  </View>
-                </>
-              )}
-            </>
+                  <Text style={rdTag.payRowAmount}>{Number(p.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+                  {!p.is_write_off && (p.user_id === userId || p.payment_to === userId) && (
+                    <TouchableOpacity
+                      style={{ marginLeft: 8, padding: 6, borderRadius: 6, backgroundColor: Colors.dangerBg }}
+                      onPress={() => setDeletePaymentConfirm(p.id)}
+                    >
+                      <Ionicons name="trash-outline" size={14} color={Colors.danger} />
+                    </TouchableOpacity>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </View>
+          ) : (
+            <View style={{ paddingHorizontal: DC.pagePadding }}>
+              <Text style={{ fontFamily: AppFont.regular, fontSize: 12, color: Colors.muted }}>none</Text>
+            </View>
           )}
 
           {/* Split bill collections */}
@@ -2195,20 +2478,6 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
 
       {/* Actions bottom sheet */}
       <BottomSheet visible={showAddChoice} onClose={() => setShowAddChoice(false)} title="actions">
-        {isOwner && (
-          <TouchableOpacity style={rd.choiceRow} activeOpacity={0.8} onPress={() => { setShowAddChoice(false); openEditModal(); }}>
-            <View style={[rd.choiceIcon, { backgroundColor: DC.accent1 + '22' }]}><Ionicons name="create-outline" size={20} color={DC.accent1} /></View>
-            <View style={{ flex: 1 }}><Text style={rd.choiceTitle}>Edit Recording</Text><Text style={rd.choiceSub}>Change name, date, amount, category</Text></View>
-            <Ionicons name="chevron-forward" size={14} color={Colors.faint} />
-          </TouchableOpacity>
-        )}
-        {!isOwner && recording?.status === 'paid' && (
-          <TouchableOpacity style={rd.choiceRow} activeOpacity={0.8} onPress={() => { setShowAddChoice(false); router.push({ pathname: '/(app)/add-recording', params: { name: recording?.name, amount: String(recording?.amount ?? ''), spaceId: recording?.space_id, date: recording?.transaction_date, type: 'expense' } } as any); }}>
-            <View style={[rd.choiceIcon, { backgroundColor: DC.accent1 + '22' }]}><Ionicons name="download-outline" size={20} color={DC.accent1} /></View>
-            <View style={{ flex: 1 }}><Text style={rd.choiceTitle}>Save to My Account</Text><Text style={rd.choiceSub}>Create an expense in your own space</Text></View>
-            <Ionicons name="chevron-forward" size={14} color={Colors.faint} />
-          </TouchableOpacity>
-        )}
         {isOwner && recording?.type === 'expense' && !linkedPayable && !linkedReceivable && !recording?.is_due && !recording?.person_name && !linkedSplitBill && (
           <TouchableOpacity style={rd.choiceRow} activeOpacity={0.8} onPress={() => { setShowAddChoice(false); setReceivableMode('full'); setReceivableManualAmount(''); setReceivableSelectedPeople([]); setReceivableModal(true); }}>
             <View style={[rd.choiceIcon, { backgroundColor: DC.accent1 + '22' }]}><Ionicons name="arrow-undo-outline" size={20} color={DC.accent1} /></View>
@@ -2216,55 +2485,58 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
             <Ionicons name="chevron-forward" size={14} color={Colors.faint} />
           </TouchableOpacity>
         )}
-        {isOwner && recording?.type === 'expense' && recording?.is_due && !recording?.tagged_friend_user_id && (recording?.shared_with ?? []).length === 0 && existingTags.length === 0 && (
-          <TouchableOpacity style={rd.choiceRow} activeOpacity={0.8} onPress={() => { setShowAddChoice(false); openTagFriendModal(); }}>
-            <View style={[rd.choiceIcon, { backgroundColor: DC.accent1 + '22' }]}><Ionicons name="person-add-outline" size={20} color={DC.accent1} /></View>
-            <View style={{ flex: 1 }}><Text style={rd.choiceTitle}>Tag a Friend</Text><Text style={rd.choiceSub}>Send a debt request to a friend</Text></View>
-            <Ionicons name="chevron-forward" size={14} color={Colors.faint} />
-          </TouchableOpacity>
-        )}
-        {isOwner && recording?.type === 'expense' && recording?.is_due && (() => {
-          const paid = Number(recording.paid_amount ?? 0);
-          const total = Number(recording.amount ?? 0);
-          if (paid >= total - 0.01) return null;
-          return (
-            <TouchableOpacity style={rd.choiceRow} activeOpacity={0.8} onPress={() => { setShowAddChoice(false); linkedSplitBill ? openSplitBill(linkedSplitBill.id, linkedSplitBill.name) : openCollectDueModal(); }}>
-              <View style={[rd.choiceIcon, { backgroundColor: DC.accent1 + '22' }]}><Ionicons name="arrow-down-circle-outline" size={20} color={DC.accent1} /></View>
-              <View style={{ flex: 1 }}><Text style={rd.choiceTitle}>Collect Payment</Text><Text style={rd.choiceSub}>Record a collection for this due</Text></View>
-              <Ionicons name="chevron-forward" size={14} color={Colors.faint} />
-            </TouchableOpacity>
-          );
-        })()}
-        {isOwner && recording?.type === 'debt' && recording?.status !== 'paid' && !recording?.is_tagged && (
-          <TouchableOpacity style={rd.choiceRow} activeOpacity={0.8} onPress={() => { setShowAddChoice(false); openPayModal(); }}>
-            <View style={[rd.choiceIcon, { backgroundColor: DC.accent1 + '22' }]}><Ionicons name="cash-outline" size={20} color={DC.accent1} /></View>
-            <View style={{ flex: 1 }}><Text style={rd.choiceTitle}>Pay Debt</Text><Text style={rd.choiceSub}>Record a payment for this debt</Text></View>
-            <Ionicons name="chevron-forward" size={14} color={Colors.faint} />
-          </TouchableOpacity>
-        )}
-        {isOwner && recording?.type === 'due' && recording?.status !== 'paid' && (
+        {isOwner && recording?.status !== 'paid' && (
           <TouchableOpacity style={rd.choiceRow} activeOpacity={0.8} onPress={() => { setShowAddChoice(false); openCollectModal(); }}>
-            <View style={[rd.choiceIcon, { backgroundColor: DC.accent1 + '22' }]}><Ionicons name="arrow-down-circle-outline" size={20} color={DC.accent1} /></View>
-            <View style={{ flex: 1 }}><Text style={rd.choiceTitle}>Collect</Text><Text style={rd.choiceSub}>Record a collection for this due</Text></View>
+            <View style={[rd.choiceIcon, { backgroundColor: DC.accent1 + '22' }]}><Ionicons name="cash-outline" size={20} color={DC.accent1} /></View>
+            <View style={{ flex: 1 }}><Text style={rd.choiceTitle}>Collect Payment</Text><Text style={rd.choiceSub}>Record a full or partial collection</Text></View>
             <Ionicons name="chevron-forward" size={14} color={Colors.faint} />
           </TouchableOpacity>
         )}
-        {isOwner && (() => {
-          const isWriteOffable = (recording?.type === 'due' || recording?.type === 'debt' || (recording?.type === 'expense' && recording?.is_due)) && recording?.status !== 'paid';
-          const remaining = Math.max(0, Number(recording?.amount ?? 0) - Number(recording?.paid_amount ?? 0));
-          if (!isWriteOffable || remaining <= 0) return null;
-          return (
-            <TouchableOpacity style={rd.choiceRow} activeOpacity={0.8} onPress={() => { setShowAddChoice(false); setWriteOffReason(''); setWriteOffModal(true); }}>
-              <View style={[rd.choiceIcon, { backgroundColor: DC.cardBg }]}><Ionicons name="close-circle-outline" size={20} color={DC.pageTextMuted} /></View>
-              <View style={{ flex: 1 }}><Text style={rd.choiceTitle}>Write Off</Text><Text style={rd.choiceSub}>Record the unpaid remainder as bad debt</Text></View>
-              <Ionicons name="chevron-forward" size={14} color={Colors.faint} />
-            </TouchableOpacity>
-          );
-        })()}
+        {isOwner && (
+          <TouchableOpacity style={rd.choiceRow} activeOpacity={0.8} onPress={() => { setShowAddChoice(false); openEditModal(); }}>
+            <View style={[rd.choiceIcon, { backgroundColor: DC.accent1 + '22' }]}><Ionicons name="create-outline" size={20} color={DC.accent1} /></View>
+            <View style={{ flex: 1 }}><Text style={rd.choiceTitle}>Edit Recording</Text><Text style={rd.choiceSub}>Change name, amount, date, reassign</Text></View>
+            <Ionicons name="chevron-forward" size={14} color={Colors.faint} />
+          </TouchableOpacity>
+        )}
+        {isOwner && recording?.status !== 'paid' && (
+          <TouchableOpacity style={rd.choiceRow} activeOpacity={0.8} onPress={() => { setShowAddChoice(false); setMarkClosedConfirm(true); }}>
+            <View style={[rd.choiceIcon, { backgroundColor: DC.cardBg }]}><Ionicons name="checkmark-circle-outline" size={20} color={DC.accent1} /></View>
+            <View style={{ flex: 1 }}><Text style={rd.choiceTitle}>Mark as Complete</Text><Text style={rd.choiceSub}>Close this recording</Text></View>
+            <Ionicons name="chevron-forward" size={14} color={Colors.faint} />
+          </TouchableOpacity>
+        )}
         {isOwner && (
           <TouchableOpacity style={rd.choiceRow} activeOpacity={0.8} onPress={() => { setShowAddChoice(false); setDeleteConfirm(true); }}>
             <View style={[rd.choiceIcon, { backgroundColor: Colors.dangerBg }]}><Ionicons name="trash-outline" size={20} color={Colors.danger} /></View>
             <View style={{ flex: 1 }}><Text style={[rd.choiceTitle, { color: Colors.danger }]}>Delete</Text><Text style={rd.choiceSub}>Permanently remove this recording</Text></View>
+          </TouchableOpacity>
+        )}
+        {isTaggedViewer && (
+          <TouchableOpacity style={rd.choiceRow} activeOpacity={0.8} onPress={() => { setShowAddChoice(false); setDeleteConfirm(true); }}>
+            <View style={[rd.choiceIcon, { backgroundColor: Colors.dangerBg }]}><Ionicons name="trash-outline" size={20} color={Colors.danger} /></View>
+            <View style={{ flex: 1 }}><Text style={[rd.choiceTitle, { color: Colors.danger }]}>Remove</Text><Text style={rd.choiceSub}>Untag yourself from this debt</Text></View>
+          </TouchableOpacity>
+        )}
+        {(isTaggedViewer || canPayAsPersonB) && recording?.status !== 'paid' && (
+          <TouchableOpacity style={rd.choiceRow} activeOpacity={0.8} onPress={() => { setShowAddChoice(false); openPayModal(); }}>
+            <View style={[rd.choiceIcon, { backgroundColor: DC.accent1 + '22' }]}><Ionicons name="cash-outline" size={20} color={DC.accent1} /></View>
+            <View style={{ flex: 1 }}><Text style={rd.choiceTitle}>Make Payment</Text><Text style={rd.choiceSub}>Record a partial or full payment</Text></View>
+            <Ionicons name="chevron-forward" size={14} color={Colors.faint} />
+          </TouchableOpacity>
+        )}
+        {(isTaggedViewer || canPayAsPersonB) && recording?.status === 'paid' && (
+          <TouchableOpacity style={rd.choiceRow} activeOpacity={0.8} onPress={() => { setShowAddChoice(false); router.push({ pathname: '/(app)/add-recording', params: { name: recording?.name, amount: String(recording?.amount ?? ''), spaceId: recording?.space_id, date: recording?.transaction_date, type: 'expense' } } as any); }}>
+            <View style={[rd.choiceIcon, { backgroundColor: DC.accent1 + '22' }]}><Ionicons name="download-outline" size={20} color={DC.accent1} /></View>
+            <View style={{ flex: 1 }}><Text style={rd.choiceTitle}>Save to My Account</Text><Text style={rd.choiceSub}>Create an expense in your own space</Text></View>
+            <Ionicons name="chevron-forward" size={14} color={Colors.faint} />
+          </TouchableOpacity>
+        )}
+        {(isTaggedViewer || canPayAsPersonB) && linkedPayments.length > 0 && (
+          <TouchableOpacity style={rd.choiceRow} activeOpacity={0.8} onPress={() => { setShowAddChoice(false); setDeletePaymentListModal(true); }}>
+            <View style={[rd.choiceIcon, { backgroundColor: Colors.dangerBg }]}><Ionicons name="trash-outline" size={20} color={Colors.danger} /></View>
+            <View style={{ flex: 1 }}><Text style={[rd.choiceTitle, { color: Colors.danger }]}>Delete Payments</Text><Text style={rd.choiceSub}>Remove payment records you made</Text></View>
+            <Ionicons name="chevron-forward" size={14} color={Colors.faint} />
           </TouchableOpacity>
         )}
       </BottomSheet>
@@ -2361,10 +2633,22 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
         defaultSpaceId={recording?.space_id ?? null}
       />
 
+      {/* Mark as complete confirm modal */}
+      <ConfirmModal
+        visible={markClosedConfirm}
+        onClose={() => setMarkClosedConfirm(false)}
+        title="mark as complete"
+        message="Mark this recording as complete (closed)? This will set the status to paid."
+        actions={[
+          { label: 'cancel', onPress: () => setMarkClosedConfirm(false), muted: true },
+          { label: 'mark complete', onPress: confirmMarkClosed },
+        ]}
+      />
+
       {/* Delete confirm modal */}
       <ConfirmModal
         visible={deleteConfirm}
-        onClose={() => setDeleteConfirm(false)}
+        onClose={() => { setDeleteConfirm(false); setDeleteError(null); }}
         title="delete recording"
         message={(() => {
           const hasPaid = Number(recording?.paid_amount ?? 0) > 0;
@@ -2397,7 +2681,29 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
             { label: deleteLoading ? '...' : linkedReceipt ? 'delete both' : 'delete', onPress: () => confirmDelete(true, !!linkedReceipt), destructive: true, disabled: deleteLoading },
           ];
         })()}
+      >
+        {deleteError ? <Text style={{ fontFamily: AppFont.regular, fontSize: 12, color: '#E74C3C', textAlign: 'center', lineHeight: 18 }}>{deleteError}</Text> : null}
+      </ConfirmModal>
+
+      <ConfirmModal
+        visible={!!deletePaymentConfirm}
+        onClose={() => setDeletePaymentConfirm(null)}
+        title="delete payment"
+        message="Remove this payment record? This will also adjust the balance."
+        actions={[
+          { label: 'cancel', onPress: () => setDeletePaymentConfirm(null), muted: true },
+          { label: 'delete', onPress: () => deletePaymentConfirm && confirmDeletePayment(deletePaymentConfirm), destructive: true },
+        ]}
       />
+
+      {deleteLoading && (
+        <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}>
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16 }}>
+            <AnimatedIcon set="line-md" icon="beer-twotone-loop" size={64} color="#9cd7d2" />
+            <Text style={{ fontFamily: AppFont.regular, fontSize: 16, color: '#000000' }}>deleting{deleteDots}</Text>
+          </View>
+        </BlurView>
+      )}
 
       <CollectModal
         visible={collectModal}
@@ -2554,6 +2860,31 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
         })()}
       </BottomSheet>
 
+      {/* Delete payment list modal (Person B) */}
+      <BottomSheet visible={deletePaymentListModal} onClose={() => setDeletePaymentListModal(false)} title="delete payments">
+        {(() => {
+          const myPayments = linkedPayments.filter((p: any) => p.user_id === userId && !p.is_write_off);
+          if (myPayments.length === 0) return <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.muted, textAlign: 'center', paddingVertical: 20 }}>no payments you made to delete</Text>;
+          return myPayments.map((p: any, i: number) => (
+            <View key={p.id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: i === myPayments.length - 1 ? 0 : 1, borderBottomColor: '#f0f0f0' }}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontFamily: AppFont.semiBold, fontSize: 13, color: '#111111' }}>{Number(p.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+                <Text style={{ fontFamily: AppFont.regular, fontSize: 11, color: '#999999', marginTop: 2 }}>{formatDate(p.transaction_date)}</Text>
+              </View>
+              <TouchableOpacity
+                style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6, backgroundColor: Colors.dangerBg }}
+                onPress={async () => {
+                  setDeletePaymentListModal(false);
+                  await confirmDeletePayment(p.id);
+                }}
+              >
+                <Text style={{ fontFamily: AppFont.semiBold, fontSize: 11, color: Colors.danger }}>{deletePaymentLoading ? '...' : 'Delete'}</Text>
+              </TouchableOpacity>
+            </View>
+          ));
+        })()}
+        <View style={{ height: 8 }} />
+      </BottomSheet>
 
       {copiedToast && (
         <View style={rd.toast} pointerEvents="none">
@@ -2629,6 +2960,62 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                   <TextInput style={[em.input, { minHeight: 60, textAlignVertical: 'top' }]} placeholder="optional" placeholderTextColor={Colors.faint} value={editNotes} onChangeText={setEditNotes} multiline />
                 </View>
 
+                {/* Receipts */}
+                <View style={{ gap: 8 }}>
+                  <Text style={em.label}>Receipts</Text>
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <TouchableOpacity style={rd.doneBtn} onPress={async () => { const { status } = await ImagePicker.requestCameraPermissionsAsync(); if (status !== 'granted') return; const r = await ImagePicker.launchCameraAsync({ quality: 1 }); if (!r.canceled && r.assets[0]) setEditNewPhotoUris(prev => [...prev, r.assets[0].uri]); }} activeOpacity={0.8}>
+                      <Ionicons name="camera-outline" size={14} color={ACCENT_DARK} />
+                      <Text style={rd.doneBtnText}>Camera</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={rd.doneBtn} onPress={async () => { const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync(); if (status !== 'granted') return; const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsMultipleSelection: true, quality: 1 }); if (!r.canceled) setEditNewPhotoUris(prev => [...prev, ...r.assets.map(a => a.uri)]); }} activeOpacity={0.8}>
+                      <Ionicons name="images-outline" size={14} color={Colors.text} />
+                      <Text style={[rd.doneBtnText, { color: Colors.text }]}>Gallery</Text>
+                    </TouchableOpacity>
+                  </View>
+                  {(receiptPhotos.length + editNewPhotoUris.length) > 0 && (
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+                      {receiptPhotos.map((p, i) => (
+                        <TouchableOpacity key={p.id} onPress={() => { setPhotoModalIndex(i); setPhotoModal(true); }} activeOpacity={0.8}>
+                          <View style={{ position: 'relative' }}>
+                            <Image source={{ uri: p.url }} style={{ width: 64, height: 64, borderRadius: 8 }} resizeMode="cover" />
+                            <TouchableOpacity style={{ position: 'absolute', top: -6, right: -6 }} onPress={() => { supabase.from('receipt_photos').delete().eq('id', p.id); setReceiptPhotos(prev => prev.filter(r => r.id !== p.id)); }}>
+                              <Ionicons name="close-circle" size={18} color="#111" />
+                            </TouchableOpacity>
+                          </View>
+                        </TouchableOpacity>
+                      ))}
+                      {editNewPhotoUris.map((uri, i) => (
+                        <View key={`new-${i}`} style={{ position: 'relative' }}>
+                          <Image source={{ uri }} style={{ width: 64, height: 64, borderRadius: 8 }} resizeMode="cover" />
+                          <TouchableOpacity style={{ position: 'absolute', top: -6, right: -6 }} onPress={() => setEditNewPhotoUris(prev => prev.filter((_, idx) => idx !== i))}>
+                            <Ionicons name="close-circle" size={18} color="#111" />
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                    </ScrollView>
+                  )}
+                </View>
+
+                {/* Reassign Transaction */}
+                {recording?.type === 'expense' && recording?.is_due && Number(recording?.paid_amount ?? 0) === 0 && (
+                  <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10 }} onPress={() => { setEditModal(false); openTagFriendModal(); }} activeOpacity={0.7}>
+                    <Ionicons name="person-add-outline" size={18} color={DC.accent1} />
+                    <Text style={{ fontFamily: AppFont.semiBold, fontSize: 13, color: DC.accent1 }}>Reassign Transaction</Text>
+                  </TouchableOpacity>
+                )}
+
+                {/* Space */}
+                <View style={em.field}>
+                  <Text style={em.label}>Space</Text>
+                  <TouchableOpacity style={em.selector} onPress={() => setShowEditSpaceModal(true)} activeOpacity={0.8}>
+                    <Text style={[em.selectorText, !editSpaceId && { color: Colors.faint }]}>
+                      {editSpaceId ? (availableSpaces.find(s => s.id === editSpaceId)?.name ?? 'select') : 'none'}
+                    </Text>
+                    <Ionicons name="chevron-down" size={13} color={Colors.faint} />
+                  </TouchableOpacity>
+                </View>
+
                 {/* Account */}
                 <View style={em.field}>
                   <Text style={em.label}>Account</Text>
@@ -2669,6 +3056,33 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
             </View>
           </SafeAreaView>
         </View>
+        {editPhotoUploadState && (
+          <View style={StyleSheet.absoluteFill}>
+            <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center' }}>
+              {editPhotoUploadState === 'uploading' ? (
+                <GooeyLoader size={140} />
+              ) : (
+                <View style={{ backgroundColor: '#fff', borderRadius: 20, padding: 32, alignItems: 'center', minWidth: 240 }}>
+                  {editPhotoUploadState === 'success' ? (
+                    <AnimatedIcon icon="line-md:check-all" size={52} />
+                  ) : (
+                    <Ionicons name="close-circle" size={52} color="#ef4444" />
+                  )}
+                  <Text style={{ fontFamily: AppFont.semiBold, fontSize: 15, color: '#333', marginTop: 12, textAlign: 'center' }}>
+                    {editPhotoUploadState === 'success' ? 'Photo uploaded successfully' : editPhotoError || 'Failed to upload photo'}
+                  </Text>
+                  <TouchableOpacity
+                    style={{ marginTop: 20, width: 36, height: 36, borderRadius: 18, backgroundColor: '#eee', justifyContent: 'center', alignItems: 'center' }}
+                    onPress={() => setEditPhotoUploadState(null)}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="close" size={20} color="#666" />
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+          </View>
+        )}
       </Modal>
 
       {/* Edit category picker */}
@@ -2692,6 +3106,29 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                 <Ionicons name={cat.icon} size={11} color={Colors.text} />
               </View>
               <Text style={{ fontFamily: Brand.font.mono, fontSize: 13, color: Colors.text }}>{cat.name}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </BottomSheet>
+
+      {/* Edit space picker */}
+      <BottomSheet visible={showEditSpaceModal} onClose={() => setShowEditSpaceModal(false)} sub="recording" title="space">
+        <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 320 }}>
+          <TouchableOpacity
+            style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 10 }}
+            onPress={() => { setEditSpaceId(null); setShowEditSpaceModal(false); }}
+          >
+            <Ionicons name={!editSpaceId ? 'checkmark-circle' : 'ellipse-outline'} size={18} color={!editSpaceId ? ACCENT_DARK : Colors.faint} />
+            <Text style={{ fontFamily: Brand.font.mono, fontSize: 13, color: Colors.muted }}>none</Text>
+          </TouchableOpacity>
+          {availableSpaces.map(sp => (
+            <TouchableOpacity
+              key={sp.id}
+              style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 10 }}
+              onPress={() => { setEditSpaceId(sp.id); setShowEditSpaceModal(false); }}
+            >
+              <Ionicons name={editSpaceId === sp.id ? 'checkmark-circle' : 'ellipse-outline'} size={18} color={editSpaceId === sp.id ? ACCENT_DARK : Colors.faint} />
+              <Text style={{ fontFamily: Brand.font.mono, fontSize: 13, color: Colors.text }}>{sp.name}</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
@@ -2723,15 +3160,17 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
             </TouchableOpacity>
           </View>
 
-          {/* 3. Action buttons */}
-          <View style={{ flexDirection: "row", justifyContent: "center", gap: 12, paddingVertical: 16 }}>
-            <TouchableOpacity style={{ backgroundColor: DC.btnBg, borderRadius: Radius.pill, paddingHorizontal: 24, paddingVertical: 10 }} activeOpacity={0.8} onPress={() => { setAddReceiptModal(true); }}>
-              <Text style={{ fontFamily: AppFont.semiBold, fontSize: 13, color: DC.btnText }}>Add More</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={{ backgroundColor: DC.photoViewerDeleteBg, borderRadius: Radius.pill, paddingHorizontal: 24, paddingVertical: 10 }} activeOpacity={0.8} onPress={() => setPhotoDeleteConfirm(true)}>
-              <Text style={{ fontFamily: AppFont.semiBold, fontSize: 13, color: DC.photoViewerDeleteText }}>Delete</Text>
-            </TouchableOpacity>
-          </View>
+          {/* 3. Action buttons (owner only) */}
+          {isOwner && (
+            <View style={{ flexDirection: "row", justifyContent: "center", gap: 12, paddingVertical: 16 }}>
+              <TouchableOpacity style={{ backgroundColor: DC.btnBg, borderRadius: Radius.pill, paddingHorizontal: 24, paddingVertical: 10 }} activeOpacity={0.8} onPress={() => { setAddReceiptModal(true); }}>
+                <Text style={{ fontFamily: AppFont.semiBold, fontSize: 13, color: DC.btnText }}>Add More</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={{ backgroundColor: DC.photoViewerDeleteBg, borderRadius: Radius.pill, paddingHorizontal: 24, paddingVertical: 10 }} activeOpacity={0.8} onPress={() => setPhotoDeleteConfirm(true)}>
+                <Text style={{ fontFamily: AppFont.semiBold, fontSize: 13, color: DC.photoViewerDeleteText }}>Delete</Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
           {/* 4. Dot indicators */}
           <View style={{ flexDirection: "row", justifyContent: "center", gap: 6, paddingBottom: 12 }}>
@@ -2976,12 +3415,13 @@ const rd = StyleSheet.create({
   amountBadge:     { backgroundColor: '#B6E1DE22', borderRadius: Radius.pill, paddingHorizontal: 12, paddingVertical: 5 },
   amountBadgeText: { fontFamily: Brand.font.monoBold, fontSize: 13 },
   scroll:     { paddingBottom: 100, backgroundColor: Colors.white },
+  actionBtn:  { width: 36, height: 36, borderRadius: 18, backgroundColor: '#eeeeee', alignItems: 'center', justifyContent: 'center' },
 
   // Info card
   infoCard: { marginHorizontal: DC.pagePadding, borderRadius: 16, backgroundColor: '#F8F8F8', padding: 16, marginTop: 8 },
-  amountRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
-  amountValue: { fontFamily: AppFont.bold, fontSize: 28, letterSpacing: -0.5 },
-  actionsBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#eeeeee', alignItems: 'center', justifyContent: 'center' },
+  tagInfoRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#eeeeee' },
+  tagInfoLabel: { fontFamily: AppFont.regular, fontSize: 11, color: '#999999' },
+  tagInfoValue: { fontFamily: AppFont.semiBold, fontSize: 13, color: '#111111', textAlign: 'right' as const },
   infoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   infoCell: { width: '46%', gap: 2 },
   infoCellLabel: { fontFamily: AppFont.regular, fontSize: 10, color: '#999999', textTransform: 'uppercase', letterSpacing: 0.5 },
@@ -3061,6 +3501,16 @@ const rd = StyleSheet.create({
   contactsLabel:{ ...Brand.type.modalLabel, marginBottom: 6 },
   contactRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.border },
   contactName:  { fontFamily: Brand.font.mono, fontSize: 13, color: Colors.text },
+});
+
+const rdTag = StyleSheet.create({
+  payRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#f0f0f0',
+  },
+  payRowName: { fontFamily: AppFont.semiBold, fontSize: 13, color: '#111111' },
+  payRowDate: { fontFamily: AppFont.regular, fontSize: 11, color: '#999999', marginTop: 2 },
+  payRowAmount: { fontFamily: AppFont.bold, fontSize: 14, color: '#111111' },
 });
 
 const em = StyleSheet.create({

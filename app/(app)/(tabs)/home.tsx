@@ -1,16 +1,15 @@
-import {
-  View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  SafeAreaView, ActivityIndicator, RefreshControl, Animated, Pressable,
-} from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView,
+  SafeAreaView, ActivityIndicator, RefreshControl,
+  TextInput, KeyboardAvoidingView, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import Svg, { Path } from 'react-native-svg';
+
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useUser } from '../../../src/hooks/useUser';
 import { supabase } from '../../../src/lib/supabase';
 import { Colors, Radius } from '@/components/ui/theme';
 import { DC } from '../../../src/lib/design';
 import { AppFont } from '../../../src/lib/fonts';
-import { useNav } from '../../../src/lib/NavContext';
+import { useNav, setHomeDateEditHandler } from '../../../src/lib/NavContext';
 import { useRouter } from 'expo-router';
 import AnimatedIcon from '@/components/ui/AnimatedIcon';
 import { BlurView } from 'expo-blur';
@@ -18,8 +17,11 @@ import GooeyLoader from '@/components/ui/GooeyLoader';
 import BottomSheet from '@/components/ui/BottomSheet';
 import { isReminderDueToday, reminderFrequencyLabel } from '../../../src/lib/reminderUtils';
 import { useState, useMemo, useEffect, useRef } from 'react';
+import TourTarget from '@/components/TourTarget';
 
 const TEAL = '#5dc4bb';
+
+import { FACE_IMAGES } from '../../../src/lib/faceImages';
 const abbrNum = (n: number) => {
   if (n === 0) return '0';
   const abs = Math.abs(n);
@@ -40,8 +42,8 @@ const YEARS = Array.from({ length: 21 }, (_, i) => 2020 + i);
 type DateMode = 'monthly' | '3months';
 
 export default function HomeScreen({ isActive }: { isActive?: boolean }) {
-  const { userId, defaultCurrency } = useUser();
-  const { switchTab, openSpace, openRecording, openTopSpending, openRecordingsPanel, openSpacesPanel, openReceivablesPanel, openRemindersPanel } = useNav();
+  const { userId, defaultCurrency, userName, user } = useUser();
+  const { switchTab, openSpace, openRecording, openRecordingsPanel, openSpacesPanel, openReceivablesPanel, openRemindersPanel } = useNav();
   const router = useRouter();
   const queryClient = useQueryClient();
   const [dateMode, setDateMode] = useState<DateMode>('monthly');
@@ -58,8 +60,8 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
   const [draftFromYear, setDraftFromYear] = useState(new Date().getFullYear());
 
   const [refreshing, setRefreshing] = useState(false);
-  const scrollRef = useRef<any>(null);
   const peopleScrollRef = useRef<any>(null);
+  const actionsScrollRef = useRef<any>(null);
 
   const { from: monthFrom, to: monthTo, label: monthLabel } = useMemo(() => {
     if (dateMode === 'monthly') {
@@ -118,7 +120,6 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
   const onRefresh = async () => {
     setRefreshing(true);
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['home-summary-v2', userId, monthFrom] }),
       queryClient.invalidateQueries({ queryKey: ['home-recent', userId] }),
       queryClient.invalidateQueries({ queryKey: ['home-people', userId] }),
       queryClient.invalidateQueries({ queryKey: ['home-spaces', userId, monthFrom] }),
@@ -126,88 +127,6 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
     ]);
     setRefreshing(false);
   };
-
-  // ── Top categories this month ───────────────────────────────────────────
-  const { data: topCategoriesData, isLoading: loadingCats } = useQuery({
-    queryKey: ['home-summary-v2', userId, monthFrom],
-    queryFn: async () => {
-      const from = monthFrom;
-      const to   = monthTo;
-      const { data } = await supabase
-        .from('recordings')
-        .select('amount, category_id, categories:category_id(name, icon)')
-        .eq('user_id', userId)
-        .eq('type', 'expense')
-        .neq('status', 'voided')
-        .gte('transaction_date', from)
-        .lte('transaction_date', to);
-      if (!data) return { all: [], total: 0 };
-      const map: Record<string, { name: string; icon: string; total: number }> = {};
-      data.forEach((r: any) => {
-        const cat = Array.isArray(r.categories) ? r.categories[0] : r.categories;
-        const key = r.category_id ?? '__none__';
-        if (!map[key]) map[key] = { name: cat?.name ?? 'Uncategorized', icon: cat?.icon ?? 'apps-outline', total: 0, categoryId: r.category_id ?? null };
-        map[key].total += Number(r.amount);
-      });
-      const all = Object.values(map).sort((a, b) => b.total - a.total);
-      return { all, total: all.length };
-    },
-    enabled: !!userId,
-  });
-
-  const allCats = topCategoriesData?.all ?? [];
-  const totalTopCategories = topCategoriesData?.total ?? 0;
-
-  const [selectedPieCat, setSelectedPieCat] = useState<number | null>(null);
-  const pieFadeAnim = useRef(new Animated.Value(1)).current;
-
-  const selectPie = (index: number | null) => {
-    setSelectedPieCat(index);
-    pieFadeAnim.setValue(0.6);
-    Animated.timing(pieFadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start();
-  };
-
-  const pieCategories = useMemo(() => {
-    if (allCats.length === 0) return [];
-    const top4 = allCats.slice(0, 4);
-    const rest = allCats.slice(4);
-    if (rest.length > 0) {
-      const othersTotal = rest.reduce((s, c) => s + c.total, 0);
-      top4.push({ name: 'Others', icon: 'apps-outline', total: othersTotal, categoryId: null });
-    }
-    return top4;
-  }, [allCats]);
-
-  const pieColors = ['#9cd7d2', '#5dc4bb', '#4f9289', '#3d7a72', '#b6e1de'];
-  const totalPie = useMemo(() => pieCategories.reduce((s, c) => s + c.total, 0), [pieCategories]);
-
-  const pieSegments = useMemo(() => {
-    if (totalPie === 0) return [];
-    let startAngle = -Math.PI / 2;
-    const rOuter = 55;
-    const rInner = 25;
-    const cx = 60;
-    const cy = 60;
-    return pieCategories.map((cat, i) => {
-      const pct = cat.total / totalPie;
-      const endAngle = startAngle + pct * 2 * Math.PI;
-      const largeArc = pct > 0.5 ? 1 : 0;
-      const x1o = cx + rOuter * Math.cos(startAngle);
-      const y1o = cy + rOuter * Math.sin(startAngle);
-      const x2o = cx + rOuter * Math.cos(endAngle);
-      const y2o = cy + rOuter * Math.sin(endAngle);
-      const x1i = cx + rInner * Math.cos(endAngle);
-      const y1i = cy + rInner * Math.sin(endAngle);
-      const x2i = cx + rInner * Math.cos(startAngle);
-      const y2i = cy + rInner * Math.sin(startAngle);
-      const path = `M${x1o},${y1o} A${rOuter},${rOuter} 0 ${largeArc},1 ${x2o},${y2o} L${x1i},${y1i} A${rInner},${rInner} 0 ${largeArc},0 ${x2i},${y2i} Z`;
-      const seg = { path, color: pieColors[i % pieColors.length], cat, pct, index: i };
-      startAngle = endAngle;
-      return seg;
-    });
-  }, [pieCategories, totalPie]);
-
-  const top3 = allCats.slice(0, 3);
 
   // ── Latest recordings ────────────────────────────────────────────────
   const { data: recent = [], isLoading: loadingRecent } = useQuery({
@@ -218,6 +137,8 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
         .select('id, name, type, amount, transaction_date')
         .eq('user_id', userId)
         .neq('status', 'voided')
+        .neq('is_tagged', true)
+        .neq('is_system_generated', true)
         .order('created_at', { ascending: false })
         .limit(3);
       return data ?? [];
@@ -282,6 +203,7 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
           const isPaid = myStatus === 'paid' || (myAmount > 0 && myPaid >= myAmount - 0.01);
           items.push({
             id: r.id,
+            recordingId: r.id,
             name: r.name,
             amount: myAmount,
             paidAmount: myPaid,
@@ -296,7 +218,7 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
 
         // My recordings that I shared with others
         (myShared ?? []).forEach((r: any) => {
-          if (r.user_id === userId && (sharedWithMe ?? []).some((s: any) => s.id === r.id)) return;
+          if ((sharedWithMe ?? []).some((s: any) => s.id === r.id)) return;
           const sw = typeof r.shared_with === 'string' ? JSON.parse(r.shared_with) : (r.shared_with ?? []);
           const ids = Array.isArray(sw) ? sw : [];
           ids.forEach((friendId: string) => {
@@ -305,6 +227,7 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
             const isPaid = r.status === 'paid' || (Number(r.amount) > 0 && paid >= Number(r.amount) - 0.01);
             items.push({
               id: r.id + '_' + friendId,
+              recordingId: r.id,
               name: r.name,
               amount: Number(r.amount),
               paidAmount: paid,
@@ -340,7 +263,7 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
     enabled: !!userId,
   });
 
-  // ── People — unified loans + receivables ──────────────────────────────
+  // ── Loans — unified loans + receivables ──────────────────────────────
   const { data: peopleData, isLoading: loadingPeople } = useQuery({
     queryKey: ['home-people', userId],
     queryFn: async () => {
@@ -355,34 +278,75 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
       ));
       const friendNameSet = new Set(friendNames);
 
-      // All recordings with a person (filtered to financial relationships)
+      // All recordings with a person (filtered to financial relationships, exclude old mirror debts)
       const { data: allRecs } = await supabase
         .from('recordings')
-        .select('person_name, type, amount, paid_amount, status, is_due')
+        .select('id, person_name, type, amount, paid_amount, status, is_due, source_recording_id, is_tagged')
         .eq('user_id', userId)
         .neq('person_name', '')
         .not('person_name', 'is', null)
         .neq('status', 'voided');
       const recs = (allRecs ?? []).filter(
-        (r: any) => r.type === 'debt' || r.type === 'due' || r.is_due
+        (r: any) => (r.type === 'debt' && !r.is_tagged) || r.type === 'due' || r.is_due
       );
 
-      // Shared recordings (expenses shared with me) — shown as debts I owe to the sharer
+      // Compute paid from returns (shared with both users)
+      const recIds = recs.flatMap(r => [r.id, r.source_recording_id].filter(Boolean));
+      const { data: copies } = recIds.length > 0 ? await supabase.from('recordings')
+        .select('id, source_recording_id').in('source_recording_id', recIds).neq('status', 'voided')
+        : { data: [] };
+      const allIds = [...new Set([...recIds, ...(copies ?? []).map((c: any) => c.id)])];
+
+      // Shared recordings where I'm tagged — I owe the owner (single-entry model)
       const { data: sharedRecs } = await supabase
         .from('recordings')
         .select('id, user_id, name, amount, status')
         .filter('shared_with', 'cs', `["${userId}"]`)
+        .neq('user_id', userId)
+        .eq('tagged_friend_user_id', userId)
         .neq('status', 'voided');
+      // Add shared recording IDs to allIds for return computation
+      (sharedRecs ?? []).forEach((sr: any) => {
+        if (sr.status === 'paid') return;
+        allIds.push(sr.id);
+      });
+      // Query returns for all recording IDs (own recordings, copies, shared)
+      const { data: returns } = allIds.length > 0 ? await supabase.from('recordings')
+        .select('linked_recording_id, amount').eq('type', 'return').neq('status', 'voided').in('linked_recording_id', allIds)
+        : { data: [] };
+      const returnSum: Record<string, number> = {};
+      (returns ?? []).forEach((p: any) => {
+        returnSum[p.linked_recording_id] = (returnSum[p.linked_recording_id] ?? 0) + Number(p.amount);
+      });
       const sharedMap: Record<string, { name: string; total: number }> = {};
       for (const sr of (sharedRecs ?? [])) {
         if (sr.status === 'paid') continue;
+        const totalPaid = returnSum[sr.id] ?? 0;
+        if (totalPaid >= Number(sr.amount ?? 0) - 0.01) continue;
         const ownerId = sr.user_id;
         if (!sharedMap[ownerId]) {
           const { data: ownerName } = await supabase.rpc('get_user_display_name', { user_id: ownerId });
           sharedMap[ownerId] = { name: ownerName ?? 'unknown', total: 0 };
         }
-        sharedMap[ownerId].total += Number(sr.amount ?? 0);
+        sharedMap[ownerId].total += Math.max(0, Number(sr.amount ?? 0) - totalPaid);
       }
+
+      // Backward compat: old mirror debt recordings in my account
+      const { data: oldDebts } = await supabase
+        .from('recordings')
+        .select('id, person_name, amount, paid_amount, status')
+        .eq('user_id', userId)
+        .eq('type', 'debt')
+        .eq('is_tagged', true)
+        .neq('status', 'voided');
+      const oldDebtMap: Record<string, number> = {};
+      (oldDebts ?? []).forEach((d: any) => {
+        const name = d.person_name?.toLowerCase() || 'unknown';
+        const remaining = Math.max(0, Number(d.amount) - Number(d.paid_amount ?? 0));
+        if (remaining > 0.01) {
+          oldDebtMap[name] = (oldDebtMap[name] ?? 0) + remaining;
+        }
+      });
 
       // Scope split data to user's bills
       const { data: userBills } = await supabase
@@ -412,8 +376,12 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
 
       (recs ?? []).forEach((r: any) => {
         if (!r.person_name) return;
-        const paid = Number(r.paid_amount ?? 0);
-        const remaining = Number(r.amount) - paid;
+        if (r.status === 'paid' || r.status === 'closed') return;
+        const linkedReturns = (returnSum[r.id] ?? 0) + (r.source_recording_id ? (returnSum[r.source_recording_id] ?? 0) : 0);
+        const copyReturns = (copies ?? []).filter((c: any) => c.source_recording_id === r.id || c.source_recording_id === r.source_recording_id)
+          .reduce((sum: number, c: any) => sum + (returnSum[c.id] ?? 0), 0);
+        const paid = Math.min(linkedReturns + copyReturns, Number(r.amount));
+        const remaining = Math.max(0, Number(r.amount) - paid);
         if (remaining <= 0.01) return;
         if (!details[r.person_name]) details[r.person_name] = { owedToMe: 0, iOwe: 0 };
         if (r.type === 'due' || r.is_due) { details[r.person_name].owedToMe += remaining; net[r.person_name] = (net[r.person_name] ?? 0) + remaining; }
@@ -445,12 +413,18 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
         if (details[pay.person_name]) details[pay.person_name].owedToMe -= Number(pay.amount);
       });
 
-      // Shared recordings — I owe the owner
-      Object.entries(sharedMap).forEach(([ownerId, data]) => {
-        const name = data.name;
+      // Add shared recordings — debts others told me I owe
+      Object.values(sharedMap).forEach((data) => {
+        if (!details[data.name]) details[data.name] = { owedToMe: 0, iOwe: 0 };
+        details[data.name].iOwe += data.total;
+        net[data.name] = (net[data.name] ?? 0) - data.total;
+      });
+
+      // Backward compat: old mirror debt recordings in my account
+      Object.entries(oldDebtMap).forEach(([name, remaining]) => {
         if (!details[name]) details[name] = { owedToMe: 0, iOwe: 0 };
-        details[name].iOwe += data.total;
-        net[name] = (net[name] ?? 0) - data.total;
+        details[name].iOwe += remaining;
+        net[name] = (net[name] ?? 0) - remaining;
       });
 
       const people = Object.entries(details)
@@ -588,225 +562,157 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
 
   const [spaceChoice, setSpaceChoice] = useState<{ id: string; name: string } | null>(null);
 
+  const [addContactSheet, setAddContactSheet] = useState(false);
+  const [addAccountSheet, setAddAccountSheet] = useState(false);
+  const [accBank, setAccBank] = useState('');
+  const [accName, setAccName] = useState('');
+  const [accNumber, setAccNumber] = useState('');
+  const [accHolder, setAccHolder] = useState('');
+  const [accError, setAccError] = useState('');
+  const [accLoading, setAccLoading] = useState(false);
+
   const fmt = (n: number | undefined | null) => (n ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const isLoading = loadingCats || loadingRecent || loadingPeople || loadingSpaces || loadingReminders;
+  const isLoading = loadingRecent || loadingPeople || loadingSpaces || loadingReminders;
+
+  const { setHomeDateLabel } = useNav();
+
+  useEffect(() => {
+    setHomeDateEditHandler(() => setShowDateSheet(true));
+    return () => setHomeDateEditHandler(null);
+  }, []);
+
+  useEffect(() => {
+    setHomeDateLabel(monthLabel);
+  }, [monthLabel, setHomeDateLabel]);
 
   return (
     <SafeAreaView style={s.root}>
-      {/* ── Date nav ── */}
-      <View style={s.monthNav}>
-        <TouchableOpacity onPress={() => {
-          if (dateMode === 'monthly') {
-            const d = new Date(pickerYear, pickerMonth - 1, 1);
-            setPickerMonth(d.getMonth());
-            setPickerYear(d.getFullYear());
-          } else {
-            const d = new Date(rangeFromYear, rangeFromMonth - 3, 1);
-            setRangeFromMonth(d.getMonth());
-            setRangeFromYear(d.getFullYear());
-          }
-        }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Ionicons name="chevron-back" size={13} color={DC.pageActionText} />
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => {
-          setDraftMode(dateMode);
-          setDraftPickerMonth(pickerMonth);
-          setDraftPickerYear(pickerYear);
-          setDraftFromMonth(rangeFromMonth);
-          setDraftFromYear(rangeFromYear);
-          setShowDateSheet(true);
-        }} activeOpacity={0.7} style={{ flex: 1, alignItems: 'center' }}>
-          <Text style={s.monthBtnText}>{monthLabel}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => {
-          if (dateMode === 'monthly') {
-            const d = new Date(pickerYear, pickerMonth + 1, 1);
-            setPickerMonth(d.getMonth());
-            setPickerYear(d.getFullYear());
-          } else {
-            const d = new Date(rangeFromYear, rangeFromMonth + 3, 1);
-            setRangeFromMonth(d.getMonth());
-            setRangeFromYear(d.getFullYear());
-          }
-        }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Ionicons name="chevron-forward" size={13} color={DC.pageActionText} />
-        </TouchableOpacity>
-      </View>
 
       <ScrollView
         contentContainerStyle={s.scroll}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        <>
-            {/* ── Top Spending ── */}
-            <SectionHeader title="Top Spending" onSeeMore={openTopSpending} seeMoreLabel="go to categories" />
-            {allCats.length === 0 ? (
-              <EmptyRow label="no expenses this month" onPress={openTopSpending} />
-            ) : (
-              <View style={s.topSpendingRow}>
-                <View style={s.pieColumn}>
-                  <Pressable onPress={(e) => {
-                    const ev = e.nativeEvent as any;
-                    const x = ev.offsetX ?? ev.locationX;
-                    const y = ev.offsetY ?? ev.locationY;
-                    if (x == null) return;
-                    const dx = x - 60;
-                    const dy = y - 60;
-                    const dist = Math.sqrt(dx * dx + dy * dy);
-                    if (dist < 25) { selectPie(null); return; }
-                    let angle = Math.atan2(dy, dx) + Math.PI / 2;
-                    if (angle < 0) angle += 2 * Math.PI;
-                    const totalPct = angle / (2 * Math.PI);
-                    let cum = 0;
-                    for (const seg of pieSegments) {
-                      cum += seg.pct;
-                      if (totalPct <= cum) { selectPie(seg.index === selectedPieCat ? null : seg.index); return; }
-                    }
-                  }}>
-                    <View>
-                      <Svg width={120} height={120} viewBox="0 0 120 120">
-                        {pieSegments.map((seg, i) => (
-                          <Path key={i} d={seg.path} fill={seg.color} opacity={selectedPieCat === null || selectedPieCat === seg.index ? 1 : 0.3} />
-                        ))}
-                        <Path d={`M60,35 A25,25 0 1,1 59.9,35 Z`} fill="#ffffff" />
-                      </Svg>
-                    </View>
-                  </Pressable>
-                  <View style={s.pieLabel}>
-                    {selectedPieCat !== null ? (
-                      <>
-                        <Text style={s.pieLabelName} numberOfLines={1}>{pieCategories[selectedPieCat].name}</Text>
-                        <Text style={s.pieLabelAmount}>{fmt(pieCategories[selectedPieCat].total)}</Text>
-                      </>
-                    ) : (
-                      <>
-                        <Text style={s.pieLabelName} numberOfLines={1}>Total</Text>
-                        <Text style={s.pieLabelAmount}>{fmt(totalPie)}</Text>
-                      </>
-                    )}
-                  </View>
-                </View>
-                <View style={s.top3Column}>
-                  {top3.map((cat, i) => (
-                    <TouchableOpacity key={i} style={s.top3Card} activeOpacity={0.7} onPress={() => openRecordingsPanel({ categoryId: cat.categoryId ?? undefined, categoryName: cat.name })}>
-                      <AnimatedIcon set="basil" icon={cat.icon} size={18} color="#111111" />
-                      <View style={{ flex: 1 }}>
-                        <Text style={s.catName} numberOfLines={1}>{cat.name}</Text>
-                        <Text style={s.catAmount}>{fmt(cat.total)}</Text>
-                      </View>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-            )}
-
-            {/* ── Spaces ── */}
-            <SectionHeader title="Spaces" onSeeMore={openSpacesPanel} seeMoreLabel="go to spaces" />
-            {spaces.length === 0 ? (
-              <EmptyRow label="no spaces" />
-            ) : (
-              <View
-                ref={scrollRef}
-                style={{ overflow: 'hidden', flexDirection: 'row', cursor: 'grab' } as any}
-                onMouseDown={makeScrollDragHandler(scrollRef)}
-                onTouchStart={makeScrollDragHandler(scrollRef)}
-              >
-                <View style={{ flexDirection: 'row', gap: 10, paddingBottom: 4 }}>
-                  {spaces.map((sp: any) => (
-                    <TouchableOpacity key={sp.id} style={s.spaceCard} activeOpacity={0.7} onPress={() => setSpaceChoice({ id: sp.id, name: sp.name })}>
-                      <AnimatedIcon set="line-md" icon="folder-twotone" size={80} color={sp.space_type === 'shared' ? '#e8e8e8' : sp.space_type === 'savings' ? '#bcd2c2' : '#fee1d3'} />
-                      <Text style={s.spaceCardName} numberOfLines={1}>{sp.name}</Text>
-                      <Text style={s.spaceCardAmount}>{fmt(sp.monthNet ?? sp.spent)}</Text>
-                      {sp.space_type === 'savings' && (
-                        <Text style={s.spaceCardAllTime}>{abbrNum(sp.spent)}{sp.budget ? <Text style={s.spaceCardGoal}> / {abbrNum(sp.budget)}</Text> : null}</Text>
-                      )}
-                      {sp.budget && sp.space_type !== 'savings' && <Text style={s.spaceCardSub}>{fmt(sp.budget)}</Text>}
-                    </TouchableOpacity>
-                  ))}
-                  {totalCounts.spaces > spaces.length && (
-                    <TouchableOpacity style={s.spaceCard} activeOpacity={0.7} onPress={openSpacesPanel}>
-                      <AnimatedIcon set="line-md" icon="folder-twotone" size={80} color="#e8e8e8" />
-                      <Text style={s.spaceCardName}>+{totalCounts.spaces - spaces.length} more</Text>
-                    </TouchableOpacity>
-                  )}
-                  <TouchableOpacity style={[s.spaceCard, { borderWidth: 1.5, borderColor: '#e0e0e0', borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' }]} activeOpacity={0.7} onPress={() => switchTab('spaces')}>
-                    <Ionicons name="add-outline" size={28} color="#bbb" style={{ marginTop: 8 }} />
-                    <Text style={[s.spaceCardName, { color: '#bbb', marginTop: -2 }]}>Add Space</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
-
-            {/* ── Latest Recordings ── */}
-            <SectionHeader title="Recordings" onSeeMore={openRecordingsPanel} seeMoreLabel="go to recordings" />
+            {/* ── RECORDS ── */}
+            <SectionHeader title="RECORDS" onArrowRight={() => openRecordingsPanel()} />
             {recent.length === 0 ? (
-              <EmptyRow label="go to recordings" onPress={openRecordingsPanel} />
+              <EmptyRow label="no recordings" />
             ) : (
               <View style={s.list}>
-                {recent.map((r: any, i: number) => (
-                  <TouchableOpacity key={r.id} style={[s.row, i === recent.length - 1 && s.rowLast]} activeOpacity={0.7} onPress={() => openRecording(r.id)}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={s.rowName} numberOfLines={1}>{r.name}</Text>
-                      <Text style={s.rowSub}>{r.type}</Text>
-                      <Text style={s.rowSub}>{r.transaction_date ? new Date(r.transaction_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</Text>
-                    </View>
-                    <Text style={s.rowValueBold}>{fmt(Number(r.amount))}</Text>
+                {recent.slice(0, 3).map((r: any, i: number) => {
+                  const typeColor = r.type === 'expense' ? '#f96262' : r.type === 'income' ? '#2bac5a' : '#2a2a26';
+                  return (
+                    <TouchableOpacity key={r.id} style={[s.recRow, i === Math.min(recent.length, 3) - 1 && s.rowLast]} activeOpacity={0.7} onPress={() => openRecording(r.id)}>
+                      <Text style={s.recRowName} numberOfLines={1}>{r.name.charAt(0).toUpperCase() + r.name.slice(1)}</Text>
+                      <Text style={[s.recRowAmount, { color: typeColor }]}>{fmt(Number(r.amount))}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+                {totalCounts.recordings > 3 && (
+                  <TouchableOpacity onPress={() => openRecordingsPanel()} activeOpacity={0.7} style={s.recMoreRow}>
+                    <Text style={s.recMoreText}>+ {totalCounts.recordings - 3} more</Text>
                   </TouchableOpacity>
-                ))}
+                )}
               </View>
             )}
 
             {/* ── Reminders ── */}
-            <SectionHeader title="Reminders" onSeeMore={openRemindersPanel} seeMoreLabel="go to reminders" />
+            <SectionHeader title="Reminders" onArrowRight={() => openRemindersPanel()} />
             {reminders.length === 0 ? (
-              <EmptyRow label="go to reminders" onPress={openRemindersPanel} />
+              <EmptyRow label="no reminders" />
             ) : (
-              <View style={s.list}>
-                {reminders.map((r: any, i: number) => {
-                  const due = isReminderDueToday(r, new Date());
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                {reminders.map((r: any) => (
+                  <View key={r.id} style={s.reminderPill}>
+                    <Text style={s.reminderPillName}>{r.name.toUpperCase()}</Text>
+                    <Text style={s.reminderPillType}>{r.recording_type === 'expense' ? 'Expense' : 'Income'}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {/* ── FOLDERS ── */}
+            <SectionHeader title="FOLDERS" onArrowRight={openSpacesPanel} />
+            {spaces.length === 0 ? (
+              <EmptyRow label="no folders" />
+            ) : (
+              <>
+                {(() => {
+                  const savingsSpaces = spaces.filter((sp: any) => sp.space_type === 'savings');
+                  const expenseSpaces = spaces.filter((sp: any) => sp.space_type !== 'savings');
                   return (
-                    <View key={r.id} style={[s.row, i === reminders.length - 1 && s.rowLast]}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={s.rowName} numberOfLines={1}>{r.name}</Text>
-                        <Text style={s.rowSub}>{reminderFrequencyLabel(r)} · {r.recording_type}</Text>
-                      </View>
-                      {due && (
-                        <Text style={{ fontFamily: 'Poppins-SemiBold', fontSize: 11, color: TEAL }}>due today</Text>
+                    <>
+                      {savingsSpaces.length > 0 && (
+                        <>
+                          <Text style={s.folderSubtitle}>SAVINGS</Text>
+                          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }} nestedScrollEnabled>
+                             {savingsSpaces.map((sp: any) => (
+                              <TouchableOpacity key={sp.id} style={s.savingsCard} activeOpacity={0.7} onPress={() => setSpaceChoice({ id: sp.id, name: sp.name })}>
+                                <View style={s.folderCardHeader}>
+                                  <Text style={s.folderCardName} numberOfLines={1}>{sp.name}</Text>
+                                  <View style={s.savingsBadge}><Text style={s.savingsBadgeText}>SAVINGS</Text></View>
+                                </View>
+                                  <Text style={[s.folderCardLabel, { color: '#3a3a34' }]}>Monthly Saved</Text>
+                                  <Text style={[s.folderCardMeta, { color: '#3a3a34' }]}>{abbrNum(sp.spent ?? 0)} | <Text style={[s.folderCardMetaBold, { color: '#3a3a34' }]}>{abbrNum(sp.budget ?? 0)}</Text></Text>
+                              </TouchableOpacity>
+                            ))}
+                          </ScrollView>
+                          <View style={{ height: 8 }} />
+                        </>
                       )}
-                    </View>
+                      {expenseSpaces.length > 0 && (
+                        <>
+                          <Text style={s.folderSubtitle}>EXPENSE</Text>
+                          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }} nestedScrollEnabled>
+                             {expenseSpaces.map((sp: any) => (
+                              <TouchableOpacity key={sp.id} style={s.expenseCard} activeOpacity={0.7} onPress={() => setSpaceChoice({ id: sp.id, name: sp.name })}>
+                                <View style={s.folderCardHeader}>
+                                  <Text style={[s.folderCardName, { color: '#ffffff' }]} numberOfLines={1}>{sp.name}</Text>
+                                  <View style={s.expenseBadge}><Text style={s.expenseBadgeText}>EXPENSE</Text></View>
+                                </View>
+                                  <Text style={[s.folderCardLabel, { color: '#cccccc' }]}>Monthly Expense</Text>
+                                  <Text style={[s.folderCardMeta, { color: '#aaaaaa' }]}>{abbrNum(sp.spent ?? 0)} | <Text style={[s.folderCardMetaBold, { color: '#aaaaaa' }]}>{abbrNum(sp.budget ?? 0)}</Text></Text>
+                              </TouchableOpacity>
+                            ))}
+                          </ScrollView>
+                        </>
+                      )}
+                    </>
                   );
-                })}
-              </View>
+                })()}
+              </>
             )}
 
-            {/* ── Shared Recordings ── */}
-            <SectionHeader title="Shared" />
-            {shared.length === 0 ? (
-              <EmptyRow label="no shared recordings" />
-            ) : (
-              <View style={s.list}>
-                {shared.map((r: any, i: number) => {
-                  const statusLabel = r.isPaid ? 'Closed' : (r.status === 'partial' ? 'Partial' : 'Pending');
-                  const counterpartyLabel = r.isOwner ? r.counterpartyName : 'Your Transaction';
-                  return (
-                    <TouchableOpacity key={r.id} style={[s.row, i === shared.length - 1 && s.rowLast]} activeOpacity={0.7} onPress={() => openRecording(r.id)}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={s.rowName} numberOfLines={1}>{r.name}</Text>
-                        <Text style={s.rowSub} numberOfLines={1}>{counterpartyLabel}</Text>
-                        <Text style={[s.rowSub, { fontStyle: 'italic', color: r.isPaid ? '#2A7A6F' : r.status === 'partial' ? '#e67e22' : '#999999' }]}>{statusLabel}</Text>
+            {/* ── Actions ── */}
+            <SectionHeader title="Actions" />
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -6, paddingBottom: 4 }}>
+              {[
+                { icon: 'chat-filled', label: 'CREATE', sub: 'RECORDING', onPress: () => router.push({ pathname: '/(app)/add-recording', params: {} } as any), tourId: 'tour-create-recording' },
+                { icon: 'folder-twotone', label: 'CREATE', sub: 'FOLDER', onPress: () => switchTab('spaces'), tourId: 'tour-create-folder' },
+                { icon: 'briefcase-twotone', label: 'ADD', sub: 'ACCOUNT', onPress: () => setAddAccountSheet(true) },
+                { icon: 'paint-drop-half-filled-twotone', label: 'ADD', sub: 'CATEGORY', onPress: () => switchTab('categories') },
+                { icon: 'person-twotone', label: 'ADD A', sub: 'CONTACT', onPress: () => setAddContactSheet(true) },
+                { icon: 'watch-twotone', label: 'VIEW', sub: 'LOANS', onPress: () => openReceivablesPanel() },
+                { icon: 'folder-twotone', label: 'VIEW', sub: 'FOLDER', onPress: openSpacesPanel },
+              ].map((action: any, i) => (
+                <View key={i} style={{ width: '33.33%', padding: 4 }}>
+                  <TourTarget id={action.tourId ?? `action-${i}`}>
+                    <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, paddingHorizontal: 8, backgroundColor: DC.pageActionBg, borderRadius: 10 }} activeOpacity={0.7} onPress={action.onPress}>
+                      <AnimatedIcon set="line-md" icon={action.icon} size={20} color={TEAL} />
+                      <View style={{ flexShrink: 1 }}>
+                        <Text style={{ fontFamily: AppFont.regular, fontSize: 8, textTransform: 'uppercase', color: '#111111' }}>{action.label}</Text>
+                        <Text style={{ fontFamily: AppFont.regular, fontSize: 8, textTransform: 'uppercase', color: '#111111' }}>{action.sub}</Text>
                       </View>
-                      <Text style={s.rowValueBold}>{fmt(r.amount)}</Text>
                     </TouchableOpacity>
-                  );
-                })}
-              </View>
-            )}
+                  </TourTarget>
+                </View>
+              ))}
+            </View>
 
-            {/* ── People ── */}
-            <SectionHeader title="People" onSeeMore={() => openReceivablesPanel()} seeMoreLabel="all people" />
+            {/* ── Loans ── */}
+            <SectionHeader title="Loans" onSeeMore={() => openReceivablesPanel()} seeMoreLabel="all loans" />
             {peopleSummary.length === 0 ? (
-              <EmptyRow label="no people with balances" />
+              <EmptyRow label="no active loans" />
             ) : (
               <View
                 ref={peopleScrollRef}
@@ -820,7 +726,7 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
                   const absNet = Math.abs(p.net);
                   return (
                     <TouchableOpacity key={p.person} style={s.spaceCard} activeOpacity={0.7} onPress={() => openReceivablesPanel(p.person)}>
-                      <AnimatedIcon set="material-symbols" icon="person-rounded" size={80} color={p.isFriend ? '#9cd7d2' : '#e8e8e8'} />
+                      <AnimatedIcon set="material-symbols" icon="person-rounded" size={52} color={isNegative ? '#fee1d3' : '#bcd2c2'} />
                       <Text style={s.spaceCardName} numberOfLines={1}>{p.person}</Text>
                       <Text style={[s.spaceCardAmount, { color: '#111111' }]}>{fmt(absNet)}</Text>
                       <Text style={s.spaceCardSub}>{isNegative ? 'you owe' : 'owes you'}</Text>
@@ -830,7 +736,7 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
                 </View>
               </View>
             )}
-          </>
+
       </ScrollView>
 
       {/* Loading overlay */}
@@ -943,19 +849,71 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
           <Ionicons name="chevron-forward" size={14} color={Colors.faint} />
         </TouchableOpacity>
       </BottomSheet>
+
+      <BottomSheet visible={addAccountSheet} onClose={() => { setAddAccountSheet(false); setAccBank(''); setAccName(''); setAccNumber(''); setAccHolder(''); setAccError(''); }} title="add account">
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <View style={{ gap: 10, paddingBottom: 16 }}>
+            <TextInput style={{ borderWidth: 1, borderColor: '#e0e0e0', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 10, fontFamily: AppFont.regular, fontSize: 13, color: '#111' }} placeholder="bank" placeholderTextColor={Colors.faint} value={accBank} onChangeText={setAccBank} />
+            <TextInput style={{ borderWidth: 1, borderColor: '#e0e0e0', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 10, fontFamily: AppFont.regular, fontSize: 13, color: '#111' }} placeholder="account name" placeholderTextColor={Colors.faint} value={accName} onChangeText={setAccName} />
+            <TextInput style={{ borderWidth: 1, borderColor: '#e0e0e0', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 10, fontFamily: AppFont.regular, fontSize: 13, color: '#111' }} placeholder="account number" placeholderTextColor={Colors.faint} value={accNumber} onChangeText={setAccNumber} keyboardType="numeric" />
+            <TextInput style={{ borderWidth: 1, borderColor: '#e0e0e0', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 10, fontFamily: AppFont.regular, fontSize: 13, color: '#111' }} placeholder="account holder" placeholderTextColor={Colors.faint} value={accHolder} onChangeText={setAccHolder} />
+            {accError ? <Text style={{ color: '#e74c3c', fontSize: 12 }}>{accError}</Text> : null}
+            <TouchableOpacity style={{ backgroundColor: TEAL, borderRadius: 8, paddingVertical: 12, alignItems: 'center', opacity: accLoading ? 0.6 : 1 }} disabled={accLoading} onPress={async () => {
+              if (!accBank.trim() || !accName.trim() || !accNumber.trim()) { setAccError('bank, account name and number are required.'); return; }
+              setAccLoading(true); setAccError('');
+              const { error: err } = await supabase.from('accounts').insert({ user_id: userId, bank: accBank.trim(), account_name: accName.trim(), account_number: accNumber.trim(), holder_name: accHolder.trim() || accName.trim(), account_type: 'Savings', account_details: '', color: Colors.border });
+              setAccLoading(false);
+              if (err) { setAccError(err.message); return; }
+              setAddAccountSheet(false); setAccBank(''); setAccName(''); setAccNumber(''); setAccHolder(''); setAccError('');
+              queryClient.invalidateQueries({ queryKey: ['accounts'] });
+            }}>
+              <Text style={{ color: '#fff', fontWeight: '600', textAlign: 'center' }}>{accLoading ? 'saving...' : 'save account'}</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </BottomSheet>
+
+      <BottomSheet visible={addContactSheet} onClose={() => setAddContactSheet(false)} title="add a contact">
+        <TouchableOpacity style={s.choiceRow} activeOpacity={0.8} onPress={() => { setAddContactSheet(false); openFriendsPanel(); }}>
+          <View style={{ flex: 1 }}>
+            <Text style={s.choiceTitle}>Add a Friend</Text>
+            <Text style={s.choiceSub}>connect with other Ledgr users</Text>
+          </View>
+          <Ionicons name="people-outline" size={18} color={TEAL} />
+        </TouchableOpacity>
+        <TouchableOpacity style={[s.choiceRow, { borderBottomWidth: 0 }]} activeOpacity={0.8} onPress={() => { setAddContactSheet(false); openContactsPanel(); }}>
+          <View style={{ flex: 1 }}>
+            <Text style={s.choiceTitle}>Add a Manual Contact</Text>
+            <Text style={s.choiceSub}>add someone without an account</Text>
+          </View>
+          <Ionicons name="person-outline" size={18} color={TEAL} />
+        </TouchableOpacity>
+      </BottomSheet>
     </SafeAreaView>
   );
 }
 
-function SectionHeader({ title, onSeeMore, seeMoreLabel }: { title: string; onSeeMore?: () => void; seeMoreLabel?: string }) {
+function SectionHeader({ title, onSeeMore, seeMoreLabel, onArrowRight, onAdd, titleStyle }: { title: string; onSeeMore?: () => void; seeMoreLabel?: string; onArrowRight?: () => void; onAdd?: () => void; titleStyle?: any }) {
   return (
     <View style={s.sectionRow}>
-      <Text style={s.sectionTitle}>{title}</Text>
-      {onSeeMore && (
-        <TouchableOpacity onPress={onSeeMore} activeOpacity={0.7} style={s.seeMoreRow}>
-          <Text style={s.seeMoreText}>{seeMoreLabel ?? 'see all'}</Text>
-        </TouchableOpacity>
-      )}
+      <Text style={[s.sectionTitle, titleStyle]}>{title}</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        {onAdd && (
+          <TouchableOpacity onPress={onAdd} activeOpacity={0.7} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name="add" size={18} color="#000000" />
+          </TouchableOpacity>
+        )}
+        {onSeeMore && (
+          <TouchableOpacity onPress={onSeeMore} activeOpacity={0.7} style={s.seeMoreRow}>
+            <Text style={s.seeMoreText}>{seeMoreLabel ?? 'see all'}</Text>
+          </TouchableOpacity>
+        )}
+        {onArrowRight && (
+          <TouchableOpacity onPress={onArrowRight} activeOpacity={0.7} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name="arrow-forward" size={18} color="#000000" />
+          </TouchableOpacity>
+        )}
+      </View>
     </View>
   );
 }
@@ -1006,18 +964,26 @@ function EmptyRow({ label, onPress }: { label: string; onPress?: () => void }) {
 }
 
 const s = StyleSheet.create({
-  root:   { flex: 1, backgroundColor: '#ffffff' },
+  root:   { flex: 1, backgroundColor: '#fdfdfd' },
   scroll: { paddingHorizontal: 28, paddingTop: 8, paddingBottom: 80 },
-
-  // Month nav
-  monthNav:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: DC.pageActionPaddingH, paddingVertical: DC.pageActionPaddingV, backgroundColor: DC.pageActionBg, borderRadius: DC.pageActionRadius, marginHorizontal: 28, marginTop: 4, marginBottom: 4 },
-  monthBtnText: { fontFamily: AppFont.regular, fontSize: DC.dropdownFontSize, color: DC.pageActionText },
 
   // Section header
   sectionRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 24, marginBottom: 10 },
-  sectionTitle:{ fontFamily: 'Poppins-Bold', fontSize: 13, color: '#9cd7d2', textTransform: 'uppercase', letterSpacing: 0.8 },
-  seeMoreRow:  { paddingHorizontal: 12, paddingVertical: 7, borderRadius: DC.pageActionRadius, backgroundColor: DC.pageActionBg, borderWidth: DC.pageActionBorderWidth },
-  seeMoreText: { fontFamily: AppFont.regular, fontSize: 12, color: DC.pageActionText },
+  sectionTitle:{ fontFamily: AppFont.semiBold, fontSize: 20, color: '#2a2a26', textTransform: 'uppercase', letterSpacing: 0.8 },
+  seeMoreRow:  { paddingHorizontal: 12, paddingVertical: 7, borderRadius: DC.pageActionRadius, backgroundColor: '#ebf7f6' },
+  seeMoreText: { fontFamily: AppFont.regular, fontSize: 11, color: '#4f9289' },
+
+  // RECORDS rows
+  recRow:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
+  recRowName:  { fontFamily: AppFont.semiBold, fontSize: 11, color: '#2a2a26', flex: 1 },
+  recRowAmount:{ fontFamily: AppFont.semiBold, fontSize: 11 },
+  recMoreRow:  { paddingVertical: 6 },
+  recMoreText: { fontFamily: AppFont.regular, fontSize: 11, color: '#2a2a26' },
+
+  // Reminder pill
+  reminderPill:       { width: 120, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 100, borderWidth: 1, borderColor: '#d2d2d2', backgroundColor: 'transparent', alignItems: 'center' },
+  reminderPillName:   { fontFamily: AppFont.regular, fontSize: 11, color: '#2a2a26', letterSpacing: 0.3 },
+  reminderPillType:   { fontFamily: AppFont.regular, fontSize: 10, color: '#2a2a26', fontStyle: 'italic' },
 
   // Empty
   emptyRow:  { paddingVertical: 12 },
@@ -1035,26 +1001,40 @@ const s = StyleSheet.create({
   spaceCardSub: { fontFamily: 'Poppins-Regular', fontSize: 9, color: '#999999', textAlign: 'center', lineHeight: 12 },
   spaceCardAllTime: { fontFamily: 'Poppins-Regular', fontSize: 9, color: '#555555', textAlign: 'center', fontStyle: 'italic', lineHeight: 12 },
   spaceCardGoal: { fontFamily: 'Poppins-Regular', fontSize: 9, color: '#bbbbbb', textAlign: 'center', fontStyle: 'italic', lineHeight: 12 },
+
+  // Folder cards
+  folderSubtitle: { fontFamily: 'Poppins-Medium', fontSize: 10, color: '#b5b4a4', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
+  savingsCard: {
+    width: 200,
+    backgroundColor: '#f5f5f5',
+    borderWidth: 1,
+    borderColor: '#d2d2d2',
+    borderRadius: 6,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    gap: 0,
+  },
+  expenseCard: {
+    width: 200,
+    backgroundColor: '#3a3a34',
+    borderRadius: 6,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    gap: 0,
+  },
+  folderCardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+  folderCardName: { fontFamily: 'Poppins-Bold', fontSize: 13, color: '#000000', flex: 1, textTransform: 'uppercase', letterSpacing: 0.3 },
+  savingsBadge: { backgroundColor: '#e5f5e8', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 100 },
+  savingsBadgeText: { fontFamily: 'Poppins-Medium', fontSize: 9, color: '#0a550f' },
+  expenseBadge: { backgroundColor: '#f9f0ec', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 100 },
+  expenseBadgeText: { fontFamily: 'Poppins-Medium', fontSize: 9, color: '#ff5757' },
+  folderCardLabel: { fontFamily: 'Poppins-Regular', fontSize: 10, color: '#555555', letterSpacing: 0.3 },
+  folderCardMeta: { fontFamily: 'Poppins-Regular', fontSize: 10, color: '#888888', letterSpacing: 0.3 },
+  folderCardMetaBold: { fontFamily: 'Poppins-SemiBold', fontSize: 10, color: '#888888', letterSpacing: 0.3 },
+
   receivableName: { fontFamily: 'Poppins-Regular', fontSize: 12, color: '#111111', textAlign: 'center', marginTop: 4 },
   receivableAmount: { fontFamily: 'Poppins-Bold', fontSize: 11, color: '#111111', textAlign: 'center', lineHeight: 14 },
   receivableUnpaid: { fontFamily: 'Poppins-Regular', fontSize: 9, color: '#999999', textAlign: 'center', fontStyle: 'italic', lineHeight: 12 },
-
-  // Top spending
-  topSpendingRow: { flexDirection: 'row', gap: 16, alignItems: 'flex-start' },
-  pieColumn: { alignItems: 'center', gap: 8 },
-  pieLabel: { alignItems: 'center', maxWidth: 120 },
-  pieLabelName: { fontFamily: 'Poppins-Bold', fontSize: 10, color: '#111111', textAlign: 'center' },
-  pieLabelAmount: { fontFamily: 'Poppins-Regular', fontSize: 10, color: '#555555', textAlign: 'center' },
-  top3Column: { flex: 1, gap: 6 },
-  top3Card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 6,
-  },
-  catName:   { fontFamily: 'Poppins-Bold', fontSize: 11, color: '#111111' },
-  catAmount: { fontFamily: 'Poppins-Regular', fontSize: 10, color: '#555555' },
 
   // Shared list rows
   list: { gap: 0 },

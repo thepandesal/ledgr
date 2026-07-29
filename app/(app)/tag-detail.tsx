@@ -80,28 +80,15 @@ export default function TagDetailScreen() {
     if (!tag) return;
     setActionLoading(true);
     try {
-      const { data: mirrored } = await supabase.from('recordings').insert({
-        user_id: userId,
-        name: recording?.name ?? 'tagged expense',
-        type: 'due',
-        amount: tag.amount,
-        transaction_date: recording?.transaction_date ?? new Date().toISOString().split('T')[0],
-        status: 'unpaid',
-        currency: recording?.currency ?? 'PHP',
-        notes: `tagged by ${taggerName}`,
-        is_tagged: true,
-      }).select('id').single();
-
       await supabase.from('recording_tags').update({
         status: 'accepted',
-        mirrored_recording_id: mirrored?.id ?? null,
       }).eq('id', tag.id);
 
       await supabase.from('notifications').insert({
         user_id: tag.tagger_user_id,
         type: 'tag_accepted',
         title: `${userName || 'Someone'} accepted your expense tag`,
-        body: `"${recording?.name ?? 'expense'}" is now a due in their account.`,
+        body: `"${recording?.name ?? 'expense'}" accepted.`,
         data: { recordingId, tagId: tag.id },
         status: 'new',
         is_read: false,
@@ -113,11 +100,7 @@ export default function TagDetailScreen() {
 
       setTag((prev: any) => ({ ...prev, status: 'accepted' }));
 
-      if (mirrored?.id) {
-        router.replace({ pathname: '/(app)/recording-detail', params: { recordingId: mirrored.id } } as any);
-      } else {
-        handleBack();
-      }
+      router.replace({ pathname: '/(app)/recording-detail', params: { recordingId } } as any);
     } catch (e) { /* silent */ }
     finally { setActionLoading(false); }
   };

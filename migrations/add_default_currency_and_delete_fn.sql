@@ -29,8 +29,14 @@ BEGIN
 
   -- recordings & related
   DELETE FROM recording_breakdowns  WHERE recording_id IN (SELECT id FROM recordings WHERE user_id = target_user_id);
+  -- Nullify source_recording_id on other users' recordings that reference the ones being deleted
+  UPDATE recordings SET source_recording_id = NULL
+    WHERE source_recording_id IN (SELECT id FROM recordings WHERE user_id = target_user_id);
   DELETE FROM recordings            WHERE user_id = target_user_id;
 
+  -- Nullify user references on recordings
+  UPDATE recordings SET tagged_by_user_id = NULL WHERE tagged_by_user_id = target_user_id;
+  UPDATE recordings SET tagged_friend_user_id = NULL WHERE tagged_friend_user_id = target_user_id;
   -- reminders
   DELETE FROM recording_reminders   WHERE user_id = target_user_id;
 

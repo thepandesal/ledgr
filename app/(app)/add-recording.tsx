@@ -152,6 +152,8 @@ export default function AddRecordingScreen({ inlineProps }: {
 
   // -- Receipt photos --------------------------------------------------------
   const [receiptPhotos, setReceiptPhotos] = useState<string[]>([]);
+  const [existingReceiptEntryId, setExistingReceiptEntryId] = useState<string | null>(null);
+  const [existingReceiptStoragePaths, setExistingReceiptStoragePaths] = useState<string[]>([]);
 
   // -- Receivable-specific --------------------------------------------------
   const [decreasedFromAccount, setDecreasedFromAccount] = useState<any>(null);
@@ -275,6 +277,20 @@ export default function AddRecordingScreen({ inlineProps }: {
         if (rec.currency) setCurrency(rec.currency);
         if (rec.categories) updateItem(items[0].id, { category: Array.isArray(rec.categories) ? rec.categories[0] : rec.categories });
         if (rec.account) updateItem(items[0].id, { account: Array.isArray(rec.account) ? rec.account[0] : rec.account });
+        const { data: receiptEntry } = await supabase.from('receipt_entries').select('id').eq('recording_id', editId).maybeSingle();
+        if (receiptEntry) {
+          setExistingReceiptEntryId(receiptEntry.id);
+          const { data: photos } = await supabase.from('receipt_photos').select('storage_path, url').eq('entry_id', receiptEntry.id);
+          if (photos && photos.length > 0) {
+            setExistingReceiptStoragePaths(photos.map((p: any) => p.storage_path));
+            const urls = await Promise.all(photos.map(async (p: any) => {
+              if (p.url) return p.url;
+              const { data: signed } = await supabase.storage.from('receipts').createSignedUrl(p.storage_path, 3600);
+              return signed?.signedUrl ?? '';
+            }));
+            updateItem(items[0].id, { photos: urls.filter(Boolean) });
+          }
+        }
       }
     }
   };
@@ -353,6 +369,32 @@ export default function AddRecordingScreen({ inlineProps }: {
           category_id: it.category?.id || null, account_id: it.account?.id || null, currency,
         }).eq("id", editId);
         if (err) throw err;
+        const photoUris = it.photos ?? [];
+        const newPhotoUris = photoUris.filter(u => u.startsWith('file://') || u.startsWith('data:'));
+        const remainingUrls = photoUris.filter(u => !u.startsWith('file://') && !u.startsWith('data:'));
+        const removedPaths = existingReceiptStoragePaths.filter(sp => !remainingUrls.some(u => u.includes(encodeURIComponent(sp)) || u.includes(sp)));
+        for (const path of removedPaths) {
+          await supabase.storage.from('receipts').remove([path]);
+          if (existingReceiptEntryId) await supabase.from('receipt_photos').delete().eq('entry_id', existingReceiptEntryId).eq('storage_path', path);
+        }
+        let entryId = existingReceiptEntryId;
+        if (newPhotoUris.length > 0) {
+          if (!entryId) {
+            const { data: entry } = await supabase.from('receipt_entries').insert({ user_id: user.id, note: it.name.trim(), recording_id: editId }).select().single();
+            if (entry) entryId = entry.id;
+          }
+          if (entryId) {
+            for (const uri of newPhotoUris) {
+              const compressed = await compressImage(uri);
+              try {
+                await uploadReceiptPhoto(compressed, entryId);
+              } catch (uploadErr: any) {
+                if (uploadErr?.message === 'RECEIPT_LIMIT_REACHED') { setError('monthly receipt limit reached.'); break; }
+                throw uploadErr;
+              }
+            }
+          }
+        }
       } else {
         for (const it of items) {
           const effectiveAccount = useSingularAccount ? singularAccount : it.account;
@@ -412,8 +454,10 @@ export default function AddRecordingScreen({ inlineProps }: {
               if (currency) rpcParams.p_currency = currency;
               if (date) rpcParams.p_transaction_date = date;
               if (it.category?.id) rpcParams.p_category_id = it.category.id;
-              await supabase.rpc('tag_friend_auto', rpcParams);
-            } catch {}
+              console.log('[tag_friend_auto] params:', JSON.stringify(rpcParams));
+              const { error: rpcErr } = await supabase.rpc('tag_friend_auto', rpcParams);
+              if (rpcErr) console.error('[tag_friend_auto] error:', JSON.stringify(rpcErr));
+            } catch (e) { console.error('[tag_friend_auto] catch:', e); }
           }
         }
       }
@@ -460,7 +504,7 @@ export default function AddRecordingScreen({ inlineProps }: {
                 <Text style={s.headerCloseText}>✕</Text>
               </View>
             </TouchableOpacity>
-          </View>{/* */}
+          </View>
           <View style={s.frozenSection}>
             <TouchableOpacity style={s.frozenRow} onPress={() => setShowTypeModal(true)} activeOpacity={0.8}>
               <Text style={s.frozenLabel}>Type</Text>
@@ -478,15 +522,15 @@ export default function AddRecordingScreen({ inlineProps }: {
                 </View>
               </TouchableOpacity>
             )}
- <View style={s.frozenRow}>
- <Text style={s.frozenLabel}>Singular account?</Text>
- <View style={[s.yesNoRow, { flex: 1 }]}>
- <TouchableOpacity style={[s.yesNoBtn, useSingularAccount && s.yesNoBtnActive]} onPress={() => setUseSingularAccount(true)} activeOpacity={0.8}>
- <Text style={[s.yesNoBtnText, useSingularAccount && s.yesNoBtnTextActive]}>Yes</Text>
-              </TouchableOpacity>
- <TouchableOpacity style={[s.yesNoBtn, !useSingularAccount && s.yesNoBtnActive]} onPress={() => { setUseSingularAccount(false); setSingularAccount(null); }} activeOpacity={0.8}>
- <Text style={[s.yesNoBtnText, !useSingularAccount && s.yesNoBtnTextActive]}>No</Text>
-              </TouchableOpacity>
+            <View style={s.frozenRow}>
+              <Text style={s.frozenLabel}>Singular account?</Text>
+              <View style={[s.yesNoRow, { flex: 1 }]}>
+                <TouchableOpacity style={[s.yesNoBtn, useSingularAccount && s.yesNoBtnActive]} onPress={() => setUseSingularAccount(true)} activeOpacity={0.8}>
+                  <Text style={[s.yesNoBtnText, useSingularAccount && s.yesNoBtnTextActive]}>Yes</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[s.yesNoBtn, !useSingularAccount && s.yesNoBtnActive]} onPress={() => { setUseSingularAccount(false); setSingularAccount(null); }} activeOpacity={0.8}>
+                  <Text style={[s.yesNoBtnText, !useSingularAccount && s.yesNoBtnTextActive]}>No</Text>
+                </TouchableOpacity>
               </View>
             </View>
             {useSingularAccount && (
@@ -498,7 +542,7 @@ export default function AddRecordingScreen({ inlineProps }: {
                 </View>
               </TouchableOpacity>
             )}
-            {(isLoanType || isReceivableType || (type === 'expense' && singularPerson)) && (
+            {!!(isLoanType || isReceivableType || (type === 'expense' && singularPerson)) && (
               <TouchableOpacity style={s.frozenRow} onPress={() => { setActivePickerItemId('singular'); setShowPersonModal(true); }} activeOpacity={0.8}>
                 <Text style={s.frozenLabel}>{isLoanType ? 'Paying' : 'Owes You'}</Text>
                 <View style={s.frozenPill}>
@@ -659,7 +703,7 @@ export default function AddRecordingScreen({ inlineProps }: {
       </TouchableOpacity>
 
       {/* Save button */}
-      {editId && (
+      {editId ? (
         <TouchableOpacity
           style={[s.saveBtn, { backgroundColor: Colors.dangerBg, marginTop: 12, marginBottom: 4, borderWidth: 1, borderColor: Colors.danger }]}
           onPress={async () => {
@@ -678,7 +722,7 @@ export default function AddRecordingScreen({ inlineProps }: {
         >
           <Text style={[s.saveBtnText, { color: Colors.danger }]}>Delete Recording</Text>
         </TouchableOpacity>
-      )}
+      ) : null}
       <TouchableOpacity
         style={[s.saveBtn, items.some(it => !it.name.trim() || !it.amount) && s.saveBtnDisabled]}
         onPress={handleSave}

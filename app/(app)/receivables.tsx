@@ -5,7 +5,7 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useUser } from '../../src/hooks/useUser';
 import { supabase } from '../../src/lib/supabase';
 import ConfirmModal from '@/components/ui/ConfirmModal';
@@ -21,6 +21,7 @@ function isSameDay(a: Date, b: Date) {
 
 export default function ReceivablesScreen() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const slideAnim = useRef(new Animated.Value(width)).current;
   const { userId } = useUser();
 
@@ -135,6 +136,17 @@ export default function ReceivablesScreen() {
   const handleBack = () => {
     Animated.timing(slideAnim, { toValue: width, duration: 250, useNativeDriver: true }).start(() => router.back());
   };
+
+  useEffect(() => {
+    if (!userId) return;
+    const channel = supabase
+      .channel(`receivables-live-${userId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'recordings', filter: `user_id=eq.${userId}` }, () => {
+        queryClient.invalidateQueries({ queryKey: ['receivables', userId] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [userId, queryClient]);
 
   return (
     <Animated.View style={[{ flex: 1, backgroundColor: Colors.white }, { transform: [{ translateX: slideAnim }] }]}>

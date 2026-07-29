@@ -9,6 +9,14 @@ export function consumePendingTabGlobal(): string | null {
   return val;
 }
 
+// Home date label + edit handler — shared between TabsLayout and HomeScreen
+let _homeDateLabel = '';
+let _homeDateEdit: (() => void) | null = null;
+export function setHomeDateLabel(label: string) { _homeDateLabel = label; }
+export function getHomeDateLabel() { return _homeDateLabel; }
+export function setHomeDateEditHandler(fn: (() => void) | null) { _homeDateEdit = fn; }
+export function triggerHomeDateEdit() { _homeDateEdit?.(); }
+
 interface NavContextType {
   activeTab: string;
   switchTab: (key: string) => void;
@@ -54,6 +62,10 @@ interface NavContextType {
   // Friends panel
   openFriendsPanel: () => void;
   closeFriendsPanel: () => void;
+  // Home date label (shared for header)
+  homeDateLabel: string;
+  setHomeDateLabel: (label: string) => void;
+  onHomeDateEdit: () => void;
 }
 
 export const NavContext = createContext<NavContextType>({
@@ -90,6 +102,9 @@ export const NavContext = createContext<NavContextType>({
   closeContactsPanel: () => {},
   openFriendsPanel: () => {},
   closeFriendsPanel: () => {},
+  homeDateLabel: '',
+  setHomeDateLabel: () => {},
+  onHomeDateEdit: () => {},
 });
 
 export const useNav = () => useContext(NavContext);

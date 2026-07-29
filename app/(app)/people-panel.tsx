@@ -62,15 +62,15 @@ export default function PeoplePanel({ onClose, initialPerson }: Props) {
       // 4. Get ALL recordings with a person (for transaction counts)
       const { data: allRecsWithPerson } = await supabase
         .from('recordings')
-        .select('id, type, person_name, amount, paid_amount, status, is_due')
+        .select('id, type, person_name, amount, paid_amount, status, is_due, is_tagged')
         .eq('user_id', userId)
         .neq('person_name', '')
         .not('person_name', 'is', null)
         .neq('status', 'voided');
 
-      // 5. Get debt/due recordings for balance calc
+      // 5. Get debt/due recordings for balance calc (exclude old mirror debts — handled in backward compat)
       const recs = (allRecsWithPerson ?? []).filter(
-        (r: any) => r.type === 'debt' || r.type === 'due' || r.is_due
+        (r: any) => (r.type === 'debt' && !r.is_tagged) || r.type === 'due' || r.is_due
       );
 
       // 6. Get split bill payments scoped to user's bills
@@ -78,20 +78,13 @@ export default function PeoplePanel({ onClose, initialPerson }: Props) {
         ? await supabase.from('split_bill_payments').select('person_name, amount, status').in('split_bill_id', billIds)
         : { data: [] };
 
-      // 7. Shared recordings — I owe the sharer (for balance + status tracking)
+      // 7. Shared recordings where I'm tagged — I owe the owner (single-entry model)
       const { data: sharedRecs } = await supabase
         .from('recordings')
         .select('id, user_id, name, amount, status, paid_amount')
         .filter('shared_with', 'cs', `["${userId}"]`)
-        .neq('status', 'voided');
-
-      // Look up my debt recordings for these shared items to get accurate status
-      const sharedByIds = [...new Set((sharedRecs ?? []).map((r: any) => r.id).filter(Boolean))] as string[];
-      const { data: myDebts } = sharedByIds.length > 0
-        ? await supabase.from('recordings').select('id, amount, paid_amount, status, source_recording_id').eq('user_id', userId).eq('is_tagged', true).in('source_recording_id', sharedByIds)
-        : { data: [] };
-      const debtMap: Record<string, any> = {};
-      (myDebts ?? []).forEach((d: any) => { debtMap[d.source_recording_id] = d; });
+        .neq('status', 'voided')
+        .eq('tagged_friend_user_id', userId);
 
       const sharedMap: Record<string, { name: string; total: number; ongoing: number; completed: number }> = {};
       for (const sr of (sharedRecs ?? [])) {
@@ -102,18 +95,34 @@ export default function PeoplePanel({ onClose, initialPerson }: Props) {
           const { data: ownerName } = await supabase.rpc('get_user_display_name', { user_id: ownerId });
           sharedMap[ownerId] = { name: ownerName ?? 'unknown', total: 0, ongoing: 0, completed: 0 };
         }
-        const debt = debtMap[sr.id];
-        const myStatus = debt ? debt.status : sr.status;
-        const myPaid = debt ? Number(debt.paid_amount ?? 0) : Number(sr.paid_amount ?? 0);
-        const myAmount = debt ? Number(debt.amount) : Number(sr.amount);
-        const isComplete = myStatus === 'paid' || (myAmount > 0 && myPaid >= myAmount - 0.01);
+        const paid = Number(sr.paid_amount ?? 0);
+        const remaining = Math.max(0, Number(sr.amount) - paid);
+        const isComplete = paid >= Number(sr.amount) - 0.01;
         if (isComplete) {
-          sharedMap[ownerId].completed += myAmount;
+          sharedMap[ownerId].completed += 1;
         } else {
-          sharedMap[ownerId].total += myAmount;
+          sharedMap[ownerId].total += remaining;
           sharedMap[ownerId].ongoing += 1;
         }
       }
+
+      // 8. Backward compat: old mirror debt recordings in my account
+      const { data: oldDebts } = await supabase
+        .from('recordings')
+        .select('id, person_name, amount, paid_amount, status')
+        .eq('user_id', userId)
+        .eq('type', 'debt')
+        .eq('is_tagged', true)
+        .neq('status', 'voided');
+      const oldDebtMap: Record<string, { amount: number; paid: number; status: string }> = {};
+      (oldDebts ?? []).forEach((d: any) => {
+        const name = d.person_name?.toLowerCase() || 'unknown';
+        if (!oldDebtMap[name]) oldDebtMap[name] = { amount: 0, paid: 0, status: d.status };
+        else {
+          oldDebtMap[name].amount += Number(d.amount);
+          oldDebtMap[name].paid += Number(d.paid_amount ?? 0);
+        }
+      });
 
       // Build per-person data
       const peopleMap: Record<string, {
@@ -164,6 +173,18 @@ export default function PeoplePanel({ onClose, initialPerson }: Props) {
         peopleMap[name].iOwe += data.total;
         peopleMap[name].ongoingCount += data.ongoing;
         peopleMap[name].completedCount += data.completed;
+      });
+
+      // Backward compat: old mirror debt recordings in my account
+      Object.entries(oldDebtMap).forEach(([name, d]) => {
+        if (!peopleMap[name]) peopleMap[name] = { ongoingCount: 0, completedCount: 0, owedToMe: 0, iOwe: 0 };
+        const remaining = Math.max(0, d.amount - d.paid);
+        if (remaining > 0.01) {
+          peopleMap[name].iOwe += remaining;
+          peopleMap[name].ongoingCount += 1;
+        } else {
+          peopleMap[name].completedCount += 1;
+        }
       });
 
       // Include contacts

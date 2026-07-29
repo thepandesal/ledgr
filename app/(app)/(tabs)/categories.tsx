@@ -50,6 +50,7 @@ export default function CategoriesScreen() {
 
   const handleDelete = async () => {
     setMenuModal(false);
+    if (selected?.name === 'Loans') return;
     await supabase.from('categories').delete().eq('id', selected!.id);
     queryClient.invalidateQueries({ queryKey: ['categories', userId] });
   };
