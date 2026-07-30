@@ -3,7 +3,6 @@ import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../src/lib/supabase';
 import { BlurView } from 'expo-blur';
-import { Ionicons } from '@expo/vector-icons';
 import { Colors, Radius } from '@/components/ui/theme';
 import { Brand } from '../../src/lib/brand';
 
@@ -167,7 +166,6 @@ export default function SplitSharePage() {
   if (loading) return <View style={s.center}><ActivityIndicator color={ACCENT_DARK} /></View>;
   if (notFound || !recording) return (
     <View style={s.center}>
-      <Ionicons name="search-outline" size={40} color={Colors.borderMid} />
       <Text style={Brand.type.emptyText}>split not found</Text>
     </View>
   );
@@ -262,9 +260,7 @@ export default function SplitSharePage() {
         {receiptId && <>
           <Text style={s.sectionHeader}>receipt</Text>
           <TouchableOpacity style={s.receiptBtn} onPress={openReceipt}>
-            <Ionicons name="receipt-outline" size={15} color={ACCENT_DARK} />
             <Text style={s.receiptBtnText}>tap to view receipt photos</Text>
-            <Ionicons name="arrow-forward" size={13} color={ACCENT_DARK} />
           </TouchableOpacity>
         </>}
 
@@ -279,7 +275,7 @@ export default function SplitSharePage() {
                   <Text style={s.payHolder}>{acc.holder_name || acc.account_name || ''}</Text>
                   <TouchableOpacity style={s.copyRow} onPress={() => copyAccountNumber(acc.account_number ?? '', i)} activeOpacity={0.7}>
                     <Text style={s.payNumber}>{acc.account_number ?? ''}</Text>
-                    <Ionicons name={copiedAccIdx === i ? 'checkmark' : 'copy-outline'} size={13} color={copiedAccIdx === i ? ACCENT_DARK : Colors.muted} />
+
                   </TouchableOpacity>
                 </View>
                 {acc.qr_code && (
@@ -297,13 +293,10 @@ export default function SplitSharePage() {
         {showUrlBar ? (
           <View style={s.urlBar}>
             <TextInput style={s.urlInput} value={shareUrl} editable selectTextOnFocus autoFocus caretHidden={false} />
-            <TouchableOpacity onPress={() => setShowUrlBar(false)} style={{ padding: 6 }}>
-              <Ionicons name="close" size={16} color={Colors.muted} />
-            </TouchableOpacity>
+
           </View>
         ) : (
           <TouchableOpacity style={s.shareBtn} onPress={handleShare} activeOpacity={0.8}>
-            <Ionicons name="share-outline" size={15} color={ACCENT_DARK} />
             <Text style={s.shareBtnText}>share this bill</Text>
           </TouchableOpacity>
         )}
@@ -315,7 +308,7 @@ export default function SplitSharePage() {
       <Modal visible={receiptModal} transparent animationType="slide" onRequestClose={() => setReceiptModal(false)}>
         <BlurView intensity={60} tint="dark" style={s.overlay}>
           <TouchableOpacity style={{ position: 'absolute', top: 56, right: 24, zIndex: 10 }} onPress={() => setReceiptModal(false)}>
-            <Ionicons name="close" size={26} color="#fff" />
+
           </TouchableOpacity>
           {receiptLoading ? (
             <ActivityIndicator color="#fff" />

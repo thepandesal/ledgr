@@ -1,13 +1,11 @@
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 
 export default function NotFound() {
   const router = useRouter();
   return (
     <View style={s.container}>
       <Text style={s.title}>ledgr</Text>
-      <Ionicons name="unlink-outline" size={48} color="#e8e8e8" style={{ marginBottom: 16 }} />
       <Text style={s.heading}>page not found</Text>
       <Text style={s.sub}>this link is invalid or no longer exists.</Text>
       <TouchableOpacity style={s.btn} onPress={() => router.replace('/')}>

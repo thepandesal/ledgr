@@ -2,7 +2,6 @@ import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
   SafeAreaView, TextInput, ActivityIndicator,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useUser } from '../../../src/hooks/useUser';
@@ -174,9 +173,7 @@ export default function ContactsScreen({ isActive }: { isActive?: boolean }) {
 
         {/* Search */}
         <View style={s.searchWrap}>
-          <Ionicons name="search-outline" size={14} color={Colors.faint} />
           <TextInput style={s.searchInput} placeholder="search contacts..." placeholderTextColor={Colors.faint} value={search} onChangeText={setSearch} />
-          {search.length > 0 && <TouchableOpacity onPress={() => setSearch('')}><Ionicons name="close" size={14} color={Colors.faint} /></TouchableOpacity>}
         </View>
 
         {/* Incoming requests */}
@@ -194,11 +191,8 @@ export default function ContactsScreen({ isActive }: { isActive?: boolean }) {
                     <Text style={s.name}>{req.requester_name}</Text>
                     <Text style={s.code}>{req.requester_code}</Text>
                   </View>
-                  <TouchableOpacity style={s.declineBtn} onPress={() => handleRespond(req.id, false)} disabled={responding === req.id} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-                    <Ionicons name="close" size={14} color={Colors.muted} />
-                  </TouchableOpacity>
                   <TouchableOpacity style={s.acceptBtn} onPress={() => handleRespond(req.id, true)} disabled={responding === req.id}>
-                    {responding === req.id ? <ActivityIndicator size="small" color={ACCENT_DARK} /> : <Ionicons name="checkmark" size={14} color={ACCENT_DARK} />}
+                    {responding === req.id ? <ActivityIndicator size="small" color={ACCENT_DARK} /> : null}
                   </TouchableOpacity>
                 </View>
               ))}
@@ -211,7 +205,6 @@ export default function ContactsScreen({ isActive }: { isActive?: boolean }) {
         <View style={s.sectionRow}>
           <Text style={s.sectionHeader}>friends</Text>
           <TouchableOpacity style={s.addBtn} onPress={() => setAddModal(true)} activeOpacity={0.8}>
-            <Ionicons name="person-add-outline" size={12} color={ACCENT_DARK} />
             <Text style={s.addBtnText}>add friend</Text>
           </TouchableOpacity>
         </View>
@@ -233,7 +226,6 @@ export default function ContactsScreen({ isActive }: { isActive?: boolean }) {
         {/* Accepted friends */}
         {friends.length === 0 && outgoing.length === 0 ? (
           <View style={s.emptyWrap}>
-            <Ionicons name="people-outline" size={28} color={Colors.faint} />
             <Text style={Brand.type.emptyText}>no friends yet — add by profile code</Text>
           </View>
         ) : (
@@ -245,7 +237,6 @@ export default function ContactsScreen({ isActive }: { isActive?: boolean }) {
                   <Text style={s.name}>{f.name}</Text>
                   <Text style={s.code}>{f.code}</Text>
                 </View>
-                <Ionicons name="checkmark-circle" size={16} color={ACCENT_DARK} />
               </View>
             ))}
           </View>
@@ -260,7 +251,6 @@ export default function ContactsScreen({ isActive }: { isActive?: boolean }) {
           <ActivityIndicator color={ACCENT_DARK} style={{ marginTop: 16 }} />
         ) : filtered.length === 0 ? (
           <View style={s.emptyWrap}>
-            <Ionicons name="person-outline" size={28} color={Colors.faint} />
             <Text style={Brand.type.emptyText}>{contacts.length === 0 ? 'contacts added via split bill appear here' : 'no contacts match your search'}</Text>
           </View>
         ) : (
@@ -269,9 +259,6 @@ export default function ContactsScreen({ isActive }: { isActive?: boolean }) {
               <View key={c.id} style={s.row}>
                 <View style={s.avatar}><Text style={s.avatarText}>{c.name.charAt(0).toUpperCase()}</Text></View>
                 <Text style={s.name}>{c.name}</Text>
-                <TouchableOpacity onPress={() => { setSelected(c); setDeleteModal(true); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                  <Ionicons name="ellipsis-horizontal" size={15} color={Colors.muted} />
-                </TouchableOpacity>
               </View>
             ))}
           </View>
@@ -296,13 +283,12 @@ export default function ContactsScreen({ isActive }: { isActive?: boolean }) {
             autoCapitalize="characters" autoCorrect={false} maxLength={9} returnKeyType="search" onSubmitEditing={searchByCode}
           />
           <TouchableOpacity style={[s.searchBtn, (!codeInput.trim() || addSearching) && { opacity: 0.4 }]} onPress={searchByCode} disabled={!codeInput.trim() || addSearching} activeOpacity={0.8}>
-            {addSearching ? <ActivityIndicator size="small" color={ACCENT_DARK} /> : <Ionicons name="search-outline" size={16} color={ACCENT_DARK} />}
+            {addSearching ? <ActivityIndicator size="small" color={ACCENT_DARK} /> : null}
           </TouchableOpacity>
         </View>
         {addError ? <Text style={s.addError}>{addError}</Text> : null}
         {addSuccess ? (
           <View style={s.addSuccessWrap}>
-            <Ionicons name="checkmark-circle" size={18} color={Colors.income} />
             <Text style={s.addSuccessText}>friend request sent!</Text>
           </View>
         ) : null}

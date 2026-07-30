@@ -6,7 +6,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useNav } from '../../../src/lib/NavContext';
 import { supabase } from '../../../src/lib/supabase';
-import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, useRef, useContext, useEffect, useMemo } from 'react';
 import { useUser } from '../../../src/hooks/useUser';
@@ -673,7 +672,7 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
               onPress={() => { setSpaceBudgetCurrency(c); setShowBudgetCurrencyModal(false); }}
             >
               <Text style={{ fontFamily: spaceBudgetCurrency === c ? AppFont.bold : AppFont.regular, fontSize: 14, color: Colors.text }}>{c}</Text>
-              {spaceBudgetCurrency === c && <Ionicons name="checkmark" size={16} color={ACCENT_DARK} />}
+
             </TouchableOpacity>
           ))}
         </ScrollView>
@@ -820,7 +819,6 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
           <Text style={s.pickerButtonText}>
             {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][selectedMonth]}
           </Text>
-          <Ionicons name={monthDropdownOpen ? "chevron-up" : "chevron-down"} size={16} color={Colors.text} />
         </TouchableOpacity>
         {monthDropdownOpen && (
           <ScrollView style={s.pickerDropdown} nestedScrollEnabled>
@@ -849,7 +847,6 @@ export default function SpacesScreen({ isActive }: { isActive?: boolean }) {
           activeOpacity={0.7}
         >
           <Text style={s.pickerButtonText}>{selectedYear}</Text>
-          <Ionicons name={yearDropdownOpen ? "chevron-up" : "chevron-down"} size={16} color={Colors.text} />
         </TouchableOpacity>
         {yearDropdownOpen && (
           <ScrollView style={s.pickerDropdown} nestedScrollEnabled>

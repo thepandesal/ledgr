@@ -2,7 +2,6 @@ import {
   View, Text, StyleSheet, ScrollView, SafeAreaView,
   TouchableOpacity, RefreshControl, Linking,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useUser } from '../../src/hooks/useUser';
@@ -202,13 +201,9 @@ export default function LoansPanel({ onClose }: Props) {
 
       {/* Month nav */}
       <View style={st.monthNav}>
-        <TouchableOpacity onPress={() => setMonthOffset(o => o - 1)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Ionicons name="chevron-back" size={13} color={DC.pageActionText} />
-        </TouchableOpacity>
+
         <Text style={st.monthLabel}>{label}</Text>
-        <TouchableOpacity onPress={() => setMonthOffset(o => o + 1)} disabled={monthOffset >= 0} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Ionicons name="chevron-forward" size={13} color={monthOffset >= 0 ? Colors.faint : DC.pageActionText} />
-        </TouchableOpacity>
+
       </View>
 
       {/* View toggle */}
@@ -278,7 +273,6 @@ export default function LoansPanel({ onClose }: Props) {
                       <Text style={st.personSub}>{items.length} item{items.length !== 1 ? 's' : ''}</Text>
                     </View>
                     <Text style={[st.rowAmount, { color: PEACH }]}>{fmt(total)}</Text>
-                    <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={14} color={Colors.muted} style={{ marginLeft: 8 }} />
                   </TouchableOpacity>
                   {expanded && (
                     <View style={st.personItems}>
@@ -297,7 +291,6 @@ export default function LoansPanel({ onClose }: Props) {
                             <Text style={st.rowSub}>{item._type === 'split_bill' ? 'split bill' : item.status}</Text>
                           </View>
                           <Text style={[st.rowAmount, { fontSize: 13, color: PEACH }]}>{fmt(Number(item.amount))}</Text>
-                          <Ionicons name="chevron-forward" size={13} color={Colors.faint} style={{ marginLeft: 6 }} />
                         </TouchableOpacity>
                       ))}
                     </View>

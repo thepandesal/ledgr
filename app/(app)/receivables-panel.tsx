@@ -4,7 +4,6 @@ import {
 } from 'react-native';
 import { useState, useEffect, useRef } from 'react';
 import ReceivableDetail from './receivable-detail';
-import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useUser } from '../../src/hooks/useUser';
 import { supabase } from '../../src/lib/supabase';
@@ -270,7 +269,6 @@ export default function ReceivablesPanel({ onClose, initialPerson }: Props) {
       {/* Controls row */}
       <View style={st.controlRow}>
         <View style={st.searchWrap}>
-          <Ionicons name="search-outline" size={13} color={Colors.faint} />
           <TextInput
             style={st.searchInput}
             placeholder="search person..."
@@ -278,11 +276,7 @@ export default function ReceivablesPanel({ onClose, initialPerson }: Props) {
             value={search}
             onChangeText={setSearch}
           />
-          {search.length > 0 && (
-            <TouchableOpacity onPress={() => setSearch('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Ionicons name="close" size={13} color={Colors.faint} />
-            </TouchableOpacity>
-          )}
+          
         </View>
       </View>
 
@@ -327,14 +321,11 @@ export default function ReceivablesPanel({ onClose, initialPerson }: Props) {
           {hasUnassigned && (
             <View style={st.personCard}>
               <TouchableOpacity style={st.personRow} onPress={() => togglePerson('__unassigned__')} activeOpacity={0.7}>
-                <View style={[st.personAvatar, { backgroundColor: Colors.surface }]}>
-                  <Ionicons name="help-outline" size={18} color={Colors.muted} />
-                </View>
+                <View style={[st.personAvatar, { backgroundColor: Colors.surface }]} />
                 <View style={{ flex: 1 }}>
                   <Text style={st.personName}>Unassigned</Text>
                   <Text style={st.personSub}>{unassignedRecordings.length + unassignedBills.length} item{unassignedRecordings.length + unassignedBills.length !== 1 ? 's' : ''}</Text>
                 </View>
-                <Ionicons name={expandedPeople.has('__unassigned__') ? 'chevron-up' : 'chevron-down'} size={14} color={Colors.muted} style={{ marginLeft: 8 }} />
               </TouchableOpacity>
               {expandedPeople.has('__unassigned__') && (
                 <View style={st.personItems}>
@@ -360,10 +351,9 @@ export default function ReceivablesPanel({ onClose, initialPerson }: Props) {
                                   <Text style={st.rowSub}>due · {Number(r.paid_amount ?? 0) > 0 ? `paid: ${fmt(Number(r.paid_amount))}` : 'no payment yet'}</Text>
                                 </View>
                                 <Text style={[st.rowAmount, { fontSize: 13, color: TEAL }]}>{fmt(Number(r.amount))}</Text>
-                                <Ionicons name="chevron-forward" size={13} color={Colors.faint} style={{ marginLeft: 6 }} />
                               </TouchableOpacity>
                             ))}
-                            {pendingBills.map((b: any, i: number) => (
+                              {pendingBills.map((b: any, i: number) => (
                               <TouchableOpacity
                                 key={b.id}
                                 style={[st.personItem, i === pendingBills.length - 1 && completedBills.length === 0 && { borderBottomWidth: 0 }]}
@@ -374,7 +364,6 @@ export default function ReceivablesPanel({ onClose, initialPerson }: Props) {
                                   <Text style={st.rowName} numberOfLines={1}>{b.name}</Text>
                                   <Text style={st.rowSub}>split bill · no people added</Text>
                                 </View>
-                                <Ionicons name="chevron-forward" size={13} color={Colors.faint} style={{ marginLeft: 6 }} />
                               </TouchableOpacity>
                             ))}
                           </>
@@ -391,12 +380,11 @@ export default function ReceivablesPanel({ onClose, initialPerson }: Props) {
                               >
                                 <View style={{ flex: 1 }}>
                                   <Text style={st.rowName} numberOfLines={1}>{b.name}</Text>
-                                  <View style={[st.badge, { backgroundColor: '#9cd7d222', marginTop: 2 }]}>
-                                    <Text style={[st.badgeText, { color: '#4f9289' }]}>closed</Text>
-                                  </View>
+                                <View style={[st.badge, { backgroundColor: '#9cd7d222', marginTop: 2 }]}>
+                                  <Text style={[st.badgeText, { color: '#4f9289' }]}>closed</Text>
                                 </View>
-                                <Ionicons name="chevron-forward" size={13} color={Colors.faint} style={{ marginLeft: 6 }} />
-                              </TouchableOpacity>
+                              </View>
+                            </TouchableOpacity>
                             ))}
                           </>
                         )}
@@ -431,7 +419,6 @@ export default function ReceivablesPanel({ onClose, initialPerson }: Props) {
                   <Text style={[st.rowAmount, { color: '#111111' }]}>
                     {fmt(personData.totalRemaining)}
                   </Text>
-                  <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={14} color={Colors.muted} style={{ marginLeft: 8 }} />
                 </TouchableOpacity>
 
                 {expanded && (
@@ -453,7 +440,6 @@ export default function ReceivablesPanel({ onClose, initialPerson }: Props) {
                               </Text>
                             </View>
                             <Text style={[st.rowAmount, { fontSize: 13, color: TEAL }]}>{fmt(bill.owed)}</Text>
-                            <Ionicons name="chevron-forward" size={13} color={Colors.faint} style={{ marginLeft: 6 }} />
                           </TouchableOpacity>
                         ))}
                       </>
@@ -478,7 +464,6 @@ export default function ReceivablesPanel({ onClose, initialPerson }: Props) {
                               <Text style={[st.rowAmount, { fontSize: 13, color: '#111111' }]}>{fmt(bill.paid)}</Text>
                               <Text style={{ fontFamily: AppFont.regular, fontSize: 10, color: Colors.muted }}>{fmt(bill.owed)} debt</Text>
                             </View>
-                            <Ionicons name="chevron-forward" size={13} color={Colors.faint} style={{ marginLeft: 6 }} />
                           </TouchableOpacity>
                         ))}
                       </>
@@ -533,7 +518,6 @@ export default function ReceivablesPanel({ onClose, initialPerson }: Props) {
                   onPress={() => setDraftMonth(i)}
                   activeOpacity={0.7}
                 >
-                  <Ionicons name={draftMonth === i ? 'radio-button-on' : 'radio-button-off'} size={16} color={draftMonth === i ? TEAL : Colors.faint} />
                   <Text style={{ fontFamily: draftMonth === i ? AppFont.semiBold : AppFont.regular, fontSize: 14, color: '#111111' }}>{m}</Text>
                 </TouchableOpacity>
               ))}
@@ -566,7 +550,6 @@ export default function ReceivablesPanel({ onClose, initialPerson }: Props) {
                   onPress={() => setDraftSelectedYear(y)}
                   activeOpacity={0.7}
                 >
-                  <Ionicons name={draftSelectedYear === y ? 'radio-button-on' : 'radio-button-off'} size={16} color={draftSelectedYear === y ? TEAL : Colors.faint} />
                   <Text style={{ fontFamily: draftSelectedYear === y ? AppFont.semiBold : AppFont.regular, fontSize: 14, color: '#111111' }}>{y}</Text>
                 </TouchableOpacity>
               ))}

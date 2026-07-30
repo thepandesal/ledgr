@@ -3,7 +3,6 @@ import {
   TextInput, ActivityIndicator, Animated, Dimensions, Modal,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../../src/lib/supabase';
 import BottomSheet from '@/components/ui/BottomSheet';
@@ -11,21 +10,16 @@ import { useUser } from '../../src/hooks/useUser';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Colors, Radius } from '@/components/ui/theme';
 import { AppFont } from '../../src/lib/fonts';
-
 const { width } = Dimensions.get('window');
-
 const toTitleCase = (str: string) =>
   str.trim().replace(/\w\S*/g, w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
-
 const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
 export default function SplitBillScreen() {
   const { recordingId, recordingName, amount } = useLocalSearchParams<{ recordingId: string; recordingName: string; amount: string }>();
   const router = useRouter();
   const queryClient = useQueryClient();
   const { userId } = useUser();
   const slideAnim = useRef(new Animated.Value(width)).current;
-
   const [splitId, setSplitId] = useState('');
   const [people, setPeople] = useState<{ id: string; name: string }[]>([]);
   const [items, setItems] = useState<{ id: string; name: string; amount: string; assignments: string[] }[]>([]);
@@ -40,13 +34,11 @@ export default function SplitBillScreen() {
   const [assigningItemIdx, setAssigningItemIdx] = useState(-1);
   const [deleteModal, setDeleteModal] = useState(false);
   const [billStatus, setBillStatus] = useState<'ongoing' | 'closed'>('ongoing');
-
   // Payment state
   const [paymentModal, setPaymentModal] = useState(false);
   const [paymentPerson, setPaymentPerson] = useState('');
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentSaving, setPaymentSaving] = useState(false);
-
   // Close confirm state
   const [closeConfirmModal, setCloseConfirmModal] = useState(false);
   const [unpaidPeopleNames, setUnpaidPeopleNames] = useState<string[]>([]);
@@ -54,12 +46,10 @@ export default function SplitBillScreen() {
   const [closeSpaceId, setCloseSpaceId] = useState<string | null>(null);
   const [closeSpaces, setCloseSpaces] = useState<any[]>([]);
   const [closingLoading, setClosingLoading] = useState(false);
-
   useEffect(() => {
     Animated.timing(slideAnim, { toValue: 0, duration: 280, useNativeDriver: false }).start();
     init();
   }, []);
-
   const init = async () => {
     setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
@@ -96,7 +86,6 @@ export default function SplitBillScreen() {
     }
     setLoading(false);
   };
-
   // ── Fetch payments for this bill split ──────────────────────────────────
   const { data: payments = [], refetch: refetchPayments } = useQuery({
     queryKey: ['bill-split-payments', splitId],
@@ -110,7 +99,6 @@ export default function SplitBillScreen() {
     },
     enabled: !!splitId,
   });
-
   // ── All-time loan/due balance per person ──────────────────────────────
   const { data: personBalances = {} } = useQuery({
     queryKey: ['person-loan-balances-split', userId],
@@ -137,11 +125,9 @@ export default function SplitBillScreen() {
     },
     enabled: !!userId,
   });
-
   const handleBack = () => {
     Animated.timing(slideAnim, { toValue: width, duration: 250, useNativeDriver: false }).start(() => router.back());
   };
-
   const ensureSplit = async () => {
     if (splitId) return splitId;
     const { data } = await supabase.from('bill_splits').insert({ recording_id: recordingId, status: 'ongoing' }).select('id').single();
@@ -149,13 +135,11 @@ export default function SplitBillScreen() {
     queryClient.invalidateQueries({ queryKey: ['split-bills', userId] });
     return data!.id;
   };
-
   const saveContact = async (name: string) => {
     if (!userId || allContacts.includes(name)) return;
     await supabase.from('contacts').upsert({ user_id: userId, name }, { onConflict: 'name' });
     setAllContacts(prev => [...prev, name].sort());
   };
-
   const handlePersonInput = (val: string) => {
     setNewPerson(val);
     if (val.trim()) {
@@ -169,7 +153,6 @@ export default function SplitBillScreen() {
       setPersonSuggestions([]);
     }
   };
-
   const addPerson = async (nameOverride?: string) => {
     const raw = nameOverride ?? newPerson;
     if (!raw.trim()) return;
@@ -182,14 +165,12 @@ export default function SplitBillScreen() {
     setPersonSuggestions([]);
     queryClient.invalidateQueries({ queryKey: ['split-bills-by-person', userId] });
   };
-
   const removePerson = async (id: string) => {
     await supabase.from('bill_split_people').delete().eq('id', id);
     setPeople(prev => prev.filter(p => p.id !== id));
     setItems(prev => prev.map(i => ({ ...i, assignments: i.assignments.filter(a => a !== id) })));
     queryClient.invalidateQueries({ queryKey: ['split-bills-by-person', userId] });
   };
-
   const addItem = async () => {
     if (!newItemName.trim() || !newItemAmount) return;
     const itemAmt = parseFloat(newItemAmount);
@@ -200,14 +181,11 @@ export default function SplitBillScreen() {
     if (data) setItems(prev => [...prev, { id: data.id, name: data.name, amount: String(data.amount), assignments: [] }]);
     setNewItemName(''); setNewItemAmount('');
   };
-
   const removeItem = async (id: string) => {
     await supabase.from('bill_split_items').delete().eq('id', id);
     setItems(prev => prev.filter(i => i.id !== id));
   };
-
   const openAssign = (idx: number) => { setAssigningItemIdx(idx); setAssignModal(true); };
-
   const toggleAssign = async (personId: string) => {
     const item = items[assigningItemIdx];
     const isAssigned = item.assignments.includes(personId);
@@ -220,7 +198,6 @@ export default function SplitBillScreen() {
       setItems(prev => prev.map((it, i) => i === assigningItemIdx ? { ...it, assignments: [...it.assignments, personId] } : it));
     }
   };
-
   const assignAll = async () => {
     const item = items[assigningItemIdx];
     for (const p of people) {
@@ -230,21 +207,18 @@ export default function SplitBillScreen() {
     }
     setItems(prev => prev.map((it, i) => i === assigningItemIdx ? { ...it, assignments: people.map(p => p.id) } : it));
   };
-
   const deleteSplit = async () => {
     if (splitId) await supabase.from('bill_splits').delete().eq('id', splitId);
     setSplitId(''); setPeople([]); setItems([]); setDeleteModal(false);
     queryClient.invalidateQueries({ queryKey: ['split-bills', userId] });
     queryClient.invalidateQueries({ queryKey: ['split-bills-by-person', userId] });
   };
-
   // ── Payment ──────────────────────────────────────────────────────────────
   const openPaymentModal = (personName: string) => {
     setPaymentPerson(personName);
     setPaymentAmount('');
     setPaymentModal(true);
   };
-
   const savePayment = async () => {
     if (!paymentPerson || !paymentAmount || !splitId) return;
     const amt = parseFloat(paymentAmount);
@@ -261,7 +235,6 @@ export default function SplitBillScreen() {
     queryClient.invalidateQueries({ queryKey: ['split-bills', userId] });
     queryClient.invalidateQueries({ queryKey: ['split-bills-by-person', userId] });
   };
-
   // ── Close / Reopen ────────────────────────────────────────────────────────
   const handleToggleStatus = async () => {
     if (billStatus === 'closed') {
@@ -290,11 +263,9 @@ export default function SplitBillScreen() {
       queryClient.invalidateQueries({ queryKey: ['split-bills', userId] });
     }
   };
-
   const confirmClose = async () => {
     if (!splitId) return;
     setClosingLoading(true);
-
     if (closeCreateRecording && closeSpaceId) {
       const total = items.reduce((s: number, i: any) => s + parseFloat(i.amount), 0);
       const { data: expense } = await supabase.from('recordings').insert({
@@ -323,7 +294,6 @@ export default function SplitBillScreen() {
         }
       }
     }
-
     await supabase.from('bill_splits').update({ status: 'closed' }).eq('id', splitId);
     setBillStatus('closed');
     setCloseConfirmModal(false);
@@ -334,7 +304,6 @@ export default function SplitBillScreen() {
       queryClient.invalidateQueries({ queryKey: ['recordings', closeSpaceId] });
     }
   };
-
   const breakdown = people.map(person => {
     let total = 0;
     items.forEach(item => {
@@ -347,17 +316,14 @@ export default function SplitBillScreen() {
       .reduce((s: number, p: any) => s + Number(p.amount), 0);
     return { ...person, total, paid };
   });
-
   const unassignedTotal = items.reduce((sum, item) => sum + (item.assignments.length === 0 ? parseFloat(item.amount) : 0), 0);
   const itemsTotal = items.reduce((sum, item) => sum + parseFloat(item.amount), 0);
   const available = parseFloat(amount) - itemsTotal;
-
   return (
     <Animated.View style={[styles.container, { transform: [{ translateX: slideAnim }] }]}>
       <SafeAreaView style={styles.inner}>
         <View style={styles.header}>
           <TouchableOpacity onPress={handleBack} style={styles.backBtn}>
-            <Ionicons name="arrow-back" size={22} color="#8a8a8a" />
           </TouchableOpacity>
           <View style={styles.headerCenter}>
             <Text style={styles.title}>split bill</Text>
@@ -367,16 +333,13 @@ export default function SplitBillScreen() {
             <View style={{ flexDirection: 'row', gap: 8 }}>
               {billStatus === 'ongoing' && (
                 <TouchableOpacity onPress={handleToggleStatus} style={{ padding: 4 }}>
-                  <Ionicons name="checkmark-done-outline" size={20} color="#00bf63" />
                 </TouchableOpacity>
               )}
               <TouchableOpacity onPress={() => setDeleteModal(true)} style={styles.deleteBtn}>
-                <Ionicons name="trash-outline" size={20} color="#e74c3c" />
               </TouchableOpacity>
             </View>
           ) : <View style={{ width: 32 }} />}
         </View>
-
         {loading ? <ActivityIndicator color="#00bf63" style={{ marginTop: 40 }} /> : (
           <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             <View style={styles.totalCard}>
@@ -388,7 +351,6 @@ export default function SplitBillScreen() {
                 </TouchableOpacity>
               )}
             </View>
-
             {/* People */}
             <Text style={styles.sectionTitle}>people</Text>
             <View style={styles.peopleRow}>
@@ -397,7 +359,6 @@ export default function SplitBillScreen() {
                   <Text style={styles.personChipText}>{p.name}</Text>
                   {billStatus === 'ongoing' && (
                     <TouchableOpacity onPress={() => removePerson(p.id)}>
-                      <Ionicons name="close" size={14} color="#8a8a8a" />
                     </TouchableOpacity>
                   )}
                 </View>
@@ -416,14 +377,12 @@ export default function SplitBillScreen() {
                     onSubmitEditing={() => addPerson()}
                   />
                   <TouchableOpacity style={styles.addBtn} onPress={() => addPerson()}>
-                    <Ionicons name="add" size={20} color="#fff" />
                   </TouchableOpacity>
                 </View>
                 {personSuggestions.length > 0 && (
                   <View style={styles.suggestions}>
                     {personSuggestions.map(s => (
                       <TouchableOpacity key={s} style={styles.suggestion} onPress={() => addPerson(s)}>
-                        <Ionicons name="person-outline" size={14} color="#8a8a8a" />
                         <Text style={styles.suggestionText}>{s}</Text>
                       </TouchableOpacity>
                     ))}
@@ -448,7 +407,6 @@ export default function SplitBillScreen() {
                 )}
               </>
             )}
-
             {/* Items */}
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>items</Text>
@@ -472,7 +430,6 @@ export default function SplitBillScreen() {
                     <Text style={styles.itemAmount}>{fmt(parseFloat(item.amount))}</Text>
                     {billStatus === 'ongoing' && (
                       <TouchableOpacity onPress={() => removeItem(item.id)} style={{ padding: 4 }}>
-                        <Ionicons name="trash-outline" size={14} color="#e74c3c" />
                       </TouchableOpacity>
                     )}
                   </View>
@@ -484,11 +441,9 @@ export default function SplitBillScreen() {
                 <TextInput style={[styles.input, { flex: 2 }]} placeholder="item name" placeholderTextColor="#b0b0b0" value={newItemName} onChangeText={setNewItemName} />
                 <TextInput style={[styles.input, { flex: 1, marginLeft: 8 }]} placeholder="amount" placeholderTextColor="#b0b0b0" value={newItemAmount} onChangeText={setNewItemAmount} keyboardType="decimal-pad" />
                 <TouchableOpacity style={[styles.addBtn, (available <= 0 || !newItemName.trim() || !newItemAmount) && styles.addBtnDisabled]} onPress={addItem} disabled={available <= 0 || !newItemName.trim() || !newItemAmount}>
-                  <Ionicons name="add" size={20} color="#fff" />
                 </TouchableOpacity>
               </View>
             )}
-
             {/* Breakdown with payments */}
             {breakdown.length > 0 && (
               <>
@@ -551,7 +506,6 @@ export default function SplitBillScreen() {
                 })}
                 {unassignedTotal > 0 && (
                   <View style={styles.unassignedRow}>
-                    <Ionicons name="alert-circle-outline" size={16} color="#e67e22" />
                     <Text style={styles.unassignedText}>{fmt(unassignedTotal)} unassigned</Text>
                   </View>
                 )}
@@ -560,7 +514,6 @@ export default function SplitBillScreen() {
           </ScrollView>
         )}
       </SafeAreaView>
-
       {/* Payment modal */}
       <Modal visible={paymentModal} transparent animationType="fade" onRequestClose={() => setPaymentModal(false)}>
         <View style={styles.modalOverlay}>
@@ -590,7 +543,6 @@ export default function SplitBillScreen() {
           </View>
         </View>
       </Modal>
-
       {/* Close confirm modal */}
       <BottomSheet visible={closeConfirmModal} onClose={() => setCloseConfirmModal(false)} title="close split bill?" maxHeight="50%">
         <Text style={{ fontFamily: AppFont.regular, fontSize: 12, color: Colors.muted, marginBottom: 12 }}>
@@ -599,7 +551,6 @@ export default function SplitBillScreen() {
         <View style={{ gap: 8, marginBottom: 16 }}>
           {unpaidPeopleNames.map((name, i) => (
             <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Ionicons name="alert-circle-outline" size={14} color="#e74c3c" />
               <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.text }}>{name}</Text>
             </View>
           ))}
@@ -608,7 +559,6 @@ export default function SplitBillScreen() {
           style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10 }}
           onPress={() => setCloseCreateRecording(v => !v)}
         >
-          <Ionicons name={closeCreateRecording ? 'checkbox' : 'square-outline'} size={20} color="#00bf63" />
           <Text style={{ fontFamily: AppFont.regular, fontSize: 12, color: Colors.text, flex: 1 }}>
             create an expense and return recordings
           </Text>
@@ -650,7 +600,6 @@ export default function SplitBillScreen() {
           <Text style={[styles.doneBtnText, { color: '#8a8a8a' }]}>cancel</Text>
         </TouchableOpacity>
       </BottomSheet>
-
       {/* Assign Modal */}
       <Modal visible={assignModal} transparent animationType="fade" onRequestClose={() => setAssignModal(false)}>
         <View style={styles.modalOverlay}>
@@ -665,7 +614,7 @@ export default function SplitBillScreen() {
               return (
                 <TouchableOpacity key={p.id} style={styles.personRow} onPress={() => toggleAssign(p.id)}>
                   <Text style={[styles.personRowText, isAssigned && styles.personRowTextActive]}>{p.name}</Text>
-                  {isAssigned && <Ionicons name="checkmark" size={18} color="#00bf63" />}
+                  {isAssigned && null}
                 </TouchableOpacity>
               );
             })}
@@ -675,7 +624,6 @@ export default function SplitBillScreen() {
           </View>
         </View>
       </Modal>
-
       {/* Delete Modal */}
       <Modal visible={deleteModal} transparent animationType="fade" onRequestClose={() => setDeleteModal(false)}>
         <View style={styles.modalOverlay}>
@@ -696,7 +644,6 @@ export default function SplitBillScreen() {
     </Animated.View>
   );
 }
-
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f5f5f5', position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   inner: { flex: 1 },
@@ -759,3 +706,4 @@ const styles = StyleSheet.create({
   doneBtn: { backgroundColor: '#00bf63', borderRadius: 999, paddingVertical: 12, alignItems: 'center', marginTop: 4 },
   doneBtnText: { fontFamily: 'DMSans_600SemiBold', fontSize: 14, color: '#ffffff' },
 });
+

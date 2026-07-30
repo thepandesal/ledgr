@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../src/lib/supabase';
 import { useUser } from '../../src/hooks/useUser';
@@ -11,28 +10,23 @@ import { useScreenAnim } from '@/components/ui/ScreenWrapper';
 import { Animated } from 'react-native';
 import { Colors, Fonts, Radius, Spacing } from '@/components/ui/theme';
 import { Brand } from '../../src/lib/brand';
-
 const ACCENT      = Brand.color.accent;
 const ACCENT_DARK = Brand.color.accentDark;
 const PEACH       = '#FFAB91';
 const PAGE        = 20;
-
 export default function TagDetailScreen() {
   const { recordingId, notificationId } = useLocalSearchParams<{ recordingId: string; notificationId?: string }>();
   const router = useRouter();
   const { userId, userName } = useUser();
   const { slideAnim, handleBack } = useScreenAnim();
-
   const [recording, setRecording] = useState<any>(null);
   const [tag, setTag] = useState<any>(null);
   const [taggerName, setTaggerName] = useState('');
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
-
   useEffect(() => {
     load();
   }, [recordingId]);
-
   const load = async () => {
     if (!recordingId || !userId) return;
     const { data: tagRow } = await supabase
@@ -53,7 +47,6 @@ export default function TagDetailScreen() {
     }
     setLoading(false);
   };
-
   const handleDecline = async () => {
     if (!tag) return;
     setActionLoading(true);
@@ -75,7 +68,6 @@ export default function TagDetailScreen() {
     } catch (e) { /* silent */ }
     finally { setActionLoading(false); }
   };
-
   const handleAccept = async () => {
     if (!tag) return;
     setActionLoading(true);
@@ -83,7 +75,6 @@ export default function TagDetailScreen() {
       await supabase.from('recording_tags').update({
         status: 'accepted',
       }).eq('id', tag.id);
-
       await supabase.from('notifications').insert({
         user_id: tag.tagger_user_id,
         type: 'tag_accepted',
@@ -93,45 +84,36 @@ export default function TagDetailScreen() {
         status: 'new',
         is_read: false,
       });
-
       if (notificationId) {
         await supabase.from('notifications').update({ status: 'opened' }).eq('id', notificationId);
       }
-
       setTag((prev: any) => ({ ...prev, status: 'accepted' }));
-
       router.replace({ pathname: '/(app)/recording-detail', params: { recordingId } } as any);
     } catch (e) { /* silent */ }
     finally { setActionLoading(false); }
   };
-
   const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2 });
   const formatDate = (d: string) => {
     if (!d) return '—';
     const [y, m, day] = d.split('-').map(Number);
     return new Date(y, m - 1, day).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
-
   return (
     <Animated.View style={[{ flex: 1, backgroundColor: Colors.white }, { transform: [{ translateX: slideAnim }] }]}>
       <View style={s.header}>
         <TouchableOpacity onPress={handleBack} style={s.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Ionicons name="arrow-back" size={20} color="#B6E1DE" />
         </TouchableOpacity>
         <Text style={s.title}>expense tag</Text>
         <View style={{ width: 36 }} />
       </View>
-
       {loading ? (
         <ActivityIndicator color={ACCENT_DARK} style={{ marginTop: 48 }} />
       ) : !recording ? (
         <View style={s.emptyWrap}>
-          <Ionicons name="alert-circle-outline" size={32} color={Colors.faint} />
           <Text style={s.emptyText}>recording not found</Text>
         </View>
       ) : (
         <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
-
           {/* Who tagged you */}
           <View style={s.tagBanner}>
             <View style={s.tagAvatarWrap}>
@@ -142,7 +124,6 @@ export default function TagDetailScreen() {
               <Text style={s.tagBannerSub}>they paid for this and expect you to pay them back</Text>
             </View>
           </View>
-
           {/* Recording details */}
           <View style={s.card}>
             <View style={s.cardRow}>
@@ -180,21 +161,17 @@ export default function TagDetailScreen() {
               </>
             )}
           </View>
-
           {/* Tag status */}
           {tag?.status === 'accepted' && (
             <View style={[s.statusBanner, { backgroundColor: Colors.successBg }]}>
-              <Ionicons name="checkmark-circle" size={16} color={Colors.success} />
               <Text style={[s.statusText, { color: Colors.success }]}>you accepted this tag — a due was created</Text>
             </View>
           )}
           {tag?.status === 'declined' && (
             <View style={[s.statusBanner, { backgroundColor: Colors.dangerBg }]}>
-              <Ionicons name="close-circle" size={16} color={Colors.danger} />
               <Text style={[s.statusText, { color: Colors.danger }]}>you declined this tag</Text>
             </View>
           )}
-
           {/* Actions — only show if still pending */}
           {(!tag?.status || tag?.status === 'pending') && (
             <View style={s.actions}>
@@ -210,7 +187,6 @@ export default function TagDetailScreen() {
                 {actionLoading
                   ? <ActivityIndicator color={Colors.white} size="small" />
                   : <>
-                      <Ionicons name="checkmark-circle-outline" size={16} color={Colors.white} />
                       <Text style={s.acceptBtnText}>accept — create loan</Text>
                     </>
                 }
@@ -221,49 +197,39 @@ export default function TagDetailScreen() {
                 disabled={actionLoading}
                 activeOpacity={0.8}
               >
-                <Ionicons name="close-circle-outline" size={16} color={Colors.danger} />
                 <Text style={s.declineBtnText}>decline</Text>
               </TouchableOpacity>
             </View>
           )}
         </ScrollView>
       )}
-
-
     </Animated.View>
   );
 }
-
 const s = StyleSheet.create({
   header:  { flexDirection: 'row', alignItems: 'center', paddingHorizontal: PAGE, paddingTop: 16, paddingBottom: 16, gap: 10, backgroundColor: '#1A1A1A', borderBottomWidth: 1, borderBottomColor: '#333' },
   backBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#B6E1DE22', alignItems: 'center', justifyContent: 'center' },
   title:   { flex: 1, fontFamily: Brand.font.display, fontSize: 20, color: '#B6E1DE', letterSpacing: -0.3, textAlign: 'center' },
-
   scroll:    { paddingHorizontal: PAGE, paddingBottom: 60, paddingTop: 20, gap: 16 },
   emptyWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
   emptyText: { fontFamily: Fonts.mono, fontSize: 13, color: Colors.muted },
-
   tagBanner:     { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: ACCENT + '22', borderRadius: Radius.xl, padding: 16 },
   tagAvatarWrap: { width: 44, height: 44, borderRadius: 22, backgroundColor: ACCENT + '44', justifyContent: 'center', alignItems: 'center' },
   tagAvatarText: { fontFamily: Fonts.monoBold, fontSize: 18, color: ACCENT_DARK },
   tagBannerTitle:{ fontFamily: Brand.font.heading, fontSize: 14, color: Colors.text },
   tagBannerSub:  { fontFamily: Fonts.mono, fontSize: 11, color: Colors.muted, lineHeight: 16 },
-
   card:        { backgroundColor: Colors.surface, borderRadius: Radius.xl, overflow: 'hidden', borderWidth: 1, borderColor: Colors.border },
   cardRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14 },
   cardDivider: { height: 1, backgroundColor: Colors.border },
   cardLabel:   { fontFamily: Fonts.mono, fontSize: 11, color: Colors.muted },
   cardValue:   { fontFamily: Fonts.mono, fontSize: 13, color: Colors.text },
-
   statusBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: Radius.lg, padding: 14 },
   statusText:   { fontFamily: Fonts.monoBold, fontSize: 13 },
-
   actions:      { gap: 10 },
   actionsHint:  { fontFamily: Fonts.mono, fontSize: 11, color: Colors.muted, textAlign: 'center', lineHeight: 16 },
   acceptBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: ACCENT_DARK, borderRadius: Radius.pill, paddingVertical: 14 },
   acceptBtnText:{ fontFamily: Fonts.monoBold, fontSize: 14, color: Colors.white },
   declineBtn:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: Colors.dangerBg, borderRadius: Radius.pill, paddingVertical: 14, borderWidth: 1, borderColor: Colors.danger + '44' },
   declineBtnText:{ fontFamily: Fonts.monoBold, fontSize: 14, color: Colors.danger },
-
-
 });
+

@@ -1,5 +1,4 @@
 import { View, Text, StyleSheet, TextInput, ScrollView, TouchableOpacity } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { Colors, Radius } from './theme';
 import { DC } from '../../src/lib/design';
@@ -81,9 +80,7 @@ export default function SearchableList<T>({
                     </Text>
                   )}
                 </View>
-                {isSelected && (
-                  <Ionicons name="checkmark" size={14} color={DC.chipActiveText} />
-                )}
+
               </TouchableOpacity>
             );
           })

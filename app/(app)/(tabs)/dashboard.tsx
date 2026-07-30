@@ -2,7 +2,6 @@ import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
   SafeAreaView, ActivityIndicator, TextInput, Animated, RefreshControl,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useState, useRef, useContext, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useUser } from '../../../src/hooks/useUser';
@@ -549,15 +548,8 @@ export default function DashboardScreen({ isActive }: { isActive?: boolean }) {
           />
           <View style={s.filterRow}>
             <View style={s.dateNavRow}>
-              <TouchableOpacity style={s.dateNavArrow} onPress={() => navigateRange(-1)} activeOpacity={0.7}>
-                <Ionicons name="chevron-back" size={14} color={ACCENT} />
-              </TouchableOpacity>
               <TouchableOpacity style={s.filterBtn} onPress={() => setShowDateModal(true)} activeOpacity={0.75}>
-                <Ionicons name="calendar-outline" size={13} color={ACCENT} />
                 <Text style={s.filterBtnText}>{rangeLabel}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={s.dateNavArrow} onPress={() => navigateRange(1)} activeOpacity={0.7}>
-                <Ionicons name="chevron-forward" size={14} color={ACCENT} />
               </TouchableOpacity>
             </View>
             <TouchableOpacity
@@ -565,7 +557,6 @@ export default function DashboardScreen({ isActive }: { isActive?: boolean }) {
               onPress={() => setShowFilterModal(true)}
               activeOpacity={0.75}
             >
-              <Ionicons name="options-outline" size={13} color={(!isAllSpaces || !isAllAccounts || !isAllCategories || amountSort !== 'none') ? ACCENT : Colors.muted} />
               <Text style={[s.filterBtnText, (!isAllSpaces || !isAllAccounts || !isAllCategories || amountSort !== 'none') && s.filterBtnTextActive]}>Filter</Text>
             </TouchableOpacity>
           </View>
@@ -591,9 +582,7 @@ export default function DashboardScreen({ isActive }: { isActive?: boolean }) {
                     </View>
                   )}
                   <TouchableOpacity style={s.row} activeOpacity={0.85} onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: item.id } } as any)}>
-                    <View style={s.rowIconWrap}>
-                      <Ionicons name={(item.categories?.icon ?? activeTabData.icon) as any} size={18} color={ACCENT} />
-                    </View>
+
                     <View style={s.rowMid}>
                       <Text style={s.rowType}>{tl?.label ?? activeTabData.label}</Text>
                       <Text style={s.rowName} numberOfLines={1}>{item.name}</Text>
@@ -729,7 +718,7 @@ export default function DashboardScreen({ isActive }: { isActive?: boolean }) {
               onPress={() => { setQaCurrency(c); setShowQaCurrencyModal(false); }}
             >
               <Text style={{ fontFamily: qaCurrency === c ? Fonts.monoBold : Fonts.mono, fontSize: 14, color: Colors.text }}>{c}</Text>
-              {qaCurrency === c && <Ionicons name="checkmark" size={16} color={ACCENT} />}
+
             </TouchableOpacity>
           ))}
         </ScrollView>
@@ -748,7 +737,6 @@ export default function DashboardScreen({ isActive }: { isActive?: boolean }) {
                 onPress={() => handlePresetSelect(p.key)}
                 activeOpacity={0.75}
               >
-                <Ionicons name={p.icon as any} size={13} color={active ? Colors.text : Colors.muted} />
                 <Text style={[s.modalPresetText, active && s.modalPresetTextActive]}>{p.label}</Text>
               </TouchableOpacity>
             );
@@ -796,13 +784,9 @@ export default function DashboardScreen({ isActive }: { isActive?: boolean }) {
               {pickingDate === 'from' ? 'tap start date' : 'tap end date'}
             </Text>
             <View style={s.pickerNav}>
-              <TouchableOpacity onPress={() => { if (pickerMonth === 0) { setPickerMonth(11); setPickerYear(y => y - 1); } else setPickerMonth(m => m - 1); }}>
-                <Ionicons name="chevron-back" size={18} color={Colors.text} />
-              </TouchableOpacity>
+
               <Text style={s.pickerMonthText}>{MONTHS[pickerMonth].toLowerCase()} {pickerYear}</Text>
-              <TouchableOpacity onPress={() => { if (pickerMonth === 11) { setPickerMonth(0); setPickerYear(y => y + 1); } else setPickerMonth(m => m + 1); }}>
-                <Ionicons name="chevron-forward" size={18} color={Colors.text} />
-              </TouchableOpacity>
+
             </View>
             <View style={{ flexDirection: 'row', marginBottom: 6 }}>
               {['su','mo','tu','we','th','fr','sa'].map(d => (

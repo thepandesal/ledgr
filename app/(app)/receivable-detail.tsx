@@ -4,7 +4,6 @@ import {
   Animated, Dimensions, Modal, ActivityIndicator,
 } from 'react-native';
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useUser } from '../../src/hooks/useUser';
 import { supabase } from '../../src/lib/supabase';
@@ -469,7 +468,6 @@ export default function ReceivableDetail({ person, onClose, onBack }: Props) {
           activeOpacity={0.7}
           onPress={() => toggleSelection(bill.billId)}
         >
-          <Ionicons name={checked ? 'radio-button-on' : 'radio-button-off'} size={20} color={checked ? TEAL : Colors.faint} />
           <View style={{ flex: 1, marginLeft: 8 }}>
             <Text style={st.rowName} numberOfLines={1}>{bill.billName}</Text>
             <Text style={st.rowSub}>Created by: {creatorLabel}</Text>
@@ -499,7 +497,6 @@ export default function ReceivableDetail({ person, onClose, onBack }: Props) {
           </Text>
           <Text style={st.rowSub}>Total: {fmt(bill.owed)} · Paid: {fmt(bill.paid)}</Text>
         </View>
-        <Ionicons name="chevron-forward" size={13} color={Colors.faint} style={{ marginLeft: 6 }} />
       </TouchableOpacity>
     );
   };
@@ -586,7 +583,6 @@ export default function ReceivableDetail({ person, onClose, onBack }: Props) {
         </View>
 
         <View style={st.searchWrap}>
-          <Ionicons name="search-outline" size={13} color={Colors.faint} />
           <TextInput
             style={st.searchInput}
             placeholder="search transactions..."
@@ -594,11 +590,7 @@ export default function ReceivableDetail({ person, onClose, onBack }: Props) {
             value={search}
             onChangeText={setSearch}
           />
-          {search.length > 0 && (
-            <TouchableOpacity onPress={() => setSearch('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Ionicons name="close" size={13} color={Colors.faint} />
-            </TouchableOpacity>
-          )}
+          
         </View>
 
         {tab === 'pending' && (hasSettleItems || returns.length > 0) && (
@@ -642,7 +634,6 @@ export default function ReceivableDetail({ person, onClose, onBack }: Props) {
                     activeOpacity={0.7}
                     onPress={() => toggleSelection(ret.billId)}
                   >
-                    <Ionicons name={checked ? 'radio-button-on' : 'radio-button-off'} size={20} color={checked ? TEAL : Colors.faint} />
                     <View style={{ flex: 1, marginLeft: 8 }}>
                       <Text style={st.rowName} numberOfLines={1}>{ret.billName}</Text>
                       <Text style={st.rowSub}>{new Date(ret.transaction_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</Text>
@@ -716,7 +707,6 @@ export default function ReceivableDetail({ person, onClose, onBack }: Props) {
                 onPress={() => setMarkComplete(!markComplete)}
                 activeOpacity={0.7}
               >
-                <Ionicons name={markComplete ? 'checkbox' : 'square-outline'} size={20} color={markComplete ? TEAL : Colors.faint} />
                 <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: '#111' }}>Mark as fully paid</Text>
               </TouchableOpacity>
               <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>

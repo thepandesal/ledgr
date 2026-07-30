@@ -4,7 +4,6 @@ import {
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
@@ -22,15 +21,12 @@ import { AppFont } from '../../src/lib/fonts';
 import { ocrReceiptImage, parseReceiptText, type ParsedItem } from '../../src/lib/receiptParser';
 import { CalSansBase64, ChillaxMediumBase64, ChillaxBoldBase64 } from '../../src/lib/fontBase64';
 import PaymentModal, { type PaymentItem } from './payment-modal';
-
 const ACCENT      = Brand.color.accent;      // light mint — backgrounds/chips only
 const ACCENT_DARK = Brand.color.accentDark;  // #2A7A6F — text/icons on white
 const ACCENT_TEXT = Brand.color.accentText;  // dark text ON accent bg
 const PAGE        = 25;
 const PEACH = '#FFAB91';
-
 const { width } = Dimensions.get('window');
-
 export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, name: propName, onClose }: { splitBillId?: string; name?: string; onClose?: () => void }) {
   const params = useLocalSearchParams<{ splitBillId: string; name: string }>();
   const splitBillId = propSplitBillId ?? params.splitBillId;
@@ -39,18 +35,15 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
   const queryClient = useQueryClient();
   const { slideAnim, handleBack: handleBackAnim } = useScreenAnim();
   const handleBack = onClose ?? handleBackAnim;
-
   useEffect(() => {
     // Load current status
     supabase.from('split_bills').select('status').eq('id', splitBillId).single()
       .then(({ data }) => { if (data?.status) setBillStatus(data.status as any); });
   }, []);
-
   const [editNameModal, setEditNameModal] = useState(false);
   const [editNameVal, setEditNameVal]     = useState('');
   const [deleteSplitModal, setDeleteSplitModal] = useState(false);
   const [billStatus, setBillStatus] = useState<'ongoing' | 'closed'>('ongoing');
-
   const openEditName = () => { setEditNameVal(String(name)); setEditNameModal(true); };
   const saveEditName = async () => {
     if (!editNameVal.trim()) return;
@@ -58,7 +51,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
     setEditNameModal(false);
     router.setParams({ name: editNameVal.trim() });
   };
-
   const confirmDeleteSplit = async () => {
     await Promise.all([
       supabase.from('bill_splits').delete().eq('split_bill_id', splitBillId),
@@ -72,7 +64,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
     queryClient.invalidateQueries({ queryKey: ['split-bills', userId] });
     router.back();
   };
-
   const confirmDeleteSplitWithRecordings = async () => {
     // Delete receipt photos linked to this split bill
     if (linkedReceipt) {
@@ -91,7 +82,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
       .not('linked_recording_id', 'is', null);
     // Now delete all recordings created from split bill payments
     await supabase.from('recordings').delete().eq('split_bill_id', splitBillId);
-    
     if (paymentRecordings && paymentRecordings.length > 0) {
       const creditByParent: Record<string, number> = {};
       paymentRecordings.forEach((rec: any) => {
@@ -99,7 +89,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
           creditByParent[rec.linked_recording_id] = (creditByParent[rec.linked_recording_id] ?? 0) + Number(rec.amount);
         }
       });
-      
       for (const [parentId, creditToReverse] of Object.entries(creditByParent)) {
         const { data: parent } = await supabase
           .from('recordings')
@@ -117,15 +106,11 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
         }
       }
     }
-    
     // Then delete the split bill itself
     await confirmDeleteSplit();
   };
-
-
   // ── Load linked recordings ────────────────────────────────────────────────
   const { userId, defaultCurrency } = useUser();
-
   // ── All-time loan/due balance per person (where you stand) ─────────────
   const { data: personBalances = {} } = useQuery({
     queryKey: ['person-loan-balances', userId],
@@ -152,7 +137,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
     },
     enabled: !!userId,
   });
-
   // ── People state ─────────────────────────────────────────────────────────
   const [addPersonModal, setAddPersonModal] = useState(false);
   const [tagInputVal, setTagInputVal] = useState('');
@@ -162,7 +146,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
   const [peopleVisible, setPeopleVisible] = useState(10);
   const [pendingInvitePerson, setPendingInvitePerson] = useState<{ name: string; friendId: string } | null>(null);
   const [sendingInvite, setSendingInvite] = useState(false);
-
   const sendInvite = async (personName: string, friendId: string, amount: number) => {
     setSendingInvite(true);
     await supabase.from('split_bill_invites').insert({
@@ -187,7 +170,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
     setSendingInvite(false);
     setPendingInvitePerson(null);
   };
-
   // ── Receipt state ─────────────────────────────────────────────────────────
   const [linkedReceipt, setLinkedReceipt]   = useState<any>(null);
   const [receiptPhotos, setReceiptPhotos]   = useState<{ id: string; url: string }[]>([]);
@@ -198,7 +180,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
   const [photoModalIndex, setPhotoModalIndex] = useState(0);
   // which pool is the carousel showing: 'direct' | 'recording'
   const [photoModalPool, setPhotoModalPool] = useState<'direct' | 'recording'>('direct');
-
   const loadLinkedReceipt = async () => {
     if (!splitBillId) return;
     const { data: entry } = await supabase.from('receipt_entries').select('id, note, created_at').eq('split_bill_id', splitBillId).maybeSingle();
@@ -219,7 +200,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
       }
     }
   };
-
   /** Load receipts that are attached to any recording linked to this split bill */
   const loadRecordingReceipts = async (linkedRecs: any[]) => {
     const recIds = linkedRecs.map((lr: any) => lr.recording?.id).filter(Boolean);
@@ -244,7 +224,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
     }
     setRecordingReceiptPhotos(allPhotos);
   };
-
   const addReceiptFromCamera = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') return;
@@ -262,7 +241,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
       loadLinkedReceipt();
     }
   };
-
   const addReceiptFromGallery = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') return;
@@ -282,9 +260,7 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
       loadLinkedReceipt();
     }
   };
-
   useEffect(() => { if (splitBillId) loadLinkedReceipt(); }, [splitBillId]);
-
   const { data: people = [], refetch: refetchPeople } = useQuery({
     queryKey: ['split-bill-people', splitBillId],
     queryFn: async () => {
@@ -297,9 +273,7 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
     },
     enabled: !!splitBillId,
   });
-
   const filledPeople = people.map((p: any) => p.person_name);
-
   // ── My invite (as invitee) ──────────────────────────────────────────────────
   const { data: myInvite, refetch: refetchMyInvite } = useQuery<any>({
     queryKey: ['my-split-bill-invite', splitBillId, userId],
@@ -314,14 +288,12 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
     },
     enabled: !!splitBillId && !!userId,
   });
-
   const [acceptModal, setAcceptModal] = useState(false);
   const [acceptSpaces, setAcceptSpaces] = useState<any[]>([]);
   const [acceptCategories, setAcceptCategories] = useState<any[]>([]);
   const [acceptSpaceId, setAcceptSpaceId] = useState('');
   const [acceptCategoryId, setAcceptCategoryId] = useState('');
   const [acceptSaving, setAcceptSaving] = useState(false);
-
   const openAcceptModal = async () => {
     const [{ data: spaces }, { data: cats }] = await Promise.all([
       supabase.from('spaces').select('id, name').eq('user_id', userId).eq('is_active', true).order('name'),
@@ -333,7 +305,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
     setAcceptCategoryId('');
     setAcceptModal(true);
   };
-
   const confirmAccept = async () => {
     if (!myInvite || !acceptSpaceId) return;
     setAcceptSaving(true);
@@ -359,7 +330,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
     setAcceptSaving(false);
     setAcceptModal(false);
   };
-
   const confirmDecline = async () => {
     if (!myInvite) return;
     await supabase.from('split_bill_invites').update({ status: 'declined' }).eq('id', myInvite.id);
@@ -377,10 +347,8 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
     },
     enabled: !!splitBillId,
   });
-
   const getInviteStatus = (personName: string) =>
     invites.find(i => i.person_name.toLowerCase() === personName.toLowerCase())?.status ?? null;
-
   // ── Friends list (for invite matching) ─────────────────────────────────────────────
   const { data: friends = [] } = useQuery<{ id: string; name: string }[]>({
     queryKey: ['friends', userId],
@@ -403,17 +371,14 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
     },
     enabled: !!userId,
   });
-
   // find a friend whose name matches the typed name
   const findMatchingFriend = (name: string) =>
     friends.find(f => f.name.toLowerCase() === name.trim().toLowerCase()) ?? null;
-
   useEffect(() => {
     if (!userId) return;
     supabase.from('contacts').select('name').eq('user_id', userId).order('name')
       .then(({ data }) => { if (data) setContacts(data.map((c: any) => c.name)); });
   }, [userId]);
-
   const savePerson = async (name: string) => {
     if (!name.trim() || filledPeople.some(p => p.toLowerCase() === name.trim().toLowerCase())) return;
     await supabase.from('bill_splits').insert({ split_bill_id: splitBillId, user_id: userId, person_name: name.trim() });
@@ -425,12 +390,10 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
     }
     refetchPeople();
   };
-
   const removePerson = async (id: string) => {
     await supabase.from('bill_splits').delete().eq('id', id);
     refetchPeople();
   };
-
   const handleAddPersonSubmit = async () => {
     if (suppressSubmitRef.current) { suppressSubmitRef.current = false; return; }
     const personName = tagInputVal.trim();
@@ -444,7 +407,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
       setPendingInvitePerson({ name: personName, friendId: match.id });
     }
   };
-
   // ── Add recording state ──────────────────────────────────────────────────
   const [addRecModal, setAddRecModal] = useState(false);
   const [allRecordings, setAllRecordings] = useState<any[]>([]);
@@ -452,14 +414,12 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
   const [recSearch, setRecSearch] = useState('');
   const [recDays, setRecDays] = useState<30 | 60 | 180 | 365 | null>(30);
   const [recShowMore, setRecShowMore] = useState(false);
-
   const REC_TABS: { key: 'debt' | 'due' | 'expense' | 'income'; label: string }[] = [
     { key: 'expense', label: 'expense' },
     { key: 'due',     label: 'due' },
     { key: 'debt',    label: 'debt' },
     { key: 'income',  label: 'income' },
   ];
-
   const REC_RANGES: { value: 30 | 60 | 180 | 365 | null; label: string }[] = [
     { value: 30, label: 'this month' },
     { value: 60, label: '60 days' },
@@ -467,7 +427,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
     { value: 365, label: '1 year' },
     { value: null, label: 'all time' },
   ];
-
   const openAddRecording = async () => {
     const linkedIds = linkedRecordings.map((lr: any) => lr.recording?.id);
     const { data } = await supabase
@@ -484,7 +443,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
     setRecShowMore(false);
     setAddRecModal(true);
   };
-
   const linkRecording = async (rec: any) => {
     await supabase.from('split_bill_recordings').insert({
       split_bill_id: splitBillId,
@@ -501,7 +459,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
   const [itemRows, setItemRows]                   = useState<{ name: string; cost: string }[]>([{ name: '', cost: '' }]);
   const [savingItem, setSavingItem]               = useState(false);
   const [manualItemType, setManualItemType]        = useState<'receivable' | 'payable'>('receivable');
-
   // ── Receipt parser state ──────────────────────────────────────────────────
   const [parseReceiptPhotos, setParseReceiptPhotos] = useState<{ id: string; url: string }[]>([]);
   const [parsedItems, setParsedItems]               = useState<{ name: string; cost: string }[]>([]);
@@ -513,11 +470,9 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
   const [parseOverBudgetModal, setParseOverBudgetModal] = useState(false);
   const [editingParsedItem, setEditingParsedItem]   = useState<{ idx: number; field: 'name' | 'cost'; value: string } | null>(null);
   const [editingExistingItem, setEditingExistingItem] = useState<{ item: any; field: 'name' | 'cost'; value: string } | null>(null);
-
   // assign-people sheet (tap an existing item)
   const [assignItem, setAssignItem]   = useState<any>(null);
   const [assignPeople, setAssignPeople] = useState<string[]>([]);
-
   const { data: items = [], refetch: refetchItems } = useQuery({
     queryKey: ['split-bill-items', splitBillId],
     queryFn: async () => {
@@ -530,12 +485,9 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
     },
     enabled: !!splitBillId,
   });
-
   // receivable / expense = collect from them (+), loan / income / savings = give back (-)
   const isDeductType = (type: string) => type === 'payable' || type === 'debt';
-
   const totalItemsCost = items.reduce((s: number, i: any) => s + Number(i.cost), 0);
-
   const openAddItem = () => {
     setItemStep('pick-type');
     setSelectedRecording(null);
@@ -546,21 +498,17 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
     setParseError('');
     setAddItemModal(true);
   };
-
   const handlePickRecording = async (lr: any) => {
     setSelectedRecording(lr);
     setItemRows([{ name: '', cost: '' }]);
-
     // Check if this recording already has receipt photos
     const recId = lr.recording?.id;
     if (!recId) { setItemStep('add-items'); return; }
-
     const { data: entries } = await supabase
       .from('receipt_entries')
       .select('id')
       .eq('recording_id', recId)
       .limit(1);
-
     if (entries && entries.length > 0) {
       // Has receipt — load photos and go straight to parse choice
       const { data: photos } = await supabase
@@ -584,7 +532,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
       setItemStep('parse-choice');
     }
   };
-
   const handleParseReceipt = async (photos: { id: string; url: string }[]) => {
     if (photos.length === 0) return;
     setParseLoading(true);
@@ -609,7 +556,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
       setParseLoading(false);
     }
   };
-
   const handleUploadReceiptForParse = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') return;
@@ -652,7 +598,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
       setParseLoading(false);
     }
   };
-
   const saveParsedItems = async () => {
     const valid = parsedItems.filter(r => r.name.trim() && r.cost && parseFloat(r.cost) > 0);
     if (!valid.length) return;
@@ -678,7 +623,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
     setAddItemModal(false);
     refetchItems();
   };
-
   const saveManualItems = async () => {
     const valid = itemRows.filter(r => r.name.trim() && r.cost);
     if (!valid.length) return;
@@ -696,7 +640,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
     setAddItemModal(false);
     refetchItems();
   };
-
   const saveItems = async () => {
     const valid = itemRows.filter(r => r.name.trim() && r.cost);
     if (!valid.length) return;
@@ -722,23 +665,19 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
     if (error) return;
     setAddItemModal(false); refetchItems();
   };
-
   const openAssign = (item: any) => {
     setAssignItem(item);
     setAssignPeople(item.people ?? []);
   };
-
   const saveAssign = async () => {
     await supabase.from('split_items').update({ people: assignPeople.length ? assignPeople : null }).eq('id', assignItem.id);
     setAssignItem(null);
     refetchItems();
   };
-
   const deleteItem = async (id: string) => {
     await supabase.from('split_items').delete().eq('id', id);
     refetchItems();
   };
-
   const saveExistingItem = async () => {
     if (!editingExistingItem) return;
     const { item, field, value } = editingExistingItem;
@@ -746,7 +685,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
     setEditingExistingItem(null);
     refetchItems();
   };
-
   // ── Share ──────────────────────────────────────────────────────────────────
   const { data: shareRow, refetch: refetchShareRow } = useQuery({
     queryKey: ['split-bill-share', splitBillId],
@@ -760,7 +698,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
     },
     enabled: !!splitBillId,
   });
-
   const [shareModal, setShareModal]             = useState(false);
   const [shareAccounts, setShareAccounts]       = useState<any[]>([]);
   const [shareSelectedIds, setShareSelectedIds] = useState<string[]>([]);
@@ -770,7 +707,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
   const [shareSaving, setShareSaving]           = useState(false);
   const [shareGenerating, setShareGenerating]   = useState(false);
   const [saveImgLoading, setSaveImgLoading]     = useState(false);
-
   const openShareModal = async () => {
     setShareCopied(false);
     const { data: accs } = await supabase
@@ -794,7 +730,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
     }
     setShareModal(true);
   };
-
   const saveShareAccounts = async () => {
     if (!shareRow) return;
     setShareSaving(true);
@@ -803,24 +738,20 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
     setShareOriginalIds([...shareSelectedIds]);
     setShareSaving(false);
   };
-
   const generateLink = async () => {
     setShareGenerating(true);
     const firstRecordingId = linkedRecordings[0]?.recording?.id ?? null;
-
     // Build slug from bill name
     const baseSlug = String(name)
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '');
-
     // Find existing slugs for this user to determine counter
     const { data: existing } = await supabase
       .from('split_shares')
       .select('slug')
       .eq('user_id', userId)
       .like('slug', `${baseSlug}%`);
-
     const usedSlugs = (existing ?? []).map((r: any) => r.slug);
     let slug = baseSlug;
     let counter = 2;
@@ -828,7 +759,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
       slug = `${baseSlug}-${counter}`;
       counter++;
     }
-
     const { data } = await supabase.from('split_shares')
       .insert({ split_bill_id: splitBillId, recording_id: firstRecordingId, data: { account_ids: shareSelectedIds }, user_id: userId, slug })
       .select('id').single();
@@ -837,7 +767,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
     setShareLink(`https://ledgr.art/split/${userId}/${slug}`);
     await refetchShareRow();
   };
-
   const copyShareLink = async () => {
     if (!shareLink) return;
     if (Platform.OS !== 'web') {
@@ -852,7 +781,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
         .catch(fallbackCopy);
     } else { fallbackCopy(); }
   };
-
   const fallbackCopy = () => {
     if (typeof document === 'undefined') return;
     const el = document.createElement('textarea');
@@ -862,7 +790,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
     try { document.execCommand('copy'); setShareCopied(true); setTimeout(() => setShareCopied(false), 2000); } catch (_) {}
     document.body.removeChild(el);
   };
-
   const saveAsImage = async () => {
     if (!shareLink) return;
     setSaveImgLoading(true);
@@ -877,7 +804,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
       });
       const grandTotal = Object.values(totals).reduce((s, v) => s + v, 0);
       const fmt2 = (n: number) => Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2 });
-
       // Per-person rows — matching share page style
       const personRowsHtml = filledPeople.map((p: string) => {
         const total = totals[p] ?? 0;
@@ -894,7 +820,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
         `<span style="font-family:'Chillax',sans-serif;font-weight:700;font-size:13px;font-weight:600;color:#2A7A6F;flex:1">total</span>`+
         `<span style="font-family:'Chillax',sans-serif;font-weight:700;font-size:14px;color:#2A7A6F">${grandTotal < 0 ? '-' : ''}${fmt2(grandTotal)}</span>`+
         `</div>`;
-
       // Item rows — matching share page style
             // Group items by recording
       const recGroups: { recId: string | null; recName: string; items: any[] }[] = [];
@@ -934,7 +859,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
         }).join('');
         return groupHeader + rows;
       }).join('');
-
       // Payment info — matching share page style
       const selectedAccounts = shareAccounts.filter((a: any) => shareSelectedIds.includes(a.id));
       const accountsWithBase64 = await Promise.all(selectedAccounts.map(async (a: any) => {
@@ -962,12 +886,10 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
           `<div style="font-family:'Chillax',sans-serif;font-weight:700;font-size:13px;color:#2e3d3d;letter-spacing:0.3px">${a.account_number ?? ''}</div>`+
           `</div>${qrImg}</div>`;
       }).join('');
-
       const sectionLabel = (text: string) =>
         `<div style="font-family:'Chillax',sans-serif;font-weight:500;font-size:11px;color:#929090;letter-spacing:0.6px;text-transform:uppercase;margin:24px 0 10px">${text}</div>`;
       const block = (inner: string) =>
         `<div style="border:1px solid #eef0f0;border-radius:14px;overflow:hidden">${inner}</div>`;
-
       const html = `<!DOCTYPE html><html><head><meta charset="utf-8">`+
         `<style>`+
         `@font-face{font-family:'CalSans';src:url('${CalSansBase64}') format('truetype')}`+
@@ -982,7 +904,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
         (payRowsHtml ? sectionLabel('payment information') + block(payRowsHtml) : '') +
         `<div style="font-family:'Chillax',sans-serif;font-weight:500;font-size:10px;color:#c8d0d0;text-align:center;margin-top:32px">generated by LEDGR</div>`+
         `</body></html>`;
-
       if (Platform.OS !== 'web') {
         const Print = require('expo-print');
         const Sharing = require('expo-sharing');
@@ -1011,7 +932,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
     } catch (e) { console.error('saveAsImage error:', e); }
     setSaveImgLoading(false);
   };
-
   const { data: linkedRecordings = [], isLoading: loadingRecs } = useQuery({
     queryKey: ['split-bill-recordings', splitBillId],
     queryFn: async () => {
@@ -1027,21 +947,17 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
     },
     enabled: !!splitBillId,
   });
-
   // Load recording receipts whenever linked recordings change
   useEffect(() => {
     if (linkedRecordings.length > 0) loadRecordingReceipts(linkedRecordings);
     else setRecordingReceiptPhotos([]);
   }, [linkedRecordings.map((lr: any) => lr.recording?.id).join(',')]);
-
   // ── Mark recording complete (from split bill) ──────────────────────────
   const [removeRecordingBlockedModal, setRemoveRecordingBlockedModal] = useState(false);
   const [markRecCompleteModal, setMarkRecCompleteModal] = useState(false);
-
   const handleRemoveRecording = async (lr: any) => {
     const rec = lr.recording;
     if (!rec) return;
-
     // Check if any payments have been credited to this recording
     const { data: linkedReturns } = await supabase
       .from('recordings')
@@ -1049,13 +965,11 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
       .eq('linked_recording_id', rec.id)
       .eq('split_bill_id', splitBillId)
       .limit(1);
-
     if (linkedReturns && linkedReturns.length > 0) {
       // Payments exist — block removal
       setRemoveRecordingBlockedModal(true);
       return;
     }
-
     // No payments — safe to remove: delete linked items too
     await supabase.from('split_items').delete()
       .eq('split_bill_id', splitBillId)
@@ -1066,12 +980,10 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
   };
   const [markRecCompleteLr, setMarkRecCompleteLr]       = useState<any>(null);
   const [markRecCompleteLoading, setMarkRecCompleteLoading] = useState(false);
-
   const openMarkRecComplete = (lr: any) => {
     setMarkRecCompleteLr(lr);
     setMarkRecCompleteModal(true);
   };
-
   const confirmMarkRecComplete = async () => {
     if (!markRecCompleteLr) return;
     setMarkRecCompleteLoading(true);
@@ -1082,7 +994,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
     setMarkRecCompleteLoading(false);
     queryClient.invalidateQueries({ queryKey: ['split-bill-recordings', splitBillId] });
   };
-
   // ── Close confirm ────────────────────────────────────────────────────────
   const [closeConfirmModal, setCloseConfirmModal] = useState(false);
   const [unpaidPeopleNames, setUnpaidPeopleNames] = useState<string[]>([]);
@@ -1091,7 +1002,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
   const [closeSpaceId, setCloseSpaceId] = useState<string | null>(null);
   const [closeSpaces, setCloseSpaces] = useState<any[]>([]);
   const [closeNoRecordings, setCloseNoRecordings] = useState(false);
-
   const handleToggleStatus = async () => {
     if (billStatus === 'closed') {
       // Reopening — revert recordings back to their actual collected state
@@ -1148,7 +1058,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
       queryClient.invalidateQueries({ queryKey: ['split-bills', userId] });
     }
   };
-
   const confirmClose = async () => {
     setClosingLoading(true);
     const today = new Date().toISOString().split('T')[0];
@@ -1208,12 +1117,10 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
       queryClient.invalidateQueries({ queryKey: ['recordings', closeSpaceId] });
     }
   };
-
   // ── Auto-complete check after payment ────────────────────────────────────
   const [autoCompleteRecs, setAutoCompleteRecs] = useState<any[]>([]);
   const [autoCompleteModal, setAutoCompleteModal] = useState(false);
   const [autoCompleteLoading, setAutoCompleteLoading] = useState(false);
-
   const checkAutoComplete = (updatedPayments: any[]) => {
     // For each linked recording, check if total payments from all people cover the recording amount
     const toComplete: any[] = [];
@@ -1251,7 +1158,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
       setAutoCompleteModal(true);
     }
   };
-
   const confirmAutoComplete = async () => {
     setAutoCompleteLoading(true);
     for (const lr of autoCompleteRecs) {
@@ -1266,13 +1172,11 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
     setAutoCompleteLoading(false);
     queryClient.invalidateQueries({ queryKey: ['split-bill-recordings', splitBillId] });
   };
-
   // ── Mark as paid ───────────────────────────────────────────────────────
   const [markPaidRec, setMarkPaidRec]     = useState<any>(null);
   const [markPaidAccounts, setMarkPaidAccounts] = useState<any[]>([]);
   const [markPaidAccount, setMarkPaidAccount]   = useState<any>(null);
   const [markPaidLoading, setMarkPaidLoading]   = useState(false);
-
   const openMarkPaid = async (lr: any) => {
     const rec = lr.recording;
     if (!rec) return;
@@ -1288,14 +1192,12 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
     setMarkPaidAccount(accs?.[0] ?? null);
     setMarkPaidRec(lr);
   };
-
   const confirmMarkPaid = async () => {
     if (!markPaidRec) return;
     setMarkPaidLoading(true);
     const rec = markPaidRec.recording;
     const today = new Date().toISOString().split('T')[0];
     const accId = markPaidAccount?.id ?? null;
-
     if (rec.type === 'expense') {
       await supabase.from('recordings').insert({
         user_id: userId, space_id: rec.space_id,
@@ -1338,14 +1240,11 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
       });
       await supabase.from('recordings').update({ status: 'paid', paid_amount: rec.amount }).eq('id', rec.id);
     }
-
     setMarkPaidLoading(false);
     setMarkPaidRec(null);
     queryClient.invalidateQueries({ queryKey: ['split-bill-recordings', splitBillId] });
   };
-
   const totalAmount = linkedRecordings.reduce((s: number, r: any) => s + Number(r.amount_contributed), 0);
-
   // ── Payment history ────────────────────────────────────────────────────────────
   const { data: payments = [], refetch: refetchPayments } = useQuery({
     queryKey: ['split-bill-payments', splitBillId],
@@ -1359,7 +1258,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
     },
     enabled: !!splitBillId,
   });
-
   const [paymentModal, setPaymentModal]     = useState(false);
   const [paymentPerson, setPaymentPerson]   = useState('');
   const [paymentMode, setPaymentMode]       = useState<'full' | 'manual'>('full');
@@ -1377,7 +1275,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
   const [chargeSpaces, setChargeSpaces]     = useState<any[]>([]);
   const [chargeAccounts, setChargeAccounts] = useState<any[]>([]);
   const [chargeCategories, setChargeCategories] = useState<any[]>([]);
-
   const { data: chargedExpenses = [], refetch: refetchChargedExpenses } = useQuery({
     queryKey: ['split-bill-charged-expenses', splitBillId],
     queryFn: async () => {
@@ -1396,20 +1293,17 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
     },
     enabled: !!splitBillId,
   });
-
   // ── Cancel payment state ───────────────────────────────────────────────
   const [cancelPaymentModal, setCancelPaymentModal] = useState(false);
   const [cancelPaymentTarget, setCancelPaymentTarget] = useState<any>(null);
   const [cancelReason, setCancelReason] = useState('');
   const [cancelSaving, setCancelSaving] = useState(false);
-
   // ── Overpayment state ──────────────────────────────────────────────────
   const [overpaymentModal, setOverpaymentModal] = useState(false);
   const [overpaymentAmount, setOverpaymentAmount] = useState(0);
   const [overpaymentPerson, setOverpaymentPerson] = useState('');
   const [overpaymentApplyModal, setOverpaymentApplyModal] = useState(false);
   const [otherSplitBills, setOtherSplitBills] = useState<any[]>([]);
-
   const confirmOverpaymentIncome = async () => {
     const spaceId = linkedRecordings[0]?.recording?.space_id ?? null;
     await supabase.from('recordings').insert({
@@ -1423,7 +1317,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
     });
     setOverpaymentModal(false);
   };
-
   const openApplyToSplitBill = async () => {
     const { data } = await supabase
       .from('split_bills')
@@ -1436,7 +1329,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
     setOverpaymentModal(false);
     setOverpaymentApplyModal(true);
   };
-
   const confirmApplyToSplitBill = async (targetBillId: string) => {
     await supabase.from('split_bill_payments').insert({
       split_bill_id: targetBillId,
@@ -1445,24 +1337,20 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
     });
     setOverpaymentApplyModal(false);
   };
-
   const openCancelPayment = (pay: any) => {
     setCancelPaymentTarget(pay);
     setCancelReason('');
     setCancelPaymentModal(true);
   };
-
   const confirmCancelPayment = async () => {
     if (!cancelPaymentTarget) return;
     setCancelSaving(true);
     const pay = cancelPaymentTarget;
-
     // 1. Void linked return recordings instead of deleting
     const { data: linkedReturns } = await supabase
       .from('recordings')
       .select('id, amount, linked_recording_id')
       .eq('split_bill_payment_id', pay.id);
-
     if (linkedReturns && linkedReturns.length > 0) {
       const creditByParent: Record<string, number> = {};
       for (const ret of linkedReturns) {
@@ -1477,7 +1365,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
         void_reason: cancelReason.trim() || 'payment cancelled',
         voided_at: new Date().toISOString(),
       }).eq('split_bill_payment_id', pay.id);
-
       // Reverse paid_amount on each parent recording
       for (const [parentId, creditToReverse] of Object.entries(creditByParent)) {
         const { data: parent } = await supabase
@@ -1496,7 +1383,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
         }
       }
     }
-
     // 2. Reduce or delete the consolidated charged expense if this payment was charged to a space
     if (pay.charged_recording_id) {
       const { data: chargedExp } = await supabase
@@ -1516,21 +1402,18 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
         queryClient.invalidateQueries({ queryKey: ['dashboard-activities', userId] });
       }
     }
-
     // 3. Mark payment as cancelled (never delete)
     await supabase.from('split_bill_payments').update({
       status: 'cancelled',
       cancelled_reason: cancelReason.trim() || null,
       cancelled_at: new Date().toISOString(),
     }).eq('id', pay.id);
-
     setCancelSaving(false);
     setCancelPaymentModal(false);
     setCancelPaymentTarget(null);
     refetchPayments();
     queryClient.invalidateQueries({ queryKey: ['split-bill-recordings', splitBillId] });
   };
-
   // compute per-person totals (reuse across summary + payment)
   const computeTotals = () => {
     const totals: Record<string, number> = {};
@@ -1544,10 +1427,8 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
     });
     return totals;
   };
-
   // Only active payments count toward paid totals
   const activePayments = payments.filter((p: any) => p.status !== 'cancelled');
-
   const openPaymentModal = async (person: string) => {
     setPaymentPerson(person);
     setPaymentMode('full');
@@ -1568,7 +1449,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
     setChargeCategories(cats ?? []);
     setPaymentModal(true);
   };
-
   const getPersonRecordingRows = (person: string) => {
     const recordingOwed: Record<string, { amount: number; rec: any }> = {};
     items.forEach((item: any) => {
@@ -1590,7 +1470,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
       }))
       .filter((row) => row.recording);
   };
-
   const getPersonManualOwed = (person: string) => {
     let manual = 0;
     items.forEach((item: any) => {
@@ -1602,13 +1481,11 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
     });
     return manual;
   };
-
   // ── Manual return prompt state ─────────────────────────────────────────
   const [manualReturnModal, setManualReturnModal] = useState(false);
   const [manualReturnAmount, setManualReturnAmount] = useState(0);
   const [manualReturnType, setManualReturnType] = useState<'return' | 'expense'>('return');
   const [manualReturnSaving, setManualReturnSaving] = useState(false);
-
   const confirmManualReturn = async () => {
     setManualReturnSaving(true);
     const spaceId = linkedRecordings[0]?.recording?.space_id ?? null;
@@ -1626,7 +1503,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
     setManualReturnSaving(false);
     setManualReturnModal(false);
   };
-
   const savePayment = async () => {
     const totals = computeTotals();
     const owed = Math.abs(totals[paymentPerson] ?? 0);
@@ -1640,7 +1516,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
       : manualRowsTotal + (parseFloat(paymentAmount || '0') || 0);
     if (!amount || amount <= 0) return;
     setPaymentSaving(true);
-
     // 1. Record the payment in split_bill_payments
     const { data: paymentRow } = await supabase.from('split_bill_payments').insert({
       split_bill_id: splitBillId,
@@ -1649,7 +1524,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
     }).select('id').single();
     // FIX 2: keep the id so we can tag every return recording with it
     const paymentRowId = paymentRow?.id ?? null;
-
     // 2. Compute per-recording and manual breakdown for this person
     // Build: { recordingId -> amount_owed_by_person } and manual total
     const recordingOwed: Record<string, { amount: number; rec: any }> = {};
@@ -1659,7 +1533,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
       const parsed = parseFloat(value || '0');
       if (parsed > 0) requestedRecordingAmounts[rid] = parsed;
     });
-
     items.forEach((item: any) => {
       const assignedToMe = (item.people ?? []).includes(paymentPerson);
       if (!assignedToMe) return;
@@ -1674,11 +1547,9 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
         manualOwed += deduct ? -pp : pp;
       }
     });
-
     // 3. Assign payments by recording first, then manual items
     let remaining = amount;
     const today = new Date().toISOString().split('T')[0];
-
     for (const rid of Object.keys(recordingOwed)) {
       if (remaining <= 0) break;
       const { amount: itemAmount, rec } = recordingOwed[rid];
@@ -1689,7 +1560,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
         : Math.min(remaining, itemAmount);
       if (credit <= 0) continue;
       remaining -= credit;
-
       // FIX 2: store split_bill_payment_id so this return can be reversed
       // if the payment row is later deleted from history.
       await supabase.from('recordings').insert({
@@ -1704,7 +1574,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
         split_bill_id: splitBillId,
         split_bill_payment_id: paymentRowId,
       });
-
       // Update paid_amount on the parent recording
       const { data: parentRec } = await supabase
         .from('recordings').select('paid_amount, amount, is_due')
@@ -1719,7 +1588,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
         }).eq('id', rid);
       }
     }
-
     // 4. Handle manual portion
     const manualExtra = parseFloat(paymentAmount || '0') || 0;
     if (remaining > 0 && manualOwed > 0) {
@@ -1731,14 +1599,12 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
         .eq('split_bill_id', splitBillId)
         .is('linked_recording_id', null)
         .limit(1);
-
       if (!existingManual || existingManual.length === 0) {
         setManualReturnAmount(manualCredit);
         setManualReturnType('return');
         setManualReturnModal(true);
       }
     }
-
     // 5. Charge to space — upsert a single consolidated expense per split bill per space
     if (chargeToSpace && chargeSpaceId) {
       const { data: existingArr } = await supabase
@@ -1781,7 +1647,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
       queryClient.invalidateQueries({ queryKey: ['recordings', chargeSpaceId] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-activities', userId] });
     }
-
     setPaymentSaving(false);
     setPaymentModal(false);
     refetchPayments();
@@ -1870,16 +1735,13 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
     await Promise.all([refetchItems(), refetchPayments(), queryClient.invalidateQueries({ queryKey: ['transactions'] })]);
   };
   const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
   const typeColor = (type: string) => {
     if (type === 'debt') return PEACH;
     return ACCENT_DARK;
   };
-
   return (
     <Animated.View style={[{ flex: 1, backgroundColor: Colors.white }, { transform: [{ translateX: slideAnim }] }]}>
       <SafeAreaView style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-
         {/* Header */}
         <PageHeader
           title={String(name)}
@@ -1887,12 +1749,10 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
           right={
             billStatus === 'ongoing' ? (
               <TouchableOpacity onPress={openEditName} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Ionicons name="create-outline" size={18} color={DC.pageTextMuted} />
               </TouchableOpacity>
             ) : undefined
           }
         />
-
         {/* Actions row */}
         <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: PAGE, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.border }}>
           <TouchableOpacity style={s.actionBtn} onPress={openShareModal}>
@@ -1905,10 +1765,8 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
             <Text style={s.actionBtnDangerText}>delete</Text>
           </TouchableOpacity>
         </View>
-
         <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
           <View style={{ height: 8 }} />
-
           {/* Invite banner — shown to invitee only */}
           {myInvite && myInvite.status === 'pending' && (
             <View style={{ backgroundColor: ACCENT + '33', borderRadius: Radius.lg, padding: 16, marginBottom: 12, gap: 8 }}>
@@ -1939,7 +1797,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
           )}
           {myInvite && myInvite.status === 'accepted' && (
             <View style={{ backgroundColor: ACCENT + '22', borderRadius: Radius.lg, padding: 12, marginBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Ionicons name="checkmark-circle" size={16} color={ACCENT_DARK} />
               <Text style={{ fontFamily: AppFont.regular, fontSize: 11, color: ACCENT_DARK }}>you accepted this split bill — debt recorded</Text>
             </View>
           )}
@@ -1977,7 +1834,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
                   activeOpacity={0.85}
                   onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: lr.recording?.id } } as any)}
                 >
-
                   <Text style={s.recNum}>{recIdx + 1}</Text>
                   <View style={s.recMid}>
                     <Text style={s.recName} numberOfLines={1}>{lr.recording?.name ?? '—'}</Text>
@@ -1986,7 +1842,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
                         ? new Date(rec.transaction_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
                         : '—'}
                     </Text>
-                    
                   </View>
                   <View style={s.recRight}>
                     <Text style={s.recAmount}>{fmt(Number(lr.amount_contributed))}</Text>
@@ -2013,7 +1868,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
                       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                       style={{ padding: 4 }}
                     >
-                      <Ionicons name="checkmark-circle-outline" size={18} color={ACCENT_DARK} />
                     </TouchableOpacity>
                   )}
                   {billStatus === 'ongoing' && (
@@ -2021,7 +1875,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
                       onPress={() => handleRemoveRecording(lr)}
                       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     >
-                      <Ionicons name="close" size={14} color={Colors.faint} />
                     </TouchableOpacity>
                   )}
                 </TouchableOpacity>
@@ -2029,7 +1882,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
                 })}
             </View>
           )}
-
           {/* People */}
           <View style={s.divider} />
           <View style={s.sectionRow}>
@@ -2052,9 +1904,9 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
                 <View key={p.id} style={{ position: 'relative' }}>
                   <View style={s.personChip}>
                     <Text style={s.personChipText}>{p.person_name}</Text>
-                    {inviteStatus === 'pending'  && <Ionicons name="time-outline"           size={11} color="#F59E0B" />}
-                    {inviteStatus === 'accepted' && <Ionicons name="checkmark-circle"       size={11} color={ACCENT_DARK} />}
-                    {inviteStatus === 'declined' && <Ionicons name="close-circle-outline"   size={11} color={Colors.muted} />}
+                    {inviteStatus === 'pending'  && null}
+                    {inviteStatus === 'accepted' && null}
+                    {inviteStatus === 'declined' && null}
                   </View>
                   {billStatus === 'ongoing' && (
                     <TouchableOpacity
@@ -2062,7 +1914,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
                       style={{ position: 'absolute', top: -5, right: -5, width: 16, height: 16, borderRadius: 8, backgroundColor: '#ef4444', alignItems: 'center', justifyContent: 'center' }}
                       hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                     >
-                      <Ionicons name="close" size={9} color="#fff" />
                     </TouchableOpacity>
                   )}
                 </View>
@@ -2080,7 +1931,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
               )}
             </View>
           )}
-
           {/* Items */}
           <View style={s.divider} />
           <View style={s.sectionRow}>
@@ -2143,7 +1993,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
                           </TouchableOpacity>
                         )}
                         <TouchableOpacity onPress={() => deleteItem(item.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                          <Ionicons name="close" size={14} color={Colors.faint} />
                         </TouchableOpacity>
                       </View>
                     )}
@@ -2157,7 +2006,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
               </View>
             </View>
           )}
-
           {/* Receipt */}
           <View style={s.divider} />
           <View style={s.sectionRow}>
@@ -2203,7 +2051,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
               </ScrollView>
             </>
           )}
-
           {/* Charged expenses */}
           {chargedExpenses.length > 0 && (
             <>
@@ -2220,7 +2067,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
                     onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: exp.id } } as any)}
                   >
                     <View style={[s.recIconWrap, { backgroundColor: PEACH + '33' }]}>
-                      <Ionicons name="card-outline" size={16} color={PEACH} />
                     </View>
                     <View style={s.recMid}>
                       <Text style={s.recName} numberOfLines={1}>{exp.name}</Text>
@@ -2229,13 +2075,11 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
                       </Text>
                     </View>
                     <Text style={[s.recAmount, { color: PEACH }]}>{fmt(Number(exp.amount))}</Text>
-                    <Ionicons name="chevron-forward" size={13} color={Colors.faint} />
                   </TouchableOpacity>
                 ))}
               </View>
             </>
           )}
-
           {/* Payment history */}
           <View style={s.divider} />
           <View style={s.sectionRow}>
@@ -2267,7 +2111,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
                   // Build relationship summary for this person
                   const personRecRows = getPersonRecordingRows(p);
                   const personManualOwed = getPersonManualOwed(p);
-
                   return (
                     <View key={p} style={[s.itemCard, { flexDirection: 'column', alignItems: 'stretch', gap: 0, paddingHorizontal: 0, paddingVertical: 0, overflow: 'hidden' }]}>
                       {/* Person row â€” no number */}
@@ -2325,7 +2168,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
                                 </View>
                                 {pay.status !== 'cancelled' && billStatus === 'ongoing' && (
                                   <TouchableOpacity onPress={() => openCancelPayment(pay)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                                    <Ionicons name="close" size={14} color={Colors.faint} />
                                   </TouchableOpacity>
                                 )}
                               </View>
@@ -2346,7 +2188,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
               </View>
             );
           })()}
-
           {/* Payment logs */}
           {chargedExpenses.length > 0 && (
             <>
@@ -2363,7 +2204,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
                     onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: exp.id } } as any)}
                   >
                     <View style={[s.recIconWrap, { backgroundColor: ACCENT + '44' }]}>
-                      <Ionicons name="receipt-outline" size={16} color={ACCENT_DARK} />
                     </View>
                     <View style={s.recMid}>
                       <Text style={s.recName} numberOfLines={1}>{exp.name}</Text>
@@ -2371,18 +2211,15 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
                       <Text style={s.recDate}>{exp.transaction_date ? new Date(exp.transaction_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}</Text>
                     </View>
                     <Text style={[s.recAmount, { color: ACCENT_DARK }]}>{fmt(Number(exp.amount))}</Text>
-                    <Ionicons name="chevron-forward" size={13} color={Colors.faint} />
                   </TouchableOpacity>
                 ))}
               </View>
             </>
           )}
-
           {/* moved to actions row above recordings */}
           <View style={{ height: 20 }} />
         </ScrollView>
       </SafeAreaView>
-
       {/* Add item modal */}
       <BottomSheet visible={addItemModal} onClose={() => { setAddItemModal(false); setEditingParsedItem(null); }} title="add items" maxHeight="65%">
         {/* Edit field overlay — inside BottomSheet so it renders above it */}
@@ -2437,26 +2274,22 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
               onPress={() => setItemStep(linkedRecordings.length > 0 ? 'pick-recording' : 'manual')}
             >
               <View style={[s.recIconWrap, { backgroundColor: ACCENT + '22' }]}>
-                <Ionicons name="receipt-outline" size={16} color={ACCENT} />
               </View>
               <View style={s.recMid}>
                 <Text style={s.recName}>from a recording</Text>
                 <Text style={s.recDate}>link to an existing recording</Text>
               </View>
-              <Ionicons name="chevron-forward" size={14} color={Colors.muted} />
             </TouchableOpacity>
             <TouchableOpacity
               style={[s.recPickRow, { borderBottomWidth: 0, backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: 16 }]}
               onPress={() => { setItemRows([{ name: '', cost: '' }]); setItemStep('manual'); }}
             >
               <View style={[s.recIconWrap, { backgroundColor: '#FFAB9122' }]}>
-                <Ionicons name="create-outline" size={16} color="#FFAB91" />
               </View>
               <View style={s.recMid}>
                 <Text style={s.recName}>manual item</Text>
                 <Text style={s.recDate}>receivable or loan · no recording created</Text>
               </View>
-              <Ionicons name="chevron-forward" size={14} color={Colors.muted} />
             </TouchableOpacity>
           </View>
         ) : itemStep === 'manual' ? (
@@ -2486,13 +2319,11 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
                 </TouchableOpacity>
                 {itemRows.length > 1 && (
                   <TouchableOpacity onPress={() => setItemRows(prev => prev.filter((_, idx) => idx !== i))} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Ionicons name="close" size={14} color={Colors.faint} />
                   </TouchableOpacity>
                 )}
               </View>
             ))}
             <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 8 }} onPress={() => setItemRows(prev => [...prev, { name: '', cost: '' }])}>
-              <Ionicons name="add" size={13} color={ACCENT_DARK} />
               <Text style={{ fontFamily: AppFont.regular, fontSize: 12, color: ACCENT_DARK }}>add another</Text>
             </TouchableOpacity>
             <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
@@ -2516,13 +2347,11 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
               return (
                 <TouchableOpacity key={lr.id} style={s.recPickRow} onPress={() => handlePickRecording(lr)}>
                   <View style={[s.recIconWrap, { backgroundColor: ACCENT + '44' }]}>
-                    <Ionicons name={recType === 'payable' ? 'cash-outline' : deduct ? 'arrow-down-circle-outline' : 'arrow-up-circle-outline'} size={16} color={deduct ? ACCENT_DARK : '#FFAB91'} />
                   </View>
                   <View style={s.recMid}>
                     <Text style={s.recName} numberOfLines={1}>{lr.recording?.name ?? '—'}</Text>
                     <Text style={s.recDate}>{recType} · {fmt(Number(lr.amount_contributed))}</Text>
                   </View>
-                  <Ionicons name="chevron-forward" size={14} color={Colors.muted} />
                 </TouchableOpacity>
               );
             })}
@@ -2549,7 +2378,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
                         <Text style={{ fontFamily: AppFont.semiBold, fontSize: 13, color: Colors.text }}>{fmt(Number(item.cost))}</Text>
                       </TouchableOpacity>
                       <TouchableOpacity onPress={() => deleteItem(item.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                        <Ionicons name="close" size={14} color={Colors.faint} />
                       </TouchableOpacity>
                     </View>
                   ))}
@@ -2598,14 +2426,12 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
                   </TouchableOpacity>
                   {itemRows.length > 1 && (
                     <TouchableOpacity onPress={() => setItemRows(prev => prev.filter((_, idx) => idx !== i))} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                      <Ionicons name="close" size={14} color={Colors.faint} />
                     </TouchableOpacity>
                   )}
                 </View>
               );
             })}
             <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 8 }} onPress={() => setItemRows(prev => [...prev, { name: '', cost: '' }])}>
-              <Ionicons name="add" size={13} color={ACCENT_DARK} />
               <Text style={{ fontFamily: AppFont.regular, fontSize: 12, color: ACCENT_DARK }}>add another</Text>
             </TouchableOpacity>
             {(() => {
@@ -2646,13 +2472,11 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
                 onPress={() => handleParseReceipt(parseReceiptPhotos)}
               >
                 <View style={[s.recIconWrap, { backgroundColor: ACCENT + '22' }]}>
-                  <Ionicons name="scan-outline" size={16} color={ACCENT_DARK} />
                 </View>
                 <View style={s.recMid}>
                   <Text style={s.recName}>parse existing receipt</Text>
                   <Text style={s.recDate}>{parseReceiptPhotos.length} photo{parseReceiptPhotos.length !== 1 ? 's' : ''} found</Text>
                 </View>
-                <Ionicons name="chevron-forward" size={14} color={Colors.muted} />
               </TouchableOpacity>
             ) : null}
             <TouchableOpacity
@@ -2660,26 +2484,22 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
               onPress={handleUploadReceiptForParse}
             >
               <View style={[s.recIconWrap, { backgroundColor: ACCENT + '22' }]}>
-                <Ionicons name="camera-outline" size={16} color={ACCENT_DARK} />
               </View>
               <View style={s.recMid}>
                 <Text style={s.recName}>upload & parse receipt</Text>
                 <Text style={s.recDate}>upload a photo and scan for items</Text>
               </View>
-              <Ionicons name="chevron-forward" size={14} color={Colors.muted} />
             </TouchableOpacity>
             <TouchableOpacity
               style={[s.recPickRow, { borderBottomWidth: 0, backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: 16 }]}
               onPress={() => { setItemRows([{ name: '', cost: '' }]); setItemStep('add-items'); }}
             >
               <View style={[s.recIconWrap, { backgroundColor: '#FFAB9122' }]}>
-                <Ionicons name="create-outline" size={16} color="#FFAB91" />
               </View>
               <View style={s.recMid}>
                 <Text style={s.recName}>add manually</Text>
                 <Text style={s.recDate}>type items yourself</Text>
               </View>
-              <Ionicons name="chevron-forward" size={14} color={Colors.muted} />
             </TouchableOpacity>
             <TouchableOpacity style={[s.doneBtn, { backgroundColor: Colors.surface, marginTop: 16 }]} onPress={() => setItemStep('pick-recording')}>
               <Text style={[s.doneBtnText, { color: Colors.muted }]}>back</Text>
@@ -2701,7 +2521,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
                     <TouchableOpacity key={p.id} onPress={() => setParsePhotoIndex(idx === parsePhotoIndex && parseEnlargeModal ? -1 : idx) || setParseEnlargeModal(true)} activeOpacity={0.85}>
                       <Image source={{ uri: p.url }} style={{ width: 100, height: 100, borderRadius: Radius.md, backgroundColor: Colors.surface }} resizeMode="cover" />
                       <View style={{ position: 'absolute', bottom: 4, right: 4, backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 4, padding: 2 }}>
-                        <Ionicons name="expand-outline" size={10} color="#fff" />
                       </View>
                     </TouchableOpacity>
                   ))}
@@ -2724,13 +2543,11 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
                       onPress={() => setParseEnlargeModal(false)}
                       hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                     >
-                      <Ionicons name="close" size={20} color="#fff" />
                     </TouchableOpacity>
                   </View>
                 )}
               </>
             )}
-
             {/* Totals checker */}
             {(() => {
               const parsedSum = parsedItems.reduce((s, r) => s + (parseFloat(r.cost || '0') || 0), 0);
@@ -2783,7 +2600,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
                 </View>
               );
             })()}
-
             {/* Editable parsed items — tap to edit */}
             <Text style={{ fontFamily: AppFont.semiBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8 }}>parsed items</Text>
             {parsedItems.map((row, i) => (
@@ -2800,12 +2616,10 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => setParsedItems(prev => prev.filter((_, idx) => idx !== i))} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                  <Ionicons name="close" size={14} color={Colors.faint} />
                 </TouchableOpacity>
               </View>
             ))}
             <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 8 }} onPress={() => setParsedItems(prev => [...prev, { name: '', cost: '' }])}>
-              <Ionicons name="add" size={13} color={ACCENT_DARK} />
               <Text style={{ fontFamily: AppFont.regular, fontSize: 12, color: ACCENT_DARK }}>add item</Text>
             </TouchableOpacity>
             <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
@@ -2823,7 +2637,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
           </ScrollView>
         ) : null}
       </BottomSheet>
-
       <BottomSheet visible={!!assignItem} onClose={() => setAssignItem(null)} title="assign people">
         {assignItem && (() => {
           const deduct = isDeductType(assignItem.recording_type);
@@ -2860,7 +2673,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
           );
         })()}
       </BottomSheet>
-
       {/* Add person modal */}
       <BottomSheet visible={addPersonModal} onClose={() => setAddPersonModal(false)} title="add people">
         <View style={s.tagInputWrap}>
@@ -2868,7 +2680,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
             <View key={p.id} style={s.tagChip}>
               <Text style={s.tagChipText}>{p.person_name}</Text>
               <TouchableOpacity onPress={() => removePerson(p.id)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-                <Ionicons name="close" size={11} color={Colors.white} />
               </TouchableOpacity>
             </View>
           ))}
@@ -2901,7 +2712,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
                       <Text style={{ fontFamily: AppFont.semiBold, fontSize: 11, color: ACCENT_DARK }}>{f.name.charAt(0).toUpperCase()}</Text>
                     </View>
                     <Text style={[s.contactName, { flex: 1 }]}>{f.name}</Text>
-                    <Ionicons name="add" size={14} color={ACCENT_DARK} />
                   </TouchableOpacity>
                 ))}
                 <View style={{ height: 1, backgroundColor: Colors.border, marginVertical: 8 }} />
@@ -2928,9 +2738,7 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
                       disabled={added}
                     >
                       <Text style={s.contactName}>{c}</Text>
-                      {added
-                        ? <Ionicons name="checkmark" size={14} color={Colors.faint} />
-                        : <Ionicons name="add" size={14} color={ACCENT_DARK} />}
+                      {added ? null : null}
                     </TouchableOpacity>
                   );
                 })}
@@ -2952,7 +2760,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
           <Text style={s.doneBtnText}>done</Text>
         </TouchableOpacity>
       </BottomSheet>
-
       {/* Friend invite prompt */}
       <BottomSheet visible={!!pendingInvitePerson} onClose={() => setPendingInvitePerson(null)} title="link to friend?">
         {pendingInvitePerson && (() => {
@@ -2983,7 +2790,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
           );
         })()}
       </BottomSheet>
-
       {/* Add recording modal */}
       <BottomSheet visible={addRecModal} onClose={() => setAddRecModal(false)} title="link a recording" maxHeight="70%">
         {/* Tabs */}
@@ -3004,7 +2810,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
         </ScrollView>
         {/* Search */}
         <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: Colors.borderMid, borderRadius: Radius.md, paddingHorizontal: 10, marginBottom: 10, gap: 6 }}>
-          <Ionicons name="search-outline" size={14} color={Colors.faint} />
           <TextInput
             style={{ flex: 1, fontFamily: AppFont.regular, fontSize: 13, color: Colors.text, paddingVertical: 8 }}
             placeholder="search..."
@@ -3014,7 +2819,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
           />
           {recSearch.length > 0 && (
             <TouchableOpacity onPress={() => setRecSearch('')}>
-              <Ionicons name="close" size={13} color={Colors.faint} />
             </TouchableOpacity>
           )}
         </View>
@@ -3037,7 +2841,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
                   return (
                     <TouchableOpacity key={rec.id} style={s.recPickRow} onPress={() => linkRecording(rec)}>
                       <View style={[s.recIconWrap, { backgroundColor: deduct ? ACCENT + '44' : '#FFAB9122' }]}>
-                        <Ionicons name={rec.type === 'payable' ? 'cash-outline' : deduct ? 'arrow-down-circle-outline' : 'arrow-up-circle-outline'} size={16} color={deduct ? ACCENT_DARK : '#FFAB91'} />
                       </View>
                       <View style={s.recMid}>
                         <Text style={s.recName} numberOfLines={1}>{rec.name}</Text>
@@ -3064,7 +2867,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
           })()}
         </ScrollView>
       </BottomSheet>
-
       {/* Share modal */}
       <BottomSheet visible={shareModal} onClose={() => setShareModal(false)} title="share split bill" maxHeight="72%">
         {/* Accounts */}
@@ -3078,7 +2880,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
                 style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 10 }}
                 onPress={() => setShareSelectedIds(prev => sel ? prev.filter(x => x !== acc.id) : [...prev, acc.id])}
               >
-                <Ionicons name={sel ? 'checkmark-circle' : 'ellipse-outline'} size={18} color={sel ? ACCENT_DARK : Colors.faint} />
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontFamily: AppFont.semiBold, fontSize: 13, color: Colors.text }}>{acc.account_name}</Text>
                   <Text style={{ fontFamily: AppFont.regular, fontSize: 10, color: Colors.muted }}>{acc.bank} · {acc.account_number}</Text>
@@ -3088,7 +2889,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
           })}
           {shareAccounts.length === 0 && <Text style={{ fontFamily: AppFont.regular, fontSize: 12, color: Colors.faint, paddingVertical: 8 }}>no accounts found</Text>}
         </ScrollView>
-
         {/* Save accounts button — only shown when link exists */}
         {shareLink ? (() => {
           const hasChanged = JSON.stringify([...shareSelectedIds].sort()) !== JSON.stringify([...shareOriginalIds].sort());
@@ -3113,7 +2913,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
             </View>
           );
         })() : null}
-
         {/* Generate link — only shown when no link yet */}
         {!shareLink && (
           <TouchableOpacity
@@ -3124,7 +2923,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
             <Text style={s.doneBtnText}>{shareGenerating ? 'generating...' : 'generate link'}</Text>
           </TouchableOpacity>
         )}
-
         {/* Link textbox + copy */}
         <Text style={{ fontFamily: AppFont.semiBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginTop: 16, marginBottom: 6 }}>link</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: shareLink ? ACCENT : Colors.borderMid, borderRadius: Radius.md, paddingHorizontal: 12, gap: 8 }}>
@@ -3133,23 +2931,19 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
           </Text>
           {shareLink ? (
             <TouchableOpacity onPress={copyShareLink} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Ionicons name={shareCopied ? 'checkmark-circle' : 'copy-outline'} size={16} color={shareCopied ? Colors.income : ACCENT} />
             </TouchableOpacity>
           ) : null}
         </View>
         {shareCopied && <Text style={{ fontFamily: AppFont.regular, fontSize: 10, color: Colors.income, marginTop: 4 }}>copied to clipboard!</Text>}
-
         {/* Save as image */}
         <TouchableOpacity
           style={[s.doneBtn, { backgroundColor: Colors.surface, marginTop: 12, flexDirection: 'row', justifyContent: 'center', gap: 8, opacity: saveImgLoading || !shareLink ? 0.4 : 1 }]}
           onPress={saveAsImage}
           disabled={saveImgLoading || !shareLink}
         >
-          <Ionicons name="document-outline" size={15} color={Colors.text} />
           <Text style={[s.doneBtnText, { color: Colors.text }]}>{saveImgLoading ? 'generating...' : 'export as pdf'}</Text>
         </TouchableOpacity>
       </BottomSheet>
-
       {/* Mark as paid modal */}
       <BottomSheet visible={!!markPaidRec} onClose={() => setMarkPaidRec(null)} title="mark as paid">
         {markPaidRec && (() => {
@@ -3172,7 +2966,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
                     style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 10 }}
                     onPress={() => setMarkPaidAccount(acc)}
                   >
-                    <Ionicons name={markPaidAccount?.id === acc.id ? 'checkmark-circle' : 'ellipse-outline'} size={18} color={markPaidAccount?.id === acc.id ? ACCENT_DARK : Colors.faint} />
                     <View style={{ flex: 1 }}>
                       <Text style={{ fontFamily: AppFont.semiBold, fontSize: 13, color: Colors.text }}>{acc.account_name}</Text>
                       <Text style={{ fontFamily: AppFont.regular, fontSize: 10, color: Colors.muted }}>{acc.bank} · {acc.account_number}</Text>
@@ -3192,7 +2985,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
           );
         })()}
       </BottomSheet>
-
       {/* Payment modal */}
       <BottomSheet visible={paymentModal} onClose={() => setPaymentModal(false)} title="add payment">
         {paymentModal && (() => {
@@ -3292,7 +3084,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
                 onPress={() => setChargeToSpace(v => !v)}
                 activeOpacity={0.7}
               >
-                <Ionicons name={chargeToSpace ? 'checkbox' : 'square-outline'} size={18} color={chargeToSpace ? ACCENT_DARK : Colors.muted} />
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontFamily: AppFont.semiBold, fontSize: 13, color: Colors.text }}>charge to a space</Text>
                   <Text style={{ fontFamily: AppFont.regular, fontSize: 10, color: Colors.muted }}>creates an expense on the selected space</Text>
@@ -3304,7 +3095,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
                   <View style={{ borderWidth: 1, borderColor: Colors.borderMid, borderRadius: Radius.md, overflow: 'hidden' }}>
                     {[...chargeSpaces].sort((a: any, b: any) => a.name.localeCompare(b.name)).map((sp: any) => (
                       <TouchableOpacity key={sp.id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 11, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: Colors.border, backgroundColor: chargeSpaceId === sp.id ? ACCENT + '22' : Colors.white }} onPress={() => setChargeSpaceId(sp.id)}>
-                        <Ionicons name={chargeSpaceId === sp.id ? 'radio-button-on' : 'radio-button-off'} size={16} color={chargeSpaceId === sp.id ? ACCENT_DARK : Colors.faint} style={{ marginRight: 10 }} />
                         <Text style={{ fontFamily: AppFont.semiBold, fontSize: 13, color: chargeSpaceId === sp.id ? ACCENT_DARK : Colors.text }}>{sp.name}</Text>
                       </TouchableOpacity>
                     ))}
@@ -3312,12 +3102,10 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
                   <Text style={{ fontFamily: AppFont.semiBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase' }}>account <Text style={{ fontFamily: AppFont.regular, textTransform: 'none' }}>(optional)</Text></Text>
                   <View style={{ borderWidth: 1, borderColor: Colors.borderMid, borderRadius: Radius.md, overflow: 'hidden' }}>
                     <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 11, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: Colors.border, backgroundColor: !chargeAccountId ? ACCENT + '22' : Colors.white }} onPress={() => setChargeAccountId(null)}>
-                      <Ionicons name={!chargeAccountId ? 'radio-button-on' : 'radio-button-off'} size={16} color={!chargeAccountId ? ACCENT_DARK : Colors.faint} style={{ marginRight: 10 }} />
                       <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.muted }}>none</Text>
                     </TouchableOpacity>
                     {[...chargeAccounts].sort((a: any, b: any) => a.account_name.localeCompare(b.account_name)).map((ac: any) => (
                       <TouchableOpacity key={ac.id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 11, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: Colors.border, backgroundColor: chargeAccountId === ac.id ? ACCENT + '22' : Colors.white }} onPress={() => setChargeAccountId(ac.id)}>
-                        <Ionicons name={chargeAccountId === ac.id ? 'radio-button-on' : 'radio-button-off'} size={16} color={chargeAccountId === ac.id ? ACCENT_DARK : Colors.faint} style={{ marginRight: 10 }} />
                         <View>
                           <Text style={{ fontFamily: AppFont.semiBold, fontSize: 13, color: chargeAccountId === ac.id ? ACCENT_DARK : Colors.text }}>{ac.account_name}</Text>
                           <Text style={{ fontFamily: AppFont.regular, fontSize: 10, color: Colors.muted }}>{ac.bank}</Text>
@@ -3328,12 +3116,10 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
                   <Text style={{ fontFamily: AppFont.semiBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase' }}>category <Text style={{ fontFamily: AppFont.regular, textTransform: 'none' }}>(optional)</Text></Text>
                   <View style={{ borderWidth: 1, borderColor: Colors.borderMid, borderRadius: Radius.md, overflow: 'hidden' }}>
                     <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 11, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: Colors.border, backgroundColor: !chargeCategoryId ? ACCENT + '22' : Colors.white }} onPress={() => setChargeCategoryId(null)}>
-                      <Ionicons name={!chargeCategoryId ? 'radio-button-on' : 'radio-button-off'} size={16} color={!chargeCategoryId ? ACCENT_DARK : Colors.faint} style={{ marginRight: 10 }} />
                       <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.muted }}>none</Text>
                     </TouchableOpacity>
                     {[...chargeCategories].sort((a: any, b: any) => a.name.localeCompare(b.name)).map((cat: any) => (
                       <TouchableOpacity key={cat.id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 11, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: Colors.border, backgroundColor: chargeCategoryId === cat.id ? ACCENT + '22' : Colors.white }} onPress={() => setChargeCategoryId(cat.id)}>
-                        <Ionicons name={chargeCategoryId === cat.id ? 'radio-button-on' : 'radio-button-off'} size={16} color={chargeCategoryId === cat.id ? ACCENT_DARK : Colors.faint} style={{ marginRight: 10 }} />
                         <Text style={{ fontFamily: AppFont.semiBold, fontSize: 13, color: chargeCategoryId === cat.id ? ACCENT_DARK : Colors.text }}>{cat.name}</Text>
                       </TouchableOpacity>
                     ))}
@@ -3351,25 +3137,21 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
           );
         })()}
       </BottomSheet>
-
       {/* Add receipt modal */}
       <BottomSheet visible={addReceiptModal} onClose={() => setAddReceiptModal(false)} title="add receipt">
         <TouchableOpacity
           style={[s.doneBtn, { flexDirection: 'row', justifyContent: 'center', gap: 8, marginTop: 0 }]}
           onPress={addReceiptFromCamera}
         >
-          <Ionicons name="camera-outline" size={18} color={ACCENT_DARK} />
           <Text style={s.doneBtnText}>camera</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[s.doneBtn, { flexDirection: 'row', justifyContent: 'center', gap: 8, backgroundColor: Colors.surface }]}
           onPress={addReceiptFromGallery}
         >
-          <Ionicons name="images-outline" size={18} color={Colors.text} />
           <Text style={[s.doneBtnText, { color: Colors.text }]}>gallery</Text>
         </TouchableOpacity>
       </BottomSheet>
-
             {/* Photo carousel modal */}
       <Modal visible={photoModal} transparent animationType="fade" onRequestClose={() => setPhotoModal(false)}>
         <SafeAreaView style={{ flex: 1, backgroundColor: DC.photoViewerBg }}>
@@ -3379,7 +3161,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
               <Text style={{ fontFamily: AppFont.bold, fontSize: 15, color: DC.pageText }}>receipt</Text>
             </View>
             <TouchableOpacity onPress={() => setPhotoModal(false)} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }} style={{ position: 'absolute', right: DC.pagePadding }}>
-              <Ionicons name="close" size={22} color={DC.pageText} />
             </TouchableOpacity>
           </View>
           {(() => {
@@ -3393,7 +3174,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
                     disabled={photoModalIndex === 0}
                     style={{ position: 'absolute', left: 12, zIndex: 10, width: 36, height: 36, borderRadius: 18, backgroundColor: DC.photoViewerNav, justifyContent: 'center', alignItems: 'center', opacity: photoModalIndex === 0 ? 0.3 : 1 }}
                   >
-                    <Ionicons name="chevron-back" size={20} color={DC.pageText} />
                   </TouchableOpacity>
                   <Image source={{ uri: pool[photoModalIndex]?.url ?? '' }} style={{ width: width - 80, height: 400, borderRadius: 12 }} resizeMode="contain" />
                   <TouchableOpacity
@@ -3401,7 +3181,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
                     disabled={photoModalIndex === pool.length - 1}
                     style={{ position: 'absolute', right: 12, zIndex: 10, width: 36, height: 36, borderRadius: 18, backgroundColor: DC.photoViewerNav, justifyContent: 'center', alignItems: 'center', opacity: photoModalIndex === pool.length - 1 ? 0.3 : 1 }}
                   >
-                    <Ionicons name="chevron-forward" size={20} color={DC.pageText} />
                   </TouchableOpacity>
                 </View>
                 {/* Recording name label */}
@@ -3429,7 +3208,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
           })()}
         </SafeAreaView>
       </Modal>
-
       {/* Manual return prompt */}
       <BottomSheet visible={manualReturnModal} onClose={() => setManualReturnModal(false)} title="manual item settlement">
         <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.text, marginBottom: 16 }}>
@@ -3464,7 +3242,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
           <Text style={[s.doneBtnText, { color: Colors.muted }]}>skip</Text>
         </TouchableOpacity>
       </BottomSheet>
-
       {/* Edit name modal */}
       <BottomSheet visible={editNameModal} onClose={() => setEditNameModal(false)} title="rename split bill">
         <TextInput
@@ -3488,7 +3265,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
           </TouchableOpacity>
         </View>
       </BottomSheet>
-
       {/* Delete split bill modal */}
       <BottomSheet visible={deleteSplitModal} onClose={() => setDeleteSplitModal(false)} title="delete split bill">
         <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.text, marginBottom: 16 }}>
@@ -3536,7 +3312,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
           </View>
         </TouchableOpacity>
       </BottomSheet>
-
       {/* Mark recording complete modal */}
       <BottomSheet visible={markRecCompleteModal} onClose={() => setMarkRecCompleteModal(false)} title="mark as complete">
         {markRecCompleteLr && (() => {
@@ -3570,7 +3345,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
           );
         })()}
       </BottomSheet>
-
       {/* Close confirm modal */}
       <BottomSheet visible={closeConfirmModal} onClose={() => setCloseConfirmModal(false)} title="close split bill?" maxHeight="50%">
         <Text style={{ fontFamily: AppFont.regular, fontSize: 12, color: Colors.muted, marginBottom: 12 }}>
@@ -3579,7 +3353,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
         <View style={{ gap: 8, marginBottom: 16 }}>
           {unpaidPeopleNames.map((name, i) => (
             <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Ionicons name="alert-circle-outline" size={14} color={PEACH} />
               <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.text }}>{name}</Text>
             </View>
           ))}
@@ -3593,7 +3366,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
               style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10 }}
               onPress={() => setCloseCreateRecording(v => !v)}
             >
-              <Ionicons name={closeCreateRecording ? 'checkbox' : 'square-outline'} size={20} color={ACCENT_DARK} />
               <Text style={{ fontFamily: AppFont.regular, fontSize: 12, color: Colors.text, flex: 1 }}>
                 create an expense and return recordings
               </Text>
@@ -3641,7 +3413,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
           <Text style={[s.doneBtnText, { color: Colors.muted }]}>cancel</Text>
         </TouchableOpacity>
       </BottomSheet>
-
       {/* Auto-complete prompt after payment */}
       <BottomSheet visible={autoCompleteModal} onClose={() => setAutoCompleteModal(false)} title="recordings fully paid">
         <Text style={{ fontFamily: AppFont.regular, fontSize: 12, color: Colors.muted, marginBottom: 12 }}>
@@ -3649,7 +3420,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
         </Text>
         {autoCompleteRecs.map((lr: any) => (
           <View key={lr.id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 10 }}>
-            <Ionicons name="checkmark-circle-outline" size={14} color={ACCENT_DARK} />
             <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.text, flex: 1 }} numberOfLines={1}>{lr.recording?.name}</Text>
             <Text style={{ fontFamily: AppFont.semiBold, fontSize: 11, color: ACCENT_DARK }}>{fmt(Number(lr.recording?.amount ?? 0))}</Text>
           </View>
@@ -3668,7 +3438,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
           <Text style={[s.doneBtnText, { color: Colors.muted }]}>not yet</Text>
         </TouchableOpacity>
       </BottomSheet>
-
       {/* Overpayment modal */}
       <BottomSheet visible={overpaymentModal} onClose={() => setOverpaymentModal(false)} title="overpayment detected">
         <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.text, marginBottom: 4 }}>
@@ -3687,7 +3456,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
           <Text style={[s.doneBtnText, { color: Colors.muted }]}>ignore</Text>
         </TouchableOpacity>
       </BottomSheet>
-
       {/* Apply overpayment to split bill picker */}
       <BottomSheet visible={overpaymentApplyModal} onClose={() => setOverpaymentApplyModal(false)} title="apply to split bill">
         <Text style={{ fontFamily: AppFont.regular, fontSize: 11, color: Colors.muted, marginBottom: 12 }}>
@@ -3699,17 +3467,14 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
           otherSplitBills.map((bill: any) => (
             <TouchableOpacity key={bill.id} style={s.recPickRow} onPress={() => confirmApplyToSplitBill(bill.id)}>
               <View style={[s.recIconWrap, { backgroundColor: ACCENT + '44' }]}>
-                <Ionicons name="people-outline" size={16} color={ACCENT_DARK} />
               </View>
               <View style={s.recMid}>
                 <Text style={s.recName}>{bill.name}</Text>
               </View>
-              <Ionicons name="chevron-forward" size={14} color={Colors.muted} />
             </TouchableOpacity>
           ))
         )}
       </BottomSheet>
-
       {/* Cancel payment modal */}
       <BottomSheet visible={cancelPaymentModal} onClose={() => setCancelPaymentModal(false)} title="cancel payment">
         <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.text, marginBottom: 4 }}>
@@ -3741,7 +3506,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
           <Text style={[s.doneBtnText, { color: Colors.muted }]}>keep payment</Text>
         </TouchableOpacity>
       </BottomSheet>
-
       {/* Remove recording blocked modal */}
       <BottomSheet visible={removeRecordingBlockedModal} onClose={() => setRemoveRecordingBlockedModal(false)} title="cannot remove">
         <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.text, marginBottom: 8 }}>
@@ -3754,7 +3518,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
           <Text style={s.doneBtnText}>ok</Text>
         </TouchableOpacity>
       </BottomSheet>
-
       {/* Accept invite modal */}
       <BottomSheet visible={acceptModal} onClose={() => setAcceptModal(false)} title="accept split bill invite" maxHeight="60%">
         {myInvite && (
@@ -3770,7 +3533,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
                   style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 10 }}
                   onPress={() => setAcceptSpaceId(sp.id)}
                 >
-                  <Ionicons name={acceptSpaceId === sp.id ? 'radio-button-on' : 'radio-button-off'} size={16} color={acceptSpaceId === sp.id ? ACCENT_DARK : Colors.faint} />
                   <Text style={{ fontFamily: AppFont.medium, fontSize: 13, color: Colors.text }}>{sp.name}</Text>
                 </TouchableOpacity>
               ))}
@@ -3781,7 +3543,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
                 style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 10 }}
                 onPress={() => setAcceptCategoryId('')}
               >
-                <Ionicons name={!acceptCategoryId ? 'radio-button-on' : 'radio-button-off'} size={16} color={!acceptCategoryId ? ACCENT_DARK : Colors.faint} />
                 <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.muted }}>none</Text>
               </TouchableOpacity>
               {acceptCategories.map((cat: any) => (
@@ -3790,7 +3551,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
                   style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 10 }}
                   onPress={() => setAcceptCategoryId(cat.id)}
                 >
-                  <Ionicons name={acceptCategoryId === cat.id ? 'radio-button-on' : 'radio-button-off'} size={16} color={acceptCategoryId === cat.id ? ACCENT_DARK : Colors.faint} />
                   <Text style={{ fontFamily: AppFont.medium, fontSize: 13, color: Colors.text }}>{cat.name}</Text>
                 </TouchableOpacity>
               ))}
@@ -3805,7 +3565,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
           </>
         )}
       </BottomSheet>
-
       {/* Over-budget overlay — inside Animated.View, shown above BottomSheet via zIndex */}
       {parseOverBudgetModal && (
         <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32, zIndex: 9999 }}>
@@ -3821,7 +3580,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
           </View>
         </View>
       )}
-
       <PaymentModal
         visible={itemPayModal}
         person={itemPayPerson}
@@ -3832,7 +3590,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
     </Animated.View>
   );
 }
-
 const s = StyleSheet.create({
   header:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: PAGE, paddingTop: 16, paddingBottom: 16, gap: 10, backgroundColor: Colors.headerBg, borderBottomWidth: 1, borderBottomColor: Colors.borderMid },
   backBtn:    { width: 36, height: 36, borderRadius: 18, backgroundColor: Brand.color.accent + '22', alignItems: 'center', justifyContent: 'center' },
@@ -3840,12 +3597,9 @@ const s = StyleSheet.create({
   title:      { flex: 1, fontFamily: AppFont.bold, fontSize: 20, color: Brand.color.accent, letterSpacing: -0.3 },
   totalBadge: { backgroundColor: ACCENT + '44', borderRadius: Radius.pill, paddingHorizontal: 12, paddingVertical: 5 },
   totalBadgeText: { fontFamily: AppFont.semiBold, fontSize: 12, color: ACCENT_DARK },
-
   scroll: { paddingBottom: 80, paddingHorizontal: PAGE },
   divider: { height: 2, backgroundColor: Colors.border, marginTop: 16, marginBottom: 8, marginHorizontal: -PAGE },
-
   emptyWrap: { alignItems: 'center', gap: 8, paddingVertical: 16 },
-
   // ── Section blocks
   sectionBlock: { marginBottom: 4 },
   sectionRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 24, paddingBottom: 10 },
@@ -3856,7 +3610,6 @@ const s = StyleSheet.create({
   actionBtnText:    { fontFamily: AppFont.bold, fontSize: 13, color: DC.btnText },
   actionBtnDanger:  { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: Radius.pill, backgroundColor: DC.btnDangerBg },
   actionBtnDangerText: { fontFamily: AppFont.bold, fontSize: 13, color: DC.btnDangerText },
-
   // ── List rows
   list:       { gap: 8 },
   recRow:     { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 14, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.white },
@@ -3867,12 +3620,10 @@ const s = StyleSheet.create({
   recName:    { fontFamily: AppFont.bold, fontSize: 14, color: '#111111' },
   recDate:    { fontFamily: AppFont.regular, fontSize: 11, color: '#111111' },
   recAmount:  { fontFamily: AppFont.bold, fontSize: 14, letterSpacing: -0.3, color: '#111111' },
-
   // ── People chips
   chipWrap:      { flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingBottom: 12, paddingTop: 4 },
   personChip:    { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#F8F8F8', borderRadius: Radius.pill, paddingVertical: 6, paddingHorizontal: 14, borderWidth: 1, borderColor: '#EFEFEF' },
   personChipText:{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.text },
-
   tagInputWrap:  { flexDirection: 'row', flexWrap: 'wrap', gap: 6, borderWidth: 1, borderColor: Colors.borderMid, borderRadius: Radius.md, padding: 8, minHeight: 44, marginBottom: 12 },
   tagChip:       { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: ACCENT + '44', borderRadius: Radius.pill, paddingVertical: 4, paddingLeft: 10, paddingRight: 6 },
   tagChipText:   { fontFamily: AppFont.semiBold, fontSize: 11, color: ACCENT_DARK },
@@ -3880,7 +3631,6 @@ const s = StyleSheet.create({
   contactsLabel: { fontFamily: AppFont.semiBold, fontSize: 11, letterSpacing: 0.4, textTransform: 'uppercase' as const, color: Colors.muted, marginBottom: 6 },
   contactRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.border },
   contactName:   { fontFamily: AppFont.medium, fontSize: 14, color: Colors.text },
-
   itemCard:      { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, paddingHorizontal: 14, borderRadius: 14, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.white },
   itemEditBtn:    { paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: DC.btnBg, borderWidth: DC.btnBorderWidth, borderColor: DC.btnBorder, shadowColor: DC.btnShadowColor, shadowOffset: DC.btnShadowOffset, shadowOpacity: DC.btnShadowOpacity, shadowRadius: DC.btnShadowRadius, elevation: DC.btnElevation },
   itemEditBtnText:{ fontFamily: AppFont.bold, fontSize: 13, color: DC.btnText },
@@ -3902,15 +3652,11 @@ const s = StyleSheet.create({
   manualTotalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10, paddingHorizontal: 12, borderRadius: Radius.md, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.borderMid },
   manualTotalLabel:{ fontFamily: AppFont.regular, fontSize: 10, color: Colors.muted },
   manualTotalValue:{ fontFamily: AppFont.semiBold, fontSize: 14, color: Colors.text },
-
   summaryRow:    { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surface, borderRadius: Radius.pill, paddingVertical: 12, paddingHorizontal: PAGE, borderWidth: 1, borderColor: Colors.border },
   summaryName:   { fontFamily: AppFont.regular, fontSize: 10, color: Colors.text, flexShrink: 0 },
   summaryDots:   { flex: 1, borderBottomWidth: 1, borderStyle: 'dotted', borderColor: Colors.faint, marginHorizontal: 10 },
   summaryAmount: { fontFamily: AppFont.semiBold, fontSize: 13, color: Colors.text, flexShrink: 0 },
-
-
   recPickRow:    { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 12 },
-
   modeBtn:           { paddingHorizontal: 14, paddingVertical: 7, borderRadius: Radius.pill, borderWidth: 1, borderColor: Colors.borderMid, backgroundColor: Colors.surface },
   modeBtnActive:     { backgroundColor: ACCENT + '44', borderColor: ACCENT },
   modeBtnText:       { fontFamily: AppFont.regular,     fontSize: 12, color: Colors.muted },
@@ -3918,3 +3664,4 @@ const s = StyleSheet.create({
   doneBtn:           { backgroundColor: DC.btnBg, borderRadius: Radius.pill, paddingVertical: 14, alignItems: 'center', marginTop: 16, borderWidth: DC.btnBorderWidth, borderColor: DC.btnBorder, shadowColor: DC.btnShadowColor, shadowOffset: DC.btnShadowOffset, shadowOpacity: DC.btnShadowOpacity, shadowRadius: DC.btnShadowRadius, elevation: DC.btnElevation },
   doneBtnText:       { fontFamily: AppFont.bold, fontSize: 14, color: DC.btnText },
 });
+

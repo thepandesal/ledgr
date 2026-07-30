@@ -2,7 +2,6 @@ import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
   SafeAreaView, TextInput, ActivityIndicator, RefreshControl,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useUser } from '../../../src/hooks/useUser';
@@ -260,35 +259,17 @@ export default function BillSplitScreen() {
                 ))}
               </View>
               {/* View toggle */}
-              <View style={s.viewToggle}>
-                <TouchableOpacity
-                  style={[s.toggleBtn, viewMode === 'date' && s.toggleBtnActive]}
-                  onPress={() => setViewMode('date')}
-                >
-                  <Ionicons name="calendar-outline" size={13} color={viewMode === 'date' ? Brand.color.accentDark : Colors.muted} />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[s.toggleBtn, viewMode === 'person' && s.toggleBtnActive]}
-                  onPress={() => setViewMode('person')}
-                >
-                  <Ionicons name="people-outline" size={13} color={viewMode === 'person' ? Brand.color.accentDark : Colors.muted} />
-                </TouchableOpacity>
-              </View>
+
             </View>
 
             {/* Date nav — only in date mode */}
             {viewMode === 'date' && (
               <View style={s.dateNav}>
-                <TouchableOpacity style={s.dateNavArrow} onPress={() => { setMonthOffset(o => o - 1); setDisplayCount(10); }} activeOpacity={0.7}>
-                  <Ionicons name="chevron-back" size={14} color={Brand.color.accentDark} />
-                </TouchableOpacity>
+
                 <View style={s.dateLabelBtn}>
-                  <Ionicons name="calendar-outline" size={13} color={Brand.color.accentDark} />
                   <Text style={s.dateLabelText}>{monthLabel}</Text>
                 </View>
-                <TouchableOpacity style={s.dateNavArrow} onPress={() => { setMonthOffset(o => o + 1); setDisplayCount(10); }} activeOpacity={0.7}>
-                  <Ionicons name="chevron-forward" size={14} color={Brand.color.accentDark} />
-                </TouchableOpacity>
+
               </View>
             )}
 
@@ -296,7 +277,6 @@ export default function BillSplitScreen() {
             {viewMode === 'date' && (
               filteredBills.length === 0 ? (
                 <View style={s.emptyWrap}>
-                  <Ionicons name="people-outline" size={32} color={Colors.faint} />
                   <Text style={Brand.type.emptyText}>{bills.length === 0 ? 'no split bills yet — tap + to create one' : `no ${statusFilter === 'all' ? '' : statusFilter + ' '}split bills in ${monthLabel}`}</Text>
                 </View>
               ) : (
@@ -313,9 +293,6 @@ export default function BillSplitScreen() {
                           activeOpacity={0.85}
                           onPress={() => openSplitBill(bill.id, bill.name)}
                         >
-                          <View style={s.cardIconWrap}>
-                            <Ionicons name="people-outline" size={18} color={Brand.color.headerText} />
-                          </View>
                           <View style={s.cardMid}>
                             <Text style={s.cardName} numberOfLines={1}>{bill.name}</Text>
                             <Text style={s.cardMeta}>
@@ -326,9 +303,7 @@ export default function BillSplitScreen() {
                             <Text style={[s.statusBadgeText, bill.status === 'closed' && s.statusBadgeTextClosed]}>{bill.status}</Text>
                           </View>
                           <Text style={s.cardAmount}>{fmt(bill.total_amount)}</Text>
-                          <TouchableOpacity onPress={() => { setSelected(bill); setMenuModal(true); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ padding: 4 }}>
-                            <Ionicons name="ellipsis-horizontal" size={15} color={Colors.muted} />
-                          </TouchableOpacity>
+
                         </TouchableOpacity>
                       ))}
                     </View>
@@ -348,7 +323,6 @@ export default function BillSplitScreen() {
             {viewMode === 'person' && (
               filteredPersonData.length === 0 ? (
                 <View style={s.emptyWrap}>
-                  <Ionicons name="people-outline" size={32} color={Colors.faint} />
                   <Text style={Brand.type.emptyText}>no people found</Text>
                 </View>
               ) : (
@@ -365,9 +339,6 @@ export default function BillSplitScreen() {
                           activeOpacity={0.85}
                           onPress={() => openSplitBill(b.id, b.name)}
                         >
-                          <View style={s.cardIconWrap}>
-                            <Ionicons name="people-outline" size={18} color={Brand.color.headerText} />
-                          </View>
                           <View style={s.cardMid}>
                             <Text style={s.cardName} numberOfLines={1}>{b.name}</Text>
                           </View>

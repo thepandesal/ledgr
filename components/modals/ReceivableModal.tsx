@@ -4,7 +4,7 @@ import formStyles from '@/components/ui/formStyles';
 import itemStyles from '@/components/ui/itemStyles';
 import accountStyles from '@/components/ui/accountStyles';
 import { Colors, Fonts } from '@/components/ui/theme';
-import { Ionicons } from '@expo/vector-icons';
+
 
 interface Item { id: string; name: string; cost: number; people: string[]; subitems: { id: string; name: string; cost: number; people: string[] }[]; }
 
@@ -66,7 +66,7 @@ export default function ReceivableModal({ visible, onClose, recording, items, fi
                   <Text style={[accountStyles.optionName, sel && accountStyles.optionNameActive]}>{p}</Text>
                   <Text style={[accountStyles.optionBank, sel && accountStyles.optionBankActive]}>{(perPersonMap[p] ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
                 </View>
-                <Ionicons name={sel ? 'checkbox' : 'square-outline'} size={18} color={sel ? Colors.white : Colors.faint} />
+
               </TouchableOpacity>
             );
           })}

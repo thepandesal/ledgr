@@ -3,7 +3,6 @@ import {
   SafeAreaView, Animated, Dimensions, ScrollView, ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useUser } from '../../src/hooks/useUser';
@@ -154,9 +153,7 @@ export default function ReceivablesScreen() {
 
         {/* Dark header */}
         <View style={s.header}>
-          <TouchableOpacity onPress={handleBack} style={s.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="arrow-back" size={20} color={Brand.color.accent} />
-          </TouchableOpacity>
+          <TouchableOpacity onPress={handleBack} style={s.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} />
           <Text style={s.headerTitle}>receivables</Text>
           <View style={{ width: 36 }} />
         </View>
@@ -186,12 +183,9 @@ export default function ReceivablesScreen() {
         {/* Date range */}
         <View style={{ paddingHorizontal: Spacing.page, marginBottom: 12 }}>
           <TouchableOpacity style={s.dateRangeBtn} onPress={() => { setPickingDate('from'); setShowPicker(true); }}>
-            <Ionicons name="calendar-outline" size={14} color={dateFrom ? Brand.color.accentDark : Colors.muted} />
             <Text style={[s.dateRangeBtnText, dateFrom && { color: Brand.color.accentDark }]}>{dateLabel()}</Text>
             {(dateFrom || dateTo) && (
-              <TouchableOpacity onPress={clearDates} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Ionicons name="close-circle" size={14} color={Colors.muted} />
-              </TouchableOpacity>
+              <TouchableOpacity onPress={clearDates} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} />
             )}
           </TouchableOpacity>
         </View>
@@ -201,7 +195,6 @@ export default function ReceivablesScreen() {
           <ActivityIndicator color={Brand.color.accentDark} style={{ marginTop: 40 }} />
         ) : filtered.length === 0 ? (
           <View style={{ alignItems: 'center', gap: 12, paddingVertical: 48 }}>
-            <Ionicons name="arrow-undo-outline" size={40} color={Colors.borderMid} />
             <Text style={{ fontFamily: Fonts.mono, fontSize: 13, color: Colors.muted }}>no receivables found</Text>
           </View>
         ) : (
@@ -213,9 +206,7 @@ export default function ReceivablesScreen() {
                 activeOpacity={0.85}
                 onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: item.id } } as any)}
               >
-                <View style={[s.recordingIconWrap, { backgroundColor: statusBg(item.status) }]}>
-                  <Ionicons name={item.categories?.icon ?? 'arrow-undo-outline'} size={18} color={statusColor(item.status)} />
-                </View>
+                <View style={[s.recordingIconWrap, { backgroundColor: statusBg(item.status) }]} />
                 <View style={s.recordingMiddle}>
                   <Text style={s.recordingType}>
                     {item.status === 'received' ? 'received' : item.status === 'partial' ? 'partial' : 'pending'}
@@ -250,13 +241,7 @@ export default function ReceivablesScreen() {
         ]}
       >
         <View style={s.pickerYearRow}>
-          <TouchableOpacity onPress={() => { if (pickerMonth === 0) { setPickerMonth(11); setPickerYear(y => y - 1); } else setPickerMonth(m => m - 1); }}>
-            <Ionicons name="chevron-back" size={20} color={Colors.text} />
-          </TouchableOpacity>
           <Text style={s.pickerYearText}>{MONTHS[pickerMonth].toLowerCase()} {pickerYear}</Text>
-          <TouchableOpacity onPress={() => { if (pickerMonth === 11) { setPickerMonth(0); setPickerYear(y => y + 1); } else setPickerMonth(m => m + 1); }}>
-            <Ionicons name="chevron-forward" size={20} color={Colors.text} />
-          </TouchableOpacity>
         </View>
         <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: Brand.color.accentDark, marginBottom: 8 }}>
           {pickingDate === 'from' ? 'tap to set start date' : 'tap to set end date'}

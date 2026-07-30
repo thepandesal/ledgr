@@ -1,8 +1,6 @@
 import { View, Text, Image, StyleSheet, TouchableOpacity, ScrollView,
   SafeAreaView, ActivityIndicator, RefreshControl,
   TextInput, KeyboardAvoidingView, Platform } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useUser } from '../../../src/hooks/useUser';
 import { supabase } from '../../../src/lib/supabase';
@@ -11,7 +9,6 @@ import { DC } from '../../../src/lib/design';
 import { AppFont } from '../../../src/lib/fonts';
 import { useNav, setHomeDateEditHandler } from '../../../src/lib/NavContext';
 import { useRouter } from 'expo-router';
-import AnimatedIcon from '@/components/ui/AnimatedIcon';
 import { BlurView } from 'expo-blur';
 import GooeyLoader from '@/components/ui/GooeyLoader';
 import BottomSheet from '@/components/ui/BottomSheet';
@@ -607,11 +604,8 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
                   const sign = r.type === 'expense' ? '- ' : '';
                   return (
                     <TouchableOpacity key={r.id} style={[s.recRow, i === Math.min(recent.length, 3) - 1 && { borderBottomWidth: 0 }]} activeOpacity={0.7} onPress={() => openRecording(r.id)}>
-                      <View style={s.recIconCircle}>
-                        <Ionicons name={r.categories?.icon ?? 'ellipse-outline'} size={16} color="#888583" />
-                      </View>
                       <View style={{ flex: 1, marginLeft: 10 }}>
-                        <Text style={s.recRowName} numberOfLines={1}>{r.name.charAt(0).toUpperCase() + r.name.slice(1)}</Text>
+                        <Text style={s.recRowName} numberOfLines={1}>{r.name.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')}</Text>
                         <Text style={s.recRowSub}>{formatDateLabel(r.transaction_date)}{r.space ? ` · ${r.space.name}` : ''}</Text>
                       </View>
                       <Text style={s.recRowAmount}>{sign}{fmt(Number(r.amount))}</Text>
@@ -725,7 +719,7 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
                   return (
                     <TouchableOpacity key={p.person} style={s.spaceCard} activeOpacity={0.7} onPress={() => openReceivablesPanel(p.person)}>
                       <Image source={FACE_IMAGES[faceIndex]} style={{ width: 52, height: 52, borderRadius: 26 }} />
-                      <Text style={[s.spaceCardName, { fontFamily: 'Inter-Bold' }]} numberOfLines={1}>{p.person}</Text>
+                      <Text style={[s.spaceCardName, { fontFamily: 'InclusiveSans-Bold' }]} numberOfLines={1}>{p.person}</Text>
                       <Text style={[s.spaceCardAmount, { color: '#111111' }]}>{fmt(absNet)}</Text>
                       <Text style={s.spaceCardSub}>{isNegative ? 'you owe' : 'owes you'}</Text>
                     </TouchableOpacity>
@@ -808,7 +802,7 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
                 </View>
               </View>
               <Text style={s.sheetLabel}>Until (auto)</Text>
-              <Text style={{ fontFamily: AppFont.semiBold, fontSize: 14, color: '#4f9289', marginBottom: 16 }}>
+              <Text style={{ fontFamily: 'InclusiveSans-SemiBold', fontSize: 14, color: '#4f9289', marginBottom: 16 }}>
                 {MONTHS[autoTo.getMonth()]} {autoTo.getFullYear()}
               </Text>
             </>
@@ -837,24 +831,22 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
             <Text style={s.choiceTitle}>View Recordings</Text>
             <Text style={s.choiceSub}>browse this space's recordings</Text>
           </View>
-          <Ionicons name="chevron-forward" size={14} color={Colors.faint} />
         </TouchableOpacity>
         <TouchableOpacity style={[s.choiceRow, { borderBottomWidth: 0 }]} activeOpacity={0.8} onPress={() => { const sp = spaceChoice; setSpaceChoice(null); openSpace(sp!.id, sp!.name, true); }}>
           <View style={{ flex: 1 }}>
             <Text style={s.choiceTitle}>Edit Space</Text>
             <Text style={s.choiceSub}>rename, archive, or delete</Text>
           </View>
-          <Ionicons name="chevron-forward" size={14} color={Colors.faint} />
         </TouchableOpacity>
       </BottomSheet>
 
       <BottomSheet visible={addAccountSheet} onClose={() => { setAddAccountSheet(false); setAccBank(''); setAccName(''); setAccNumber(''); setAccHolder(''); setAccError(''); }} title="add account">
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={{ gap: 10, paddingBottom: 16 }}>
-            <TextInput style={{ borderWidth: 1, borderColor: '#e0e0e0', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 10, fontFamily: AppFont.regular, fontSize: 13, color: '#111' }} placeholder="bank" placeholderTextColor={Colors.faint} value={accBank} onChangeText={setAccBank} />
-            <TextInput style={{ borderWidth: 1, borderColor: '#e0e0e0', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 10, fontFamily: AppFont.regular, fontSize: 13, color: '#111' }} placeholder="account name" placeholderTextColor={Colors.faint} value={accName} onChangeText={setAccName} />
-            <TextInput style={{ borderWidth: 1, borderColor: '#e0e0e0', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 10, fontFamily: AppFont.regular, fontSize: 13, color: '#111' }} placeholder="account number" placeholderTextColor={Colors.faint} value={accNumber} onChangeText={setAccNumber} keyboardType="numeric" />
-            <TextInput style={{ borderWidth: 1, borderColor: '#e0e0e0', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 10, fontFamily: AppFont.regular, fontSize: 13, color: '#111' }} placeholder="account holder" placeholderTextColor={Colors.faint} value={accHolder} onChangeText={setAccHolder} />
+            <TextInput style={{ borderWidth: 1, borderColor: '#e0e0e0', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 10, fontFamily: 'InclusiveSans-Regular', fontSize: 13, color: '#111' }} placeholder="bank" placeholderTextColor={Colors.faint} value={accBank} onChangeText={setAccBank} />
+            <TextInput style={{ borderWidth: 1, borderColor: '#e0e0e0', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 10, fontFamily: 'InclusiveSans-Regular', fontSize: 13, color: '#111' }} placeholder="account name" placeholderTextColor={Colors.faint} value={accName} onChangeText={setAccName} />
+            <TextInput style={{ borderWidth: 1, borderColor: '#e0e0e0', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 10, fontFamily: 'InclusiveSans-Regular', fontSize: 13, color: '#111' }} placeholder="account number" placeholderTextColor={Colors.faint} value={accNumber} onChangeText={setAccNumber} keyboardType="numeric" />
+            <TextInput style={{ borderWidth: 1, borderColor: '#e0e0e0', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 10, fontFamily: 'InclusiveSans-Regular', fontSize: 13, color: '#111' }} placeholder="account holder" placeholderTextColor={Colors.faint} value={accHolder} onChangeText={setAccHolder} />
             {accError ? <Text style={{ color: '#e74c3c', fontSize: 12 }}>{accError}</Text> : null}
             <TouchableOpacity style={{ backgroundColor: TEAL, borderRadius: 8, paddingVertical: 12, alignItems: 'center', opacity: accLoading ? 0.6 : 1 }} disabled={accLoading} onPress={async () => {
               if (!accBank.trim() || !accName.trim() || !accNumber.trim()) { setAccError('bank, account name and number are required.'); return; }
@@ -877,14 +869,12 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
             <Text style={s.choiceTitle}>Add a Friend</Text>
             <Text style={s.choiceSub}>connect with other Ledgr users</Text>
           </View>
-          <Ionicons name="people-outline" size={18} color={TEAL} />
         </TouchableOpacity>
         <TouchableOpacity style={[s.choiceRow, { borderBottomWidth: 0 }]} activeOpacity={0.8} onPress={() => { setAddContactSheet(false); openContactsPanel(); }}>
           <View style={{ flex: 1 }}>
             <Text style={s.choiceTitle}>Add a Manual Contact</Text>
             <Text style={s.choiceSub}>add someone without an account</Text>
           </View>
-          <Ionicons name="person-outline" size={18} color={TEAL} />
         </TouchableOpacity>
       </BottomSheet>
     </SafeAreaView>
@@ -896,11 +886,7 @@ function SectionHeader({ title, onSeeMore, seeMoreLabel, onArrowRight, onAdd, ti
     <View style={s.sectionRow}>
       <Text style={[s.sectionTitle, titleStyle]}>{title}</Text>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        {onAdd && (
-          <TouchableOpacity onPress={onAdd} activeOpacity={0.7} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="add" size={18} color="#000000" />
-          </TouchableOpacity>
-        )}
+
         {onSeeMore && (
           <TouchableOpacity onPress={onSeeMore} activeOpacity={0.7} style={s.seeMoreRow}>
             <Text style={s.seeMoreText}>{seeMoreLabel ?? 'see all'}</Text>
@@ -967,28 +953,28 @@ const s = StyleSheet.create({
 
   // Section header
   sectionRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 0, marginBottom: 20 },
-  sectionTitle:{ fontFamily: 'Aujournuit-Regular', fontSize: 20, color: '#000000', letterSpacing: 0.4 },
+  sectionTitle:{ fontFamily: 'Aujournuit-Regular', fontSize: 17, color: '#000000', letterSpacing: 0.4 },
   divider:     { height: 1, backgroundColor: '#d2d2d2', marginTop: 20, marginBottom: 20 },
   seeMoreRow:  { paddingHorizontal: 12, paddingVertical: 7, borderRadius: DC.pageActionRadius, backgroundColor: '#ebf7f6' },
-  seeMoreText: { fontFamily: AppFont.regular, fontSize: 11, color: '#4f9289' },
+  seeMoreText: { fontFamily: 'InclusiveSans-Regular', fontSize: 11, color: '#4f9289' },
 
   // RECORDS rows
   recRow:      { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#d2d2d2', borderStyle: 'dotted' },
   recIconCircle:{ width: 32, height: 32, borderRadius: 16, borderWidth: 1, borderColor: '#c9c7c3', alignItems: 'center', justifyContent: 'center' },
-  recRowName:  { fontFamily: 'Inter-SemiBold', fontSize: 11, color: '#3a3a34' },
+  recRowName:  { fontFamily: 'InclusiveSans-Medium', fontSize: 12, color: '#3a3a34', letterSpacing: 0.5, textTransform: 'capitalize' },
   recRowSub:   { fontFamily: 'Inter-Regular', fontSize: 9, color: '#b5b4a4', marginTop: 4 },
   recRowAmount:{ fontFamily: 'Inter-Regular', fontSize: 11, color: '#3a3a34', letterSpacing: 0.3 },
   recMoreRow:  { paddingVertical: 6 },
-  recMoreText: { fontFamily: AppFont.regular, fontSize: 11, color: '#2a2a26' },
+  recMoreText: { fontFamily: 'InclusiveSans-Regular', fontSize: 11, color: '#2a2a26' },
 
   // Reminder pill
   reminderPill:       { width: 120, paddingHorizontal: 14, paddingVertical: 16, borderRadius: 100, borderWidth: 1, borderColor: '#d2d2d2', backgroundColor: 'transparent', alignItems: 'center', gap: 4 },
-  reminderPillName:   { fontFamily: AppFont.regular, fontSize: 11, color: '#2a2a26', letterSpacing: 0.5 },
-  reminderPillType:   { fontFamily: AppFont.regular, fontSize: 9, color: '#2a2a26', fontStyle: 'italic' },
+  reminderPillName:   { fontFamily: 'InclusiveSans-Regular', fontSize: 11, color: '#2a2a26', letterSpacing: 0.5 },
+  reminderPillType:   { fontFamily: 'InclusiveSans-Regular', fontSize: 9, color: '#2a2a26', fontStyle: 'italic' },
 
   // Empty
   emptyRow:  { paddingVertical: 12 },
-  emptyText: { fontFamily: 'Inter-Regular', fontSize: 12, color: Colors.faint },
+  emptyText: { fontFamily: 'InclusiveSans-Regular', fontSize: 12, color: Colors.faint },
 
   // Spaces album
   spaceAlbum: { gap: 10, paddingBottom: 4 },
@@ -997,11 +983,11 @@ const s = StyleSheet.create({
     alignItems: 'center',
     gap: 1,
   },
-  spaceCardName: { fontFamily: 'Inter-Bold', fontSize: 10, color: '#111111', textAlign: 'center', marginTop: -6 },
+  spaceCardName: { fontFamily: 'InclusiveSans-Bold', fontSize: 10, color: '#111111', textAlign: 'center', marginTop: -6 },
   spaceCardAmount: { fontFamily: 'Inter-Bold', fontSize: 11, color: '#111111', textAlign: 'center', lineHeight: 14 },
-  spaceCardSub: { fontFamily: 'Inter-Regular', fontSize: 9, color: '#999999', textAlign: 'center', lineHeight: 12 },
-  spaceCardAllTime: { fontFamily: 'Inter-Regular', fontSize: 9, color: '#555555', textAlign: 'center', fontStyle: 'italic', lineHeight: 12 },
-  spaceCardGoal: { fontFamily: 'Inter-Regular', fontSize: 9, color: '#bbbbbb', textAlign: 'center', fontStyle: 'italic', lineHeight: 12 },
+  spaceCardSub: { fontFamily: 'InclusiveSans-Regular', fontSize: 9, color: '#999999', textAlign: 'center', lineHeight: 12 },
+  spaceCardAllTime: { fontFamily: 'InclusiveSans-Regular', fontSize: 9, color: '#555555', textAlign: 'center', fontStyle: 'italic', lineHeight: 12 },
+  spaceCardGoal: { fontFamily: 'InclusiveSans-Regular', fontSize: 9, color: '#bbbbbb', textAlign: 'center', fontStyle: 'italic', lineHeight: 12 },
 
   // Folder cards
   folderSubtitle: { fontFamily: 'CormorantGaramond-Bold', fontSize: 10, color: '#3a3a34', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 20 },
@@ -1028,16 +1014,16 @@ const s = StyleSheet.create({
   folderCardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   folderCardName: { fontFamily: 'CormorantGaramond-Bold', fontSize: 11, color: '#3a3a34', flex: 1, letterSpacing: 0.3, textTransform: 'uppercase' },
   folderLabelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
-  folderCardLabel: { fontFamily: 'Inter-Regular', fontSize: 9, color: '#888888', letterSpacing: 0.3 },
+  folderCardLabel: { fontFamily: 'InclusiveSans-Regular', fontSize: 9, color: '#888888', letterSpacing: 0.3 },
   folderCardValue: { fontFamily: 'Inter-SemiBold', fontSize: 10, color: '#3a3a34', letterSpacing: 0.3 },
   savingsBadge: { backgroundColor: '#e5f5e8', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 100 },
-  savingsBadgeText: { fontFamily: 'Inter-Medium', fontSize: 9, color: '#0a550f' },
+  savingsBadgeText: { fontFamily: 'InclusiveSans-Medium', fontSize: 9, color: '#0a550f' },
   expenseBadge: { backgroundColor: '#f9f0ec', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 100 },
-  expenseBadgeText: { fontFamily: 'Inter-Medium', fontSize: 9, color: '#ff5757' },
+  expenseBadgeText: { fontFamily: 'InclusiveSans-Medium', fontSize: 9, color: '#ff5757' },
 
-  receivableName: { fontFamily: 'Inter-Regular', fontSize: 12, color: '#111111', textAlign: 'center', marginTop: 4 },
+  receivableName: { fontFamily: 'InclusiveSans-Regular', fontSize: 12, color: '#111111', textAlign: 'center', marginTop: 4 },
   receivableAmount: { fontFamily: 'Inter-Bold', fontSize: 11, color: '#111111', textAlign: 'center', lineHeight: 14 },
-  receivableUnpaid: { fontFamily: 'Inter-Regular', fontSize: 9, color: '#999999', textAlign: 'center', fontStyle: 'italic', lineHeight: 12 },
+  receivableUnpaid: { fontFamily: 'InclusiveSans-Regular', fontSize: 9, color: '#999999', textAlign: 'center', fontStyle: 'italic', lineHeight: 12 },
 
   // Shared list rows
   list: { gap: 0 },
@@ -1049,24 +1035,24 @@ const s = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
-  rowName:      { fontFamily: 'Inter-Regular', fontSize: 12, color: '#111111' },
+  rowName:      { fontFamily: 'InclusiveSans-Medium', fontSize: 13, color: '#111111', letterSpacing: 0.5 },
   rowSub:       { fontFamily: 'Inter-Regular', fontSize: 10, color: '#999999' },
   rowValue:     { fontFamily: 'Inter-Bold', fontSize: 11, color: '#111111' },
   rowLast:     { borderBottomWidth: 0 },
   rowValueBold: { fontFamily: 'Inter-Bold', fontSize: 12, color: '#111111' },
   choiceRow:   { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
-  choiceTitle: { fontFamily: AppFont.semiBold, fontSize: 14, color: '#111111' },
-  choiceSub:   { fontFamily: AppFont.regular, fontSize: 11, color: '#999999', marginTop: 2 },
+  choiceTitle: { fontFamily: 'InclusiveSans-SemiBold', fontSize: 14, color: '#111111' },
+  choiceSub:   { fontFamily: 'InclusiveSans-Regular', fontSize: 11, color: '#999999', marginTop: 2 },
   chip:        { paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: '#f5f5f5', borderWidth: 1, borderColor: '#eeeeee' },
   chipActive:  { backgroundColor: '#ebf7f6', borderColor: '#9cd7d2' },
-  chipText:    { fontFamily: AppFont.regular, fontSize: 13, color: '#666666' },
-  chipTextActive: { fontFamily: AppFont.semiBold, fontSize: 13, color: '#4f9289' },
-  sheetLabel:  { fontFamily: AppFont.semiBold, fontSize: 11, color: '#999999', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8 },
+  chipText:    { fontFamily: 'InclusiveSans-Regular', fontSize: 13, color: '#666666' },
+  chipTextActive: { fontFamily: 'InclusiveSans-SemiBold', fontSize: 13, color: '#4f9289' },
+  sheetLabel:  { fontFamily: 'InclusiveSans-SemiBold', fontSize: 11, color: '#999999', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8 },
   dropCol:      { height: 160, backgroundColor: '#f5f5f5', borderRadius: 8 },
   dropItem:     { paddingVertical: 10, paddingHorizontal: 12 },
   dropItemActive: { backgroundColor: '#ebf7f6', borderRadius: 6 },
-  dropText:     { fontFamily: AppFont.regular, fontSize: 13, color: '#666666' },
-  dropTextActive: { fontFamily: AppFont.semiBold, fontSize: 13, color: '#4f9289' },
+  dropText:     { fontFamily: 'InclusiveSans-Regular', fontSize: 13, color: '#666666' },
+  dropTextActive: { fontFamily: 'InclusiveSans-SemiBold', fontSize: 13, color: '#4f9289' },
   applyBtn:     { backgroundColor: '#4f9289', borderRadius: Radius.pill, paddingVertical: 14, alignItems: 'center', marginTop: 20 },
-  applyBtnText: { fontFamily: AppFont.semiBold, fontSize: 15, color: '#ffffff' },
+  applyBtnText: { fontFamily: 'InclusiveSans-SemiBold', fontSize: 15, color: '#ffffff' },
 });

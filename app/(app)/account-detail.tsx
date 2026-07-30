@@ -3,7 +3,6 @@ import {
   SafeAreaView, Animated, Dimensions, ScrollView, ActivityIndicator, TextInput,
 } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../src/lib/supabase';
@@ -245,9 +244,7 @@ export default function AccountDetailScreen() {
 
         {/* Header */}
         <View style={s.header}>
-          <TouchableOpacity onPress={() => handleBack()} style={s.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="arrow-back" size={20} color={Colors.text} />
-          </TouchableOpacity>
+
           <View style={{ flex: 1 }}>
             <Text style={s.title} numberOfLines={1}>{(accountName ?? '').toLowerCase()}</Text>
             <Text style={s.subtitle}>{(bankName ?? '').toLowerCase()}</Text>
@@ -257,16 +254,11 @@ export default function AccountDetailScreen() {
         {/* Date filter row */}
         <View style={s.filterRow}>
           <View style={s.dateNavRow}>
-            <TouchableOpacity style={s.dateNavArrow} onPress={() => navigateRange(-1)} activeOpacity={0.7}>
-              <Ionicons name="chevron-back" size={14} color={ACCENT_DARK} />
-            </TouchableOpacity>
+
             <TouchableOpacity style={s.filterBtn} onPress={() => setShowDateModal(true)} activeOpacity={0.75}>
-              <Ionicons name="calendar-outline" size={13} color={ACCENT_DARK} />
               <Text style={s.filterBtnText}>{rangeLabel}</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={s.dateNavArrow} onPress={() => navigateRange(1)} activeOpacity={0.7}>
-              <Ionicons name="chevron-forward" size={14} color={ACCENT_DARK} />
-            </TouchableOpacity>
+
           </View>
         </View>
 
@@ -290,7 +282,6 @@ export default function AccountDetailScreen() {
           <ActivityIndicator color={ACCENT_DARK} style={{ marginTop: 40 }} />
         ) : grouped.length === 0 ? (
           <View style={{ alignItems: 'center', marginTop: 60, gap: 8 }}>
-            <Ionicons name="receipt-outline" size={36} color={Colors.borderMid} />
             <Text style={Brand.type.emptyText}>no recordings for this period</Text>
           </View>
         ) : (
@@ -321,9 +312,7 @@ export default function AccountDetailScreen() {
                       activeOpacity={0.85}
                       onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: item.id } } as any)}
                     >
-                      <View style={s.rowIconWrap}>
-                        <Ionicons name={item.categories?.icon ?? 'ellipse-outline'} size={18} color={ACCENT_DARK} />
-                      </View>
+
                       <View style={{ flex: 1, gap: 2 }}>
                         <Text style={s.rowName} numberOfLines={1}>{item.name}</Text>
                         <Text style={s.rowMeta}>{statusLabel || item.categories?.name || item.type}</Text>
@@ -354,7 +343,6 @@ export default function AccountDetailScreen() {
             const active = p.key === activePreset;
             return (
               <TouchableOpacity key={p.key} style={[s.chip, active && s.chipActive]} onPress={() => applyPreset(p.key)} activeOpacity={0.75}>
-                <Ionicons name={p.icon as any} size={13} color={active ? Colors.white : Colors.muted} />
                 <Text style={[s.chipText, active && s.chipTextActive]}>{p.label}</Text>
               </TouchableOpacity>
             );
@@ -378,13 +366,9 @@ export default function AccountDetailScreen() {
           <View style={s.calWrap}>
             <Text style={s.calHint}>{pickingDate === 'from' ? 'tap start date' : 'tap end date'}</Text>
             <View style={s.pickerNav}>
-              <TouchableOpacity onPress={() => { if (pickerMonth === 0) { setPickerMonth(11); setPickerYear(y => y - 1); } else setPickerMonth(m => m - 1); }}>
-                <Ionicons name="chevron-back" size={18} color={Colors.text} />
-              </TouchableOpacity>
+
               <Text style={s.pickerMonthText}>{MONTHS[pickerMonth].toLowerCase()} {pickerYear}</Text>
-              <TouchableOpacity onPress={() => { if (pickerMonth === 11) { setPickerMonth(0); setPickerYear(y => y + 1); } else setPickerMonth(m => m + 1); }}>
-                <Ionicons name="chevron-forward" size={18} color={Colors.text} />
-              </TouchableOpacity>
+
             </View>
             <View style={{ flexDirection: 'row', marginBottom: 6 }}>
               {['su','mo','tu','we','th','fr','sa'].map(d => <Text key={d} style={s.calDay}>{d}</Text>)}

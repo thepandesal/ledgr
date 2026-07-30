@@ -2,7 +2,6 @@ import {
   View, Text, StyleSheet, ScrollView, SafeAreaView,
   TouchableOpacity, RefreshControl, TextInput, ActivityIndicator,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useState, useEffect } from 'react';
 import { BlurView } from 'expo-blur';
 import { useUser } from '../../src/hooks/useUser';
@@ -143,7 +142,6 @@ export default function FriendsPanel({ onClose }: Props) {
 
           {/* Search */}
           <View style={st.searchWrap}>
-            <Ionicons name="search-outline" size={13} color={Colors.faint} />
             <TextInput
               style={st.searchInput}
               placeholder="search friends..."
@@ -151,11 +149,7 @@ export default function FriendsPanel({ onClose }: Props) {
               value={search}
               onChangeText={setSearch}
             />
-            {search.length > 0 && (
-              <TouchableOpacity onPress={() => setSearch('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Ionicons name="close" size={13} color={Colors.faint} />
-              </TouchableOpacity>
-            )}
+
           </View>
 
           {filtered.length === 0 ? (

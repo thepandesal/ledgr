@@ -1,7 +1,6 @@
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions, PanResponder, Animated } from 'react-native';
 import { Image } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import { useRef, useState, useEffect } from 'react';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { cropEvents } from '../../src/lib/cropEvents';
@@ -129,25 +128,16 @@ export default function CropQRScreen() {
 
         {/* Bottom-right corner — resize handle */}
         <View style={[styles.corner, styles.cornerBR]} {...resizePan.panHandlers} />
-        <View style={styles.resizeHandle} {...resizePan.panHandlers}>
-          <Ionicons name="resize-outline" size={14} color="#0ccfcf" />
-        </View>
+
       </Animated.View>
 
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.headerBtn}>
-          <Ionicons name="close" size={24} color="#fff" />
-        </TouchableOpacity>
         <Text style={styles.headerTitle}>drag to move · corner to resize</Text>
-        <TouchableOpacity onPress={crop} style={styles.headerBtn}>
-          <Ionicons name="checkmark" size={24} color="#0ccfcf" />
-        </TouchableOpacity>
       </View>
 
       {/* Save button at bottom */}
       <TouchableOpacity style={styles.saveBtn} onPress={crop}>
-        <Ionicons name="checkmark-circle" size={20} color="#000" />
         <Text style={styles.saveBtnText}>save crop</Text>
       </TouchableOpacity>
     </View>

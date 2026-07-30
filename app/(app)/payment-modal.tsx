@@ -2,7 +2,6 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator,
 } from 'react-native';
 import { useState } from 'react';
-import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useUser } from '../../src/hooks/useUser';
 import { supabase } from '../../src/lib/supabase';
@@ -195,7 +194,6 @@ export default function PaymentModal({ visible, person, splitBillId, onClose, on
             onPress={handleAll}
             activeOpacity={0.7}
           >
-            <Ionicons name={allSelected ? 'checkmark-circle' : 'ellipse-outline'} size={16} color={allSelected ? '#fff' : Colors.muted} />
             <Text style={[s.allBtnText, allSelected && s.allBtnTextActive]}>All — {fmt(totalOwed)}</Text>
           </TouchableOpacity>
 
@@ -206,7 +204,6 @@ export default function PaymentModal({ visible, person, splitBillId, onClose, on
               onPress={handleThisBill}
               activeOpacity={0.7}
             >
-              <Ionicons name="document-text-outline" size={16} color={Colors.muted} />
               <Text style={s.allBtnText}>This split bill only</Text>
             </TouchableOpacity>
           )}
@@ -235,11 +232,6 @@ export default function PaymentModal({ visible, person, splitBillId, onClose, on
                         }}
                         activeOpacity={0.7}
                       >
-                        <Ionicons
-                          name={isSelected ? 'checkmark-circle' : 'ellipse-outline'}
-                          size={18}
-                          color={isSelected ? (item.type === 'loan' ? '#e74c3c' : TEAL) : Colors.faint}
-                        />
                         <View style={{ flex: 1 }}>
                           <Text style={s.itemName} numberOfLines={1}>{item.sourceName}</Text>
                           <Text style={s.itemSub}>{item.source === 'split_bill' ? 'split bill' : 'recording'} · {item.type === 'receivable' ? 'owes you' : 'you owe'}</Text>

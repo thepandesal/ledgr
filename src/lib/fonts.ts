@@ -16,4 +16,8 @@ export const AppFont = {
   brand:      'MuseoModerno_Black',
   brandLight: 'MuseoModerno_Regular',
   brandMedium:'MuseoModerno_Medium',
+  incRegular: 'InclusiveSans-Regular',
+  incMedium:  'InclusiveSans-Medium',
+  incSemiBold:'InclusiveSans-SemiBold',
+  incBold:    'InclusiveSans-Bold',
 } as const;

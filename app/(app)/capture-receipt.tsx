@@ -1,6 +1,5 @@
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Animated, Dimensions, FlatList, Image, Alert } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '../../src/lib/supabase';
@@ -121,9 +120,7 @@ export default function CaptureReceiptScreen() {
     <Animated.View style={[pageStyles.container, { transform: [{ translateX: slideAnim }] }]}>
       <SafeAreaView style={pageStyles.inner}>
         <View style={s.header}>
-          <TouchableOpacity onPress={handleBack} style={pageStyles.backBtn}>
-            <Ionicons name="arrow-back" size={22} color={Colors.muted} />
-          </TouchableOpacity>
+
           <View>
             <Text style={pageStyles.pageLabel}>receipts</Text>
             <Text style={[pageStyles.pageName, { fontSize: 22, lineHeight: 26 }]}>add photos</Text>
@@ -140,11 +137,9 @@ export default function CaptureReceiptScreen() {
             if (item === 'add') return (
               <View style={s.addPhotoCell}>
                 <TouchableOpacity style={s.addPhotoBtn} onPress={pickFromCamera}>
-                  <Ionicons name="camera-outline" size={22} color={Colors.cyan} />
                   <Text style={s.addPhotoBtnText}>camera</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={s.addPhotoBtn} onPress={pickFromGallery}>
-                  <Ionicons name="images-outline" size={22} color={Colors.text} />
                   <Text style={[s.addPhotoBtnText, { color: Colors.text }]}>gallery</Text>
                 </TouchableOpacity>
               </View>
@@ -152,9 +147,7 @@ export default function CaptureReceiptScreen() {
             return (
               <View style={s.photoCell}>
                 <Image source={{ uri: item }} style={s.photoThumb} resizeMode="cover" />
-                <TouchableOpacity style={s.photoRemove} onPress={() => removePhoto(index)}>
-                  <Ionicons name="close-circle" size={20} color={Colors.danger} />
-                </TouchableOpacity>
+
               </View>
             );
           }}

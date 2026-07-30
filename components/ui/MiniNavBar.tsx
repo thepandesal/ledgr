@@ -1,9 +1,9 @@
 import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Colors, Fonts } from './theme';
 import { useNav } from '../../src/lib/NavContext';
+import NavIcon from './NavIcons';
 
 const NAV_ACCENT   = '#282C2A';
 const NAV_INACTIVE = '#9CA3AF';
@@ -42,7 +42,7 @@ export default function MiniNavBar() {
             activeOpacity={0.7}
           >
             <View style={s.iconWrap}>
-              <Ionicons name={tab.icon as any} size={22} color={isActive ? NAV_ACCENT : NAV_INACTIVE} />
+              <NavIcon name={tab.key === 'notifications-tab' ? 'notifications' : tab.key} size={22} color={isActive ? NAV_ACCENT : NAV_INACTIVE} />
               {showBadge && (
                 <View style={s.badge}>
                   <Text style={s.badgeText}>{unreadCount > 9 ? '9+' : String(unreadCount)}</Text>

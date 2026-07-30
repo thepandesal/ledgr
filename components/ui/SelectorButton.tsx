@@ -14,7 +14,6 @@
  */
 
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { Colors, Fonts, Radius } from './theme';
 
 interface Props {
@@ -40,15 +39,7 @@ export default function SelectorButton({
           : <Text style={styles.placeholder}>{placeholder}</Text>}
       </View>
       <View style={styles.right}>
-        {hasValue && onClear && (
-          <TouchableOpacity
-            onPress={onClear}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Ionicons name="close" size={14} color={Colors.muted} />
-          </TouchableOpacity>
-        )}
-        <Ionicons name="chevron-down" size={14} color={Colors.faint} />
+
       </View>
     </TouchableOpacity>
   );

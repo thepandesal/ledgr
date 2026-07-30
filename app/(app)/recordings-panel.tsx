@@ -1,44 +1,31 @@
 import {
   View, Text, StyleSheet, ScrollView, SafeAreaView,
-  ActivityIndicator, TouchableOpacity, RefreshControl, TextInput,
+  ActivityIndicator, TouchableOpacity, RefreshControl, TextInput, Image, Modal, Animated,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useUser } from '../../src/hooks/useUser';
 import { supabase } from '../../src/lib/supabase';
 import { Colors, Radius } from '@/components/ui/theme';
-import { AppFont } from '../../src/lib/fonts';
 import { DC } from '../../src/lib/design';
-import PageHeader from '@/components/ui/PageHeader';
 import { useNav } from '../../src/lib/NavContext';
-import ActivityTabs, { ACTIVITY_TABS, type ActivityTab } from '@/components/ui/ActivityTabs';
-import GooeyLoader from '@/components/ui/GooeyLoader';
-import { BlurView } from 'expo-blur';
-import BottomSheet from '@/components/ui/BottomSheet';
-import AddRecordingScreen from './add-recording';
-import AnimatedIcon from '@/components/ui/AnimatedIcon';
-
-const BADGE_COLOR = '#9cd7d2';
-const PEACH       = '#FFAB91';
-
-const TYPE_BADGE: Record<string, { label: string; color: string }> = {
-  expense:  { label: 'expense',  color: PEACH },
-  income:   { label: 'income',   color: BADGE_COLOR },
-  debt:     { label: 'loan',     color: PEACH },
-  due:      { label: 'due',      color: BADGE_COLOR },
-  return:   { label: 'return',   color: BADGE_COLOR },
-  payment:  { label: 'payment',  color: PEACH },
-  savings:  { label: 'savings',  color: BADGE_COLOR },
-};
-
-const ALL_TYPES = ['expense','income','debt','due','return','payment','savings'];
-const AMOUNT_SORTS = [
-  { key: 'none', label: 'Default' },
-  { key: 'high', label: 'High → Low' },
-  { key: 'low',  label: 'Low → High' },
+import AddExpenseScreen from './add-expense';
+import { FACE_IMAGES } from '../../src/lib/faceImages';
+const BORDER      = '#d2d2d2';
+const FILTER_OPTIONS = [
+  { key: 'all', label: 'All' },
+  { key: 'money-in', label: 'Money In' },
+  { key: 'money-out', label: 'Money Out' },
+  { key: 'owes-you', label: 'Owes You' },
+  { key: 'you-owe', label: 'You Owe' },
 ] as const;
-
+const FILTER_TYPE_MAP: Record<string, string[]> = {
+  'all': ['expense','income','debt','due','return','payment','savings'],
+  'money-in': ['income','due','return'],
+  'money-out': ['expense','debt','payment'],
+  'owes-you': ['due'],
+  'you-owe': ['debt'],
+};
 interface Props {
   onClose: () => void;
   categoryId?: string;
@@ -46,50 +33,33 @@ interface Props {
   spaceId?: string;
   spaceName?: string;
 }
-
 export default function RecordingsPanel({ onClose, categoryId, categoryName, spaceId: propSpaceId, spaceName }: Props) {
-  const { userId, defaultCurrency } = useUser();
+  const { userId, defaultCurrency, userName, user } = useUser();
   const { openRecording } = useNav();
   const queryClient = useQueryClient();
-  const [monthOffset, setMonthOffset] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedTabs, setSelectedTabs] = useState<Set<ActivityTab>>(new Set(['all']));
-
   const [search, setSearch] = useState('');
-
-  // ── Filter state ──────────────────────────────────────────────────────
-  const [showFilter, setShowFilter] = useState(false);
-  const [showAddRecording, setShowAddRecording] = useState(false);
-  const [filterTypes, setFilterTypes] = useState<Set<string>>(new Set(['all']));
-  const [filterSpaces, setFilterSpaces] = useState<Set<string>>(new Set(['all']));
-  const [amountSort, setAmountSort] = useState<'none' | 'high' | 'low'>('none');
-
-  const hasActiveFilter = !filterTypes.has('all') || !filterSpaces.has('all') || amountSort !== 'none';
-
-  const handleTabToggle = (key: ActivityTab) => {
-    setSelectedTabs(new Set([key]));
-  };
-
-  const activeTypes = useMemo(() => {
-    if (selectedTabs.has('all')) return ALL_TYPES;
-    return ACTIVITY_TABS.filter(t => t.key !== 'all' && selectedTabs.has(t.key)).flatMap(t => [...t.types]);
-  }, [selectedTabs]);
-
+  const [viewMode, setViewMode] = useState<'date' | 'category'>('date');
+  const [filterOption, setFilterOption] = useState('all');
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+  const [showAddExpense, setShowAddExpense] = useState(false);
+  const [expenseFormType, setExpenseFormType] = useState<'expense' | 'income'>('expense');
+  const [showTypeChoice, setShowTypeChoice] = useState(false);
+  const activeTypes = useMemo(() => FILTER_TYPE_MAP[filterOption], [filterOption]);
   const { from, to, label } = useMemo(() => {
     const now = new Date();
-    const d = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1);
-    const from = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
-    const to   = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()}`;
+    const d = new Date(now.getFullYear(), now.getMonth(), 1);
+    const f = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+    const t = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()}`;
     const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-    return { from, to, label: `${months[d.getMonth()]} ${d.getFullYear()}` };
-  }, [monthOffset]);
-
+    return { from: f, to: t, label: `${months[d.getMonth()]} ${d.getFullYear()}` };
+  }, []);
   const { data: recordings = [], isLoading } = useQuery({
     queryKey: ['recordings-panel', userId, from, categoryId, propSpaceId],
     queryFn: async () => {
       let query = supabase
         .from('recordings')
-        .select('id, name, type, amount, transaction_date, created_at, currency, space_id, spaces:space_id(name), is_due, paid_amount, status')
+        .select('id, name, type, amount, transaction_date, created_at, currency, space_id, spaces:space_id(name), category_id, categories:category_id(icon), is_due, paid_amount, status, linked_recording_id')
         .eq('user_id', userId)
         .neq('status', 'voided')
         .neq('is_tagged', true)
@@ -109,16 +79,6 @@ export default function RecordingsPanel({ onClose, categoryId, categoryName, spa
     },
     enabled: !!userId,
   });
-
-  const { data: spaces = [] } = useQuery({
-    queryKey: ['spaces-list', userId],
-    queryFn: async () => {
-      const { data } = await supabase.from('spaces').select('id, name').eq('user_id', userId).order('name');
-      return data ?? [];
-    },
-    enabled: !!userId,
-  });
-
   useEffect(() => {
     if (!userId) return;
     const channel = supabase
@@ -129,57 +89,42 @@ export default function RecordingsPanel({ onClose, categoryId, categoryName, spa
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [userId, queryClient]);
-
   const onRefresh = async () => {
     setRefreshing(true);
     await queryClient.invalidateQueries({ queryKey: ['recordings-panel', userId, from] });
     setRefreshing(false);
   };
-
   const filtered = useMemo(() => {
     let result = recordings.filter(r => activeTypes.includes(r.type));
-    if (!filterTypes.has('all')) result = result.filter(r => filterTypes.has(r.type));
-    if (!filterSpaces.has('all')) result = result.filter(r => filterSpaces.has(r.space_id));
     if (search.trim()) result = result.filter(r => r.name.toLowerCase().includes(search.toLowerCase()));
-    if (amountSort === 'high') result = [...result].sort((a, b) => Number(b.amount) - Number(a.amount));
-    if (amountSort === 'low')  result = [...result].sort((a, b) => Number(a.amount) - Number(b.amount));
+    // Hide individual return payments; adjust parent recording amount to remaining balance
+    const parentIds = new Set(
+      recordings.filter(r => r.type === 'return' && r.linked_recording_id).map(r => r.linked_recording_id)
+    );
+    if (parentIds.size > 0) {
+      result = result
+        .filter(r => r.type !== 'return')
+        .map(r => {
+          if (parentIds.has(r.id)) {
+            const remaining = Number(r.amount) - Number(r.paid_amount ?? 0);
+            return { ...r, _displayAmount: remaining > 0 ? remaining : 0 };
+          }
+          return r;
+        });
+    }
     return result;
-  }, [recordings, activeTypes, filterTypes, filterSpaces, amountSort, search]);
-
-  const tabValue = (key: string) => {
-    if (key === 'all')          return String(recordings.length);
-    if (key === 'money-in')    return String(recordings.filter(r => ['income','due','return'].includes(r.type)).length);
-    if (key === 'money-out')   return String(recordings.filter(r => ['expense','debt','payment'].includes(r.type)).length);
-    if (key === 'loans')       return String(recordings.filter(r => r.type === 'debt').length);
-    if (key === 'receivables') return String(recordings.filter(r => r.type === 'due').length);
-    return '';
-  };
-
-  const activeTab = useMemo(() => {
-    if (selectedTabs.has('all')) return 'all';
-    return [...selectedTabs][0];
-  }, [selectedTabs]);
-
-  const isStatusGrouped = activeTab === 'loans' || activeTab === 'receivables';
-
+  }, [recordings, activeTypes, search]);
   const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
   const grouped = useMemo(() => {
-    if (isStatusGrouped) {
-      const pending: typeof filtered = [];
-      const completed: typeof filtered = [];
+    if (viewMode === 'category') {
+      const map: Record<string, typeof filtered> = {};
       filtered.forEach(r => {
-        const isDebtDue = r.type === 'debt' || r.type === 'due' || (r.type === 'expense' && r.is_due);
-        if (isDebtDue) {
-          const paid = Number(r.paid_amount ?? 0);
-          const total = Number(r.amount ?? 0);
-          if (paid >= total - 0.01 && total > 0) completed.push(r);
-          else pending.push(r);
-        } else {
-          completed.push(r);
-        }
+        const cat = r.space?.name || 'Other';
+        if (!map[cat]) map[cat] = [];
+        map[cat].push(r);
       });
-      return { type: 'status', pending, completed } as const;
+      const entries = Object.entries(map).sort(([a], [b]) => a.localeCompare(b));
+      return { type: 'category', entries } as const;
     }
     const map: Record<string, typeof filtered> = {};
     filtered.forEach(r => {
@@ -188,90 +133,109 @@ export default function RecordingsPanel({ onClose, categoryId, categoryName, spa
     });
     const entries = Object.entries(map).sort(([a], [b]) => b.localeCompare(a));
     return { type: 'date', entries } as const;
-  }, [filtered, isStatusGrouped]);
-
+  }, [filtered, viewMode]);
   const formatDate = (d: string) => {
     if (!d) return '—';
     const [y, m, day] = d.split('-').map(Number);
-    return new Date(y, m - 1, day).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return new Date(y, m - 1, day).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
   };
-
-  const toggleSet = (set: Set<string>, key: string, setFn: (s: Set<string>) => void) => {
-    if (key === 'all') { setFn(new Set(['all'])); return; }
-    const next = new Set(set);
-    next.delete('all');
-    if (next.has(key)) { next.delete(key); if (next.size === 0) { setFn(new Set(['all'])); return; } }
-    else next.add(key);
-    setFn(next);
-  };
-
+  const currentFilterLabel = FILTER_OPTIONS.find(o => o.key === filterOption)?.label || 'All';
   return (
     <SafeAreaView style={s.root}>
-      <PageHeader title={categoryName ?? spaceName ?? 'RECORDINGS'} onBack={onClose} titleColor="#9cd7d2" />
-
-      {/* Activity tabs */}
-      <View style={s.tabsWrap}>
-        <ActivityTabs
-          selectedTabs={selectedTabs}
-          onToggle={handleTabToggle}
-          tabValue={tabValue}
-          activeColor="#ebf7f6"
-          activeTextColor="#4f9289"
-        />
-      </View>
-
-      {/* Month nav + Filter + Add */}
-      <View style={s.controlRow}>
-        <View style={[s.actionBtn, { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
-          <TouchableOpacity onPress={() => setMonthOffset(o => o - 1)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="chevron-back" size={13} color={DC.pageActionText} />
-          </TouchableOpacity>
-          <Text style={[s.actionBtnText, { flex: 1, textAlign: 'center', fontSize: 11 }]} numberOfLines={1}>{label}</Text>
-          <TouchableOpacity onPress={() => setMonthOffset(o => o + 1)} disabled={monthOffset >= 0} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="chevron-forward" size={13} color={monthOffset >= 0 ? Colors.faint : DC.pageActionText} />
+      {/* Header — matches home panel exactly */}
+      <View style={s.waveBg}>
+        <TouchableOpacity onPress={onClose} activeOpacity={0.7} style={s.goBackRow}>
+          <Text style={s.goBackText}>go back</Text>
+        </TouchableOpacity>
+        <View style={s.headerRow}>
+          <View style={s.faceCircle}>
+            <Image source={FACE_IMAGES[user?.user_metadata?.avatar_index ?? 0]} style={{ width: 48, height: 48, borderRadius: 24 }} />
+          </View>
+          <View style={s.headerTextCol}>
+            <Text style={s.headerGreeting}>Hello, <Text style={s.headerName}>{userName?.split(' ')[0]?.charAt(0).toUpperCase() + userName?.split(' ')[0]?.slice(1) || 'There'}</Text></Text>
+            <TouchableOpacity activeOpacity={0.7} style={s.headerDateRow} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Text style={s.headerDateValue}>{label.toUpperCase()}</Text>
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity activeOpacity={0.7} style={{ marginLeft: 'auto' }}>
           </TouchableOpacity>
         </View>
-        <TouchableOpacity
-          style={[s.actionBtn, s.iconBtn, hasActiveFilter && s.actionBtnActive]}
-          activeOpacity={0.7}
-          onPress={() => setShowFilter(true)}
-        >
-          <AnimatedIcon set="basil" icon="filter-solid" size={18} color={hasActiveFilter ? '#4f9289' : DC.pageActionText} />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[s.actionBtn, s.iconBtn]}
-          activeOpacity={0.7}
-          onPress={() => setShowAddRecording(true)}
-        >
-          <AnimatedIcon set="basil" icon="plus-solid" size={18} color={DC.pageActionText} />
+      </View>
+      {/* Recordings title + add */}
+      <View style={s.sectionRow}>
+        <Text style={s.sectionTitle}>Recordings</Text>
+        <TouchableOpacity onPress={() => setShowTypeChoice(true)} activeOpacity={0.7} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
         </TouchableOpacity>
       </View>
-
-      {/* Search */}
-      <View style={s.searchRow}>
-        <Ionicons name="search-outline" size={14} color={Colors.faint} />
-        <TextInput
-          style={s.searchInput}
-          placeholder="search recordings..."
-          placeholderTextColor={Colors.faint}
-          value={search}
-          onChangeText={setSearch}
-          returnKeyType="search"
-        />
-        {search.length > 0 && (
-          <TouchableOpacity onPress={() => setSearch('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="close-circle" size={14} color={Colors.faint} />
+      {/* Toggle pills + Generate Statement */}
+      <View style={s.toggleRow}>
+        <View style={s.toggleGroup}>
+          <TouchableOpacity
+            style={[s.togglePill, viewMode === 'date' && s.togglePillActive]}
+            onPress={() => setViewMode('date')}
+            activeOpacity={0.7}
+          >
+            <Text style={[s.togglePillText, viewMode === 'date' && s.togglePillTextActive]}>Date</Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={[s.togglePill, viewMode === 'category' && s.togglePillActive]}
+            onPress={() => setViewMode('category')}
+            activeOpacity={0.7}
+          >
+            <Text style={[s.togglePillText, viewMode === 'category' && s.togglePillTextActive]}>Category</Text>
+          </TouchableOpacity>
+        </View>
+        <TouchableOpacity style={s.genStmtBtn} activeOpacity={0.7}>
+          <Text style={s.genStmtBtnText}>Generate Statement</Text>
+        </TouchableOpacity>
+      </View>
+      {/* Search + Dropdown — same row, same height */}
+      <View style={s.filterRow}>
+        <View style={s.searchRow}>
+          <TextInput
+            style={s.searchInput}
+            placeholder="search recordings..."
+            placeholderTextColor={Colors.faint}
+            value={search}
+            onChangeText={setSearch}
+            returnKeyType="search"
+          />
+          {search.length > 0 && (
+            <TouchableOpacity onPress={() => setSearch('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            </TouchableOpacity>
+          )}
+        </View>
+        <TouchableOpacity
+          style={s.dropdownBtn}
+          onPress={() => setShowFilterDropdown(p => !p)}
+          activeOpacity={0.7}
+        >
+          <Text style={s.dropdownBtnText}>{currentFilterLabel}</Text>
+        </TouchableOpacity>
+        {showFilterDropdown && (
+          <View style={s.dropdownList}>
+            {FILTER_OPTIONS.map(opt => (
+              <TouchableOpacity
+                key={opt.key}
+                style={[s.dropdownItem, filterOption === opt.key && s.dropdownItemActive]}
+                onPress={() => { setFilterOption(opt.key); setShowFilterDropdown(false); }}
+                activeOpacity={0.7}
+              >
+                <Text style={[s.dropdownItemText, filterOption === opt.key && s.dropdownItemTextActive]}>{opt.label}</Text>
+
+              </TouchableOpacity>
+            ))}
+          </View>
         )}
       </View>
-
+      {/* List */}
       {isLoading ? (
-        <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}>
-          <GooeyLoader />
-        </BlurView>
+        <View style={s.empty}>
+          <ActivityIndicator color={Colors.muted} />
+        </View>
       ) : filtered.length === 0 ? (
         <View style={s.empty}>
-          <Text style={s.emptyText}>no recordings for {label}</Text>
+          <Text style={s.emptyText}>no recordings for this period</Text>
         </View>
       ) : (
         <ScrollView
@@ -279,214 +243,190 @@ export default function RecordingsPanel({ onClose, categoryId, categoryName, spa
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         >
-          {grouped.type === 'status' ? (
-            <>
-              {grouped.pending.length > 0 && (
-                <View>
-                  <Text style={s.sectionHeader}>Ongoing</Text>
-                  {grouped.pending.map((r, i) => {
-                    const badge = TYPE_BADGE[r.type] ?? { label: r.type, color: BADGE_COLOR };
-                    return (
-                      <TouchableOpacity
-                        key={r.id}
-                        style={[s.row, i === grouped.pending.length - 1 && grouped.completed.length === 0 && s.rowLast]}
-                        activeOpacity={0.7}
-                        onPress={() => openRecording(r.id)}
-                      >
-                        <View style={s.rowLeft}>
-                          <Text style={s.rowName} numberOfLines={1}>{r.name}</Text>
-                          <Text style={s.rowDate}>{formatDate(r.transaction_date)}</Text>
-                        </View>
-                        <View style={s.rowRight}>
-                          <Text style={s.rowAmount}>{r.currency ?? defaultCurrency} {fmt(Number(r.amount))}</Text>
-                          <View style={[s.badge, { backgroundColor: badge.color + '22', alignSelf: 'flex-end' }]}>
-                            <Text style={[s.badgeText, { color: badge.color }]}>{badge.label}</Text>
-                          </View>
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              )}
-              {grouped.completed.length > 0 && (
-                <View>
-                  <Text style={s.sectionHeader}>Completed</Text>
-                  {grouped.completed.map((r, i) => {
-                    const badge = TYPE_BADGE[r.type] ?? { label: r.type, color: BADGE_COLOR };
-                    return (
-                      <TouchableOpacity
-                        key={r.id}
-                        style={[s.row, i === grouped.completed.length - 1 && s.rowLast]}
-                        activeOpacity={0.7}
-                        onPress={() => openRecording(r.id)}
-                      >
-                        <View style={s.rowLeft}>
-                          <Text style={s.rowName} numberOfLines={1}>{r.name}</Text>
-                          <Text style={s.rowDate}>{formatDate(r.transaction_date)}</Text>
-                        </View>
-                        <View style={s.rowRight}>
-                          <Text style={s.rowAmount}>{r.currency ?? defaultCurrency} {fmt(Number(r.amount))}</Text>
-                          <View style={[s.badge, { backgroundColor: badge.color + '22', alignSelf: 'flex-end' }]}>
-                            <Text style={[s.badgeText, { color: badge.color }]}>{badge.label}</Text>
-                          </View>
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              )}
-            </>
-          ) : (
-            grouped.entries.map(([date, items]) => (
-              <View key={date}>
-                <Text style={s.sectionHeader}>
-                  {new Date(date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                </Text>
-                {items.map((r, i) => {
-                  const badge = TYPE_BADGE[r.type] ?? { label: r.type, color: BADGE_COLOR };
-                  return (
-                    <TouchableOpacity
-                      key={r.id}
-                      style={[s.row, i === items.length - 1 && s.rowLast]}
-                      activeOpacity={0.7}
-                      onPress={() => openRecording(r.id)}
-                    >
-                      <View style={s.rowLeft}>
-                        <Text style={s.rowName} numberOfLines={1}>{r.name}</Text>
-                        {r.space?.name && (
-                          <Text style={s.rowCat} numberOfLines={1}>{r.space.name}</Text>
-                        )}
-                      </View>
-                      <View style={s.rowRight}>
-                        <Text style={s.rowAmount}>{r.currency ?? defaultCurrency} {fmt(Number(r.amount))}</Text>
-                        <View style={[s.badge, { backgroundColor: badge.color + '22', alignSelf: 'flex-end' }]}>
-                          <Text style={[s.badgeText, { color: badge.color }]}>{badge.label}</Text>
-                        </View>
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            ))
-          )}
+          {grouped.entries.map(([sectionKey, items]) => (
+            <View key={sectionKey}>
+              <Text style={viewMode === 'category' ? s.sectionCategoryHeader : s.sectionDateHeader}>
+                {viewMode === 'category' ? sectionKey : formatDate(sectionKey)}
+              </Text>
+              {items.map((r, i) => {
+                const sign = r.type === 'expense' ? '- ' : '';
+                const nameStr = r.name.split(' ').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+                return (
+                  <TouchableOpacity
+                    key={r.id}
+                    style={[s.row, i === items.length - 1 && s.rowLast]}
+                    activeOpacity={0.7}
+                    onPress={() => openRecording(r.id)}
+                  >
+                    <View style={s.recIconCircle}>
+                    </View>
+                    <View style={{ flex: 1, marginLeft: 10 }}>
+                      <Text style={s.rowName} numberOfLines={1}>{nameStr}</Text>
+                      <Text style={s.rowSpace}>{r.space?.name || ''}</Text>
+                    </View>
+                    <Text style={s.rowAmount}>{sign}{r.currency ?? defaultCurrency} {fmt(Number(r._displayAmount ?? r.amount))}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          ))}
         </ScrollView>
       )}
-
-      {showAddRecording && (
-        <AddRecordingScreen
-          inlineProps={{
-            spaceId: propSpaceId,
-            spaceName: spaceName,
-            categoryId,
-            categoryName,
-            defaultDate: new Date().toISOString().split('T')[0],
-            onClose: () => {
-              setShowAddRecording(false);
-              queryClient.invalidateQueries({ queryKey: ['recordings-panel', userId, from] });
-            },
+      {/* Type choice modal */}
+      <Modal visible={showTypeChoice} transparent animationType="fade" onRequestClose={() => setShowTypeChoice(false)}>
+        <View style={s.choiceOverlay}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setShowTypeChoice(false)} />
+          <Animated.View style={s.choiceCard}>
+            <Text style={s.choiceTitle}>New Record</Text>
+            <View style={s.choiceGrid}>
+              <TouchableOpacity
+                style={s.choicePill}
+                activeOpacity={0.8}
+                onPress={() => { setShowTypeChoice(false); setShowAddExpense(true); setExpenseFormType('income'); }}
+              >
+                <Text style={s.choicePillText}>Money In</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={s.choicePill}
+                activeOpacity={0.8}
+                onPress={() => { setShowTypeChoice(false); setShowAddExpense(true); setExpenseFormType('expense'); }}
+              >
+                <Text style={s.choicePillText}>Money Out</Text>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+        </View>
+      </Modal>
+      {showAddExpense && (
+        <AddExpenseScreen
+          type={expenseFormType}
+          onClose={() => {
+            setShowAddExpense(false);
+            queryClient.invalidateQueries({ queryKey: ['recordings-panel', userId, from] });
           }}
+          userId={userId}
+          defaultCurrency={defaultCurrency}
+          spaceId={propSpaceId}
+          spaceName={spaceName}
         />
       )}
-
-      {/* ── Filter modal ── */}
-      <BottomSheet visible={showFilter} onClose={() => setShowFilter(false)} title="filter">
-
-        {/* Clear */}
-        <TouchableOpacity
-          style={s.clearBtn}
-          onPress={() => { setFilterTypes(new Set(['all'])); setFilterSpaces(new Set(['all'])); setAmountSort('none'); }}
-          activeOpacity={0.7}
-        >
-          <Text style={s.clearBtnText}>Clear All</Text>
-        </TouchableOpacity>
-
-        {/* Type */}
-        <Text style={s.filterLabel}>Recording Type</Text>
-        <View style={s.chips}>
-          <TouchableOpacity style={[s.chip, filterTypes.has('all') && s.chipActive]} onPress={() => setFilterTypes(new Set(['all']))} activeOpacity={0.7}>
-            <Text style={[s.chipText, filterTypes.has('all') && s.chipTextActive]}>All</Text>
-          </TouchableOpacity>
-          {ALL_TYPES.map(t => (
-            <TouchableOpacity key={t} style={[s.chip, filterTypes.has(t) && s.chipActive]} onPress={() => toggleSet(filterTypes, t, setFilterTypes)} activeOpacity={0.7}>
-              <Text style={[s.chipText, filterTypes.has(t) && s.chipTextActive]}>{TYPE_BADGE[t]?.label ?? t}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Space */}
-        <Text style={s.filterLabel}>Space</Text>
-        <View style={s.chips}>
-          <TouchableOpacity style={[s.chip, filterSpaces.has('all') && s.chipActive]} onPress={() => setFilterSpaces(new Set(['all']))} activeOpacity={0.7}>
-            <Text style={[s.chipText, filterSpaces.has('all') && s.chipTextActive]}>All</Text>
-          </TouchableOpacity>
-          {(spaces as any[]).map((sp: any) => (
-            <TouchableOpacity key={sp.id} style={[s.chip, filterSpaces.has(sp.id) && s.chipActive]} onPress={() => toggleSet(filterSpaces, sp.id, setFilterSpaces)} activeOpacity={0.7}>
-              <Text style={[s.chipText, filterSpaces.has(sp.id) && s.chipTextActive]}>{sp.name}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Amount sort */}
-        <Text style={s.filterLabel}>Sort by Amount</Text>
-        <View style={s.chips}>
-          {AMOUNT_SORTS.map(opt => (
-            <TouchableOpacity key={opt.key} style={[s.chip, amountSort === opt.key && s.chipActive]} onPress={() => setAmountSort(opt.key)} activeOpacity={0.7}>
-              <Text style={[s.chipText, amountSort === opt.key && s.chipTextActive]}>{opt.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-      </BottomSheet>
     </SafeAreaView>
   );
 }
-
 const s = StyleSheet.create({
   root:   { flex: 1, backgroundColor: Colors.white },
-  scroll: { paddingHorizontal: DC.pagePadding, paddingBottom: 80 },
-
-  tabsWrap:   { paddingHorizontal: DC.pagePadding, paddingTop: 8, borderBottomWidth: 1, borderBottomColor: Colors.border },
-
-  controlRow:    { flexDirection: 'row', gap: 8, paddingHorizontal: DC.pagePadding, paddingVertical: 10 },
-  actionBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: DC.pageActionPaddingH, paddingVertical: DC.pageActionPaddingV, borderRadius: DC.pageActionRadius, backgroundColor: DC.pageActionBg, borderWidth: DC.pageActionBorderWidth },
-  actionBtnActive: { backgroundColor: '#ebf7f6' },
-  actionBtnText: { fontFamily: AppFont.regular, fontSize: DC.dropdownFontSize, color: DC.pageActionText },
-  iconBtn:       { paddingHorizontal: 14 },
-
-  empty:     { flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 80 },
-  emptyText: { fontFamily: AppFont.regular, fontSize: 13, color: Colors.muted },
-
-  sectionHeader: { fontFamily: AppFont.semiBold, fontSize: 11, color: Colors.muted, letterSpacing: 0.6, textTransform: 'uppercase', marginTop: 20, marginBottom: 8 },
-
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
+  // ── Header
+  waveBg: {
+    backgroundColor: Colors.white,
+    paddingHorizontal: DC.pagePadding,
+    paddingTop: 8,
+    paddingBottom: 14,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-    gap: 12,
+    borderBottomColor: BORDER,
   },
-  rowLast:   { borderBottomWidth: 0 },
-  rowLeft:   { flex: 1, gap: 3 },
-  badge:     { alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 2, borderRadius: Radius.pill },
-  badgeText: { fontFamily: AppFont.semiBold, fontSize: 10 },
-  rowName:   { fontFamily: AppFont.regular, fontSize: 14, color: '#111111' },
-  rowDate:   { fontFamily: AppFont.regular, fontSize: 10, color: Colors.muted, marginTop: 1 },
-  rowCat:    { fontFamily: AppFont.regular, fontSize: 11, color: Colors.muted, fontStyle: 'italic' },
-  rowRight:  { alignItems: 'flex-end', gap: 4 },
-  rowAmount: { fontFamily: AppFont.bold, fontSize: 13, color: '#111111' },
-
-  searchRow:  { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: DC.pagePadding, marginBottom: 4, paddingHorizontal: 12, paddingVertical: 10, borderRadius: Radius.lg, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.borderMid },
-  searchInput:{ flex: 1, fontFamily: AppFont.regular, fontSize: 14, color: DC.pageText },
-
-  // Filter modal
-  clearBtn:     { alignSelf: 'flex-end', marginBottom: 8, paddingHorizontal: 14, paddingVertical: 6, borderRadius: Radius.pill, backgroundColor: Colors.surface },
-  clearBtnText: { fontFamily: AppFont.semiBold, fontSize: 12, color: '#4f9289' },
-  filterLabel:  { fontFamily: AppFont.semiBold, fontSize: 11, color: Colors.muted, textTransform: 'uppercase', letterSpacing: 0.6, marginTop: 14, marginBottom: 8 },
-  chips:        { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip:         { paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: Colors.surface },
-  chipActive:   { backgroundColor: '#ebf7f6' },
-  chipText:     { fontFamily: AppFont.regular, fontSize: 13, color: Colors.muted },
-  chipTextActive: { fontFamily: AppFont.semiBold, fontSize: 13, color: '#4f9289' },
+  headerRow:     { flexDirection: 'row', alignItems: 'center', gap: 10, width: '100%', marginTop: 4 },
+  faceCircle:    { width: 60, height: 60, borderRadius: 30, borderWidth: 3, borderColor: '#c9c7c3', alignItems: 'center', justifyContent: 'center' },
+  headerTextCol: { flex: 1, justifyContent: 'center' },
+  headerGreeting: { fontFamily: 'Aujournuit-Regular', fontSize: 22, color: '#000000' },
+  headerName:    { fontFamily: 'Aujournuit-Regular', fontSize: 22, color: '#000000' },
+  headerDateRow: { flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: 4 },
+  headerDateValue: { fontFamily: 'Inter-Bold', fontSize: 10, color: '#b5b4a4', letterSpacing: 1.5 },
+  // ── Section title
+  goBackRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 2,
+    marginBottom: 4,
+  },
+  goBackText: { fontFamily: 'InclusiveSans-Regular', fontSize: 11, color: '#464646' },
+  sectionRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: DC.pagePadding, paddingTop: 20, paddingBottom: 20,
+  },
+  sectionTitle: { fontFamily: 'Aujournuit-Regular', fontSize: 17, color: '#000000', letterSpacing: 0.4 },
+  // ── Toggle
+  toggleRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingHorizontal: DC.pagePadding, paddingBottom: 10,
+  },
+  toggleGroup:   { flexDirection: 'row', gap: 0, borderWidth: 1, borderColor: BORDER, borderRadius: Radius.pill, overflow: 'hidden', height: 36 },
+  togglePill:    { paddingHorizontal: 16, justifyContent: 'center', height: 36 },
+  togglePillActive: { backgroundColor: '#464646' },
+  togglePillText:     { fontFamily: 'InclusiveSans-Regular', fontSize: 12, color: '#464646' },
+  togglePillTextActive: { fontFamily: 'InclusiveSans-SemiBold', fontSize: 12, color: '#ffffff' },
+  genStmtBtn: {
+    flex: 1, height: 36, justifyContent: 'center', alignItems: 'center',
+    borderRadius: Radius.pill, borderWidth: 1, borderColor: BORDER,
+    position: 'relative',
+  },
+  genStmtBtnText: { fontFamily: 'InclusiveSans-Regular', fontSize: 12, color: '#464646' },
+  // ── Type choice modal
+  choiceOverlay: {
+    flex: 1, backgroundColor: 'transparent',
+    justifyContent: 'center', alignItems: 'center',
+    paddingHorizontal: 32,
+  },
+  choiceCard: {
+    backgroundColor: 'rgba(255,255,255,0.85)', borderRadius: 20,
+    borderWidth: 1, borderColor: '#d0d0d0',
+    padding: 20, width: '100%', maxWidth: 320,
+  },
+  choiceTitle: { fontFamily: 'Aujournuit-Regular', fontSize: 17, color: '#000000', letterSpacing: 0.4, marginBottom: 16 },
+  choiceGrid: {
+    flexDirection: 'row', flexWrap: 'wrap', gap: 10,
+  },
+  choicePill: {
+    backgroundColor: '#3a3a34', borderRadius: 999,
+    paddingVertical: 10, paddingHorizontal: 14,
+    alignItems: 'center', width: '48%', flexGrow: 1,
+  },
+  choicePillText: { fontFamily: 'InclusiveSans-Medium', fontSize: 12, color: '#ffffff' },
+  // ── Filter row (search + dropdown, same height)
+  filterRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingHorizontal: DC.pagePadding, marginBottom: 8,
+    position: 'relative', zIndex: 10,
+  },
+  searchRow: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingVertical: 8, paddingHorizontal: 14,
+    borderRadius: Radius.pill, borderWidth: 1, borderColor: BORDER, overflow: 'hidden',
+  },
+  searchInput: { flex: 1, fontFamily: 'InclusiveSans-Regular', fontSize: 16, color: Colors.text, paddingVertical: 0, paddingHorizontal: 0, textAlignVertical: 'center' },
+  dropdownBtn: {
+    height: 36, justifyContent: 'center', alignItems: 'center',
+    paddingHorizontal: 14, minWidth: 130,
+    borderRadius: Radius.pill, borderWidth: 1, borderColor: BORDER,
+    position: 'relative',
+  },
+  dropdownBtnText: { fontFamily: 'InclusiveSans-Regular', fontSize: 12, color: '#464646' },
+  dropdownArrow: { position: 'absolute', right: 12, top: 12 },
+  dropdownList: {
+    position: 'absolute', top: 44, right: 0, minWidth: 160,
+    borderRadius: Radius.lg, borderWidth: 1, borderColor: BORDER,
+    backgroundColor: Colors.white, overflow: 'hidden', zIndex: 20,
+    elevation: 6,
+  },
+  dropdownItem: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 14, paddingVertical: 10,
+    borderBottomWidth: 1, borderBottomColor: BORDER,
+  },
+  dropdownItemActive: { backgroundColor: Colors.surface },
+  dropdownItemText:     { fontFamily: 'InclusiveSans-Regular', fontSize: 13, color: Colors.text },
+  dropdownItemTextActive: { fontFamily: 'InclusiveSans-SemiBold', fontSize: 13, color: '#464646' },
+  // ── List
+  empty:     { flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 80 },
+  emptyText: { fontFamily: 'InclusiveSans-Regular', fontSize: 13, color: Colors.muted },
+  scroll: { paddingHorizontal: DC.pagePadding, paddingBottom: 80 },
+  sectionDateHeader: { fontFamily: 'Inter-SemiBold', fontSize: 10, color: '#3a3a34', letterSpacing: 1, marginTop: 16, marginBottom: 10 },
+  sectionCategoryHeader: { fontFamily: 'InclusiveSans-SemiBold', fontSize: 11, color: Colors.muted, letterSpacing: 0.6, textTransform: 'uppercase', marginTop: 16, marginBottom: 6 },
+  row: {
+    flexDirection: 'row', alignItems: 'center', paddingVertical: 14,
+    borderBottomWidth: 1, borderBottomColor: '#d2d2d2', borderStyle: 'dotted',
+  },
+  rowLast: { borderBottomWidth: 0 },
+  recIconCircle: { width: 32, height: 32, borderRadius: 16, borderWidth: 1, borderColor: '#c9c7c3', alignItems: 'center', justifyContent: 'center' },
+  rowName: { fontFamily: 'InclusiveSans-Medium', fontSize: 12, color: '#3a3a34', letterSpacing: 0.5, textTransform: 'capitalize' },
+  rowSpace:{ fontFamily: 'Inter-Regular', fontSize: 12, color: '#b5b4a4', marginTop: 1, letterSpacing: 0.5 },
+  rowAmount: { fontFamily: 'Inter-Regular', fontSize: 11, color: '#3a3a34', letterSpacing: 0.3 },
 });
+

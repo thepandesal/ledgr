@@ -4,7 +4,7 @@ import formStyles from '@/components/ui/formStyles';
 import itemStyles from '@/components/ui/itemStyles';
 import accountStyles from '@/components/ui/accountStyles';
 import { Colors, Fonts } from '@/components/ui/theme';
-import { Ionicons } from '@expo/vector-icons';
+
 
 interface Item { id: string; name: string; cost: number; people: string[]; subitems: { id: string; name: string; cost: number; people: string[] }[]; }
 
@@ -61,7 +61,7 @@ export default function CollectModal({ visible, onClose, recording, items, fille
                   <Text style={[accountStyles.optionName, account?.id === acc.id && accountStyles.optionNameActive]}>{acc.holder_name || acc.account_name}</Text>
                   <Text style={[accountStyles.optionBank, account?.id === acc.id && accountStyles.optionBankActive]}>{acc.bank} · {acc.account_number}</Text>
                 </View>
-                {account?.id === acc.id && <Ionicons name="checkmark" size={14} color={Colors.white} />}
+
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -98,7 +98,7 @@ export default function CollectModal({ visible, onClose, recording, items, fille
                       <Text style={[accountStyles.optionName, sel && accountStyles.optionNameActive]}>{p}</Text>
                       <Text style={[accountStyles.optionBank, sel && accountStyles.optionBankActive]}>{(perPersonMap[p] ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
                     </View>
-                    <Ionicons name={sel ? 'checkbox' : 'square-outline'} size={18} color={sel ? Colors.white : Colors.faint} />
+
                   </TouchableOpacity>
                 );
               })}

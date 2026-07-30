@@ -2,7 +2,6 @@ import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
   SafeAreaView, TextInput, ActivityIndicator, RefreshControl,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useState, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useFocusEffect } from 'expo-router';
@@ -265,22 +264,12 @@ export default function RemindersScreen() {
       activeOpacity={0.85}
       onPress={() => openChoice(r)}
     >
-      <View style={[s.rowIcon, isDue && s.rowIconDue]}>
-        <Ionicons name="alarm-outline" size={18} color={isDue ? Colors.cyan : Colors.muted} />
-      </View>
       <View style={s.rowMid}>
         {isDue && <Text style={s.rowDueLabel}>due today · tap to fill</Text>}
         <Text style={s.rowName} numberOfLines={1}>{r.name}</Text>
         <Text style={s.rowMeta}>{reminderFrequencyLabel(r)}{r.space ? ` · ${r.space.name}` : ''}</Text>
       </View>
-      <View style={s.rowActions}>
-        <TouchableOpacity onPress={() => handleToggleStatus(r)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Ionicons name={r.status === 'active' ? 'pause-circle-outline' : 'play-circle-outline'} size={18} color={Colors.muted} />
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => handleDelete(r.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Ionicons name="archive-outline" size={16} color={Colors.muted} />
-        </TouchableOpacity>
-      </View>
+
     </TouchableOpacity>
   );
 
@@ -297,7 +286,6 @@ export default function RemindersScreen() {
 
         {/* Add button */}
         <TouchableOpacity style={s.addBtn} onPress={openAdd} activeOpacity={0.8}>
-          <Ionicons name="add" size={16} color={Colors.cyan} />
           <Text style={s.addBtnText}>new reminder</Text>
         </TouchableOpacity>
 
@@ -343,28 +331,20 @@ export default function RemindersScreen() {
           activeOpacity={0.8}
           onPress={() => { setChoiceModal(false); if (choiceTarget) openFill(choiceTarget); }}
         >
-          <View style={[s.choiceIcon, { backgroundColor: Colors.cyan + '22' }]}>
-            <Ionicons name="add-circle-outline" size={20} color={Colors.cyan} />
-          </View>
           <View style={{ flex: 1 }}>
             <Text style={s.choiceTitle}>record amount</Text>
             <Text style={s.choiceSub}>log a transaction for this reminder</Text>
           </View>
-          <Ionicons name="chevron-forward" size={14} color={Colors.faint} />
         </TouchableOpacity>
         <TouchableOpacity
           style={s.choiceRow}
           activeOpacity={0.8}
           onPress={() => { setChoiceModal(false); if (choiceTarget) openEdit(choiceTarget); }}
         >
-          <View style={[s.choiceIcon, { backgroundColor: Colors.surface }]}>
-            <Ionicons name="create-outline" size={20} color={Colors.muted} />
-          </View>
           <View style={{ flex: 1 }}>
             <Text style={s.choiceTitle}>edit reminder</Text>
             <Text style={s.choiceSub}>change name, frequency, or category</Text>
           </View>
-          <Ionicons name="chevron-forward" size={14} color={Colors.faint} />
         </TouchableOpacity>
       </BottomSheet>
 
@@ -567,9 +547,7 @@ export default function RemindersScreen() {
                       <Text style={{ fontFamily: Fonts.monoBold, fontSize: 12, color: Colors.text }}>{Number(r.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
                       <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted }}>{r.transaction_date} · {r.type} · {r.status}</Text>
                     </View>
-                    <TouchableOpacity onPress={() => deleteLinkedRecording(r.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                      <Ionicons name="close-circle-outline" size={18} color={Colors.muted} />
-                    </TouchableOpacity>
+
                   </View>
                 ))}
               </>

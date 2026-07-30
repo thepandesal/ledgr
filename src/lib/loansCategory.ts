@@ -12,7 +12,7 @@ export async function getOrCreateLoansCategory(userId: string): Promise<string |
 
   const { data: created } = await supabase
     .from('categories')
-    .insert({ user_id: userId, name: 'Loans', icon: 'cash-outline', color: '#4F9289' })
+    .insert({ user_id: userId, name: 'Loans', color: '#4F9289' })
     .select('id')
     .single();
 

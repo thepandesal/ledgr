@@ -11,7 +11,6 @@ import {
 } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../src/lib/supabase';
@@ -506,19 +505,17 @@ export default function AddRecordingScreen({ inlineProps }: {
             </TouchableOpacity>
           </View>
           <View style={s.frozenSection}>
-            <TouchableOpacity style={s.frozenRow} onPress={() => setShowTypeModal(true)} activeOpacity={0.8}>
-              <Text style={s.frozenLabel}>Type</Text>
-              <View style={s.frozenPill}>
-                <Text style={s.frozenPillText}>{selectedType.label.charAt(0).toUpperCase() + selectedType.label.slice(1)}</Text>
-                <Ionicons name="chevron-down" size={13} color={DC.pageText} />
-              </View>
-            </TouchableOpacity>
+              <TouchableOpacity style={s.frozenRow} onPress={() => setShowTypeModal(true)} activeOpacity={0.8}>
+                <Text style={s.frozenLabel}>Type</Text>
+                <View style={s.frozenPill}>
+                  <Text style={s.frozenPillText}>{selectedType.label.charAt(0).toUpperCase() + selectedType.label.slice(1)}</Text>
+                </View>
+              </TouchableOpacity>
             {needsSpacePicker && (
               <TouchableOpacity style={s.frozenRow} onPress={() => setShowSpaceModal(true)} activeOpacity={0.8}>
                 <Text style={s.frozenLabel}>Space</Text>
                 <View style={s.frozenPill}>
                   <Text style={s.frozenPillText}>{selectedSpaceName || 'None (Uncategorized)'}</Text>
-                  <Ionicons name="chevron-down" size={13} color={DC.pageText} />
                 </View>
               </TouchableOpacity>
             )}
@@ -538,7 +535,6 @@ export default function AddRecordingScreen({ inlineProps }: {
                 <Text style={s.frozenLabel}>Account</Text>
                 <View style={s.frozenPill}>
                   <Text style={s.frozenPillText}>{singularAccount ? singularAccount.account_name : 'Select'}</Text>
-                  <Ionicons name="chevron-down" size={13} color={DC.pageText} />
                 </View>
               </TouchableOpacity>
             )}
@@ -547,7 +543,6 @@ export default function AddRecordingScreen({ inlineProps }: {
                 <Text style={s.frozenLabel}>{isLoanType ? 'Paying' : 'Owes You'}</Text>
                 <View style={s.frozenPill}>
                   <Text style={s.frozenPillText}>{singularPerson || 'Select'}</Text>
-                  <Ionicons name="chevron-down" size={13} color={DC.pageText} />
                 </View>
               </TouchableOpacity>
             )}
@@ -579,11 +574,7 @@ export default function AddRecordingScreen({ inlineProps }: {
           {/* Card header with remove button */}
           <View style={s.itemCardHeader}>
             <Text style={s.itemCardNum}>Item {idx + 1}</Text>
-            {items.length > 1 && (
-              <TouchableOpacity onPress={() => removeItem(item.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Ionicons name="close-circle" size={18} color={DC.pageTextMuted} />
-              </TouchableOpacity>
-            )}
+
           </View>
 
           {/* Name */}
@@ -629,7 +620,6 @@ export default function AddRecordingScreen({ inlineProps }: {
               <Text style={s.itemLabel}>Category <Text style={{ color: Colors.muted, fontSize: 9, fontFamily: AppFont.regular }}>(optional)</Text></Text>
               <View style={s.itemPill}>
                 <Text style={s.itemPillText}>{item.category ? item.category.name : "Select"}</Text>
-                <Ionicons name="chevron-down" size={13} color={DC.pageText} />
               </View>
             </TouchableOpacity>
           )}
@@ -640,7 +630,6 @@ export default function AddRecordingScreen({ inlineProps }: {
               <Text style={s.itemLabel}>Account <Text style={{ color: Colors.muted, fontSize: 9, fontFamily: AppFont.regular }}>(optional)</Text></Text>
               <View style={s.itemPill}>
                 <Text style={s.itemPillText}>{item.account ? item.account.account_name : "Select"}</Text>
-                <Ionicons name="chevron-down" size={13} color={DC.pageText} />
               </View>
             </TouchableOpacity>
           )}
@@ -665,7 +654,6 @@ export default function AddRecordingScreen({ inlineProps }: {
               <Text style={s.itemLabel}>{isLoanType ? 'Paying' : 'Owes You'} <Text style={{ color: Colors.muted, fontSize: 9, fontFamily: AppFont.regular }}>(optional)</Text></Text>
               <View style={s.itemPill}>
                 <Text style={s.itemPillText}>{item.person || 'Select'}</Text>
-                <Ionicons name="chevron-down" size={13} color={DC.pageText} />
               </View>
             </TouchableOpacity>
           )}
@@ -687,9 +675,7 @@ export default function AddRecordingScreen({ inlineProps }: {
                 {item.photos.map((uri, i) => (
                   <View key={i} style={s.photoThumbWrap}>
                     <Image source={{ uri }} style={s.receiptThumb} resizeMode="cover" />
-                    <TouchableOpacity style={s.photoRemoveBtn} onPress={() => removePhoto(item.id, i)}>
-                      <Ionicons name="close-circle" size={18} color={Colors.text} />
-                    </TouchableOpacity>
+
                   </View>
                 ))}
               </ScrollView>
@@ -741,7 +727,6 @@ export default function AddRecordingScreen({ inlineProps }: {
               onPress={() => { setCurrency(c); setShowCurrencyModal(false); }}
             >
               <Text style={{ fontFamily: currency === c ? AppFont.semiBold : AppFont.regular, fontSize: DC.chipFontSize, color: DC.pageText }}>{c}</Text>
-              {currency === c && <Ionicons name="checkmark" size={16} color={Colors.cyan} />}
             </TouchableOpacity>
           ))}
         </ScrollView>
@@ -780,11 +765,7 @@ export default function AddRecordingScreen({ inlineProps }: {
             setShowCategoryModal(false);
           }}
           keyExtractor={c => c.id} labelExtractor={c => c.name}
-          renderLeft={(c) => (
-            <View style={[s.catDot, { backgroundColor: c.color }]}>
-              <Ionicons name={c.icon} size={11} color={Colors.text} />
-            </View>
-          )}
+          renderLeft={() => null}
           emptyText="no categories found"
         />
         <FormActions onCancel={() => setShowCategoryModal(false)} onConfirm={() => setShowCategoryModal(false)} cancelLabel="cancel" confirmLabel="done" />
@@ -798,7 +779,6 @@ export default function AddRecordingScreen({ inlineProps }: {
           keyExtractor={a => a.id} labelExtractor={a => a.account_name}
           subLabelExtractor={a => a.bank}
           subLabel2Extractor={a => a.holder_name}
-          renderLeft={(a) => <Ionicons name="card-outline" size={22} color={DC.pageText} />}
           emptyText="no accounts found"
         />
         <FormActions onCancel={() => setShowAccountModal(false)} onConfirm={() => setShowAccountModal(false)} cancelLabel="cancel" confirmLabel="done" />
@@ -811,7 +791,6 @@ export default function AddRecordingScreen({ inlineProps }: {
           keyExtractor={a => a.id} labelExtractor={a => a.account_name}
           subLabelExtractor={a => a.bank}
           subLabel2Extractor={a => a.holder_name}
-          renderLeft={(a) => <Ionicons name="card-outline" size={22} color={DC.pageText} />}
           emptyText="no accounts found"
         />
         <FormActions onCancel={() => setShowSingularAccountModal(false)} onConfirm={() => setShowSingularAccountModal(false)} cancelLabel="cancel" confirmLabel="done" />
@@ -856,7 +835,7 @@ export default function AddRecordingScreen({ inlineProps }: {
           keyExtractor={e => e.id}
           labelExtractor={e => e.name}
           subLabelExtractor={e => `${Number(e.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })} � ${e.transaction_date}`}
-          renderLeft={() => <Ionicons name="receipt-outline" size={14} color={Colors.expense} />}
+          renderLeft={() => null}
           emptyText="no expenses found"
         />
         <FormActions onCancel={() => setShowExpenseModal(false)} onConfirm={() => setShowExpenseModal(false)} cancelLabel="cancel" confirmLabel="done" />
@@ -897,9 +876,7 @@ export default function AddRecordingScreen({ inlineProps }: {
                   <Text style={{ fontFamily: AppFont.bold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 8 }}>friends</Text>
                   {visibleFriends.map(n => (
                     <TouchableOpacity key={n} style={{ flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border }} onPress={() => selectPerson(n, friendIdMap[n] ?? null)} activeOpacity={0.75}>
-                      <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.cyan + "33", alignItems: "center", justifyContent: "center" }}>
-                        <Ionicons name="people-outline" size={14} color={Colors.cyan} />
-                      </View>
+
                       <Text style={{ fontFamily: AppFont.regular, fontSize: 14, color: Colors.text, flex: 1 }}>{n}</Text>
                     </TouchableOpacity>
                   ))}
@@ -915,9 +892,7 @@ export default function AddRecordingScreen({ inlineProps }: {
                   <Text style={{ fontFamily: AppFont.bold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: "uppercase", marginTop: filteredFriends.length > 0 ? 16 : 0, marginBottom: 8 }}>contacts</Text>
                   {visibleContacts.map(n => (
                     <TouchableOpacity key={n} style={{ flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border }} onPress={() => selectPerson(n, null)} activeOpacity={0.75}>
-                      <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.surface, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: Colors.borderMid }}>
-                        <Ionicons name="person-outline" size={14} color={Colors.muted} />
-                      </View>
+
                       <Text style={{ fontFamily: AppFont.regular, fontSize: 14, color: Colors.text, flex: 1 }}>{n}</Text>
                     </TouchableOpacity>
                   ))}
@@ -948,7 +923,6 @@ export default function AddRecordingScreen({ inlineProps }: {
             onPress={() => { setSelectedSpaceId(null); setSelectedSpaceName(''); setShowSpaceModal(false); }}
             activeOpacity={0.7}
           >
-            <Ionicons name={!selectedSpaceId ? 'radio-button-on' : 'radio-button-off'} size={18} color={!selectedSpaceId ? DC.accent1 : Colors.faint} />
             <Text style={{ fontFamily: AppFont.regular, fontSize: 14, color: Colors.muted }}>None (Uncategorized)</Text>
           </TouchableOpacity>
           <ScrollView style={{ maxHeight: 300 }} showsVerticalScrollIndicator={false}>
@@ -959,7 +933,6 @@ export default function AddRecordingScreen({ inlineProps }: {
                 onPress={() => { setSelectedSpaceId(sp.id); setSelectedSpaceName(sp.name); setShowSpaceModal(false); }}
                 activeOpacity={0.7}
               >
-                <Ionicons name={selectedSpaceId === sp.id ? 'radio-button-on' : 'radio-button-off'} size={18} color={selectedSpaceId === sp.id ? DC.accent1 : Colors.faint} />
                 <Text style={{ fontFamily: AppFont.regular, fontSize: 14, color: Colors.text }}>{sp.name}</Text>
               </TouchableOpacity>
             ))}

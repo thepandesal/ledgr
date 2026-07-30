@@ -3,7 +3,6 @@ import {
   Dimensions, ScrollView, Image, ActivityIndicator, Alert, Modal, TextInput
 } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../../src/lib/supabase';
 import { useSlideScreen } from '../../src/hooks/useSlideScreen';
@@ -199,16 +198,13 @@ export default function ReceiptDetailScreen() {
     <Animated.View style={[pageStyles.container, { transform: [{ translateX: slideAnim }] }]}>
       <SafeAreaView style={pageStyles.inner}>
 
-        <TouchableOpacity onPress={handleBack} style={pageStyles.backBtn}>
-          <Ionicons name="arrow-back" size={22} color={Colors.muted} />
-        </TouchableOpacity>
+
 
         <View style={[pageStyles.titleBlock, { paddingHorizontal: Spacing.page }]}>
           <Text style={pageStyles.pageLabel}>receipts</Text>
           <View style={s.titleRow}>
             <TouchableOpacity style={s.titleNameBtn} onPress={() => { setRenameVal(entry?.note ?? ''); setRenameModal(true); }}>
               <Text style={pageStyles.pageName} numberOfLines={1}>{(entry?.note ?? 'untitled').toLowerCase()}</Text>
-              <Ionicons name="pencil-outline" size={12} color={Colors.faint} />
             </TouchableOpacity>
             <Text style={s.pageDate}>{formatDate(entry?.created_at ?? '')}</Text>
           </View>
@@ -216,15 +212,12 @@ export default function ReceiptDetailScreen() {
 
         <View style={[pageStyles.actionRow, { marginHorizontal: Spacing.page }]}>
           <TouchableOpacity style={pageStyles.actionBtn} onPress={addFromCamera}>
-            <Ionicons name="camera-outline" size={15} color={Colors.text} />
             <Text style={pageStyles.actionBtnText}>camera</Text>
           </TouchableOpacity>
           <TouchableOpacity style={pageStyles.actionBtn} onPress={addFromGallery}>
-            <Ionicons name="images-outline" size={15} color={Colors.text} />
             <Text style={pageStyles.actionBtnText}>photos</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[pageStyles.actionBtn, pageStyles.actionBtnDanger]} onPress={() => setDeleteEntryConfirm(true)}>
-            <Ionicons name="trash-outline" size={15} color={Colors.danger} />
             <Text style={[pageStyles.actionBtnText, { color: Colors.danger }]}>delete</Text>
           </TouchableOpacity>
         </View>
@@ -240,15 +233,12 @@ export default function ReceiptDetailScreen() {
                   <TouchableOpacity onPress={() => setCarouselIdx(i)} activeOpacity={0.85} style={{ flex: 1 }}>
                     <Image source={{ uri: p.url }} style={s.cellImg} resizeMode="cover" />
                   </TouchableOpacity>
-                  <TouchableOpacity style={s.cellDelete} onPress={() => setDeletePhotoConfirm(p)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Ionicons name="close-circle" size={20} color={Colors.danger} />
-                  </TouchableOpacity>
+
                 </View>
               ))}
             </View>
           ) : (
             <View style={[pageStyles.emptyBox, { borderWidth: 0, backgroundColor: 'transparent', marginBottom: 24 }]}>
-              <Ionicons name="images-outline" size={32} color={Colors.borderMid} />
               <Text style={pageStyles.emptyText}>no photos yet</Text>
             </View>
           )}
@@ -263,18 +253,14 @@ export default function ReceiptDetailScreen() {
                   <Text style={s.unlinkText}>unlink recording</Text>
                 </TouchableOpacity>
               </View>
-              <TouchableOpacity onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: entry.recording_id } } as any)}>
-                <Ionicons name="arrow-forward" size={16} color={Colors.faint} />
-              </TouchableOpacity>
+
             </View>
           ) : (
             <View style={s.recordingActions}>
               <TouchableOpacity style={s.makeRecordingBtn} onPress={() => router.push({ pathname: '/(app)/add-recording', params: { from: 'receipt', receiptId, defaultDate: new Date().toISOString().split('T')[0] } } as any)} activeOpacity={0.85}>
-                <Ionicons name="add-circle-outline" size={16} color={Colors.white} />
                 <Text style={s.makeRecordingText}>make a recording</Text>
               </TouchableOpacity>
               <TouchableOpacity style={s.linkBtn} onPress={openLinkModal} activeOpacity={0.85}>
-                <Ionicons name="link-outline" size={16} color={Colors.text} />
                 <Text style={s.linkBtnText}>link existing recording</Text>
               </TouchableOpacity>
             </View>
@@ -288,26 +274,11 @@ export default function ReceiptDetailScreen() {
         <BlurView intensity={60} tint="light" style={StyleSheet.absoluteFill}>
           <SafeAreaView style={{ flex: 1 }}>
             <View style={s.carouselHeader}>
-              <TouchableOpacity onPress={() => setCarouselIdx(null)} style={s.carouselBtn}>
-                <Ionicons name="close" size={22} color={Colors.text} />
-              </TouchableOpacity>
               <Text style={s.carouselCount}>{(carouselIdx ?? 0) + 1} / {photos.length}</Text>
-              <TouchableOpacity onPress={() => deletePhoto(photos[carouselIdx ?? 0])} style={s.carouselBtn}>
-                <Ionicons name="trash-outline" size={18} color={Colors.danger} />
-              </TouchableOpacity>
             </View>
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
               <Image source={{ uri: photos[carouselIdx ?? 0]?.url ?? '' }} style={{ width: SW - 32, height: SH * 0.55, borderRadius: 16 }} resizeMode="contain" />
-              {(carouselIdx ?? 0) > 0 && (
-                <TouchableOpacity style={s.arrowLeft} onPress={() => setCarouselIdx(prev => (prev ?? 1) - 1)}>
-                  <Ionicons name="chevron-back" size={28} color={Colors.text} />
-                </TouchableOpacity>
-              )}
-              {(carouselIdx ?? 0) < photos.length - 1 && (
-                <TouchableOpacity style={s.arrowRight} onPress={() => setCarouselIdx(prev => (prev ?? 0) + 1)}>
-                  <Ionicons name="chevron-forward" size={28} color={Colors.text} />
-                </TouchableOpacity>
-              )}
+
             </View>
             {photos.length > 1 && (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.thumbStrip}>
@@ -326,13 +297,7 @@ export default function ReceiptDetailScreen() {
       <BottomSheet visible={linkModal} onClose={() => setLinkModal(false)} sub="receipt" title="link to recording">
         <TextInput style={formStyles.searchInput} placeholder="search by name..." placeholderTextColor={Colors.faint} value={linkSearch} onChangeText={setLinkSearch} />
         <View style={s.linkDateRow}>
-          <TouchableOpacity onPress={() => changeDate(-1)} style={s.carouselBtn}>
-            <Ionicons name="chevron-back" size={18} color={Colors.muted} />
-          </TouchableOpacity>
           <Text style={s.linkDateText}>{new Date(linkDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</Text>
-          <TouchableOpacity onPress={() => changeDate(1)} style={s.carouselBtn}>
-            <Ionicons name="chevron-forward" size={18} color={Colors.muted} />
-          </TouchableOpacity>
         </View>
         {filteredRecordings.length === 0 ? (
           <Text style={formStyles.listEmpty}>no recordings on this date</Text>
@@ -344,7 +309,6 @@ export default function ReceiptDetailScreen() {
                 <Text style={formStyles.listItemText} numberOfLines={1}>{rec.name.toLowerCase()}</Text>
                 <Text style={formStyles.listItemSub}>{rec.type} · {Number(rec.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
               </View>
-              <Ionicons name="link-outline" size={14} color={Colors.cyan} />
             </TouchableOpacity>
           ))
         )}

@@ -5,9 +5,9 @@
  */
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Colors, Spacing } from './theme';
+import NavIcon from './NavIcons';
 
 const HEADER_BG   = Colors.headerBg;
 const HEADER_TEXT = '#B6E1DE';
@@ -43,9 +43,7 @@ export default function ScreenChrome({
     <View style={s.container}>
       {/* Shared dark header */}
       <View style={[s.header, { paddingTop: insets.top + 10 }]}>
-        <TouchableOpacity onPress={() => router.back()} style={s.headerBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Ionicons name="arrow-back" size={20} color={HEADER_TEXT} />
-        </TouchableOpacity>
+
         <Text style={s.headerTitle}>{title}</Text>
         <View style={s.headerBtn}>{headerRight}</View>
       </View>
@@ -56,9 +54,7 @@ export default function ScreenChrome({
       <View style={[s.navBar, { paddingBottom: insets.bottom || 8 }]}>
         {MAIN_TABS.map(tab => (
           <TouchableOpacity key={tab.key} style={s.navItem} onPress={() => goTab(tab.key)} activeOpacity={0.7}>
-            <View style={s.navIconWrap}>
-              <Ionicons name={tab.icon as any} size={22} color={NAV_INACTIVE} />
-            </View>
+            <NavIcon name={tab.key === 'notifications-tab' ? 'notifications' : tab.key} size={20} color={NAV_INACTIVE} />
             <Text style={s.navLabel}>{tab.label}</Text>
           </TouchableOpacity>
         ))}

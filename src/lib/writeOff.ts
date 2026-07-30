@@ -16,7 +16,7 @@ async function getOrCreateWriteOffCategory(userId: string): Promise<string | nul
 
   const { data: created } = await supabase
     .from('categories')
-    .insert({ user_id: userId, name: 'Write-offs', icon: 'close-circle-outline', color: '#929090' })
+    .insert({ user_id: userId, name: 'Write-offs', color: '#929090' })
     .select('id')
     .single();
 

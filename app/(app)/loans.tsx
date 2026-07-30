@@ -3,7 +3,6 @@ import {
   SafeAreaView, Animated, Dimensions, ScrollView, ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useUser } from '../../src/hooks/useUser';
@@ -138,13 +137,9 @@ export default function LoansScreen() {
 
         {/* Header */}
         <View style={s.header}>
-          <TouchableOpacity onPress={handleBack} style={s.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="arrow-back" size={20} color="#B6E1DE" />
-          </TouchableOpacity>
+
           <Text style={s.title}>loans</Text>
-          <TouchableOpacity style={s.headerBtn} onPress={() => { setPickingDate('from'); setShowPicker(true); }} activeOpacity={0.8}>
-            <Ionicons name="calendar-outline" size={16} color="#B6E1DE" />
-          </TouchableOpacity>
+
         </View>
 
         {/* Stats row */}
@@ -173,11 +168,7 @@ export default function LoansScreen() {
         {/* Date range label */}
         {(dateFrom || dateTo) && (
           <View style={s.dateRow}>
-            <Ionicons name="calendar-outline" size={12} color={ACCENT_DARK} />
             <Text style={s.dateRowText}>{dateLabel}</Text>
-            <TouchableOpacity onPress={clearDates} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Ionicons name="close-circle" size={13} color={Colors.muted} />
-            </TouchableOpacity>
           </View>
         )}
 
@@ -185,7 +176,6 @@ export default function LoansScreen() {
           <ActivityIndicator color={ACCENT_DARK} style={{ marginTop: 40 }} />
         ) : filtered.length === 0 ? (
           <View style={s.emptyWrap}>
-            <Ionicons name="cash-outline" size={32} color={Colors.faint} />
             <Text style={s.emptyText}>no loans found</Text>
           </View>
         ) : (
@@ -206,9 +196,7 @@ export default function LoansScreen() {
                       activeOpacity={0.85}
                       onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: item.id } } as any)}
                     >
-                      <View style={s.rowIconWrap}>
-                        <Ionicons name={(item.categories?.icon ?? 'cash-outline') as any} size={18} color={isPaid ? ACCENT_DARK : PEACH} />
-                      </View>
+
                       <View style={s.rowMid}>
                         <Text style={s.rowType}>
                           {isPaid ? 'paid' : isPartial ? 'partial' : 'unpaid'}
@@ -235,13 +223,9 @@ export default function LoansScreen() {
       {/* Date picker */}
       <BottomSheet visible={showPicker} onClose={() => { setShowPicker(false); setPickingDate('from'); }} title={pickingDate === 'from' ? 'start date' : 'end date'} height="55%">
         <View style={s.pickerNav}>
-          <TouchableOpacity onPress={() => { if (pickerMonth === 0) { setPickerMonth(11); setPickerYear(y => y - 1); } else setPickerMonth(m => m - 1); }}>
-            <Ionicons name="chevron-back" size={18} color={Colors.text} />
-          </TouchableOpacity>
+
           <Text style={s.pickerMonthText}>{MONTHS[pickerMonth].toLowerCase()} {pickerYear}</Text>
-          <TouchableOpacity onPress={() => { if (pickerMonth === 11) { setPickerMonth(0); setPickerYear(y => y + 1); } else setPickerMonth(m => m + 1); }}>
-            <Ionicons name="chevron-forward" size={18} color={Colors.text} />
-          </TouchableOpacity>
+
         </View>
         <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: ACCENT_DARK, marginBottom: 8 }}>
           {pickingDate === 'from' ? 'tap start date' : 'tap end date'}

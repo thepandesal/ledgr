@@ -1,5 +1,4 @@
 import { View, Text, TouchableOpacity, ScrollView, TextInput } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import BottomSheet from '@/components/ui/BottomSheet';
 import formStyles from '@/components/ui/formStyles';
 import itemStyles from '@/components/ui/itemStyles';
@@ -93,11 +92,7 @@ export default function AddItemModal({
                   keyboardType="decimal-pad"
                 />
               </View>
-              {itemForms.length > 1 && (
-                <TouchableOpacity onPress={() => removeItemForm(itemIdx)} style={{ padding: 6 }}>
-                  <Ionicons name="close" size={16} color={Colors.faint} />
-                </TouchableOpacity>
-              )}
+
             </View>
 
             {/* People (no subitems) */}
@@ -144,9 +139,7 @@ export default function AddItemModal({
                           <Text style={formStyles.hint}>{equalCost.toLocaleString('en-US', { minimumFractionDigits: 2 })} each</Text>
                         )}
                       </View>
-                      <TouchableOpacity onPress={() => removeSubitemForm(itemIdx, subIdx)} style={{ padding: 4, flexShrink: 0 }}>
-                        <Ionicons name="close" size={12} color={Colors.faint} />
-                      </TouchableOpacity>
+
                     </View>
                     {filledPeople.length > 0 && (
                       <View style={[itemStyles.personSelectRow, { marginLeft: 20, marginTop: 6 }]}>
@@ -167,7 +160,6 @@ export default function AddItemModal({
 
             {/* Add subitem */}
             <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 8 }} onPress={() => addSubitemForm(itemIdx)}>
-              <Ionicons name="add" size={12} color={Colors.cyan} />
               <Text style={{ fontFamily: Fonts.mono, fontSize: 11, color: Colors.cyan }}>add subitem</Text>
             </TouchableOpacity>
           </View>
@@ -175,7 +167,6 @@ export default function AddItemModal({
       })}
 
       <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, justifyContent: 'center' }} onPress={addItemForm}>
-        <Ionicons name="add-circle-outline" size={16} color={Colors.cyan} />
         <Text style={{ fontFamily: Fonts.mono, fontSize: 13, color: Colors.cyan }}>add another item</Text>
       </TouchableOpacity>
 

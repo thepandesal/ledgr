@@ -3,7 +3,6 @@ import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../../src/lib/supabase';
 import { BlurView } from 'expo-blur';
-import { Ionicons } from '@expo/vector-icons';
 import { Colors, Radius } from '@/components/ui/theme';
 import { Brand } from '../../../src/lib/brand';
 
@@ -242,7 +241,6 @@ export default function SplitShareSlugPage() {
   if (loading) return <View style={s.center}><ActivityIndicator color={ACCENT_DARK} /></View>;
   if (notFound || !recording) return (
     <View style={s.center}>
-      <Ionicons name="search-outline" size={36} color={Colors.borderMid} />
       <Text style={s.emptyText}>split not found</Text>
     </View>
   );
@@ -261,7 +259,6 @@ export default function SplitShareSlugPage() {
 
         {billClosed && (
           <View style={{ backgroundColor: '#FFAB9122', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 16, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Ionicons name="lock-closed-outline" size={14} color="#FFAB91" />
             <Text style={{ fontFamily: Brand.font.mono, fontSize: 12, color: '#FFAB91', flex: 1 }}>this split bill has been closed by the owner</Text>
           </View>
         )}
@@ -278,13 +275,7 @@ export default function SplitShareSlugPage() {
               const partiallyPaid = paid > 0 && !fullyPaid;
               return (
               <View key={i} style={s.row}>
-                <View style={[s.rowIconWrap, { backgroundColor: fullyPaid ? '#4CAF5022' : partiallyPaid ? '#FFAB9122' : ACCENT + '44' }]}>
-                  <Ionicons
-                    name={fullyPaid || partiallyPaid ? 'checkmark-circle' : 'person-outline'}
-                    size={15}
-                    color={fullyPaid ? '#4CAF50' : partiallyPaid ? '#FFAB91' : ACCENT_DARK}
-                  />
-                </View>
+
                 <View style={{ flex: 1 }}>
                   <Text style={s.rowName}>{p.name}</Text>
                   {partiallyPaid && (
@@ -301,7 +292,7 @@ export default function SplitShareSlugPage() {
               );
             })}
             <View style={[s.row, { backgroundColor: ACCENT + '44' }]}>
-              <View style={[s.rowIconWrap, { backgroundColor: ACCENT }]}><Ionicons name="calculator-outline" size={15} color={ACCENT_DARK} /></View>
+
               <Text style={[s.rowName, { fontFamily: Brand.font.monoBold, color: ACCENT_DARK }]}>total</Text>
               <Text style={[s.rowAmount, { color: ACCENT_DARK }]}>{fmt(grandTotal)}</Text>
             </View>
@@ -416,9 +407,7 @@ export default function SplitShareSlugPage() {
             }
             setReceiptLoading(false);
           }} activeOpacity={0.8}>
-            <Ionicons name="receipt-outline" size={15} color={ACCENT_DARK} />
             <Text style={s.actionBtnText}>view receipt photos</Text>
-            <Ionicons name="chevron-forward" size={13} color={ACCENT_DARK} />
           </TouchableOpacity>
         </>}
 
@@ -427,13 +416,13 @@ export default function SplitShareSlugPage() {
           <View style={s.listBlock}>
             {payments.map((acc: any, i: number) => (
               <View key={i} style={s.payRow}>
-                <View style={[s.rowIconWrap, { backgroundColor: ACCENT }]}><Ionicons name="card-outline" size={15} color={ACCENT_DARK} /></View>
+
                 <View style={{ flex: 1, gap: 2 }}>
                   <Text style={s.payBank}>{acc.bank || ''}</Text>
                   <Text style={s.payHolder}>{acc.holder_name || acc.account_name || ''}</Text>
                   <TouchableOpacity style={s.copyRow} onPress={() => copyAccountNumber(acc.account_number ?? '', i)} activeOpacity={0.7}>
                     <Text style={s.payNumber}>{acc.account_number ?? ''}</Text>
-                    <Ionicons name={copiedAccIdx === i ? 'checkmark' : 'copy-outline'} size={12} color={copiedAccIdx === i ? ACCENT_DARK : Colors.muted} />
+
                   </TouchableOpacity>
                 </View>
                 {acc.qr_code && (
@@ -450,13 +439,10 @@ export default function SplitShareSlugPage() {
         {showUrlBar ? (
           <View style={s.urlBar}>
             <TextInput style={s.urlInput} value={shareUrl} editable selectTextOnFocus autoFocus caretHidden={false} />
-            <TouchableOpacity onPress={() => setShowUrlBar(false)} style={{ padding: 6 }}>
-              <Ionicons name="close" size={16} color={Colors.muted} />
-            </TouchableOpacity>
+
           </View>
         ) : (
           <TouchableOpacity style={s.shareBtn} onPress={handleShare} activeOpacity={0.8}>
-            <Ionicons name="share-outline" size={15} color={ACCENT_DARK} />
             <Text style={s.shareBtnText}>share this bill</Text>
           </TouchableOpacity>
         )}
@@ -470,7 +456,7 @@ export default function SplitShareSlugPage() {
         <BlurView intensity={60} tint="dark" style={s.overlay}>
           <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setReceiptModal(false)} />
           <TouchableOpacity style={{ position: 'absolute', top: 56, right: 24, zIndex: 10 }} onPress={() => setReceiptModal(false)}>
-            <Ionicons name="close" size={26} color="#fff" />
+
           </TouchableOpacity>
           {receiptLoading ? <ActivityIndicator color="#fff" /> : receiptModalPhotos.length === 0 ? (
             <Text style={{ fontFamily: Brand.font.mono, fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>no photos found</Text>

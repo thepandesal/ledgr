@@ -1,9 +1,8 @@
-﻿import {
+import {
   View, Text, StyleSheet, TouchableOpacity, TextInput,
   SafeAreaView, Animated, Dimensions, ScrollView, ActivityIndicator, Platform,
 } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useUser } from '../../src/hooks/useUser';
@@ -23,20 +22,14 @@ import AddRecordingScreen from './add-recording';
 import BottomNav from '@/components/ui/BottomNav';
 import StatementWebView from '@/components/ui/StatementWebView';
 import { useNav } from '../../src/lib/NavContext';
-import AnimatedIcon from '@/components/ui/AnimatedIcon';
 import { setPendingFocusDate } from '../../src/lib/focusDate';
-
-// ── Constants ────────────────────────────────────────────────────────────────
+// -- Constants ----------------------------------------------------------------
 const { width } = Dimensions.get('window');
-
 const today = new Date();
 const PEACH = '#FFAB91';
 const PAGE_HEIGHT = 1200; // px per image slice (at scale 2 = 2400px actual)
-
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-
 const MODAL_HEIGHT = '50%';
-
 type Preset = 'this-month' | 'last-30' | 'cutoff' | 'custom';
 const PRESETS: { key: Preset; label: string; icon: string }[] = [
   { key: 'this-month', label: 'This Month', icon: 'calendar-outline' },
@@ -44,18 +37,15 @@ const PRESETS: { key: Preset; label: string; icon: string }[] = [
   { key: 'cutoff',     label: 'Cutoff',     icon: 'cut-outline'      },
   { key: 'custom',     label: 'Custom',     icon: 'options-outline'  },
 ];
-
-// ── Helper functions ─────────────────────────────────────────────────────────
+// -- Helper functions ---------------------------------------------------------
 function isSameDay(a: Date, b: Date) {
   return a.getFullYear() === b.getFullYear()
       && a.getMonth()    === b.getMonth()
       && a.getDate()     === b.getDate();
 }
-
 function dateKey(d: Date) {
   return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 }
-
 function getRangeForPreset(preset: Preset, cutoffDay: number, offset = 0): { from: Date; to: Date } {
   const now = new Date();
   if (preset === 'this-month') {
@@ -78,21 +68,17 @@ function getRangeForPreset(preset: Preset, cutoffDay: number, offset = 0): { fro
   }
   return { from: new Date(now.getFullYear(), now.getMonth(), 1), to: now };
 }
-
 function fmtAbbr(n: number) {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
   if (n >= 1_000)     return (n / 1_000).toFixed(1) + 'K';
   return n.toLocaleString('en-US', { maximumFractionDigits: 0 });
 }
-
 function fmtAmount(n: number) {
   return n.toLocaleString('en-US', { minimumFractionDigits: 2 });
 }
-
 function toTitleCase(str: string) {
   return str.replace(/\w\S*/g, txt => txt.charAt(0).toUpperCase() + txt.slice(1).toLowerCase());
 }
-
 function getTypeLabel(type: string, status: string, is_due?: boolean, paid_amount?: number, amount?: number) {
   if (type === 'income')  return { label: 'Income',  color: DC.incomeColor };
   if (type === 'expense') {
@@ -101,33 +87,31 @@ function getTypeLabel(type: string, status: string, is_due?: boolean, paid_amoun
       const total = Number(amount ?? 0);
       const collected = total > 0 && paid >= total - 0.01;
       const partial   = paid > 0 && !collected;
-      if (collected) return { label: 'Expense · Collected',        color: DC.incomeColor };
-      if (partial)   return { label: 'Expense · Due · Partial',    color: DC.overBudgetColor };
-      return               { label: 'Expense · Due',               color: DC.overBudgetColor };
+      if (collected) return { label: 'Expense � Collected',        color: DC.incomeColor };
+      if (partial)   return { label: 'Expense � Due � Partial',    color: DC.overBudgetColor };
+      return               { label: 'Expense � Due',               color: DC.overBudgetColor };
     }
     return { label: 'Expense', color: DC.overBudgetColor };
   }
   if (type === 'debt') {
-    if (status === 'paid')    return { label: 'Debt · Paid',           color: DC.overBudgetColor };
-    if (status === 'partial') return { label: 'Debt · Partially Paid', color: DC.overBudgetColor };
+    if (status === 'paid')    return { label: 'Debt � Paid',           color: DC.overBudgetColor };
+    if (status === 'partial') return { label: 'Debt � Partially Paid', color: DC.overBudgetColor };
     return                           { label: 'Debt',                  color: DC.overBudgetColor };
   }
   if (type === 'due') {
-    if (status === 'paid')    return { label: 'Due · Collected',        color: DC.incomeColor };
-    if (status === 'partial') return { label: 'Due · Partially Paid',   color: DC.incomeColor };
+    if (status === 'paid')    return { label: 'Due � Collected',        color: DC.incomeColor };
+    if (status === 'partial') return { label: 'Due � Partially Paid',   color: DC.incomeColor };
     return                           { label: 'Due',                    color: DC.incomeColor };
   }
   if (type === 'payment') return { label: 'Payment', color: DC.overBudgetColor };
   if (type === 'return')  return { label: 'Return',  color: DC.incomeColor };
   return { label: type, color: Colors.muted };
 }
-
 import { smartDateLabel } from '../../src/lib/smartDateLabel';
 import { getDateRange, getDateLabel, type DateMode as LocalDateMode, type WeekStart } from '../../src/lib/dateUtils';
 import { computeGhosts, getDueDateForCycle, isLoanComplete, type GhostRow } from '../../src/lib/recurringUtils';
 import { isReminderDueToday } from '../../src/lib/reminderUtils';
 import type { RecordingReminder } from '../../src/types';
-
 export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName, onClose, openEdit }: { spaceId?: string; name?: string; onClose?: () => void; openEdit?: boolean }) {
   const params = useLocalSearchParams<{ spaceId: string; name: string }>();
   const spaceId = propSpaceId ?? params.spaceId;
@@ -136,11 +120,9 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
   const queryClient = useQueryClient();
   const { userId, defaultCurrency } = useUser();
   const { convert } = useExchangeRates();
-
   const { slideAnim, handleBack: handleBackAnim } = useScreenAnim();
   const handleBack = onClose ?? handleBackAnim;
   const { openRecording } = useNav();
-
   // Load default settings from spaces page
   const { data: spacesSettings } = useQuery({
     queryKey: ['spaces-settings', userId],
@@ -154,7 +136,6 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
     },
     enabled: !!userId,
   });
-
   // Date range state - initialized from spaces settings
   const [activePreset, setActivePreset] = useState<Preset>('this-month');
   const [rangeOffset,  setRangeOffset]  = useState(0);
@@ -162,8 +143,7 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
   const [cutoffInput,  setCutoffInput]  = useState('25');
   const [customFrom,   setCustomFrom]   = useState<Date>(new Date());
   const [customTo,     setCustomTo]     = useState<Date>(new Date());
-
-  // Local filter state (temporary — never saved, spaces settings always takes over on load)
+  // Local filter state (temporary � never saved, spaces settings always takes over on load)
   const [localMode,      setLocalMode]      = useState<LocalDateMode>('monthly');
   const [localOffset,    setLocalOffset]    = useState(0);
   const [localWeekStart, setLocalWeekStart] = useState<WeekStart>('monday');
@@ -172,37 +152,30 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
   const [localCustomFrom, setLocalCustomFrom] = useState('');
   const [localCustomTo,   setLocalCustomTo]   = useState('');
   const [showLocalFilter, setShowLocalFilter] = useState(false);
-  // true once spacesSettings has been applied — prevents local changes being overwritten
+  // true once spacesSettings has been applied � prevents local changes being overwritten
   const settingsAppliedRef = useRef(false);
-
   // Calendar picker state
   const [pickingDate, setPickingDate] = useState<'from' | 'to'>('from');
   const [pickerMonth, setPickerMonth] = useState(new Date().getMonth());
   const [pickerYear,  setPickerYear]  = useState(new Date().getFullYear());
-
   // Tab filter state
   const [selectedTabs, setSelectedTabs] = useState<Set<ActivityTab>>(new Set(['all']));
-
   // Category filter state
   const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set(['all']));
-
   // Modal visibility
   const [showDateModal,   setShowDateModal]   = useState(false);
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [confirmModal,    setConfirmModal]    = useState(false);
-
   // Delete state
   const [pendingDeleteId,   setPendingDeleteId]   = useState('');
   const [pendingDeleteName, setPendingDeleteName] = useState('');
-
   const [showAddModal, setShowAddModal] = useState(false);
   const [showAddChoice, setShowAddChoice] = useState(false);
   const [showReminderModal, setShowReminderModal] = useState(false);
   const [reminderTab, setReminderTab] = useState<'active' | 'completed' | 'paused'>('active');
   const [recordingSearch, setRecordingSearch] = useState('');
   const [activeSection, setActiveSection] = useState<'recordings' | 'reminders'>('recordings');
-
-  // ── Reminder add modal state (quick-add from space) ────────────────────────────────────────────────────────────
+  // -- Reminder add modal state (quick-add from space) ------------------------------------------------------------
   const [rName, setRName]               = useState('');
   const [rFrequency, setRFrequency]     = useState<'daily'|'weekly'|'monthly'>('monthly');
   const [rDayOfWeek, setRDayOfWeek]     = useState(1);
@@ -214,11 +187,9 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
   const [editReminderId, setEditReminderId] = useState<string | null>(null);
   const [rRecordingType, setRRecordingType] = useState<'expense'|'income'|'debt'|'due'>('expense');
   const [rCategoryId, setRCategoryId]       = useState('');
-
   const SD_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const SD_DAYS   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   const SD_YEARS  = Array.from({ length: 6 }, (_, i) => today.getFullYear() + i);
-
   const handleSaveReminder = async () => {
     if (!rName.trim()) return;
     setRSaving(true);
@@ -252,14 +223,12 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
       setRSaving(false);
     }
   };
-
-  // ── Ghost payment modal ────────────────────────────────────────────────────────────
+  // -- Ghost payment modal ------------------------------------------------------------
   const [ghostModal, setGhostModal]       = useState(false);
   const [ghostTarget, setGhostTarget]     = useState<GhostRow | null>(null);
   const [ghostAmount, setGhostAmount]     = useState('');
   const [ghostSaving, setGhostSaving]     = useState(false);
-
-  // ── Reminder fill modal ────────────────────────────────────────────────────────────
+  // -- Reminder fill modal ------------------------------------------------------------
   const [reminderModal, setReminderModal]   = useState(false);
   const [reminderTarget, setReminderTarget] = useState<RecordingReminder | null>(null);
   const [reminderAmount, setReminderAmount] = useState('');
@@ -267,8 +236,6 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
   const [reminderLinked, setReminderLinked] = useState<any[]>([]);
   const [reminderIsPartial, setReminderIsPartial] = useState(false);
   const [reminderDate, setReminderDate] = useState('');
-
-
   const deleteReminderLinked = async (id: string) => {
     await supabase.from('recordings').delete().eq('id', id);
     setReminderLinked(prev => prev.filter(r => r.id !== id));
@@ -276,12 +243,10 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
   };
   const [reminderChoiceModal, setReminderChoiceModal]   = useState(false);
   const [reminderChoiceTarget, setReminderChoiceTarget] = useState<RecordingReminder | null>(null);
-
   const openReminderChoice = (r: RecordingReminder) => {
     setReminderChoiceTarget(r);
     setReminderChoiceModal(true);
   };
-
   const openReminderModal = async (r: RecordingReminder) => {
     setReminderTarget(r);
     setReminderAmount('');
@@ -295,7 +260,6 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
     setReminderLinked(data ?? []);
     setReminderModal(true);
   };
-
   const confirmReminderFill = async () => {
     if (!reminderTarget || !reminderAmount) return;
     setReminderSaving(true);
@@ -304,9 +268,6 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
       if (!user) return;
       const recType = reminderTarget.recording_type ?? 'expense';
       const recStatus = reminderIsPartial ? 'partial' : recType === 'income' ? 'received' : 'paid';
-
-
-
       await supabase.from('recordings').insert({
         user_id:          user.id,
         space_id:         spaceId,
@@ -325,13 +286,11 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
       setReminderSaving(false);
     }
   };
-
   const openGhostModal = (g: GhostRow) => {
     setGhostTarget(g);
     setGhostAmount(String(g.rec.installment_amount));
     setGhostModal(true);
   };
-
   const confirmGhostPayment = async () => {
     if (!ghostTarget) return;
     setGhostSaving(true);
@@ -341,7 +300,6 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
       const { rec, cycleKey: ck, dueDate } = ghostTarget;
       const amt = parseFloat(ghostAmount || '0') || rec.installment_amount;
       const txDate = dueDate.toISOString().split('T')[0];
-
       await supabase.from('recordings').insert({
         user_id: user.id,
         space_id: rec.space_id,
@@ -354,31 +312,26 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
         recurring_record_id: rec.id,
         cycle_key: ck,
       });
-
       const newTotalPaid = rec.total_paid + amt;
       const updates: any = { total_paid: newTotalPaid };
       if (isLoanComplete({ ...rec, total_paid: newTotalPaid })) {
         updates.status = 'completed';
       }
       await supabase.from('recurring_records').update(updates).eq('id', rec.id);
-
       setGhostModal(false);
       queryClient.invalidateQueries({ queryKey: ['recordings', spaceId] });
       queryClient.invalidateQueries({ queryKey: ['recurring-records', spaceId] });
     } catch (e) { /* ghost payment failed silently */ }
     finally { setGhostSaving(false); }
   };
-
   // Statement image state
   const [statementLoading, setStatementLoading] = useState(false);
   const [captureHtml, setCaptureHtml] = useState<string | null>(null);
   const webviewRef = useRef<any>(null);
-
   // Pagination state
   const [displayCount, setDisplayCount] = useState(10);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-
-  // ── Queries ────────────────────────────────────────────────────────────────
+  // -- Queries ----------------------------------------------------------------
   const { data: recordings = [], isLoading } = useQuery({
     queryKey: ['recordings', spaceId, userId],
     queryFn: async () => {
@@ -399,7 +352,6 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
     },
     enabled: !!spaceId && (spaceId !== 'all' || !!userId),
   });
-
   const { data: splitBillPaymentsData = [] } = useQuery({
     queryKey: ['split-bill-payments', spaceId],
     queryFn: async () => {
@@ -412,7 +364,7 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
         );
       const billIds = [...new Set((sbrRows ?? []).map((r: any) => r.split_bill_id))];
       if (billIds.length === 0) return [];
-      // Step 2: build map split_bill_id → transaction_date from recordings
+      // Step 2: build map split_bill_id ? transaction_date from recordings
       const recIds = [...new Set((sbrRows ?? []).map((r: any) => r.recording_id))];
       const { data: recRows } = await supabase.from('recordings').select('id, transaction_date').in('id', recIds);
       const recDateMap: Record<string, string> = {};
@@ -438,7 +390,6 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
     },
     enabled: !!spaceId && spaceId !== 'all',
   });
-
   const { data: spaceData } = useQuery({
     queryKey: ['space-budget', spaceId],
     queryFn: async () => {
@@ -451,7 +402,6 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
     },
     enabled: !!spaceId && spaceId !== 'all',
   });
-
   const { data: categories = [] } = useQuery({
     queryKey: ['categories', userId],
     queryFn: async () => {
@@ -464,7 +414,6 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
     },
     enabled: !!userId,
   });
-
   const { data: recurringRecords = [] } = useQuery({
     queryKey: ['recurring-records', spaceId],
     queryFn: async () => {
@@ -478,7 +427,6 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
     },
     enabled: !!spaceId && spaceId !== 'all',
   });
-
   const { data: spaceReminders = [] } = useQuery<RecordingReminder[]>({
     queryKey: ['space-reminders', spaceId, userId],
     queryFn: async () => {
@@ -496,17 +444,13 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
     },
     enabled: !!spaceId && spaceId !== 'all' && !!userId,
   });
-
   const budget       = spaceData?.budget ? convert(spaceData.budget, spaceData.budget_currency ?? 'PHP', defaultCurrency) : null;
   const isExpSpace   = (spaceData?.space_type ?? 'expense') === 'expense';
   const isAllCats    = selectedCategories.has('all');
-
   const [sortBy, setSortBy] = useState<'date' | 'category'>('date');
-
   useEffect(() => {
     if (spaceData?.sort_by) setSortBy(spaceData.sort_by as 'date' | 'category');
   }, [spaceData]);
-
   const handleSortToggle = async () => {
     const next = sortBy === 'date' ? 'category' : 'date';
     setSortBy(next);
@@ -514,18 +458,15 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
       await supabase.from('spaces').update({ sort_by: next }).eq('id', spaceId);
     }
   };
-
-  // ── Computed values ────────────────────────────────────────────────────────
+  // -- Computed values --------------------------------------------------------
   const range = getDateRange(localMode, localOffset, localWeekStart, localUseCutoff, localCutoffDay,
     localCustomFrom ? new Date(localCustomFrom) : undefined,
     localCustomTo   ? new Date(localCustomTo)   : undefined
   );
-
   const isAll = selectedTabs.has('all');
   const currentTypes = isAll
     ? ['income','expense','debt','due']
     : ACTIVITY_TABS.filter(t => t.key !== 'all' && selectedTabs.has(t.key)).flatMap(t => [...t.types]);
-
   const filtered = recordings.filter(r => {
     if (!currentTypes.includes(r.type)) return false;
     if (r.status === 'voided') return false;
@@ -538,7 +479,6 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
     const to = new Date(range.to); to.setHours(23, 59, 59);
     return date <= to;
   });
-
   // Group filtered by date or category
   const grouped: { key: string; label: string; date: Date; items: any[] }[] = [];
   if (sortBy === 'date') {
@@ -561,33 +501,27 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
     grouped.sort((a, b) => a.label.localeCompare(b.label));
     grouped.forEach(g => g.items.sort((a, b) => b.transaction_date.localeCompare(a.transaction_date)));
   }
-
   // Paginate groups
   const paginatedGroups = grouped.slice(0, displayCount);
   const hasMore = displayCount < grouped.length;
-
-  // ── Ghost rows from recurring records ───────────────────────────────────────────────
+  // -- Ghost rows from recurring records -----------------------------------------------
   const ghosts: GhostRow[] = computeGhosts(
     recurringRecords,
     recordings.filter(r => r.recurring_record_id),
     new Date()
   );
-
   const fromStr = `${range.from.getFullYear()}-${String(range.from.getMonth()+1).padStart(2,'0')}-${String(range.from.getDate()).padStart(2,'0')}`;
   const toStr   = `${range.to.getFullYear()}-${String(range.to.getMonth()+1).padStart(2,'0')}-${String(range.to.getDate()).padStart(2,'0')}`;
-
   const reminderCompletedInRange = new Set(
     recordings
       .filter(r => r.reminder_id && r.transaction_date >= fromStr && r.transaction_date <= toStr)
       .map(r => r.reminder_id)
   );
-
-  // ── Due reminders for this space ──────────────────────────────────────────
+  // -- Due reminders for this space ------------------------------------------
   const rangeSpanDays = (range.to.getTime() - range.from.getTime()) / 86400000;
   const isWideRange = rangeSpanDays > 35;
   const visibleReminders = spaceReminders.filter(r => {
     if (r.status === 'archived') return false;
-
     if (r.status === 'paused') return (reminderTab as string) === 'paused';
     const doneThisPeriod = reminderCompletedInRange.has(r.id);
     if (reminderTab === 'completed') return doneThisPeriod;
@@ -602,7 +536,6 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
     ).length;
     return { filledCount, isDone: reminderCompletedInRange.has(r.id) };
   };
-
   const dateFiltered = recordings.filter(r => {
     if (r.status === 'voided') return false;
     const [y, m, d] = r.transaction_date.split('-').map(Number);
@@ -611,12 +544,10 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
     const to = new Date(range.to); to.setHours(23, 59, 59);
     return date <= to;
   });
-
   const splitBillMoneyIn = (splitBillPaymentsData as any[]).filter(p => {
     if (!p.transaction_date) return false;
     return p.transaction_date >= fromStr && p.transaction_date <= toStr;
   }).reduce((s: number, p: any) => s + Number(p.amount), 0);
-
   const moneyIn  = dateFiltered.filter(r => (r.type === 'income' || r.type === 'due' || r.type === 'return') && r.status !== 'voided').reduce((s, r) => s + Number(r.amount), 0) + splitBillMoneyIn;
   const moneyOut = dateFiltered.filter(r => (r.type === 'expense' || r.type === 'debt' || r.type === 'payment') && r.status !== 'voided').reduce((s, r) => s + Number(r.amount), 0);
   const loansActive        = dateFiltered.filter(r => r.type === 'debt' && r.status !== 'paid').length;
@@ -627,7 +558,6 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
   const mainValue  = isExpSpace ? moneyOut : moneyIn;
   const pct        = budget ? Math.min(mainValue / budget, 1) : 0;
   const overBudget = isExpSpace && budget ? mainValue > budget : false;
-
   // Tab circle values
   const tabValue = (key: string) => {
     if (key === 'all')          return fmtAbbr(moneyIn + moneyOut);
@@ -637,7 +567,6 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
     if (key === 'receivables')  return String(receivablesPending);
     return '';
   };
-
   // Range label
   const fmtShort = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   const fmtFull  = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -645,29 +574,24 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
     localCustomFrom ? new Date(localCustomFrom) : undefined,
     localCustomTo   ? new Date(localCustomTo)   : undefined
   );
-
   // Calendar helpers
   const firstDay    = new Date(pickerYear, pickerMonth, 1).getDay();
   const daysInMonth = new Date(pickerYear, pickerMonth + 1, 0).getDate();
   const cells = Array(firstDay).fill(null).concat(Array.from({ length: daysInMonth }, (_, i) => i + 1));
   const isInRange = (day: number) => { const d = new Date(pickerYear, pickerMonth, day); return d > customFrom && d < customTo; };
   const isEdge    = (day: number) => { const d = new Date(pickerYear, pickerMonth, day); return isSameDay(d, customFrom) || isSameDay(d, customTo); };
-
-  // ── Event handlers ─────────────────────────────────────────────────────────
+  // -- Event handlers ---------------------------------------------------------
   // Initialize from spaces settings
   useEffect(() => {
     if (!spacesSettings) return;
-    
     const dateMode = spacesSettings.spaces_date_mode || 'monthly';
     const offset = Number(spacesSettings.spaces_date_offset ?? 0);
     const useCutoff = Boolean(spacesSettings.spaces_use_cutoff);
     const cutoff = Number(spacesSettings.spaces_cutoff_day ?? 25);
     const ws = (spacesSettings.spaces_week_start ?? 'monday') as WeekStart;
-
     // Always apply cutoff day if set
     setCutoffDay(cutoff);
     setCutoffInput(String(cutoff));
-
     // Map spaces filters to space-detail presets
     if (dateMode === 'monthly') {
       if (useCutoff) {
@@ -680,7 +604,6 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
       setActivePreset('this-month');
       setRangeOffset(0);
     }
-
     // Initialize local filter to match spaces settings (only on first load)
     if (!settingsAppliedRef.current) {
       setLocalMode(dateMode as LocalDateMode);
@@ -691,14 +614,12 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
       settingsAppliedRef.current = true;
     }
   }, [spacesSettings]);
-
   useEffect(() => {
     // Push a history entry on web so minimize/restore keeps us here
     if (typeof window !== 'undefined' && window.history) {
       window.history.pushState(null, '', window.location.href);
     }
   }, []);
-
   // Prevent Chrome minimize/restore from popping back to spaces on web
   useEffect(() => {
     if (typeof document === 'undefined') return;
@@ -722,7 +643,6 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
       window.removeEventListener('popstate', onPopState);
     };
   }, []);
-
   useFocusEffect(useCallback(() => {
     if (!spaceId) return;
     // Only refetch if data is older than 30s, so navigating back doesn't always reload
@@ -735,25 +655,21 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
     setDisplayCount(10);
     setPendingFocusDate(null);
   }, [spaceId, userId]));
-
   const confirmDelete = async () => {
     await supabase.from('recordings').delete().eq('id', pendingDeleteId);
     setConfirmModal(false);
     queryClient.refetchQueries({ queryKey: ['recordings', spaceId] });
   };
-
   const navigateRange = (dir: 1 | -1) => {
     setDisplayCount(10);
     setLocalOffset(o => o + dir);
   };
-
   const applyPreset = (key: Preset) => {
     setRangeOffset(0);
     setActivePreset(key);
     setDisplayCount(10);
     if (key === 'custom') setPickingDate('from');
   };
-
   const handleDayPress = (day: number) => {
     const d = new Date(pickerYear, pickerMonth, day);
     if (pickingDate === 'from') {
@@ -764,7 +680,6 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
       setPickingDate('from');
     }
   };
-
   const handleTabToggle = (key: ActivityTab) => {
     if (key === 'all') { setSelectedTabs(new Set(['all'])); setDisplayCount(10); return; }
     setSelectedTabs(prev => {
@@ -776,12 +691,10 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
       return next;
     });
   };
-
   const handleScroll = (event: any) => {
     const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
     const paddingToBottom = 100;
     const isCloseToBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom;
-    
     if (isCloseToBottom && hasMore && !isLoadingMore) {
       setIsLoadingMore(true);
       setTimeout(() => {
@@ -790,12 +703,10 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
       }, 300);
     }
   };
-
   const handleCategoryFilter = () => {
     setShowFilterModal(true);
     setDisplayCount(10);
   };
-
   const buildStatementHtml = (paymentsByParent: Record<string, any[]>) => {
     const fmtDate = (d: string) => {
       if (!d) return '\u2014';
@@ -804,14 +715,12 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
     };
     const fmtAmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2 });
     const fmtD = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-
     const TEXT   = '#111111';
     const MUTED  = '#666666';
     const FAINT  = '#999999';
     const BORDER = '#e0e0e0';
-
     // Build groups from all date-filtered recordings (ignores tab filter) for accurate totals
-    // Exclude linked recordings — they'll be appended after their parent
+    // Exclude linked recordings � they'll be appended after their parent
     const linkedIds = new Set(Object.values(paymentsByParent).flat().map((p: any) => p.id));
     const allGrouped: { key: string; date: Date; items: any[] }[] = [];
     dateFiltered.filter((r: any) => !linkedIds.has(r.id)).forEach((r: any) => {
@@ -822,66 +731,20 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
       if (existing) existing.items.push(r);
       else allGrouped.push({ key: k, date, items: [r] });
     });
-    // Sort earliest → oldest
+    // Sort earliest ? oldest
     const sortedGroups = allGrouped.sort((a, b) => a.date.getTime() - b.date.getTime());
-
     let totalIn = 0, totalOut = 0;
     sortedGroups.flatMap(g => g.items).forEach((r: any) => {
       if (r.type === 'income' || r.type === 'return') totalIn += Number(r.amount);
       else if (r.type === 'expense' || r.type === 'debt' || r.type === 'payment') totalOut += Number(r.amount);
     });
     const netBalance = totalIn - totalOut;
-
     const rangeStr = isSameDay(range.from, range.to)
       ? fmtDate(fmtD(range.from))
       : `${fmtDate(fmtD(range.from))} &ndash; ${fmtDate(fmtD(range.to))}`;
     const generatedOn = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-
-    // ── Category breakdown ──────────────────────────────────────────────────
-    // SVG paths for common Ionicons (outline variants)
-    const ICON_SVG: Record<string, string> = {
-      'fitness-outline':       'M20.57 14.86L22 13.43 20.57 12 17 15.57 8.43 7 12 3.43 10.57 2 9.14 3.43 7.71 2 5.57 4.14 4.14 2.71 2 4.86l1.43 1.43L2 7.71l1.43 1.43L2 10.57 3.43 12 7 8.43 15.57 17 12 20.57 13.43 22l1.43-1.43L16.29 22l2.14-2.14L19.86 21.43 22 19.29l-1.43-1.43L22 16.43z',
-      'barbell-outline':       'M20.57 14.86L22 13.43 20.57 12 17 15.57 8.43 7 12 3.43 10.57 2 9.14 3.43 7.71 2 5.57 4.14 4.14 2.71 2 4.86l1.43 1.43L2 7.71l1.43 1.43L2 10.57 3.43 12 7 8.43 15.57 17 12 20.57 13.43 22l1.43-1.43L16.29 22l2.14-2.14L19.86 21.43 22 19.29l-1.43-1.43L22 16.43z',
-      'restaurant-outline':    'M18 2v8c0 1.1-.9 2-2 2h-2v10h-2V12H10c-1.1 0-2-.9-2-2V2h2v7h2V2h2v7h2V2h2zM6 2C4.34 2 3 3.34 3 5v6h2.5v11h2V11H10V5c0-1.66-1.34-3-4-3z',
-      'fast-food-outline':     'M18.06 22.99h1.66c.84 0 1.53-.64 1.63-1.46L23 5.05h-5V1h-1.97v4.05h-4.97l.3 2.34c1.71.47 3.31 1.32 4.27 2.26 1.44 1.42 2.43 2.89 2.43 5.29v8.05zM1 21.99V21h15.03v.99c0 .55-.45 1-1.01 1H2.01c-.56 0-1.01-.45-1.01-1zm15.03-7H1v-2h15.03v2zm0-4H1v-2h15.03v2z',
-      'cafe-outline':          'M20 3H4v10c0 2.21 1.79 4 4 4h6c2.21 0 4-1.79 4-4v-3h2c1.11 0 2-.89 2-2V5c0-1.11-.89-2-2-2zm0 5h-2V5h2v3zM4 19h16v2H4z',
-      'cart-outline':          'M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96C5 16.1 6.1 17 7 17h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63H19c.75 0 1.41-.41 1.75-1.03l3.58-6.49A1 1 0 0023.46 4H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z',
-      'bag-outline':           'M18 6h-2c0-2.21-1.79-4-4-4S8 3.79 8 6H6c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-8 4c0 .55-.45 1-1 1s-1-.45-1-1V8h2v2zm2-4c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm4 4c0 .55-.45 1-1 1s-1-.45-1-1V8h2v2z',
-      'car-outline':           'M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z',
-      'airplane-outline':      'M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z',
-      'home-outline':          'M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z',
-      'business-outline':      'M12 7V3H2v18h20V7H12zM6 19H4v-2h2v2zm0-4H4v-2h2v2zm0-4H4V9h2v2zm0-4H4V5h2v2zm4 12H8v-2h2v2zm0-4H8v-2h2v2zm0-4H8V9h2v2zm0-4H8V5h2v2zm10 12h-8v-2h2v-2h-2v-2h2v-2h-2V9h8v10zm-2-8h-2v2h2v-2zm0 4h-2v2h2v-2z',
-      'medkit-outline':        'M20 6h-2.18c.07-.44.18-.88.18-1.36C18 2.53 15.47 0 12.36 0c-1.5 0-2.84.59-3.82 1.55L7 3H4c-1.1 0-2 .9-2 2v15c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-8.55-4.26c.51-.51 1.21-.74 1.91-.74 1.49 0 2.64 1.15 2.64 2.64 0 .48-.14.94-.32 1.36H9.5l2.95-3.26zM13 14h-2v3H9v-3H6v-2h3v-3h2v3h3v2z',
-      'heart-outline':         'M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z',
-      'school-outline':        'M5 13.18v4L12 21l7-3.82v-4L12 17l-7-3.82zM12 3L1 9l11 6 9-4.91V17h2V9L12 3z',
-      'book-outline':          'M18 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 4h5v8l-2.5-1.5L6 12V4z',
-      'game-controller-outline':'M15 7.5V2H9v5.5l3 3 3-3zM7.5 9H2v6h5.5l3-3-3-3zM9 16.5V22h6v-5.5l-3-3-3 3zM16.5 9l-3 3 3 3H22V9h-5.5z',
-      'musical-notes-outline': 'M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z',
-      'phone-portrait-outline':'M17 1.01L7 1c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-1.99-2-1.99zM17 19H7V5h10v14z',
-      'laptop-outline':        'M20 18c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z',
-      'cash-outline':          'M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z',
-      'card-outline':          'M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z',
-      'wallet-outline':        'M21 18v1c0 1.1-.9 2-2 2H5c-1.11 0-2-.9-2-2V5c0-1.1.89-2 2-2h14c1.1 0 2 .9 2 2v1h-9c-1.11 0-2 .9-2 2v8c0 1.1.89 2 2 2h9zm-9-2h10V8H12v8zm4-2.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z',
-      'gift-outline':          'M20 6h-2.18c.07-.44.18-.88.18-1.36C18 2.53 15.47 0 12.36 0c-1.5 0-2.84.59-3.82 1.55L7 3H4c-1.1 0-2 .9-2 2v15c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-7.64-4.26c.51-.51 1.21-.74 1.91-.74 1.49 0 2.64 1.15 2.64 2.64 0 .48-.14.94-.32 1.36H9.5l2.86-3.26zM11 11H4V8h7v3zm2 9H4v-7h9v7zm7 0h-5v-7h5v7zm0-9h-5V8h5v3z',
-      'paw-outline':           'M4.5 9.5a2.5 2.5 0 0 1 0-5 2.5 2.5 0 0 1 0 5zm7-8a2.5 2.5 0 0 1 0 5 2.5 2.5 0 0 1 0-5zm5 0a2.5 2.5 0 0 1 0 5 2.5 2.5 0 0 1 0-5zm3.5 9.5a2.5 2.5 0 0 1 0-5 2.5 2.5 0 0 1 0 5zm-3.5 6.5c-1.5 0-2.5-1-4-1s-2.5 1-4 1c-2 0-4-2-4-5 0-2.5 2-4.5 4-4.5 1 0 2 .5 4 .5s3-.5 4-.5c2 0 4 2 4 4.5 0 3-2 5-4 5z',
-      'leaf-outline':          'M17 8C8 10 5.9 16.17 3.82 21.34L5.71 22l1-2.3A4.49 4.49 0 0 0 8 20C19 20 22 3 22 3c-1 2-8 2-5 8z',
-      'water-outline':         'M12 2c-5.33 4.55-8 8.48-8 11.8 0 4.98 3.8 8.2 8 8.2s8-3.22 8-8.2c0-3.32-2.67-7.25-8-11.8z',
-      'flash-outline':         'M7 2v11h3v9l7-12h-4l4-8z',
-      'flame-outline':         'M13.5.67s.74 2.65.74 4.8c0 2.06-1.35 3.73-3.41 3.73-2.07 0-3.63-1.67-3.63-3.73l.03-.36C5.21 7.51 4 10.62 4 14c0 4.42 3.58 8 8 8s8-3.58 8-8C20 8.61 17.41 3.8 13.5.67zM11.71 19c-1.78 0-3.22-1.4-3.22-3.14 0-1.62 1.05-2.76 2.81-3.12 1.77-.36 3.6-1.21 4.62-2.58.39 1.29.59 2.65.59 4.04 0 2.65-2.15 4.8-4.8 4.8z',
-      'sunny-outline':         'M6.76 4.84l-1.8-1.79-1.41 1.41 1.79 1.79 1.42-1.41zM4 10.5H1v2h3v-2zm9-9.95h-2V3.5h2V.55zm7.45 3.91l-1.41-1.41-1.79 1.79 1.41 1.41 1.79-1.79zm-3.21 13.7l1.79 1.8 1.41-1.41-1.8-1.79-1.4 1.4zM20 10.5v2h3v-2h-3zm-8-5c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6zm-1 16.95h2V19.5h-2v2.95zm-7.45-3.91l1.41 1.41 1.79-1.8-1.41-1.41-1.79 1.8z',
-      'people-outline':        'M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z',
-      'person-outline':        'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z',
-      'trending-up-outline':   'M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z',
-      'star-outline':          'M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z',
-      'ellipse-outline':       'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z',
-    };
-
+    // -- Category breakdown --------------------------------------------------
     const iconSvg = (iconName: string, catName: string): string => {
-      const path = ICON_SVG[iconName];
-      if (path) {
-        return `<div style="width:36px;height:36px;margin-bottom:10px;background:${BORDER};border-radius:8px;display:flex;align-items:center;justify-content:center;padding:6px;box-sizing:border-box">`+
-          `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="${MUTED}"><path d="${path}"/></svg></div>`;
-      }
       const initial = (catName || '?').charAt(0).toUpperCase();
       return `<div style="width:36px;height:36px;border:1.5px solid ${BORDER};border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:${MUTED};margin-bottom:6px">${initial}</div><div style="font-size:8px;color:${FAINT};margin-bottom:4px;word-break:break-all">${iconName}</div>`;
     };
@@ -904,7 +767,6 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
           ${c.in > 0 ? `<div style="margin-bottom:6px"><div style="font-size:9px;font-weight:600;color:${FAINT};letter-spacing:0.6px;text-transform:uppercase;margin-bottom:2px">money in</div><div style="font-size:13px;font-weight:700;color:${TEXT}">${fmtAmt(c.in)}</div></div>` : ''}
           ${c.out > 0 ? `<div><div style="font-size:9px;font-weight:600;color:${FAINT};letter-spacing:0.6px;text-transform:uppercase;margin-bottom:2px">money out</div><div style="font-size:13px;font-weight:700;color:${TEXT}">${fmtAmt(c.out)}</div></div>` : ''}
         </div>`).join('');
-
     // Flatten all items across groups into a single sorted list, appending linked activities after their parent
     const allItems: any[] = [];
     sortedGroups.forEach(group => {
@@ -913,7 +775,6 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
         (paymentsByParent[r.id] ?? []).forEach((sub: any) => allItems.push(sub));
       });
     });
-
     let runningBalance = 0;
     const tableRows = allItems.map((r: any) => {
         const tl = getTypeLabel(r.type, r.status, r.is_due, r.paid_amount, r.amount);
@@ -922,7 +783,6 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
         const isDebit  = r.type === 'expense' || r.type === 'debt' || r.type === 'payment';
         if (isCredit) runningBalance += displayAmt;
         else if (isDebit) runningBalance -= displayAmt;
-
         return `<tr>
           <td style="padding:9px 8px;font-size:11px;color:${MUTED};white-space:nowrap">${fmtDate(r.transaction_date)}</td>
           <td style="padding:9px 8px">
@@ -935,7 +795,6 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
           <td style="padding:9px 8px;text-align:right;font-size:12px;font-weight:600;color:${TEXT}">${fmtAmt(runningBalance)}</td>
         </tr>`;
       }).join('');
-
     return `<!DOCTYPE html><html><head><meta charset="utf-8">
 <style>
   * { box-sizing:border-box; margin:0; padding:0; }
@@ -946,15 +805,11 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
   th:nth-child(4), th:nth-child(5), th:nth-child(6) { text-align:right; }
 </style>
 </head><body>
-
 <div style="font-size:11px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:${MUTED};margin-bottom:32px">LEDGR</div>
-
 <div style="font-size:22px;font-weight:700;color:${TEXT};margin-bottom:4px">${String(name)}</div>
 <div style="font-size:12px;color:${MUTED};margin-bottom:2px">${rangeStr}</div>
 <div style="font-size:11px;color:${FAINT};margin-bottom:32px">${dateFiltered.length} transaction${dateFiltered.length !== 1 ? 's' : ''} &middot; generated ${generatedOn}</div>
-
 <div style="height:1px;background:${TEXT};margin-bottom:24px"></div>
-
 <div style="display:flex;gap:0;margin-bottom:32px;border:1px solid ${BORDER}">
   <div style="flex:1;padding:16px 20px;border-right:1px solid ${BORDER}">
     <div style="font-size:10px;font-weight:600;color:${MUTED};letter-spacing:0.6px;text-transform:uppercase;margin-bottom:6px">Money In</div>
@@ -969,10 +824,8 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
     <div style="font-size:18px;font-weight:700;color:${TEXT}">${fmtAmt(netBalance)}</div>
   </div>
 </div>
-
 <div style="font-size:10px;font-weight:600;color:${MUTED};letter-spacing:0.6px;text-transform:uppercase;margin-bottom:12px;margin-top:32px">By Category</div>
 <div style="margin-bottom:32px">${catCards}</div>
-
 <div style="font-size:10px;font-weight:600;color:${MUTED};letter-spacing:0.6px;text-transform:uppercase;margin-bottom:10px">Transactions</div>
 <table>
   <thead>
@@ -995,12 +848,9 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
     </tr>
   </tfoot>
 </table>
-
 <div style="font-size:10px;color:${FAINT};text-align:center;margin-top:32px;letter-spacing:1px;text-transform:uppercase">LEDGR</div>
-
 </body></html>`;
   };
-
   const handleStatementWebViewMessage = async (event: any) => {
     const dataUrl: string = event.nativeEvent.data;
     if (!dataUrl.startsWith('data:image/png')) return;
@@ -1028,7 +878,6 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
     } catch (e) { /* statement webview capture failed silently */ }
     finally { setStatementLoading(false); }
   };
-
   const generateStatement = async () => {
     const diffDays = (range.to.getTime() - range.from.getTime()) / 86400000;
     if (diffDays > 184) { alert('Statement is limited to a maximum of 6 months.'); return; }
@@ -1073,8 +922,7 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
       setStatementLoading(false);
     }
   };
-
-  // ── Space ownership + members ──────────────────────────────────────────────────
+  // -- Space ownership + members --------------------------------------------------
   const { data: spaceOwner } = useQuery<string>({
     queryKey: ['space-owner', spaceId],
     queryFn: async () => {
@@ -1084,7 +932,6 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
     enabled: !!spaceId && spaceId !== 'all',
   });
   const isOwner = spaceOwner === userId;
-
   const { data: members = [], refetch: refetchMembers } = useQuery<{ id: string; user_id: string; role: string; status: string; name: string }[]>({
     queryKey: ['space-members', spaceId],
     queryFn: async () => {
@@ -1102,13 +949,11 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
     },
     enabled: !!spaceId && spaceId !== 'all',
   });
-
   // role for this user in this space (null = owner)
   const myMembership = members.find(m => m.user_id === userId);
   const myRole = isOwner ? 'owner' : (myMembership?.status === 'accepted' ? myMembership.role : null);
   const canAddRecordings = myRole === 'owner' || myRole === 'co-owner';
   const canViewOnly = myRole === 'viewer';
-
   // Delete permission: owner can delete any recording.
   // co-owner can delete their own recordings or other co-owners', but NOT the owner's recordings.
   const canDeleteRecording = (recordingUserId: string) => {
@@ -1116,7 +961,6 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
     if (myRole === 'co-owner') return recordingUserId !== spaceOwner;
     return false;
   };
-
   // Space edit state
   const [showSpaceActions, setShowSpaceActions] = useState(openEdit ?? false);
   const [showEditSpaceName, setShowEditSpaceName] = useState(false);
@@ -1127,7 +971,6 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
   const [deletingSpace, setDeletingSpace] = useState(false);
   const [deleteProgress, setDeleteProgress] = useState<{splitBills: boolean; recordings: boolean; space: boolean} | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-
   const handleEditSpaceName = async () => {
     if (!editSpaceName.trim()) return;
     setEditSpaceNameSaving(true);
@@ -1139,7 +982,6 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
     queryClient.invalidateQueries({ queryKey: ['spaces', userId] });
     queryClient.invalidateQueries({ queryKey: ['home-spaces', userId] });
   };
-
   const handleArchiveSpace = async () => {
     await supabase.from('spaces').update({ is_active: false }).eq('id', spaceId as string);
     setShowSpaceActions(false);
@@ -1148,13 +990,11 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
     queryClient.invalidateQueries({ queryKey: ['home-spaces', userId] });
     handleBack();
   };
-
   const handleDeleteSpace = async () => {
     if (deleteSpaceConfirmText.toLowerCase() !== 'delete') return;
     setDeletingSpace(true);
     setDeleteProgress({ splitBills: false, recordings: false, space: false });
     setDeleteError(null);
-
     try {
       // Step 1: delete split bills linked to this space
       const { data: sRecs } = await supabase.from('recordings').select('id').eq('space_id', spaceId);
@@ -1172,18 +1012,15 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
         }
       }
       setDeleteProgress(prev => prev && { ...prev, splitBills: true });
-
     // Step 2: delete recordings (nullify source_recording_id refs first)
     if (recIds.length > 0) {
       await supabase.from('recordings').update({ source_recording_id: null }).in('source_recording_id', recIds);
     }
     await supabase.from('recordings').delete().eq('space_id', spaceId as string);
     setDeleteProgress(prev => prev && { ...prev, recordings: true });
-
       // Step 3: delete space
       await supabase.from('spaces').delete().eq('id', spaceId as string);
       setDeleteProgress(prev => prev && { ...prev, space: true });
-
       setDeletingSpace(false);
       setShowDeleteSpaceConfirm(false);
       setDeleteProgress(null);
@@ -1197,14 +1034,12 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
       setDeletingSpace(false);
     }
   };
-
   const [membersModal, setMembersModal] = useState(false);
   const [inviteModal, setInviteModal] = useState(false);
   const [inviteFriends, setInviteFriends] = useState<{ id: string; name: string }[]>([]);
   const [inviteFriendId, setInviteFriendId] = useState('');
   const [inviteRole, setInviteRole] = useState<'co-owner' | 'viewer'>('viewer');
   const [inviteSaving, setInviteSaving] = useState(false);
-
   const openInviteModal = async () => {
     const { data: friendships } = await supabase
       .from('friendships')
@@ -1225,7 +1060,6 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
     setInviteRole('viewer');
     setInviteModal(true);
   };
-
   const sendSpaceInvite = async () => {
     if (!inviteFriendId) return;
     setInviteSaving(true);
@@ -1240,8 +1074,8 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
       user_id: inviteFriendId,
       type: 'space_invite',
       title: `${userName} is inviting you to join a space`,
-      body: `${String(name)} — role: ${inviteRole}`,
-      message: `${String(name)} — role: ${inviteRole}`,
+      body: `${String(name)} � role: ${inviteRole}`,
+      message: `${String(name)} � role: ${inviteRole}`,
       data: { spaceId, spaceName: String(name) },
       is_read: false,
       status: 'new',
@@ -1250,27 +1084,23 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
     setInviteSaving(false);
     setInviteModal(false);
   };
-
   const removeMember = async (memberId: string) => {
     await supabase.from('space_members').delete().eq('id', memberId);
     refetchMembers();
   };
-
-  // ── Render ──────────────────────────────────────────────────────────────────
+  // -- Render ------------------------------------------------------------------
   return (
     <Animated.View style={[{ flex: 1, backgroundColor: Colors.white }, { transform: [{ translateX: slideAnim }] }]}>
       <SafeAreaView style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-
         {/* Header */}
         <PageHeader
           title={String(name)}
           onBack={handleBack}
           right={isOwner ? (
-            <HeaderActionBtn icon="ellipsis-horizontal" onPress={() => setShowSpaceActions(true)} />
+            <HeaderActionBtn onPress={() => setShowSpaceActions(true)} />
           ) : undefined}
         />
-
-        {/* ── Sticky controls ── */}
+        {/* -- Sticky controls -- */}
         <View style={s.stickyControls}>
           {/* Section toggle: Recordings / Reminders */}
           <View style={s.sectionToggleRow}>
@@ -1281,7 +1111,6 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
               <Text style={[s.sectionToggleText, activeSection === 'reminders' && s.sectionToggleTextActive]}>Reminders</Text>
             </TouchableOpacity>
           </View>
-
           {activeSection === 'recordings' && (
             <View style={{ gap: 10 }}>
               <ActivityTabs selectedTabs={selectedTabs} onToggle={handleTabToggle} tabValue={tabValue} />
@@ -1302,17 +1131,14 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
                 )}
               </View>
               <View style={s.searchBar}>
-                <Ionicons name="search-outline" size={13} color={Colors.faint} />
                 <TextInput style={s.searchInput} placeholder="Search Recordings.." placeholderTextColor={Colors.faint} value={recordingSearch} onChangeText={v => { setRecordingSearch(v); setDisplayCount(10); }} />
                 {recordingSearch.length > 0 && (
                   <TouchableOpacity onPress={() => setRecordingSearch('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Ionicons name="close" size={13} color={Colors.faint} />
                   </TouchableOpacity>
                 )}
               </View>
             </View>
           )}
-
           {activeSection === 'reminders' && (
             <View style={{ gap: 10 }}>
               <View style={s.filterControlsRow}>
@@ -1327,7 +1153,6 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
                 </TouchableOpacity>
                 {canAddRecordings && (
                   <TouchableOpacity style={s.addCircleBtn} onPress={() => { setEditReminderId(null); setRRecordingType('expense'); setRCategoryId(''); setRName(''); setRFrequency('monthly'); setRDayOfWeek(1); setRDayOfMonth(1); setRStartMonth(today.getMonth()); setRStartDay(today.getDate()); setRStartYear(today.getFullYear()); setShowReminderModal(true); }} activeOpacity={0.8}>
-                    <Ionicons name="add" size={18} color={DC.btnText} />
                   </TouchableOpacity>
                 )}
               </View>
@@ -1339,13 +1164,11 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
                 ))}
               </View>
               <View style={s.searchBar}>
-                <Ionicons name="search-outline" size={13} color={Colors.faint} />
                 <TextInput style={s.searchInput} placeholder="Search Reminders.." placeholderTextColor={Colors.faint} />
               </View>
             </View>
           )}
         </View>
-
         {/* Main scroll */}
         <ScrollView
           contentContainerStyle={s.scroll}
@@ -1378,7 +1201,6 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
                               onLongPress={() => { if (!canDeleteRecording(item.user_id)) return; setPendingDeleteId(item.id); setPendingDeleteName(item.name); setConfirmModal(true); }}
                             >
                               <View style={s.rowIconWrap}>
-                                <Ionicons name={(item.categories?.icon ?? 'ellipse-outline') as any} size={24} color={DC.pageText} />
                               </View>
                               <View style={s.rowMid}>
                                 <Text style={s.rowName} numberOfLines={1}>{toTitleCase(item.name)}</Text>
@@ -1400,7 +1222,6 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
                   ))
                 )}
               </View>
-
               {/* Ghost rows */}
               {ghosts.length > 0 && (
                 <View style={{ gap: 10 }}>
@@ -1412,18 +1233,16 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
                   {ghosts.map(g => (
                     <TouchableOpacity key={`${g.rec.id}-${g.cycleKey}`} style={[s.row, s.ghostRow, g.isOverdue && s.ghostRowOverdue]} activeOpacity={0.8} onPress={() => openGhostModal(g)}>
                       <View style={[s.rowIconWrap, { backgroundColor: g.isOverdue ? '#F9731622' : Colors.surface }]}>
-                        <Ionicons name="repeat-outline" size={18} color={g.isOverdue ? '#F97316' : DC.pageText} />
                       </View>
                       <View style={s.rowMid}>
                         <Text style={s.rowName} numberOfLines={1}>{g.rec.name}</Text>
-                        <Text style={[s.rowType, g.isOverdue && { color: '#F97316' }]}>{g.isOverdue ? 'overdue' : 'scheduled'} · due {g.dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</Text>
+                        <Text style={[s.rowType, g.isOverdue && { color: '#F97316' }]}>{g.isOverdue ? 'overdue' : 'scheduled'} � due {g.dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</Text>
                       </View>
                       <Text style={[s.rowAmount, { color: g.isOverdue ? '#F97316' : DC.pageTextMuted }]}>{g.rec.installment_amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
               )}
-
               {hasMore && (
                 <View style={s.loadMoreWrap}>
                   {isLoadingMore ? <ActivityIndicator color={DC.accent1} size="small" /> : <Text style={s.loadMoreText}>scroll for more</Text>}
@@ -1431,7 +1250,6 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
               )}
             </View>
           )}
-
           {activeSection === 'reminders' && (
             <View style={{ gap: 12 }}>
               {/* Reminder cards */}
@@ -1445,13 +1263,11 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
                     return (
                       <TouchableOpacity key={`reminder-${r.id}`} style={s.row} activeOpacity={0.8} onPress={() => openReminderChoice(r)}>
                         <View style={s.rowIconWrap}>
-                          <Ionicons name={isDone ? 'checkmark-circle-outline' : 'alarm-outline'} size={24} color={DC.pageText} />
                         </View>
                         <View style={s.rowMid}>
                           <Text style={s.rowName} numberOfLines={1}>{toTitleCase(r.name)}</Text>
                           <Text style={s.rowType}>{isDone ? `filled ${filledCount}x this period` : isDue ? 'due today' : r.status === 'paused' ? 'paused' : r.categories?.name ?? 'reminder'}</Text>
                         </View>
-                        <Ionicons name="chevron-forward" size={14} color={DC.pageTextMuted} />
                       </TouchableOpacity>
                     );
                   })
@@ -1459,53 +1275,44 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
               </View>
             </View>
           )}
-
           <View style={{ height: 80 }} />
         </ScrollView>
       </SafeAreaView>
-
       {showAddModal && (
         <AddRecordingScreen inlineProps={{ spaceId: spaceId as string, spaceName: name as string, defaultDate: new Date().toISOString().split('T')[0], onClose: () => { setShowAddModal(false); queryClient.invalidateQueries({ queryKey: ['recordings', spaceId] }); } }} />
       )}
-
       {/* Add / Actions choice sheet */}
       <BottomSheet visible={showAddChoice} onClose={() => setShowAddChoice(false)} title="actions">
         <TouchableOpacity style={s.choiceRow} activeOpacity={0.8} onPress={() => { setShowAddChoice(false); setShowAddModal(true); }}>
           <View style={[s.choiceIcon, { backgroundColor: DC.accent1 + '22' }]}>
-            <Ionicons name="receipt-outline" size={20} color={DC.accent1} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={s.choiceTitle}>Add Recording</Text>
             <Text style={s.choiceSub}>Log an expense, income, or loan</Text>
           </View>
-          <Ionicons name="chevron-forward" size={14} color={Colors.faint} />
         </TouchableOpacity>
         <TouchableOpacity style={s.choiceRow} activeOpacity={0.8} onPress={() => { setShowAddChoice(false); generateStatement(); }}>
           <View style={[s.choiceIcon, { backgroundColor: DC.accent1 + '22' }]}>
             {statementLoading
               ? <ActivityIndicator size="small" color={DC.accent1} />
-              : <Ionicons name="document-text-outline" size={20} color={DC.accent1} />}
+              : null}
           </View>
           <View style={{ flex: 1 }}>
             <Text style={s.choiceTitle}>Export Statement</Text>
             <Text style={s.choiceSub}>Download a PDF statement for this period</Text>
           </View>
-          <Ionicons name="chevron-forward" size={14} color={Colors.faint} />
         </TouchableOpacity>
         {isOwner && spaceId !== 'all' && (
           <TouchableOpacity style={s.choiceRow} activeOpacity={0.8} onPress={() => { setShowAddChoice(false); setMembersModal(true); }}>
             <View style={[s.choiceIcon, { backgroundColor: DC.accent1 + '22' }]}>
-              <Ionicons name="people-outline" size={20} color={DC.accent1} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={s.choiceTitle}>Members</Text>
               <Text style={s.choiceSub}>Manage space members and invites</Text>
             </View>
-            <Ionicons name="chevron-forward" size={14} color={Colors.faint} />
           </TouchableOpacity>
         )}
       </BottomSheet>
-
       {/* Quick-add reminder modal */}
       <BottomSheet visible={showReminderModal} onClose={() => setShowReminderModal(false)} title={editReminderId ? 'edit reminder' : 'new reminder'}>
         {/* Name */}
@@ -1518,7 +1325,6 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
           onChangeText={setRName}
           autoFocus
         />
-
         {/* Recording Type */}
         <Text style={s.modalLabel}>Recording Type</Text>
         <View style={s.dropdownRow}>
@@ -1528,7 +1334,6 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
             </TouchableOpacity>
           ))}
         </View>
-
         {/* Category */}
         <Text style={s.modalLabel}>Category <Text style={{ fontFamily: AppFont.regular, fontSize: 11, color: DC.pageTextMuted }}>(optional)</Text></Text>
         <View style={s.dropdownRow}>
@@ -1541,7 +1346,6 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
             </TouchableOpacity>
           ))}
         </View>
-
         {/* Frequency */}
         <Text style={s.modalLabel}>Frequency</Text>
         <View style={s.dropdownRow}>
@@ -1551,7 +1355,6 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
             </TouchableOpacity>
           ))}
         </View>
-
         {/* Day of week (weekly) */}
         {rFrequency === 'weekly' && (
           <>
@@ -1565,7 +1368,6 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
             </View>
           </>
         )}
-
         {/* Day of month (monthly) */}
         {rFrequency === 'monthly' && (
           <>
@@ -1579,7 +1381,6 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
             </ScrollView>
           </>
         )}
-
         {/* Start date */}
         <Text style={s.modalLabel}>{rFrequency === 'monthly' ? 'Starts From' : 'Start Date'}</Text>
         <View style={{ flexDirection: 'row', gap: 8, height: 130 }}>
@@ -1607,7 +1408,6 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
             ))}
           </ScrollView>
         </View>
-
         <TouchableOpacity
           style={[s.saveBtn, (!rName.trim() || rSaving) && { opacity: 0.4 }]}
           onPress={handleSaveReminder}
@@ -1617,8 +1417,7 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
           <Text style={s.saveBtnText}>{rSaving ? 'Saving...' : editReminderId ? 'Save Changes' : 'Create Reminder'}</Text>
         </TouchableOpacity>
       </BottomSheet>
-
-      {/* Local filter modal — temporary, never saved */}
+      {/* Local filter modal � temporary, never saved */}
       <BottomSheet visible={showLocalFilter} onClose={() => setShowLocalFilter(false)} title="date filter" height="55%">
         <Text style={s.modalLabel}>view by</Text>
         <View style={s.chipRow}>
@@ -1628,7 +1427,6 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
             </TouchableOpacity>
           ))}
         </View>
-
         {localMode === 'custom' && (
           <>
             <Text style={s.modalLabel}>from</Text>
@@ -1653,7 +1451,6 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
             />
           </>
         )}
-
         {localMode === 'monthly' && (
           <>
             <Text style={s.modalLabel}>use cutoff?</Text>
@@ -1679,7 +1476,6 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
             )}
           </>
         )}
-
         {localMode === 'weekly' && (
           <>
             <Text style={s.modalLabel}>week starts on</Text>
@@ -1692,7 +1488,6 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
             </View>
           </>
         )}
-
         <Text style={[s.modalLabel, { marginTop: 8 }]}>quick jump</Text>
         <View style={s.chipRow}>
           {[{label:'Today',mode:'daily'},{label:'This Week',mode:'weekly'},{label:'This Month',mode:'monthly'},{label:'This Year',mode:'yearly'}].map(p => (
@@ -1701,12 +1496,10 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
             </TouchableOpacity>
           ))}
         </View>
-
         <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: Colors.faint, marginTop: 12 }}>
-          temporary — spaces filter always resets this on open
+          temporary � spaces filter always resets this on open
         </Text>
       </BottomSheet>
-
       {/* Filter modal */}
       <BottomSheet visible={showFilterModal} onClose={() => setShowFilterModal(false)} title="filter" height={MODAL_HEIGHT}>
         <TouchableOpacity style={s.clearBtn} onPress={() => setSelectedCategories(new Set(['all']))} activeOpacity={0.75}>
@@ -1734,10 +1527,8 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
           })}
         </View>
       </BottomSheet>
-
       {/* Hidden WebView for native statement capture */}
       {captureHtml && <StatementWebView html={captureHtml} webviewRef={webviewRef} onMessage={handleStatementWebViewMessage} />}
-
       {/* Reminder choice modal */}
       <BottomSheet visible={reminderChoiceModal} onClose={() => setReminderChoiceModal(false)} title={reminderChoiceTarget?.name ?? 'reminder'} height="45%">
         <TouchableOpacity
@@ -1746,13 +1537,11 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
           onPress={() => { setReminderChoiceModal(false); if (reminderChoiceTarget) openReminderModal(reminderChoiceTarget); }}
         >
           <View style={[s.choiceIcon, { backgroundColor: Brand.color.accent + '22' }]}>
-            <Ionicons name="add-circle-outline" size={20} color={Brand.color.accentDark} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={s.choiceTitle}>record amount</Text>
             <Text style={s.choiceSub}>log a transaction for this reminder</Text>
           </View>
-          <Ionicons name="chevron-forward" size={14} color={Colors.faint} />
         </TouchableOpacity>
         <TouchableOpacity
           style={s.choiceRow}
@@ -1776,13 +1565,11 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
           }}
         >
           <View style={[s.choiceIcon, { backgroundColor: Colors.surface }]}>
-            <Ionicons name="create-outline" size={20} color={Colors.muted} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={s.choiceTitle}>edit reminder</Text>
             <Text style={s.choiceSub}>change name, frequency, or category</Text>
           </View>
-          <Ionicons name="chevron-forward" size={14} color={Colors.faint} />
         </TouchableOpacity>
         <TouchableOpacity
           style={s.choiceRow}
@@ -1796,10 +1583,6 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
           }}
         >
           <View style={[s.choiceIcon, { backgroundColor: Colors.surface }]}>
-            <Ionicons
-              name={reminderChoiceTarget?.status === 'active' ? 'pause-circle-outline' : 'play-circle-outline'}
-              size={20} color={Colors.muted}
-            />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={s.choiceTitle}>{reminderChoiceTarget?.status === 'active' ? 'pause reminder' : 'resume reminder'}</Text>
@@ -1822,7 +1605,7 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
           }}
         >
           <View style={[s.choiceIcon, { backgroundColor: Colors.surface }]}>
-            <Ionicons name={recordings.some(r => r.reminder_id === reminderChoiceTarget?.id) ? 'archive-outline' : 'trash-outline'} size={20} color={Colors.muted} />
+            null
           </View>
           <View style={{ flex: 1 }}>
             <Text style={s.choiceTitle}>{recordings.some(r => r.reminder_id === reminderChoiceTarget?.id) ? 'archive reminder' : 'delete reminder'}</Text>
@@ -1830,7 +1613,6 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
           </View>
         </TouchableOpacity>
       </BottomSheet>
-
       {/* Reminder fill modal */}
       <BottomSheet visible={reminderModal} onClose={() => setReminderModal(false)} title="fill reminder">
         {reminderTarget && (
@@ -1841,7 +1623,6 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
             <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: Colors.muted, marginBottom: 12 }}>
               {reminderTarget.recording_type ?? 'expense'}
             </Text>
-
             {/* Previous payments */}
             {reminderLinked.length > 0 && (
               <>
@@ -1850,16 +1631,14 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
                   <View key={r.id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 10 }}>
                     <View style={{ flex: 1 }}>
                       <Text style={{ fontFamily: Fonts.monoBold, fontSize: 12, color: Colors.text }}>{Number(r.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
-                      <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted }}>{r.transaction_date} · {r.type} · {r.status}</Text>
+                      <Text style={{ fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted }}>{r.transaction_date} � {r.type} � {r.status}</Text>
                     </View>
                     <TouchableOpacity onPress={() => deleteReminderLinked(r.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                      <Ionicons name="close-circle-outline" size={18} color={Colors.muted} />
                     </TouchableOpacity>
                   </View>
                 ))}
               </>
             )}
-
             {/* Partial/complete toggle */}
             <Text style={{ fontFamily: Fonts.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.6, textTransform: 'uppercase', marginTop: 12, marginBottom: 6 }}>payment type</Text>
             <View style={s.chipRow}>
@@ -1870,7 +1649,6 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
                 <Text style={[s.chipText, reminderIsPartial && s.chipTextActive]}>partial</Text>
               </TouchableOpacity>
             </View>
-
             <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginTop: 12, marginBottom: 6 }}>date</Text>
             <TextInput
               style={{ fontFamily: Brand.font.mono, fontSize: 14, color: Colors.text, backgroundColor: Colors.surface, borderRadius: Radius.md, paddingHorizontal: 14, paddingVertical: 11, borderWidth: 1, borderColor: Colors.borderMid, marginBottom: 16 }}
@@ -1901,7 +1679,6 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
           </>
         )}
       </BottomSheet>
-
       {/* Ghost payment modal */}
       <BottomSheet visible={ghostModal} onClose={() => setGhostModal(false)} title="record payment">
         {ghostTarget && (
@@ -1910,7 +1687,7 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
               {ghostTarget.rec.name}
             </Text>
             <Text style={{ fontFamily: Brand.font.mono, fontSize: 11, color: Colors.muted, marginBottom: 16 }}>
-              {ghostTarget.cycleKey} · due {ghostTarget.dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+              {ghostTarget.cycleKey} � due {ghostTarget.dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
             </Text>
             <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 6 }}>amount</Text>
             <TextInput
@@ -1932,7 +1709,6 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
           </>
         )}
       </BottomSheet>
-
       {/* Members modal */}
       <BottomSheet visible={membersModal} onClose={() => setMembersModal(false)} title="members" maxHeight="60%">
         {isOwner && (
@@ -1940,7 +1716,6 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
             style={{ flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-end', paddingHorizontal: 12, paddingVertical: 6, borderRadius: Radius.pill, backgroundColor: Brand.color.accent + '33', marginBottom: 12 }}
             onPress={() => { setMembersModal(false); openInviteModal(); }}
           >
-            <Ionicons name="person-add-outline" size={13} color={Brand.color.accentDark} />
             <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 12, color: Brand.color.accentDark }}>invite friend</Text>
           </TouchableOpacity>
         )}
@@ -1954,23 +1729,21 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
               </View>
               <View style={{ flex: 1, gap: 2 }}>
                 <Text style={{ fontFamily: Brand.font.heading, fontSize: 13, color: Colors.text }}>{m.name}</Text>
-                <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: Colors.muted }}>{m.role} · {m.status}</Text>
+                <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: Colors.muted }}>{m.role} � {m.status}</Text>
               </View>
               {isOwner && (
                 <TouchableOpacity onPress={() => removeMember(m.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                  <Ionicons name="close" size={14} color={Colors.muted} />
                 </TouchableOpacity>
               )}
             </View>
           ))
         )}
       </BottomSheet>
-
       {/* Invite modal */}
       <BottomSheet visible={inviteModal} onClose={() => setInviteModal(false)} title="invite to space">
         {inviteFriends.length === 0 ? (
           <Text style={{ fontFamily: Brand.font.mono, fontSize: 12, color: Colors.muted }}>
-            no friends available to invite — add friends first from the contacts page.
+            no friends available to invite � add friends first from the contacts page.
           </Text>
         ) : (
           <>
@@ -1982,7 +1755,6 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
                   style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 10 }}
                   onPress={() => setInviteFriendId(f.id)}
                 >
-                  <Ionicons name={inviteFriendId === f.id ? 'radio-button-on' : 'radio-button-off'} size={16} color={inviteFriendId === f.id ? Brand.color.accentDark : Colors.faint} />
                   <Text style={{ fontFamily: Brand.font.heading, fontSize: 13, color: Colors.text }}>{f.name}</Text>
                 </TouchableOpacity>
               ))}
@@ -2012,7 +1784,6 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
           </>
         )}
       </BottomSheet>
-
       {/* Space actions sheet */}
       <BottomSheet visible={showSpaceActions} onClose={() => setShowSpaceActions(false)} title={String(name)}>
         <TouchableOpacity style={s.choiceRow} activeOpacity={0.7} onPress={() => { setShowSpaceActions(false); setEditSpaceName(String(name)); setShowEditSpaceName(true); }}>
@@ -2020,24 +1791,20 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
             <Text style={s.choiceTitle}>Edit Name</Text>
             <Text style={s.choiceSub}>rename this space</Text>
           </View>
-          <Ionicons name="chevron-forward" size={14} color={Colors.faint} />
         </TouchableOpacity>
         <TouchableOpacity style={s.choiceRow} activeOpacity={0.7} onPress={handleArchiveSpace}>
           <View style={{ flex: 1 }}>
             <Text style={s.choiceTitle}>Archive</Text>
-            <Text style={s.choiceSub}>mark as inactive — recordings are kept</Text>
+            <Text style={s.choiceSub}>mark as inactive � recordings are kept</Text>
           </View>
-          <Ionicons name="chevron-forward" size={14} color={Colors.faint} />
         </TouchableOpacity>
         <TouchableOpacity style={[s.choiceRow, { borderBottomWidth: 0 }]} activeOpacity={0.7} onPress={() => { setShowSpaceActions(false); setDeleteSpaceConfirmText(''); setShowDeleteSpaceConfirm(true); }}>
           <View style={{ flex: 1 }}>
             <Text style={[s.choiceTitle, { color: '#FF5757' }]}>Delete</Text>
             <Text style={s.choiceSub}>permanently deletes space and all recordings</Text>
           </View>
-          <Ionicons name="chevron-forward" size={14} color={Colors.faint} />
         </TouchableOpacity>
       </BottomSheet>
-
       {/* Edit space name sheet */}
       <BottomSheet visible={showEditSpaceName} onClose={() => setShowEditSpaceName(false)} title="Edit Space Name">
         <TextInput
@@ -2057,24 +1824,20 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
           <Text style={s.saveBtnText}>{editSpaceNameSaving ? 'saving...' : 'Save'}</Text>
         </TouchableOpacity>
       </BottomSheet>
-
       {/* Delete space confirmation / progress overlay */}
       {showDeleteSpaceConfirm && (
         <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 24, zIndex: 999 }}>
           <View style={{ backgroundColor: Colors.white, borderRadius: Radius.xl, padding: 24, width: '100%' }}>
             {deletingSpace && deleteProgress ? (
               <View style={{ alignItems: 'center' }}>
-                <AnimatedIcon set="line-md" icon="document-delete" size={48} color="#FF5757" loop />
-                <Text style={{ fontFamily: AppFont.bold, fontSize: 16, color: '#111111', marginTop: 16, marginBottom: 20 }}>Deleting "{name}"…</Text>
+                <Text style={{ fontFamily: AppFont.bold, fontSize: 16, color: '#111111', marginTop: 16, marginBottom: 20 }}>Deleting "{name}"�</Text>
                 {[
                   { key: 'splitBills', label: 'Deleting split bills' },
                   { key: 'recordings', label: 'Deleting records' },
                   { key: 'space', label: 'Deleting space' },
                 ].map(({ key, label }) => (
                   <View key={key} style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'stretch', paddingVertical: 6 }}>
-                    {deleteProgress[key as keyof typeof deleteProgress] ? (
-                      <AnimatedIcon set="lets-icons" icon="check-fill" size={18} color={Colors.green ?? '#2ECC71'} />
-                    ) : (
+                    {deleteProgress[key as keyof typeof deleteProgress] ? null : (
                       <View style={{ width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: Colors.borderMid }} />
                     )}
                     <Text style={{ fontFamily: AppFont.regular, fontSize: 14, color: deleteProgress[key as keyof typeof deleteProgress] ? '#111111' : Colors.muted, marginLeft: 10 }}>{label}</Text>
@@ -2093,7 +1856,7 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
               <>
                 <Text style={{ fontFamily: AppFont.bold, fontSize: 16, color: '#111111', marginBottom: 8 }}>Delete "{name}"?</Text>
                 <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.muted, lineHeight: 20, marginBottom: 16 }}>
-                  ⚠️ This will permanently delete the space and ALL recordings under it. This cannot be undone.{' '}We recommend archiving instead to keep your data.
+                  ?? This will permanently delete the space and ALL recordings under it. This cannot be undone.{' '}We recommend archiving instead to keep your data.
                 </Text>
                 <Text style={{ fontFamily: AppFont.semiBold, fontSize: 11, color: DC.pageTextMuted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8 }}>Type "delete" to confirm</Text>
                 <TextInput
@@ -2123,7 +1886,6 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
           </View>
         </View>
       )}
-
       {/* Delete confirm */}
       <ConfirmModal
         visible={confirmModal}
@@ -2138,7 +1900,6 @@ export default function SpaceDetailScreen({ spaceId: propSpaceId, name: propName
     </Animated.View>
   );
 }
-
 const s = StyleSheet.create({
   stickyControls: { paddingHorizontal: DC.pagePadding, paddingTop: 12, paddingBottom: 10, backgroundColor: Colors.white, gap: 10 },
   // Section toggle tabs
@@ -2147,29 +1908,22 @@ const s = StyleSheet.create({
   sectionToggleBtnActive:  { backgroundColor: '#111111', borderColor: '#111111' },
   sectionToggleText:       { fontFamily: AppFont.semiBold, fontSize: 13, color: DC.pageTextMuted },
   sectionToggleTextActive: { color: Colors.white },
-
   // Filter dot
   filterDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: DC.btnText },
-
   // Actions button
   actionsBtn:     { paddingHorizontal: 16, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: DC.btnBg, alignItems: 'center', justifyContent: 'center', borderWidth: DC.btnBorderWidth },
   actionsBtnText: { fontFamily: AppFont.semiBold, fontSize: 12, color: DC.btnText },
-
   // Add circle button (reminders)
   addCircleBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: DC.btnBg, alignItems: 'center', justifyContent: 'center', borderWidth: DC.btnBorderWidth },
-
   // Scroll
   scroll:  { paddingHorizontal: DC.pagePadding, paddingBottom: 80 },
   divider: { height: 8, backgroundColor: Colors.surface, marginHorizontal: -DC.pagePadding, marginVertical: 8 },
-
   // Section
   sectionRow:    { alignItems: 'center', paddingTop: 20, paddingBottom: 10 },
   sectionHeader: { fontFamily: AppFont.bold, fontSize: 16, color: DC.pageText, textAlign: 'center' },
-
   // Search bar
   searchBar:   { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: DC.cardBorder, borderRadius: Radius.pill, paddingHorizontal: 14, paddingVertical: 12, backgroundColor: DC.cardBg },
   searchInput: { flex: 1, fontFamily: AppFont.regular, fontSize: 13, color: DC.pageText, padding: 0 },
-
   // Filter controls row
   filterControlsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, width: '100%' },
   filterRow:    { flexDirection: 'row', alignItems: 'center', gap: 4 },
@@ -2179,17 +1933,14 @@ const s = StyleSheet.create({
   filterBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: 12, height: 36, borderRadius: Radius.pill, backgroundColor: DC.btnBg, borderWidth: DC.btnBorderWidth },
   filterBtnDate: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: DC.btnBg, borderWidth: DC.btnBorderWidth },
   filterBtnText: { fontFamily: AppFont.regular, fontSize: 13, color: DC.btnText },
-
   // Empty
   emptyWrap: { alignItems: 'center', paddingVertical: 24 },
   emptyText: { fontFamily: AppFont.regular, fontSize: 13, color: DC.pageTextMuted },
-
   // Date header with lines
   dateGroup:      { paddingVertical: 16, gap: 10 },
   dateHeaderRow:  { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
   dateHeaderLine: { flex: 1, height: 1, backgroundColor: DC.cardBorder },
   dateHeaderText: { fontFamily: AppFont.regular, fontSize: 11, color: DC.pageTextMuted },
-
   // Recording / reminder row
   row:         { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, paddingHorizontal: 14, borderRadius: 14, borderWidth: 1, borderColor: DC.cardBorder, backgroundColor: '#ffffff' },
   rowIconWrap: { width: 44, height: 44, borderRadius: 12, justifyContent: 'center', alignItems: 'center', backgroundColor: '#ffffff' },
@@ -2198,7 +1949,6 @@ const s = StyleSheet.create({
   rowName:     { fontFamily: AppFont.bold, fontSize: 14, color: DC.pageText },
   rowDate:     { fontFamily: AppFont.regular, fontSize: 10, color: DC.pageTextMuted },
   rowAmount:   { fontFamily: AppFont.bold, fontSize: 14, letterSpacing: -0.3, minWidth: 70, textAlign: 'right' },
-
   // Modal chips
   chipRow:        { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
   chip:           { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: DC.cardBg, borderWidth: 1, borderColor: DC.cardBorder },
@@ -2209,7 +1959,6 @@ const s = StyleSheet.create({
   sectionLabel:   { fontFamily: AppFont.bold, fontSize: 11, color: DC.pageTextMuted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8, marginTop: 4 },
   clearBtn:       { alignSelf: 'flex-end', marginBottom: 12, paddingHorizontal: 14, paddingVertical: 7, borderRadius: Radius.pill, backgroundColor: DC.btnBg, borderWidth: DC.btnBorderWidth },
   clearBtnText:   { fontFamily: AppFont.semiBold, fontSize: 12, color: DC.btnText },
-
   // Calendar
   calWrap:           { width: '100%' },
   calHint:           { fontFamily: AppFont.regular, fontSize: 11, color: DC.accent1, marginBottom: 10 },
@@ -2222,21 +1971,17 @@ const s = StyleSheet.create({
   calCellToday:      { backgroundColor: DC.cardBg },
   calCellText:       { fontFamily: AppFont.regular, fontSize: 13, color: DC.pageText },
   calCellTextActive: { fontFamily: AppFont.bold, color: Colors.white },
-
   // Load more
   loadMoreWrap: { alignItems: 'center', paddingVertical: 20 },
   loadMoreText: { fontFamily: AppFont.regular, fontSize: 11, color: DC.pageTextMuted },
-
   // Ghost rows
   ghostRow:        { borderStyle: 'dashed', borderWidth: 1, borderColor: DC.cardBorder, borderRadius: DC.cardRadius, backgroundColor: DC.cardBg },
   ghostRowOverdue: { borderColor: '#F97316', backgroundColor: '#F9731608' },
-
   // Choice sheet
   choiceRow:   { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: DC.cardBorder },
   choiceIcon:  { width: 40, height: 40, borderRadius: Radius.md, justifyContent: 'center', alignItems: 'center' },
   choiceTitle: { fontFamily: AppFont.semiBold, fontSize: 14, color: DC.pageText },
   choiceSub:   { fontFamily: AppFont.regular, fontSize: 11, color: DC.pageTextMuted, marginTop: 2 },
-
   // Dropdown options
   dropdownRow:              { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 4 },
   dropdownOption:           { paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, borderWidth: 1, borderColor: DC.cardBorder, backgroundColor: DC.cardBg },

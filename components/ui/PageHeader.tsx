@@ -1,5 +1,4 @@
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { Colors, Radius } from './theme';
 import { AppFont } from '../../src/lib/fonts';
 import { DC } from '../../src/lib/design';
@@ -15,11 +14,7 @@ export default function PageHeader({ title, onBack, right, titleColor }: Props) 
   return (
     <View style={s.header}>
       <View style={s.side}>
-        {onBack && (
-          <TouchableOpacity onPress={onBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="caret-back" size={22} color={DC.pageText} />
-          </TouchableOpacity>
-        )}
+
       </View>
       <View style={s.center}>
         <Text style={s.brand}>LEDGR</Text>
@@ -37,13 +32,11 @@ export const PAGE_HEADER_ACTIONS_STYLE = {
   gap: 6,
 };
 
-export function HeaderActionBtn({ onPress, icon, loading }: { onPress: () => void; icon: string; loading?: boolean }) {
+export function HeaderActionBtn({ onPress, loading }: { onPress: () => void; loading?: boolean }) {
   const { ActivityIndicator } = require('react-native');
   return (
     <TouchableOpacity style={s.actionBtn} onPress={onPress} activeOpacity={0.8}>
-      {loading
-        ? <ActivityIndicator size="small" color={DC.accent1} />
-        : <Ionicons name={icon as any} size={16} color={DC.accent1} />}
+      {loading && <ActivityIndicator size="small" color={DC.accent1} />}
     </TouchableOpacity>
   );
 }

@@ -4,7 +4,6 @@ import {
 } from 'react-native';
 import { useState, useEffect, useRef } from 'react';
 import ReceivableDetail from './receivable-detail';
-import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useUser } from '../../src/hooks/useUser';
 import { supabase } from '../../src/lib/supabase';
@@ -262,7 +261,6 @@ export default function PeoplePanel({ onClose, initialPerson }: Props) {
 
       {/* Search */}
       <View style={s.searchRow}>
-        <Ionicons name="search-outline" size={14} color={Colors.faint} />
         <TextInput
           style={s.searchInput}
           placeholder="search people..."
@@ -270,11 +268,7 @@ export default function PeoplePanel({ onClose, initialPerson }: Props) {
           value={search}
           onChangeText={setSearch}
         />
-        {search.length > 0 && (
-          <TouchableOpacity onPress={() => setSearch('')}>
-            <Ionicons name="close" size={14} color={Colors.faint} />
-          </TouchableOpacity>
-        )}
+
       </View>
 
       {/* Section tabs */}
@@ -333,7 +327,6 @@ export default function PeoplePanel({ onClose, initialPerson }: Props) {
                   </View>
                 ) : (
                   <View style={{ alignItems: 'center', paddingVertical: 48, gap: 12 }}>
-                    <Ionicons name="people-outline" size={32} color={Colors.faint} />
                     <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.muted }}>
                       {search ? 'no people match your search' : 'no ongoing transactions'}
                     </Text>
@@ -369,7 +362,6 @@ export default function PeoplePanel({ onClose, initialPerson }: Props) {
                   </View>
                 ) : (
                   <View style={{ alignItems: 'center', paddingVertical: 48, gap: 12 }}>
-                    <Ionicons name="checkmark-circle-outline" size={32} color={Colors.faint} />
                     <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.muted }}>
                       {search ? 'no people match your search' : 'no completed transactions'}
                     </Text>

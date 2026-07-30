@@ -3,7 +3,7 @@ import ConfirmModal from '@/components/ui/ConfirmModal';
 import formStyles from '@/components/ui/formStyles';
 import accountStyles from '@/components/ui/accountStyles';
 import { Colors } from '@/components/ui/theme';
-import { Ionicons } from '@expo/vector-icons';
+
 
 interface Props {
   visible: boolean;
@@ -40,7 +40,7 @@ export default function ShareModal({ visible, onClose, shareRowId, shareAccounts
                 <Text style={[accountStyles.optionName, selected && accountStyles.optionNameActive]}>{acc.holder_name || acc.account_name}</Text>
                 <Text style={[accountStyles.optionBank, selected && accountStyles.optionBankActive]}>{acc.bank} · {acc.account_number}</Text>
               </View>
-              <Ionicons name={selected ? 'checkbox' : 'square-outline'} size={18} color={selected ? Colors.white : Colors.faint} />
+
             </TouchableOpacity>
           );
         })}
@@ -48,11 +48,9 @@ export default function ShareModal({ visible, onClose, shareRowId, shareAccounts
       </ScrollView>
       <View style={accountStyles.shareRow}>
         <TouchableOpacity style={[accountStyles.shareBtn, !shareRowId && { opacity: 0.4 }, linkCopied && { borderColor: Colors.income, backgroundColor: Colors.successBg }]} onPress={onShare} disabled={!shareRowId}>
-          <Ionicons name={linkCopied ? 'checkmark' : 'link-outline'} size={18} color={linkCopied ? Colors.income : Colors.cyan} />
           <Text style={[accountStyles.shareBtnText, linkCopied && { color: Colors.income }]}>{!shareRowId ? 'preparing...' : linkCopied ? 'link copied!' : 'share link'}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[accountStyles.shareBtn, shareLoading && { opacity: 0.4 }]} onPress={onSaveImage} disabled={shareLoading}>
-          <Ionicons name="image-outline" size={18} color={Colors.text} />
           <Text style={[accountStyles.shareBtnText, { color: Colors.text }]}>{shareLoading ? 'saving...' : 'save as pdf'}</Text>
         </TouchableOpacity>
       </View>

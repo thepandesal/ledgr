@@ -4,7 +4,6 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../../src/lib/supabase';
-import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, useState, useContext } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useUser } from '../../../src/hooks/useUser';
@@ -97,7 +96,6 @@ export default function AccountsScreen({ isActive }: { isActive?: boolean }) {
 
         {/* Search */}
         <View style={s.searchBar}>
-          <Ionicons name="search-outline" size={14} color={DC.pageTextMuted} />
           <TextInput
             style={s.searchInput}
             placeholder="Search Accounts.."
@@ -110,7 +108,6 @@ export default function AccountsScreen({ isActive }: { isActive?: boolean }) {
         {/* List */}
         {accounts.length === 0 ? (
           <View style={s.emptyBox}>
-            <Ionicons name="card-outline" size={40} color={Colors.faint} />
             <Text style={s.emptyText}>no accounts saved yet</Text>
           </View>
         ) : (
@@ -127,7 +124,7 @@ export default function AccountsScreen({ isActive }: { isActive?: boolean }) {
                 >
                   {account.qr_code
                     ? <Image source={{ uri: account.qr_code }} style={s.qrThumb} resizeMode="cover" />
-                    : <Ionicons name="card-outline" size={22} color={DC.pageText} />
+                    : null
                   }
                 </TouchableOpacity>
 
@@ -144,14 +141,7 @@ export default function AccountsScreen({ isActive }: { isActive?: boolean }) {
                 </TouchableOpacity>
 
                 {/* Right: action buttons */}
-                <View style={s.cardActions}>
-                  <TouchableOpacity style={s.circleBtn} onPress={() => { setSelected(account); openEdit(account); }} activeOpacity={0.8}>
-                    <Ionicons name="pencil-outline" size={14} color={DC.pageBg} />
-                  </TouchableOpacity>
-                  <TouchableOpacity style={s.circleBtn} onPress={() => copyAccount(account)} activeOpacity={0.8}>
-                    <Ionicons name="copy-outline" size={14} color="#ffffff" />
-                  </TouchableOpacity>
-                </View>
+
 
                 {/* Copied toast */}
                 {copiedId === account.id && (
@@ -308,12 +298,9 @@ function InlineCropModal({ uri, onCrop, onCancel }: { uri: string; onCrop: (b64:
 
       {/* header */}
       <View style={{ position: 'absolute', top: 52, left: 0, right: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24 }}>
-        <TouchableOpacity onPress={onCancel} style={cs.headerBtn}><Ionicons name="close" size={24} color="#fff" /></TouchableOpacity>
         <Text style={{ fontFamily: AppFont.regular, fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>drag to move · corner to resize</Text>
-        <TouchableOpacity onPress={doCrop} style={cs.headerBtn}><Ionicons name="checkmark" size={24} color="#0ccfcf" /></TouchableOpacity>
       </View>
       <TouchableOpacity style={{ position: 'absolute', bottom: 48, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#0ccfcf', borderRadius: 999, paddingVertical: 14, paddingHorizontal: 32 }} onPress={doCrop}>
-        <Ionicons name="checkmark-circle" size={20} color="#000" />
         <Text style={{ fontFamily: AppFont.semiBold, fontSize: 14, color: '#000' }}>save crop</Text>
       </TouchableOpacity>
     </View>
@@ -417,13 +404,10 @@ function AccountForm({ visible, userId, initial, onClose, onSaved }: {
             {qrCode ? (
               <View style={{ alignItems: 'center', padding: 16 }}>
                 <Image source={{ uri: qrCode }} style={f.qrPreview} resizeMode="cover" />
-                <TouchableOpacity style={{ position: 'absolute', top: 8, right: 8 }} onPress={() => setQrCode(null)}>
-                  <Ionicons name="close-circle" size={20} color={Colors.expense} />
-                </TouchableOpacity>
+
               </View>
             ) : (
               <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 20, gap: 6 }}>
-                <Ionicons name="qr-code-outline" size={26} color={Colors.faint} />
                 <Text style={{ fontFamily: AppFont.regular, fontSize: 11, color: Colors.muted }}>tap to upload & crop</Text>
               </View>
             )}

@@ -1,6 +1,5 @@
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView, Image, ActivityIndicator, TextInput, Alert, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useUser } from '../../../src/hooks/useUser';
@@ -154,7 +153,6 @@ export default function ReceiptsScreen({ isActive }: { isActive?: boolean }) {
         <View style={s.center}><ActivityIndicator color={Brand.color.accent} /></View>
       ) : entries.length === 0 ? (
         <View style={s.center}>
-          <Ionicons name="receipt-outline" size={40} color={Colors.borderMid} />
           <Text style={Brand.type.emptyText}>no receipts yet</Text>
         </View>
       ) : (
@@ -171,9 +169,7 @@ export default function ReceiptsScreen({ isActive }: { isActive?: boolean }) {
               {entry.firstPhoto ? (
                 <Image source={{ uri: entry.firstPhoto }} style={s.thumb} resizeMode="cover" />
               ) : (
-                <View style={s.thumbEmpty}>
-                  <Ionicons name="image-outline" size={22} color={Colors.faint} />
-                </View>
+                <View style={s.thumbEmpty} />
               )}
               <View style={s.cardInfo}>
                 <Text style={s.cardDate}>{formatDate(entry.created_at)}</Text>
@@ -188,7 +184,6 @@ export default function ReceiptsScreen({ isActive }: { isActive?: boolean }) {
                   <Text style={s.unlinkedText}>no recording linked</Text>
                 )}
               </View>
-              <Ionicons name="chevron-forward" size={16} color={Colors.faint} />
             </TouchableOpacity>
           ))}
           {hasMore && (
@@ -204,9 +199,7 @@ export default function ReceiptsScreen({ isActive }: { isActive?: boolean }) {
         </ScrollView>
       )}
 
-      <TouchableOpacity style={s.fab} onPress={() => setAddModal(true)} activeOpacity={0.8}>
-        <Ionicons name="add" size={22} color={Brand.color.accentText} />
-      </TouchableOpacity>
+
 
       <BottomSheet visible={addModal} onClose={closeAddModal} title={addStep === 'name' ? 'new receipt' : 'add photos'}>
         {addStep === 'name' ? (
@@ -226,11 +219,9 @@ export default function ReceiptsScreen({ isActive }: { isActive?: boolean }) {
           <>
             <View style={accountStyles.photoButtons}>
               <TouchableOpacity style={accountStyles.photoBtn} onPress={addFromCamera}>
-                <Ionicons name="camera-outline" size={28} color={Brand.color.headerText} />
                 <Text style={accountStyles.photoBtnText}>camera</Text>
               </TouchableOpacity>
               <TouchableOpacity style={accountStyles.photoBtn} onPress={addFromGallery}>
-                <Ionicons name="images-outline" size={28} color={Colors.text} />
                 <Text style={[accountStyles.photoBtnText, { color: Colors.text }]}>gallery</Text>
               </TouchableOpacity>
             </View>

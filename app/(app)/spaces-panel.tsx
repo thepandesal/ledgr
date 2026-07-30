@@ -2,7 +2,6 @@ import {
   View, Text, StyleSheet, ScrollView, SafeAreaView,
   TouchableOpacity, RefreshControl, Alert, TextInput, ActivityIndicator,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useUser } from '../../src/hooks/useUser';
@@ -16,12 +15,9 @@ import { useExchangeRates } from '../../src/lib/useExchangeRates';
 import GooeyLoader from '@/components/ui/GooeyLoader';
 import { BlurView } from 'expo-blur';
 import BottomSheet from '@/components/ui/BottomSheet';
-
 const TEAL = '#9cd7d2';
 const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
 interface Props { onClose: () => void; }
-
 export default function SpacesPanel({ onClose }: Props) {
   const { userId, defaultCurrency } = useUser();
   const { openRecordingsPanel, openSpace, switchTab } = useNav();
@@ -30,7 +26,6 @@ export default function SpacesPanel({ onClose }: Props) {
   const [refreshing, setRefreshing] = useState(false);
   const [monthOffset, setMonthOffset] = useState(0);
   const [activeFilter, setActiveFilter] = useState<'active' | 'inactive'>('active');
-
   const [createModal, setCreateModal] = useState(false);
   const [spaceName, setSpaceName] = useState('');
   const [spaceBudget, setSpaceBudget] = useState('');
@@ -39,14 +34,12 @@ export default function SpacesPanel({ onClose }: Props) {
   const [spaceTargetDate, setSpaceTargetDate] = useState('');
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState('');
-
   const openCreate = () => {
     setSpaceName(''); setCreateError(''); setSpaceBudget('');
     setSpaceBudgetCurrency(defaultCurrency);
     setSpaceType('expense'); setSpaceTargetDate('');
     setCreateModal(true);
   };
-
   const handleCreateSpace = async () => {
     if (!spaceName.trim()) { setCreateError('name is required.'); return; }
     setCreating(true);
@@ -63,7 +56,6 @@ export default function SpacesPanel({ onClose }: Props) {
     queryClient.invalidateQueries({ queryKey: ['spaces-panel', userId] });
     queryClient.invalidateQueries({ queryKey: ['spaces', userId] });
   };
-
   const { from, to, label } = useMemo(() => {
     const now = new Date();
     const d = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1);
@@ -72,7 +64,6 @@ export default function SpacesPanel({ onClose }: Props) {
     const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
     return { from, to, label: `${months[d.getMonth()]} ${d.getFullYear()}` };
   }, [monthOffset]);
-
   const { data: spaces = [], isLoading } = useQuery({
     queryKey: ['spaces-panel', userId, from],
     queryFn: async () => {
@@ -95,7 +86,6 @@ export default function SpacesPanel({ onClose }: Props) {
     },
     enabled: !!userId,
   });
-
   const { data: sharedSpaces = [] } = useQuery({
     queryKey: ['shared-spaces-panel', userId, from],
     queryFn: async () => {
@@ -113,16 +103,12 @@ export default function SpacesPanel({ onClose }: Props) {
     },
     enabled: !!userId,
   });
-
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['spaces-panel', userId, from] });
     queryClient.invalidateQueries({ queryKey: ['spaces', userId] });
   };
-
   const onRefresh = async () => { setRefreshing(true); await invalidate(); setRefreshing(false); };
-
   const [spaceChoice, setSpaceChoice] = useState<{ id: string; name: string } | null>(null);
-
   useEffect(() => {
     if (!userId) return;
     const invalidateAll = () => {
@@ -137,12 +123,10 @@ export default function SpacesPanel({ onClose }: Props) {
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [userId, queryClient]);
-
   const expenseActive   = spaces.filter((s: any) => (s.space_type ?? 'expense') === 'expense' && s.is_active !== false);
   const savingsActive   = spaces.filter((s: any) => s.space_type === 'savings' && s.is_active !== false);
   const expenseInactive = spaces.filter((s: any) => (s.space_type ?? 'expense') === 'expense' && s.is_active === false);
   const savingsInactive = spaces.filter((s: any) => s.space_type === 'savings' && s.is_active === false);
-
   const renderSpaceRow = (sp: any, i: number, arr: any[], isShared = false) => {
     const isExpense = (sp.space_type ?? 'expense') === 'expense';
     const value = isExpense ? (sp.spent ?? 0) : (sp.savedAllTime ?? 0);
@@ -162,7 +146,6 @@ export default function SpacesPanel({ onClose }: Props) {
       </TouchableOpacity>
     );
   };
-
   const doDeleteSpace = async (sp: { id: string; name: string }) => {
     setSpaceChoice(null);
     try {
@@ -180,7 +163,6 @@ export default function SpacesPanel({ onClose }: Props) {
       Alert.alert('Error', e?.message ?? 'Failed to delete space');
     }
   };
-
   const handleDeleteSpace = (sp: { id: string; name: string }) => {
     Alert.alert(
       `Delete "${sp.name}"?`,
@@ -191,20 +173,12 @@ export default function SpacesPanel({ onClose }: Props) {
       ]
     );
   };
-
   return (
     <SafeAreaView style={st.root}>
       <PageHeader title="Spaces" onBack={onClose} titleColor={TEAL} />
-
       <View style={st.controlRow}>
         <View style={[st.monthNav, { flex: 1 }]}>
-          <TouchableOpacity onPress={() => setMonthOffset(o => o - 1)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="chevron-back" size={13} color={DC.pageActionText} />
-          </TouchableOpacity>
           <Text style={st.monthLabel}>{label}</Text>
-          <TouchableOpacity onPress={() => setMonthOffset(o => o + 1)} disabled={monthOffset >= 0} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="chevron-forward" size={13} color={monthOffset >= 0 ? Colors.faint : DC.pageActionText} />
-          </TouchableOpacity>
         </View>
         <TouchableOpacity style={[st.filterBtn, activeFilter === 'active' && st.filterBtnActive]} onPress={() => setActiveFilter('active')} activeOpacity={0.7}>
           <Text style={[st.filterBtnText, activeFilter === 'active' && st.filterBtnTextActive]}>Active</Text>
@@ -212,17 +186,13 @@ export default function SpacesPanel({ onClose }: Props) {
         <TouchableOpacity style={[st.filterBtn, activeFilter === 'inactive' && st.filterBtnActive]} onPress={() => setActiveFilter('inactive')} activeOpacity={0.7}>
           <Text style={[st.filterBtnText, activeFilter === 'inactive' && st.filterBtnTextActive]}>Inactive</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[st.filterBtn, { paddingHorizontal: 8 }]} onPress={openCreate} activeOpacity={0.7}>
-          <Ionicons name="add-outline" size={18} color={DC.pageActionText} />
-        </TouchableOpacity>
+        <TouchableOpacity style={[st.filterBtn, { paddingHorizontal: 8 }]} onPress={openCreate} activeOpacity={0.7} />
       </View>
-
       {isLoading ? (
         <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}><GooeyLoader /></BlurView>
       ) : (
         <ScrollView contentContainerStyle={st.scroll} showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
-
           {activeFilter === 'active' && expenseActive.length > 0 && (
             <><Text style={st.sectionTitle}>Expense Tracker</Text><Text style={st.sectionDesc}>track your spending against a budget</Text><View style={st.list}>{expenseActive.map((sp, i) => renderSpaceRow(sp, i, expenseActive))}</View></>
           )}
@@ -246,32 +216,26 @@ export default function SpacesPanel({ onClose }: Props) {
           )}
         </ScrollView>
       )}
-
-
       <BottomSheet visible={!!spaceChoice} onClose={() => setSpaceChoice(null)} title={spaceChoice?.name ?? ''}>
         <TouchableOpacity style={st.choiceRow} activeOpacity={0.8} onPress={() => { const sp = spaceChoice; setSpaceChoice(null); openRecordingsPanel({ spaceId: sp!.id, spaceName: sp!.name }); }}>
           <View style={{ flex: 1 }}>
             <Text style={st.choiceTitle}>View Recordings</Text>
             <Text style={st.choiceSub}>browse this space's recordings</Text>
           </View>
-          <Ionicons name="chevron-forward" size={14} color={Colors.muted} />
         </TouchableOpacity>
         <TouchableOpacity style={st.choiceRow} activeOpacity={0.8} onPress={() => { const sp = spaceChoice; setSpaceChoice(null); openSpace(sp!.id, sp!.name, true); }}>
           <View style={{ flex: 1 }}>
             <Text style={st.choiceTitle}>Edit Space</Text>
             <Text style={st.choiceSub}>rename or archive</Text>
           </View>
-          <Ionicons name="chevron-forward" size={14} color={Colors.muted} />
         </TouchableOpacity>
         <TouchableOpacity style={[st.choiceRow, { borderBottomWidth: 0 }]} activeOpacity={0.8} onPress={() => { const sp = spaceChoice!; handleDeleteSpace(sp); }}>
           <View style={{ flex: 1 }}>
             <Text style={[st.choiceTitle, { color: '#FF5757' }]}>Delete Space</Text>
             <Text style={st.choiceSub}>permanently deletes space and all recordings</Text>
           </View>
-          <Ionicons name="trash-outline" size={14} color="#FF5757" />
         </TouchableOpacity>
       </BottomSheet>
-
       {/* Create space modal */}
       <BottomSheet visible={createModal} onClose={() => setCreateModal(false)} title="new space" height="50%">
         {createError ? <Text style={{ fontFamily: AppFont.regular, fontSize: 12, color: '#FF5757', marginBottom: 8 }}>{createError}</Text> : null}
@@ -305,7 +269,6 @@ export default function SpacesPanel({ onClose }: Props) {
     </SafeAreaView>
   );
 }
-
 const st = StyleSheet.create({
   root:   { flex: 1, backgroundColor: Colors.white },
   scroll: { paddingHorizontal: DC.pagePadding, paddingBottom: 80 },
@@ -324,13 +287,11 @@ const st = StyleSheet.create({
   rowName: { fontFamily: AppFont.regular, fontSize: 14, color: '#111111' },
   rowSub:  { fontFamily: AppFont.regular, fontSize: 11, color: Colors.muted, fontStyle: 'italic' },
   rowValue:{ fontFamily: AppFont.bold, fontSize: 13, color: '#111111' },
-
   empty:     { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 60 },
   emptyText: { fontFamily: AppFont.regular, fontSize: 13, color: Colors.muted },
   choiceRow:  { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: Colors.border },
   choiceTitle:{ fontFamily: AppFont.semiBold, fontSize: 14, color: '#111111' },
   choiceSub:  { fontFamily: AppFont.regular, fontSize: 11, color: Colors.muted, marginTop: 2 },
-
   label:      { fontFamily: AppFont.semiBold, fontSize: 11, color: DC.pageTextMuted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8 },
   typeBtn:       { flex: 1, paddingVertical: 10, borderRadius: Radius.pill, borderWidth: 1, borderColor: Colors.borderMid, alignItems: 'center' },
   typeBtnActive: { backgroundColor: '#111111', borderColor: '#111111' },
@@ -340,3 +301,4 @@ const st = StyleSheet.create({
   saveBtn:    { paddingVertical: 14, borderRadius: Radius.pill, backgroundColor: '#111111', alignItems: 'center', justifyContent: 'center', marginTop: 8 },
   saveBtnText:{ fontFamily: AppFont.semiBold, fontSize: 14, color: Colors.white },
 });
+

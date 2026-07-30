@@ -2,7 +2,6 @@ import {
   View, Text, StyleSheet, TouchableOpacity, Modal,
   ScrollView, Platform, Animated, useWindowDimensions,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useContext, useEffect, useRef, useState } from 'react';
 import formStyles from './formStyles';
 import { BlurContext } from '../../src/lib/BlurContext';
@@ -23,7 +22,6 @@ export default function BottomSheet({ visible, onClose, sub, title, children }: 
   const { setBlur, __hasProvider } = useContext(BlurContext);
   const hasContext = !!__hasProvider;
 
-  const scaleAnim = useRef(new Animated.Value(0.95)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const [mounted, setMounted] = useState(false);
 
@@ -31,15 +29,9 @@ export default function BottomSheet({ visible, onClose, sub, title, children }: 
     if (hasContext) setBlur(visible);
     if (visible) {
       setMounted(true);
-      Animated.parallel([
-        Animated.timing(scaleAnim,   { toValue: 1,    duration: 200, useNativeDriver: true }),
-        Animated.timing(opacityAnim, { toValue: 1,    duration: 200, useNativeDriver: true }),
-      ]).start();
+      Animated.timing(opacityAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start();
     } else {
-      Animated.parallel([
-        Animated.timing(scaleAnim,   { toValue: 0.95, duration: 150, useNativeDriver: true }),
-        Animated.timing(opacityAnim, { toValue: 0,    duration: 150, useNativeDriver: true }),
-      ]).start(() => setMounted(false));
+      Animated.timing(opacityAnim, { toValue: 0, duration: 150, useNativeDriver: true }).start(() => setMounted(false));
     }
   }, [visible]);
 
@@ -53,15 +45,13 @@ export default function BottomSheet({ visible, onClose, sub, title, children }: 
 
       <View style={s.centeredWrap} pointerEvents="box-none">
         <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
-        <Animated.View style={[s.card, { opacity: opacityAnim, transform: [{ scale: scaleAnim }] }]}>
+        <Animated.View style={[s.card, { opacity: opacityAnim }]}>
           <View style={formStyles.header}>
             <View>
               {sub ? <Text style={formStyles.headerSub}>{sub}</Text> : null}
               <Text style={formStyles.headerTitle}>{title}</Text>
             </View>
-            <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Ionicons name="close" size={20} color="#929090" />
-            </TouchableOpacity>
+
           </View>
 
           <ScrollView

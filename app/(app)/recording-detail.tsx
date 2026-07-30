@@ -1,4 +1,4 @@
-﻿import GooeyLoader from '@/components/ui/GooeyLoader';
+import GooeyLoader from '@/components/ui/GooeyLoader';
 import { BlurView } from 'expo-blur';
 import AddItemModal from './AddItemModal';
 import { setPendingFocusDate } from '../../src/lib/focusDate';
@@ -6,7 +6,6 @@ import { useScreenAnim } from '@/components/ui/ScreenWrapper';
 import PageHeader from '@/components/ui/PageHeader';
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Animated, Dimensions, ScrollView, TextInput, Modal, Platform, Image, Share, Alert, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../../src/lib/supabase';
 import * as ImagePicker from 'expo-image-picker';
@@ -22,28 +21,22 @@ import ReceivableModal from '@/components/modals/ReceivableModal';
 import MiniNavBar from '@/components/ui/MiniNavBar';
 import formStyles from '@/components/ui/formStyles';
 import { Colors, Radius } from '@/components/ui/theme';
-import AnimatedIcon from '@/components/ui/AnimatedIcon';
 import { Brand } from '../../src/lib/brand';
 import { DC } from '../../src/lib/design';
 import { AppFont } from '../../src/lib/fonts';
 import { writeOff } from '../../src/lib/writeOff';
-
 import { useUser } from '../../src/hooks/useUser';
 import { useNav } from '../../src/lib/NavContext';
 import { useQueryClient } from '@tanstack/react-query';
-
 const ACCENT      = Brand.color.accent;
 const ACCENT_DARK = Brand.color.accentDark;
 const PEACH       = '#FFAB91';
 const PAGE        = 20;
-
 const { width } = Dimensions.get('window');
 const MAX_NAME_CHARS = 18;
 const MAX_ITEM_NAME = 20;
-
 interface Subitem { id: string; name: string; cost: number; people: string[]; }
 interface Item { id: string; name: string; cost: number; people: string[]; subitems: Subitem[]; }
-
 export default function RecordingDetailScreen({ recordingId: propRecordingId, onClose }: { recordingId?: string; onClose?: () => void }) {
   const params = useLocalSearchParams<{ recordingId: string }>();
   const recordingId = propRecordingId ?? params.recordingId;
@@ -54,7 +47,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
   const { defaultCurrency, userId, userName } = useUser();
   const { openRecording, openSplitBill } = useNav();
   const queryClient = useQueryClient();
-
   // Tag a friend state
   const [tagFriendModal, setTagFriendModal] = useState(false);
   const [tagFriends, setTagFriends] = useState<{ id: string; name: string }[]>([]);
@@ -66,7 +58,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
   const [tagsLoaded, setTagsLoaded] = useState(false);
   const [friendDebtAccepted, setFriendDebtAccepted] = useState(false);
   const [friendTagDeclined, setFriendTagDeclined] = useState(false);
-
   const [recording, setRecording] = useState<any>(null);
   const [people, setPeople] = useState<string[]>([]);
   const [items, setItems] = useState<Item[]>([]);
@@ -145,7 +136,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
   const [collectDate, setCollectDate] = useState(new Date().toISOString().split('T')[0]);
   const [collectComplete, setCollectComplete] = useState<boolean | null>(null);
   const [collectLoading, setCollectLoading] = useState(false);
-
   // Collect due payment (expense tagged as due, no split bill)
   const [collectDueModal, setCollectDueModal] = useState(false);
   const [collectDueAmount, setCollectDueAmount] = useState('');
@@ -159,49 +149,40 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
   const [collectDueChargeCategoryId, setCollectDueChargeCategoryId] = useState<string | null>(null);
   const [collectDueChargeAccounts, setCollectDueChargeAccounts] = useState<any[]>([]);
   const [collectDueChargeCategories, setCollectDueChargeCategories] = useState<any[]>([]);
-
   // Shared spaces for space picker
   const [availableSpaces, setAvailableSpaces] = useState<{ id: string; name: string }[]>([]);
-
   // Space overrides for pay/collect modals
   const [collectSpaceId, setCollectSpaceId] = useState<string | null>(null);
   const [paySpaceId, setPaySpaceId] = useState<string | null>(null);
-
   // Mark as complete state
   const [markCompleteModal, setMarkCompleteModal] = useState(false);
   const [markCompleteMode, setMarkCompleteMode] = useState<'as-is' | 'full' | 'manual'>('as-is');
   const [markCompleteAmount, setMarkCompleteAmount] = useState('');
   const [markCompleteLoading, setMarkCompleteLoading] = useState(false);
-
-  // isOwner derived from recording data (not state — avoids timing issues)
+  // isOwner derived from recording data (not state � avoids timing issues)
   const isOwner = !!recording && recording.user_id === userId && !recording.is_tagged;
   const isTaggedViewer = !!recording && recording.is_tagged && recording.tagged_by_user_id !== userId;
   // Person B = owes on this recording: shared due not owned, or has a tagged debt copy
   const canPayAsPersonB = !isOwner && !isTaggedViewer && (
     ((recording?.shared_with ?? []).includes(userId) && recording?.is_due)
   );
-
   // Delete payment state (Person B)
   const [deletePaymentConfirm, setDeletePaymentConfirm] = useState<string | null>(null);
   const [deletePaymentLoading, setDeletePaymentLoading] = useState(false);
   const [deletePaymentListModal, setDeletePaymentListModal] = useState(false);
-
   // Cancel due state
   const [cancelDueConfirm, setCancelDueConfirm] = useState(false);
   const [cancelDueLoading, setCancelDueLoading] = useState(false);
-
   // Write-off state
   const [writeOffModal, setWriteOffModal] = useState(false);
   const [writeOffReason, setWriteOffReason] = useState('');
   const [writeOffLoading, setWriteOffLoading] = useState(false);
-
   // Owes-you edit state
   const [owesYouEditModal, setOwesYouEditModal] = useState(false);
   const [owesYouFriends, setOwesYouFriends] = useState<{ id: string; name: string }[]>([]);
   const [owesYouContacts, setOwesYouContacts] = useState<string[]>([]);
   const [owesYouSearch, setOwesYouSearch] = useState('');
   const [owesYouLoading, setOwesYouLoading] = useState(false);
-
   const cleanupTaggedDebt = async (friendUserId: string, sourceRecId: string, reason: 'removed' | 'cancelled' | 'deleted') => {
     const { error: rpcErr } = await supabase.rpc('untag_friend', {
       p_recording_id: sourceRecId,
@@ -223,12 +204,11 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
       }
     }
   };
-
-  // ── Helper: settle B's debt (write-off / mark complete) ───────────────────
+  // -- Helper: settle B's debt (write-off / mark complete) -------------------
   const settleTaggedDebt = async (friendUserId: string, sourceRecId: string, reason: 'written_off' | 'completed') => {
     const bodyMap = {
-      written_off: `"${recording?.name}" — the debt has been written off. you're cleared.`,
-      completed: `"${recording?.name}" — the expense has been marked as complete. you're cleared.`,
+      written_off: `"${recording?.name}" � the debt has been written off. you're cleared.`,
+      completed: `"${recording?.name}" � the expense has been marked as complete. you're cleared.`,
     };
     await supabase.from('notifications').insert({
       user_id: friendUserId,
@@ -241,7 +221,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
       is_read: false,
     });
   };
-
   const openOwesYouEdit = async () => {
     setOwesYouSearch('');
     setOwesYouLoading(true);
@@ -261,7 +240,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
     setOwesYouContacts((contacts ?? []).map((c: any) => c.name));
     setOwesYouLoading(false);
   };
-
   const saveOwesYouPerson = async (name: string, friendUserId: string | null) => {
     const prevFriendId = recording?.tagged_friend_user_id;
     const hasPaid = Number(recording?.paid_amount ?? 0) > 0;
@@ -299,7 +277,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
     queryClient.invalidateQueries({ queryKey: ['home-people', userId] });
     setOwesYouEditModal(false);
   };
-
   const removeOwesYouPerson = async () => {
     const hasPaid = Number(recording?.paid_amount ?? 0) > 0;
     if (hasPaid) return;
@@ -313,7 +290,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
     setRecording((prev: any) => ({ ...prev, person_name: null, tagged_friend_user_id: null }));
     setOwesYouEditModal(false);
   };
-
   const confirmWriteOff = async () => {
     if (!recording) return;
     setWriteOffLoading(true);
@@ -340,7 +316,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
     } catch (e) { /* write-off failed silently */ }
     finally { setWriteOffLoading(false); }
   };
-
   // Reset tag states when recording changes (e.g. person removed and re-tagged)
   useEffect(() => {
     if (!recording?.tagged_friend_user_id) {
@@ -354,7 +329,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
   const [receivableManualAmount, setReceivableManualAmount] = useState('');
   const [receivableSelectedPeople, setReceivableSelectedPeople] = useState<string[]>([]);
   const [receivableLoading, setReceivableLoading] = useState(false);
-
   // Add item form state
   const [itemForms, setItemForms] = useState<{ name: string; cost: string; people: string[]; subitemForms: { name: string; people: string[] }[] }[]>([{ name: '', cost: '', people: [], subitemForms: [] }]);
   const addItemForm = () => setItemForms(prev => [...prev, { name: '', cost: '', people: [], subitemForms: [] }]);
@@ -371,16 +345,13 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
     setItemForms(prev => { const n = [...prev]; const subs = [...n[itemIdx].subitemForms]; const people = subs[subIdx].people.includes(person) ? subs[subIdx].people.filter(p => p !== person) : [...subs[subIdx].people, person]; subs[subIdx] = { ...subs[subIdx], people }; n[itemIdx] = { ...n[itemIdx], subitemForms: subs }; return n; });
   const removeSubitemForm = (itemIdx: number, subIdx: number) =>
     setItemForms(prev => { const n = [...prev]; n[itemIdx] = { ...n[itemIdx], subitemForms: n[itemIdx].subitemForms.filter((_, idx) => idx !== subIdx) }; return n; });
-
-  // ── Linked split bill ────────────────────────────────────────────────────
+  // -- Linked split bill ----------------------------------------------------
   const [linkedSplitBill, setLinkedSplitBill] = useState<{ id: string; name: string } | null>(null);
   const [chargedFromSplitBill, setChargedFromSplitBill] = useState<{ id: string; name: string } | null>(null);
   const [relatedSplitBillPayments, setRelatedSplitBillPayments] = useState<any[]>([]);
   const [splitBillModal, setSplitBillModal] = useState(false);
   const [splitBillName, setSplitBillName] = useState('');
   const [existingSplitBills, setExistingSplitBills] = useState<any[]>([]);
-
-
   const loadRelatedSplitBillPayments = async () => {
     if (!recordingId) return;
     const { data } = await supabase
@@ -398,7 +369,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
       }
     }
   };
-
   const loadLinkedSplitBill = async () => {
     if (!recordingId) return;
     const { data } = await supabase
@@ -411,7 +381,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
       if (sb) setLinkedSplitBill(sb);
     }
   };
-
   const createAndLinkSplitBill = async () => {
     if (!recording) return;
     const { data: { user } } = await supabase.auth.getUser();
@@ -427,7 +396,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
     setSplitBillModal(false);
     openSplitBill(bill.id, bill.name);
   };
-
   const linkToExistingSplitBill = async (bill: any) => {
     await supabase.from('split_bill_recordings').insert({
       split_bill_id: bill.id, recording_id: recordingId, amount_contributed: recording?.amount ?? 0,
@@ -435,7 +403,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
     setSplitBillModal(false);
     openSplitBill(bill.id, bill.name);
   };
-
   const openSplitBillModal = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
@@ -444,13 +411,11 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
     setSplitBillName(recording?.name ?? '');
     setSplitBillModal(true);
   };
-
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [markClosedConfirm, setMarkClosedConfirm] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleteDots, setDeleteDots] = useState('');
-
   useEffect(() => {
     if (!deleteLoading) { setDeleteDots(''); return; }
     const i = setInterval(() => setDeleteDots(p => p.length >= 3 ? '' : p + '.'), 400);
@@ -459,7 +424,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
   const [showAddChoice, setShowAddChoice] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [photoDeleteConfirm, setPhotoDeleteConfirm] = useState(false);
-
   const confirmDelete = async (keepLinked: boolean, deleteReceipt = false, deletePayable = false, forceDeleteAll = false) => {
     setDeleteLoading(true);
     setDeleteError(null);
@@ -510,7 +474,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
           }
         }
       }
-
       // If force delete all, remove all linked return recordings (collections)
       if (forceDeleteAll) {
         await supabase.from('recordings').delete().eq('linked_recording_id', recordingId).eq('type', 'return');
@@ -547,7 +510,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
       setDeleteError(e?.message ?? e ?? 'unknown error');
     }
   };
-
   const confirmMarkClosed = async () => {
     setMarkClosedConfirm(false);
     const { error } = await supabase.from('recordings').update({ status: 'paid', closed_by: userName }).eq('id', recordingId).eq('user_id', userId);
@@ -563,7 +525,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
     queryClient.invalidateQueries({ queryKey: ['home-people', userId] });
     queryClient.invalidateQueries({ queryKey: ['receivable-detail'] });
   };
-
   const confirmDeletePayment = async (paymentId: string) => {
     setDeletePaymentLoading(true);
     try {
@@ -607,7 +568,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
     } catch (e) { /* delete payment failed silently */ }
     finally { setDeletePaymentLoading(false); }
   };
-
   useEffect(() => {
     Promise.all([
       loadRecording(),
@@ -638,7 +598,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
       }),
     ]).then(() => { loadPaymentData(); loadTrackingExpense(); });
   }, []);
-
   useFocusEffect(useCallback(() => {
     loadRecording();
     loadPaymentData();
@@ -656,7 +615,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
       });
     }
   }, [recordingId]));
-
   // Realtime listener for tag status changes (B accepts/declines)
   useEffect(() => {
     if (!recordingId || !userId) return;
@@ -701,7 +659,7 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
         const n = payload.new as any;
         if (n.type === 'expense_tag' && n.data?.sourceRecordingId === recordingId) {
           if (!['new', 'saw'].includes(n.status)) {
-            // Notification was opened (declined) — re-check debt
+            // Notification was opened (declined) � re-check debt
             supabase.from('recordings').select('id')
               .eq('source_recording_id', recordingId)
               .eq('type', 'debt')
@@ -717,8 +675,7 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [recordingId, userId]);
-
-  // Realtime listener for the current recording — auto-refresh on update, go back on delete
+  // Realtime listener for the current recording � auto-refresh on update, go back on delete
   useEffect(() => {
     if (!recordingId) return;
     const channel = supabase
@@ -742,12 +699,10 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [recordingId]);
-
   const loadPaymentData = async () => {
     if (!recordingId) return;
     const { data: rec } = await supabase.from('recordings').select('type, linked_recording_id, source_recording_id').eq('id', recordingId).single();
     if (!rec) return;
-
     // Always load split bill payments if this recording is linked to a split bill
     const { data: sbrRow } = await supabase
       .from('split_bill_recordings')
@@ -764,7 +719,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
     } else {
       setSplitBillPayments([]);
     }
-
     if (rec.type === 'debt' || rec.type === 'due') {
       const paymentTypes = ['return'];
       const { data: payments } = await supabase.from('recordings')
@@ -873,7 +827,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
       if (recv) setLinkedReceivable(recv);
     }
   };
-
   const loadTrackingExpense = async () => {
     if (!recordingId || !userId) return;
     const { data } = await supabase.from('recordings')
@@ -885,13 +838,11 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
       .maybeSingle();
     setTrackingExpense(data ?? null);
   };
-
   const openMarkCompleteModal = () => {
     setMarkCompleteMode('as-is');
     setMarkCompleteAmount('');
     setMarkCompleteModal(true);
   };
-
   const confirmMarkComplete = async () => {
     if (!recording) return;
     setMarkCompleteLoading(true);
@@ -932,7 +883,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
     } catch (e) { /* mark complete failed silently */ }
     finally { setMarkCompleteLoading(false); }
   };
-
   const openCollectDueModal = async () => {
     setCollectDueAmount('');
     setCollectDueDate(new Date().toISOString().split('T')[0]);
@@ -953,7 +903,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
     }
     setCollectDueModal(true);
   };
-
   const confirmCollectDue = async () => {
     if (!recording) return;
     const amount = parseFloat(collectDueAmount || '0') || 0;
@@ -984,7 +933,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
         });
       await supabase.from('recordings').update({ paid_amount: cappedPaid, status: newStatus }).eq('id', recordingId).eq('user_id', recording?.user_id ?? userId);
       setRecording((prev: any) => ({ ...prev, paid_amount: cappedPaid, status: newStatus }));
-
       // Sync to friend's payable if this recording has a tagged friend
       if (recording.tagged_friend_user_id) {
         const { data: friendPayable } = await supabase
@@ -1026,8 +974,8 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
             type: 'tag_payment_update',
             title: fNewStatus === 'paid' ? 'debt fully settled' : 'payment collected',
             body: fNewStatus === 'paid'
-              ? `"${recording.name}" — your debt has been fully collected.`
-              : `"${recording.name}" — ${cappedAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })} collected. remaining: ${remaining.toLocaleString('en-US', { minimumFractionDigits: 2 })}.`,
+              ? `"${recording.name}" � your debt has been fully collected.`
+              : `"${recording.name}" � ${cappedAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })} collected. remaining: ${remaining.toLocaleString('en-US', { minimumFractionDigits: 2 })}.`,
             message: '',
             data: { sourceRecordingId: recordingId },
             status: 'new',
@@ -1035,7 +983,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
           });
         }
       }
-
       // Charge to space
       if (collectDueChargeToSpace && collectDueChargeSpaceId) {
         const today = collectDueDate;
@@ -1057,7 +1004,7 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
         await supabase.from('recordings').insert({
           user_id: user.id,
           space_id: recording.space_id ?? null,
-          name: `${recording.name} · overpayment`,
+          name: `${recording.name} � overpayment`,
           type: 'income',
           amount: Math.round(excess * 100) / 100,
           transaction_date: collectDueDate,
@@ -1068,7 +1015,7 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
           user_id: user.id,
           type: 'tag_payment_update',
           title: 'overpayment detected',
-          body: `"${recording.name}" — ${Math.round(excess * 100) / 100} over the amount. recorded as income.`,
+          body: `"${recording.name}" � ${Math.round(excess * 100) / 100} over the amount. recorded as income.`,
           message: '',
           data: { sourceRecordingId: recordingId },
           status: 'new',
@@ -1080,7 +1027,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
     } catch (e) { /* collect due failed silently */ }
     finally { setCollectDueLoading(false); }
   };
-
   const confirmCancelDue = async () => {
     const hasPaid = Number(recording?.paid_amount ?? 0) > 0;
     if (hasPaid) return;
@@ -1098,7 +1044,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
     } catch (e) { /* cancel due failed silently */ }
     finally { setCancelDueLoading(false); }
   };
-
   const openCollectModal = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
@@ -1115,7 +1060,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
     setCollectSpaceId(recording?.space_id ?? null);
     setCollectModal(true);
   };
-
   const getCollectAmount = () => {
     if (collectMode === 'full') return Number(recording?.amount ?? 0);
     if (collectMode === 'manual') return parseFloat(collectManualAmount || '0') || 0;
@@ -1136,7 +1080,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
     }
     return 0;
   };
-
   const confirmCollect = async () => {
     if (collectComplete === null || !recording) return;
     const amount = getCollectAmount();
@@ -1145,7 +1088,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-
       // Build per-person split breakdown if split mode
       const perPersonMap: Record<string, number> = {};
       if (collectMode === 'split') {
@@ -1158,7 +1100,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
           else item.subitems.forEach((s: any) => calc(s.people, s.cost));
         });
       }
-
       // Create or increment the return recording
       const { data: existingReturn } = await supabase
         .from('recordings')
@@ -1191,7 +1132,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
         }).select('id').single();
         newRec = inserted;
       }
-
       // Insert breakdowns for split mode
       if (newRec?.id && collectMode === 'split' && collectSelectedPeople.length > 0) {
         await supabase.from('recording_breakdowns').insert(
@@ -1203,7 +1143,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
           }))
         );
       }
-
       const prevPaid = Number(recording.paid_amount ?? 0);
       const total = Number(recording.amount ?? 0);
       const newPaid = prevPaid + amount;
@@ -1216,7 +1155,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
         ...(collectComplete ? { closed_by: userName } : {}),
       }).eq('id', recordingId).eq('user_id', recording?.user_id ?? userId);
       setRecording((prev: any) => ({ ...prev, status: newStatus, paid_amount: cappedPaid, ...(collectComplete ? { closed_by: userName } : {}) }));
-
       // Sync to friend's payable if this recording has a tagged friend
       if (recording.tagged_friend_user_id) {
         const { data: friendPayable } = await supabase
@@ -1253,8 +1191,8 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
             type: 'tag_payment_update',
             title: collectComplete ? 'debt fully settled' : 'payment collected',
             body: collectComplete
-              ? `"${recording.name}" — your debt has been fully collected.`
-              : `"${recording.name}" — ${amount.toLocaleString('en-US', { minimumFractionDigits: 2 })} collected. remaining: ${remaining.toLocaleString('en-US', { minimumFractionDigits: 2 })}.`,
+              ? `"${recording.name}" � your debt has been fully collected.`
+              : `"${recording.name}" � ${amount.toLocaleString('en-US', { minimumFractionDigits: 2 })} collected. remaining: ${remaining.toLocaleString('en-US', { minimumFractionDigits: 2 })}.`,
             message: '',
             data: { sourceRecordingId: recordingId },
             status: 'new',
@@ -1262,7 +1200,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
           });
         }
       }
-
       setCollectModal(false);
       loadPaymentData();
       if (excess > 0.01) {
@@ -1272,7 +1209,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
     } catch (e) { /* collect failed silently */ }
     finally { setCollectLoading(false); }
   };
-
   const openPayModal = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
@@ -1289,7 +1225,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
     setPaySpaceId(recording?.space_id ?? null);
     setPayModal(true);
   };
-
   const getPayAmount = () => {
     if (payMode === 'full') return Number(recording?.amount ?? 0);
     if (payMode === 'manual') return parseFloat(payManualAmount || '0') || 0;
@@ -1310,7 +1245,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
     }
     return 0;
   };
-
   const confirmPayment = async () => {
     if (payComplete === null || !recording) return;
     const amount = getPayAmount();
@@ -1319,7 +1253,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-
       const perPersonMap: Record<string, number> = {};
       if (payMode === 'split') {
         items.forEach(item => {
@@ -1331,7 +1264,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
           else item.subitems.forEach((s: any) => calc(s.people, s.cost));
         });
       }
-
       const { data: newRec } = await supabase.from('recordings').insert({
         space_id: paySpaceId ?? recording.space_id,
         user_id: user.id,
@@ -1346,7 +1278,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
         category_id: recording.category_id ?? null,
         payment_to: payMode === 'split' && paySelectedPeople.length > 0 ? paySelectedPeople.join(', ') : null,
       }).select('id').single();
-
       if (newRec?.id && payMode === 'split' && paySelectedPeople.length > 0) {
         await supabase.from('recording_breakdowns').insert(
           paySelectedPeople.map(person => ({
@@ -1357,7 +1288,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
           }))
         );
       }
-
       const prevPaid = Number(recording.paid_amount ?? 0);
       const total = Number(recording.amount ?? 0);
       const newPaid = prevPaid + amount;
@@ -1388,7 +1318,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
     } catch (e) { /* payment failed silently */ }
     finally { setPayLoading(false); }
   };
-
   const getReceivableAmount = () => {
     if (receivableMode === 'full') return Number(recording?.amount ?? 0);
     if (receivableMode === 'manual') return parseFloat(receivableManualAmount || '0') || 0;
@@ -1406,7 +1335,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
     }
     return 0;
   };
-
   const confirmCreateReceivable = async () => {
     if (!recording) return;
     setReceivableLoading(true);
@@ -1420,11 +1348,9 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
     } catch (e) { /* receivable failed silently */ }
     finally { setReceivableLoading(false); }
   };
-
   const loadExistingShare = async () => {
     // no-op: share data is now fetched live on the share page
   };
-
   const openTagFriendModal = async () => {
     setTagError('');
     setTagSelectedFriend(null);
@@ -1449,18 +1375,17 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
     setExistingTags(existing ?? []);
     setTagFriendModal(true);
   };
-
   const confirmTagFriend = async () => {
-    console.log('[tag] confirmTagFriend called — friend:', tagSelectedFriend?.id, 'amount:', tagAmount);
+    console.log('[tag] confirmTagFriend called � friend:', tagSelectedFriend?.id, 'amount:', tagAmount);
     if (!tagSelectedFriend || !tagAmount) {
-      console.log('[tag] blocked — missing friend or amount');
+      console.log('[tag] blocked � missing friend or amount');
       return;
     }
     setTagLoading(true); setTagError('');
     try {
       const amount = parseFloat(tagAmount);
       if (isNaN(amount) || amount <= 0) { setTagError('enter a valid amount'); setTagLoading(false); return; }
-      // Share directly — no request/accept needed
+      // Share directly � no request/accept needed
       const { data: rec } = await supabase
         .from('recordings')
         .select('shared_with')
@@ -1477,10 +1402,8 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
     } catch (e: any) { setTagError(e.message ?? 'something went wrong'); }
     finally { setTagLoading(false); }
   };
-
   useEffect(() => {
     if (!recordingId || !userId) return;
-
     Promise.all([
       supabase.from('recordings').select('id')
         .eq('source_recording_id', recordingId)
@@ -1499,7 +1422,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
       setTagsLoaded(true);
     });
   }, [recordingId, userId]);
-
   const addReceiptFromCamera = async () => {
     try {
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
@@ -1531,7 +1453,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
       }
     }
   };
-
   const addReceiptFromGallery = async () => {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -1565,7 +1486,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
       }
     }
   };
-
   const loadLinkedReceipt = async () => {
     if (!recordingId) return;
     let entryId: string | null = null;
@@ -1588,7 +1508,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
       setReceiptPhotos(resolved.filter(p => p.url));
     }
   };
-
   const openLinkReceiptModal = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
@@ -1596,14 +1515,12 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
     setLinkReceiptEntries(data ?? []);
     setLinkReceiptModal(true);
   };
-
   const linkReceiptToRecording = async (entry: any) => {
     await supabase.from('receipt_entries').update({ recording_id: recordingId }).eq('id', entry.id);
     setLinkedReceipt(entry);
     setLinkReceiptModal(false);
     loadLinkedReceipt();
   };
-
   const loadRecording = async () => {
     if (!recordingId) return;
     const { data } = await supabase.from('recordings')
@@ -1650,7 +1567,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
       }
     }
   };
-
   const loadAvailableSpaces = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
@@ -1668,7 +1584,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
     const seen = new Set<string>();
     setAvailableSpaces(all.filter(s => { if (seen.has(s.id)) return false; seen.add(s.id); return true; }));
   };
-
   const loadPeople = async () => {
     if (!recordingId) return;
     const { data } = await supabase.from('bill_splits')
@@ -1680,7 +1595,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
       setItems(prev => { checkStale(loaded, prev); return prev; });
     }
   };
-
   const loadItems = async () => {
     if (!recordingId) return;
     const { data } = await supabase.from('split_items')
@@ -1703,14 +1617,12 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
         .map((s: any) => ({ id: s.id, name: s.name, cost: Number(s.cost), people: Array.isArray(s.people) ? s.people : [] })),
     })));
   };
-
   const loadContacts = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
     const { data } = await supabase.from('contacts').select('name').eq('user_id', user.id).order('name');
     if (data) setContacts(data.map((c: any) => c.name));
   };
-
   const saveContact = async (name: string) => {
     if (!name.trim() || contacts.includes(name.trim())) return;
     const { data: { user } } = await supabase.auth.getUser();
@@ -1718,7 +1630,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
     await supabase.from('contacts').insert({ user_id: user.id, name: name.trim() });
     setContacts(prev => [...prev, name.trim()].sort());
   };
-
   const openSaveImage = async () => {
     setSaveImageModal(true);
     // Pre-fetch accounts
@@ -1738,12 +1649,11 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
       if (inserted?.id) { setShareRowId(inserted.id); setShareSelectedAccountIds([]); }
     }
   };
-
   const buildShareData = () => {
     const perPersonMap: Record<string, number> = {};
     items.forEach(item => {
       if (item.subitems.length === 0) {
-        // no subitems — split equally among item.people
+        // no subitems � split equally among item.people
         const pp = item.people.length > 0 ? item.cost / item.people.length : 0;
         item.people.forEach(p => { perPersonMap[p] = (perPersonMap[p] || 0) + pp; });
       } else {
@@ -1764,7 +1674,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
       receiptId: linkedReceipt?.id ?? null,
     };
   };
-
   const buildHtml = (data: ReturnType<typeof buildShareData>) => {
     const amtColor = data.recordingType === 'expense' ? '#ed6a6a' : data.recordingType === 'income' ? '#2ab671' : '#425252';
     const perPersonRows = data.perPerson.map(p =>
@@ -1779,13 +1688,13 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
         ${item.subitems.map(sub => {
           const pp = sub.people.length > 0 ? sub.cost / sub.people.length : sub.cost;
           return `<div style="display:flex;gap:8px;margin-bottom:8px">
-            <span style="color:#c0c0c0">↳</span>
+            <span style="color:#c0c0c0">?</span>
             <div style="flex:1">
               <div style="display:flex;justify-content:space-between">
                 <span style="font-family:monospace;font-weight:bold;font-size:11px;color:#425252">${sub.name}</span>
                 <span style="font-family:monospace;font-size:11px;color:#929090">${sub.cost.toLocaleString('en-US',{minimumFractionDigits:2})}</span>
               </div>
-              <div style="font-family:monospace;font-size:10px;color:#929090">${sub.people.length} ${sub.people.length===1?'person':'people'} · ${pp.toLocaleString('en-US',{minimumFractionDigits:2})} each</div>
+              <div style="font-family:monospace;font-size:10px;color:#929090">${sub.people.length} ${sub.people.length===1?'person':'people'} � ${pp.toLocaleString('en-US',{minimumFractionDigits:2})} each</div>
               <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">${sub.people.map(p=>`<span style="background:#f0f0f0;border-radius:99px;padding:2px 8px;font-family:monospace;font-size:10px;color:#425252">${p}</span>`).join('')}</div>
             </div>
           </div>`;
@@ -1819,7 +1728,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
       <div style="font-family:monospace;font-size:10px;color:#c0c0c0;text-align:center;margin-top:24px">generated by LEDGR</div>
     </body></html>`;
   };
-
   const generateShare = async () => {
     if (!shareRowId) return;
     // Upsert selected accounts into split_shares.data
@@ -1841,7 +1749,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
       window.prompt('Copy this link:', shareUrl);
     }
   };
-
   const saveAsImage = async () => {
     if (!recording || Platform.OS === 'web') {
       // Web fallback: generate link instead
@@ -1864,7 +1771,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
     );
     setCaptureHtml(captureHtmlWithScript);
   };
-
   const handleWebViewMessage = async (event: any) => {
     if (Platform.OS === 'web') return;
     const dataUrl = event.nativeEvent.data;
@@ -1889,8 +1795,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
     } catch (e) { /* webview capture failed silently */ }
     finally { setShareLoading(false); }
   };
-
-
   const openEditModal = () => {
     setEditDate(recording?.transaction_date ?? '');
     setEditAccountId(recording?.account_id ?? '');
@@ -1904,7 +1808,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
     setEditModal(true);
     loadAvailableSpaces();
   };
-
   const saveEdit = async () => {
     if (!editDate) return;
     setEditError('');
@@ -1967,7 +1870,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
       setEditPhotoUploadState('error');
     }
   };
-
   const openPeopleModal = () => {
     setSavedPeople([...people]);
     setTagInputVal('');
@@ -1981,7 +1883,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
     setSuggestions(val.trim() ? contacts.filter(c => c.toLowerCase().startsWith(val.toLowerCase()) && !people.includes(c)) : []);
   };
   const removePerson = (i: number) => setPeople(prev => prev.filter((_, idx) => idx !== i));
-
   const requestDeletePerson = (i: number) => {
     const name = people[i]?.trim();
     if (!name) { removePerson(i); return; }
@@ -1990,7 +1891,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
     if (affectedItems === 0) { removePerson(i); return; }
     setDeletePersonConfirm({ idx: i, name, affectedItems });
   };
-
   const confirmDeletePerson = () => {
     if (!deletePersonConfirm) return;
     const name = deletePersonConfirm.name;
@@ -2028,9 +1928,7 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
     setSuggestions([]);
     checkStale(filled, items);
   };
-
   const filledPeople = people.filter(p => p.trim());
-
   const saveItem = async () => {
     const valid = itemForms.filter(f => f.name.trim() && f.cost);
     if (valid.length === 0) return;
@@ -2072,19 +1970,16 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
     setItemForms([{ name: '', cost: '', people: [], subitemForms: [] }]);
     setAddItemModal(false);
   };
-
   // subitem forms for editing existing item
   const [editSubitemForms, setEditSubitemForms] = useState<{ name: string; people: string[] }[]>([{ name: '', people: [] }]);
   const addEditSubitemForm = () => setEditSubitemForms(prev => [...prev, { name: '', people: [] }]);
   const updateEditSubitemForm = (i: number, val: string) => setEditSubitemForms(prev => { const n = [...prev]; n[i] = { ...n[i], name: val }; return n; });
   const toggleEditSubitemPerson = (i: number, person: string) => setEditSubitemForms(prev => { const n = [...prev]; const p = n[i].people.includes(person) ? n[i].people.filter(x => x !== person) : [...n[i].people, person]; n[i] = { ...n[i], people: p }; return n; });
   const removeEditSubitemForm = (i: number) => setEditSubitemForms(prev => prev.filter((_, idx) => idx !== i));
-
   const openEditSubitems = (item: Item) => {
     setEditSubitemsItemId(item.id);
     setEditSubitemForms([{ name: '', people: [] }]);
   };
-
   const saveEditSubitems = async () => {
     if (!editSubitemsItemId) return;
     const item = items.find(i => i.id === editSubitemsItemId);
@@ -2106,11 +2001,9 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
     ));
     setEditSubitemsItemId(null);
   };
-
   const checkStale = (currentPeople: string[], currentItems: Item[]) => {
     // no-op: stale tracking removed, share page fetches live
   };
-
   const deleteItem = async (id: string) => {
     await supabase.from('split_items').delete().eq('id', id);
     setItems(prev => {
@@ -2119,7 +2012,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
       return next;
     });
   };
-
   const deleteSubitem = async (itemId: string, subitemId: string) => {
     await supabase.from('split_subitems').delete().eq('id', subitemId);
     const item = items.find(i => i.id === itemId);
@@ -2136,7 +2028,6 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
       setItems(prev => prev.map(i => i.id === itemId ? { ...i, subitems: [] } : i));
     }
   };
-
   const updateItemCost = async (itemId: string, newCost: number) => {
     if (isNaN(newCost) || newCost <= 0) return;
     await supabase.from('split_items').update({ cost: newCost }).eq('id', itemId);
@@ -2155,9 +2046,7 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
     }
     setEditingItemCost(null);
   };
-
 const truncate = (str: string, max: number) => str && str.length > max ? str.slice(0, max) + '...' : str;
-
   const amountColor = () => {
     if (!recording) return Colors.muted;
     if (recording.type === 'expense' && !recording.is_due) return PEACH;
@@ -2169,29 +2058,26 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
     }
     return Colors.text;
   };
-
   const displayAmount = () => {
-    if (!recording) return '—';
+    if (!recording) return '�';
     if (recording.is_due || recording.type === 'due') {
       const remaining = Math.max(0, Number(recording.amount) - Number(recording.paid_amount ?? 0));
       return remaining.toLocaleString('en-US', { minimumFractionDigits: 2 });
     }
     return Number(recording.amount).toLocaleString('en-US', { minimumFractionDigits: 2 });
   };
-
-  const formatDate = (d: string) => { if (!d) return '—'; const [y, m, day] = d.split('-').map(Number); return new Date(y, m - 1, day).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); };
-
+  const formatDate = (d: string) => { if (!d) return '�'; const [y, m, day] = d.split('-').map(Number); return new Date(y, m - 1, day).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); };
   const typeLabel = (type: string, status: string) => {
     if (recording?.is_write_off) return 'Write-off';
     if (type === 'debt') {
-      if (status === 'paid')    return 'Debt · Paid';
-      if (status === 'partial') return 'Debt · Partially Paid';
-      return 'Debt · Unpaid';
+      if (status === 'paid')    return 'Debt � Paid';
+      if (status === 'partial') return 'Debt � Partially Paid';
+      return 'Debt � Unpaid';
     }
     if (type === 'due') {
-      if (status === 'paid')    return 'Due · Collected';
-      if (status === 'partial') return 'Due · Partially Paid';
-      return 'Due · Unpaid';
+      if (status === 'paid')    return 'Due � Collected';
+      if (status === 'partial') return 'Due � Partially Paid';
+      return 'Due � Unpaid';
     }
     if (type === 'return') return 'Return';
     if (type === 'expense' && recording?.is_due) {
@@ -2199,16 +2085,15 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
       const total = Number(recording?.amount ?? 0);
       const collected = total > 0 && paid >= total - 0.01;
       const partial   = paid > 0 && !collected;
-      if (collected) return 'Expense · Collected';
-      if (partial)   return 'Expense · Due · Partial';
-      return 'Expense · Due';
+      if (collected) return 'Expense � Collected';
+      if (partial)   return 'Expense � Due � Partial';
+      return 'Expense � Due';
     }
     return { expense: 'Expense', income: 'Income' }[type] ?? type;
   };
-
   // Due status label for the status cell (expense with is_due shows due status, not expense status)
   const displayStatus = () => {
-    if (!recording) return '—';
+    if (!recording) return '�';
     if (recording.type === 'expense' && recording.is_due) {
       const paid = Number(recording.paid_amount ?? 0);
       const total = Number(recording.amount ?? 0);
@@ -2216,57 +2101,47 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
       if (paid > 0) return 'partial';
       return 'pending';
     }
-    return recording.status ?? '—';
+    return recording.status ?? '�';
   };
-
           const isPayableLocked = recording?.type === 'debt' && (recording?.status === 'partial' || recording?.status === 'paid');
   const isReceivableLocked = recording?.type === 'due' && (recording?.status === 'partial' || recording?.status === 'paid');
   const isSplitLocked = isPayableLocked || isReceivableLocked;
-
   const PREVIEW_LIMIT = 4;
   const visiblePeople = filledPeople.slice(0, PREVIEW_LIMIT);
   const extraCount = filledPeople.length - PREVIEW_LIMIT;
-
   return (
     <Animated.View style={[{ flex: 1, backgroundColor: Colors.white }, { transform: [{ translateX: slideAnim }] }]}>
       <SafeAreaView style={{ flex: 1 }}>
-
         {/* Header */}
         <PageHeader
           title={recording?.name ?? ''}
           onBack={handleBack}
           titleColor="#9cd7d2"
         />
-
         <ScrollView contentContainerStyle={rd.scroll} showsVerticalScrollIndicator={false} style={{ backgroundColor: Colors.white }}>
           <View style={{ height: 8 }} />
-
           {/* Actions row */}
           <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 8, paddingHorizontal: DC.pagePadding, marginBottom: 8 }}>
             <TouchableOpacity style={rd.actionBtn} onPress={() => { if (recordingId) Clipboard.setStringAsync(recordingId); }} activeOpacity={0.8}>
-              <Ionicons name="copy-outline" size={16} color="#111111" />
             </TouchableOpacity>
             {isOwner && (recording?.closed_by || recording?.status === 'closed') && (
               <TouchableOpacity style={rd.actionBtn} onPress={async () => { await supabase.from('recordings').update({ closed_by: null }).eq('id', recordingId); setRecording((prev: any) => prev ? { ...prev, closed_by: null } : prev); }} activeOpacity={0.8}>
-                <Ionicons name="refresh-outline" size={16} color="#111111" />
               </TouchableOpacity>
             )}
             {isOwner && (
               <TouchableOpacity style={rd.actionBtn} onPress={() => setShowAddChoice(true)} activeOpacity={0.8}>
-                <Ionicons name="ellipsis-horizontal" size={16} color="#111111" />
               </TouchableOpacity>
             )}
           </View>
-
           {/* Info card */}
           <View style={rd.infoCard}>
             <View style={rd.tagInfoRow}>
               <Text style={rd.tagInfoLabel}>Transaction Name</Text>
-              <Text style={rd.tagInfoValue}>{recording?.name ?? '—'}</Text>
+              <Text style={rd.tagInfoValue}>{recording?.name ?? '�'}</Text>
             </View>
             <View style={rd.tagInfoRow}>
               <Text style={rd.tagInfoLabel}>Date</Text>
-              <Text style={rd.tagInfoValue}>{recording ? formatDate(recording.transaction_date) : '—'}</Text>
+              <Text style={rd.tagInfoValue}>{recording ? formatDate(recording.transaction_date) : '�'}</Text>
             </View>
             <View style={rd.tagInfoRow}>
               <Text style={rd.tagInfoLabel}>Amount</Text>
@@ -2277,7 +2152,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
             <View style={rd.tagInfoRow}>
               <Text style={rd.tagInfoLabel}>Payment Status</Text>
               <Text style={rd.tagInfoValue}>
-                {!recording ? '—' : recording.status === 'paid' ? 'Fully Paid' : recording.status === 'partial' ? 'Partially Paid' : recording.status === 'unpaid' ? 'Unpaid' : recording.status ?? '—'}
+                {!recording ? '�' : recording.status === 'paid' ? 'Fully Paid' : recording.status === 'partial' ? 'Partially Paid' : recording.status === 'unpaid' ? 'Unpaid' : recording.status ?? '�'}
               </Text>
             </View>
             <View style={rd.tagInfoRow}>
@@ -2286,7 +2161,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
             </View>
             <View style={rd.tagInfoRow}>
               <Text style={rd.tagInfoLabel}>Created By</Text>
-              <Text style={rd.tagInfoValue}>{creatorName || (isTaggedViewer ? (recording as any)?.tagged_by_user_id : recording?.user_id) || '—'}</Text>
+              <Text style={rd.tagInfoValue}>{creatorName || (isTaggedViewer ? (recording as any)?.tagged_by_user_id : recording?.user_id) || '�'}</Text>
             </View>
             {recording?.person_name && (
             <View style={rd.tagInfoRow}>
@@ -2305,7 +2180,6 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
               </View>
             )}
           </View>
-
           {/* Related Records section */}
           {trackingExpense && (
             <>
@@ -2315,8 +2189,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
               </View>
               <View style={{ paddingHorizontal: DC.pagePadding }}>
                 <TouchableOpacity style={rd.recRow} onPress={() => openRecording(trackingExpense.id)} activeOpacity={0.7}>
-                  <View style={rd.recIconWrap}><Ionicons name="receipt-outline" size={14} color={DC.pageText} /></View>
-                  <View style={rd.recMid}>
+                                    <View style={rd.recMid}>
                     <Text style={rd.recName} numberOfLines={1}>{trackingExpense.name}</Text>
                     <Text style={rd.recDate}>{new Date(trackingExpense.transaction_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</Text>
                   </View>
@@ -2327,7 +2200,6 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
               </View>
             </>
           )}
-
           {/* SPLIT BILL section */}
           {!((recording?.type === 'debt' || recording?.type === 'due' || recording?.is_due) && !linkedSplitBill) && (
             <View style={rd.sectionDivider} />
@@ -2340,7 +2212,6 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
               </TouchableOpacity>
             </View>
           )}
-
           {/* RECEIPTS section */}
           <View style={rd.sectionRow}>
             <Text style={rd.sectionLabel}>Receipts</Text>
@@ -2367,9 +2238,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
               <Text style={{ fontFamily: AppFont.regular, fontSize: 12, color: Colors.muted }}>none</Text>
             </View>
           )}
-
           {/* section divider */}
-
           {/* Payments / Collections */}
           <View style={rd.sectionDivider} />
           <View style={rd.sectionRow}>
@@ -2392,7 +2261,6 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                       style={{ marginLeft: 8, padding: 6, borderRadius: 6, backgroundColor: Colors.dangerBg }}
                       onPress={() => setDeletePaymentConfirm(p.id)}
                     >
-                      <Ionicons name="trash-outline" size={14} color={Colors.danger} />
                     </TouchableOpacity>
                   )}
                 </TouchableOpacity>
@@ -2403,7 +2271,6 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
               <Text style={{ fontFamily: AppFont.regular, fontSize: 12, color: Colors.muted }}>none</Text>
             </View>
           )}
-
           {/* Split bill collections */}
           {splitBillPayments.length > 0 && (
             <>
@@ -2414,8 +2281,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
               <View style={{ paddingHorizontal: DC.pagePadding }}>
                 {splitBillPayments.map((p: any) => (
                   <View key={p.id} style={rd.recRow}>
-                    <View style={rd.recIconWrap}><Ionicons name="person-outline" size={14} color={DC.pageText} /></View>
-                    <View style={rd.recMid}>
+                                        <View style={rd.recMid}>
                       <Text style={rd.recName}>{p.person_name}</Text>
                       <Text style={rd.recDate}>{new Date(p.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</Text>
                     </View>
@@ -2427,8 +2293,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
               </View>
             </>
           )}
-
-          {/* Related records — payments charged to this expense from a split bill */}
+          {/* Related records � payments charged to this expense from a split bill */}
           {relatedSplitBillPayments.length > 0 && (
             <>
               <View style={rd.sectionDivider} />
@@ -2448,7 +2313,6 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                     activeOpacity={chargedFromSplitBill ? 0.7 : 1}
                   >
                     <View style={rd.recIconWrap}>
-                      <Ionicons name={p.status === 'cancelled' ? 'close-circle-outline' : 'people-outline'} size={14} color={DC.pageText} />
                     </View>
                     <View style={rd.recMid}>
                       <Text style={[rd.recName, p.status === 'cancelled' && { textDecorationLine: 'line-through', color: Colors.muted }]}>
@@ -2456,87 +2320,67 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                       </Text>
                       <Text style={rd.recDate}>
                         {new Date(p.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                        {p.status === 'cancelled' ? ' · cancelled' : ''}
-                        {chargedFromSplitBill ? ` · ${chargedFromSplitBill.name}` : ''}
+                        {p.status === 'cancelled' ? ' � cancelled' : ''}
+                        {chargedFromSplitBill ? ` � ${chargedFromSplitBill.name}` : ''}
                       </Text>
                     </View>
                     <Text style={{ fontFamily: AppFont.semiBold, fontSize: 13, color: p.status === 'cancelled' ? DC.pageTextMuted : DC.accent1 }}>
                       {Number(p.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </Text>
-                    {chargedFromSplitBill && p.status !== 'cancelled' && (
-                      <Ionicons name="chevron-forward" size={13} color={Colors.faint} />
-                    )}
+                    
                   </TouchableOpacity>
                 ))}
               </View>
             </>
           )}
           <View style={{ height: 20 }} />
-
         </ScrollView>
       </SafeAreaView>
-
       {/* Actions bottom sheet */}
       <BottomSheet visible={showAddChoice} onClose={() => setShowAddChoice(false)} title="actions">
         {isOwner && recording?.type === 'expense' && !linkedPayable && !linkedReceivable && !recording?.is_due && !recording?.person_name && !linkedSplitBill && (
           <TouchableOpacity style={rd.choiceRow} activeOpacity={0.8} onPress={() => { setShowAddChoice(false); setReceivableMode('full'); setReceivableManualAmount(''); setReceivableSelectedPeople([]); setReceivableModal(true); }}>
-            <View style={[rd.choiceIcon, { backgroundColor: DC.accent1 + '22' }]}><Ionicons name="arrow-undo-outline" size={20} color={DC.accent1} /></View>
-            <View style={{ flex: 1 }}><Text style={rd.choiceTitle}>Tag as Due</Text><Text style={rd.choiceSub}>Mark this expense as collectible</Text></View>
-            <Ionicons name="chevron-forward" size={14} color={Colors.faint} />
+                        <View style={{ flex: 1 }}><Text style={rd.choiceTitle}>Tag as Due</Text><Text style={rd.choiceSub}>Mark this expense as collectible</Text></View>
           </TouchableOpacity>
         )}
         {isOwner && recording?.status !== 'paid' && (
           <TouchableOpacity style={rd.choiceRow} activeOpacity={0.8} onPress={() => { setShowAddChoice(false); openCollectModal(); }}>
-            <View style={[rd.choiceIcon, { backgroundColor: DC.accent1 + '22' }]}><Ionicons name="cash-outline" size={20} color={DC.accent1} /></View>
-            <View style={{ flex: 1 }}><Text style={rd.choiceTitle}>Collect Payment</Text><Text style={rd.choiceSub}>Record a full or partial collection</Text></View>
-            <Ionicons name="chevron-forward" size={14} color={Colors.faint} />
+                        <View style={{ flex: 1 }}><Text style={rd.choiceTitle}>Collect Payment</Text><Text style={rd.choiceSub}>Record a full or partial collection</Text></View>
           </TouchableOpacity>
         )}
         {isOwner && (
           <TouchableOpacity style={rd.choiceRow} activeOpacity={0.8} onPress={() => { setShowAddChoice(false); openEditModal(); }}>
-            <View style={[rd.choiceIcon, { backgroundColor: DC.accent1 + '22' }]}><Ionicons name="create-outline" size={20} color={DC.accent1} /></View>
-            <View style={{ flex: 1 }}><Text style={rd.choiceTitle}>Edit Recording</Text><Text style={rd.choiceSub}>Change name, amount, date, reassign</Text></View>
-            <Ionicons name="chevron-forward" size={14} color={Colors.faint} />
+                        <View style={{ flex: 1 }}><Text style={rd.choiceTitle}>Edit Recording</Text><Text style={rd.choiceSub}>Change name, amount, date, reassign</Text></View>
           </TouchableOpacity>
         )}
         {isOwner && recording?.status !== 'paid' && (
           <TouchableOpacity style={rd.choiceRow} activeOpacity={0.8} onPress={() => { setShowAddChoice(false); setMarkClosedConfirm(true); }}>
-            <View style={[rd.choiceIcon, { backgroundColor: DC.cardBg }]}><Ionicons name="checkmark-circle-outline" size={20} color={DC.accent1} /></View>
-            <View style={{ flex: 1 }}><Text style={rd.choiceTitle}>Mark as Complete</Text><Text style={rd.choiceSub}>Close this recording</Text></View>
-            <Ionicons name="chevron-forward" size={14} color={Colors.faint} />
+                        <View style={{ flex: 1 }}><Text style={rd.choiceTitle}>Mark as Complete</Text><Text style={rd.choiceSub}>Close this recording</Text></View>
           </TouchableOpacity>
         )}
         {isOwner && (
           <TouchableOpacity style={rd.choiceRow} activeOpacity={0.8} onPress={() => { setShowAddChoice(false); setDeleteConfirm(true); }}>
-            <View style={[rd.choiceIcon, { backgroundColor: Colors.dangerBg }]}><Ionicons name="trash-outline" size={20} color={Colors.danger} /></View>
-            <View style={{ flex: 1 }}><Text style={[rd.choiceTitle, { color: Colors.danger }]}>Delete</Text><Text style={rd.choiceSub}>Permanently remove this recording</Text></View>
+                        <View style={{ flex: 1 }}><Text style={[rd.choiceTitle, { color: Colors.danger }]}>Delete</Text><Text style={rd.choiceSub}>Permanently remove this recording</Text></View>
           </TouchableOpacity>
         )}
         {isTaggedViewer && (
           <TouchableOpacity style={rd.choiceRow} activeOpacity={0.8} onPress={() => { setShowAddChoice(false); setDeleteConfirm(true); }}>
-            <View style={[rd.choiceIcon, { backgroundColor: Colors.dangerBg }]}><Ionicons name="trash-outline" size={20} color={Colors.danger} /></View>
-            <View style={{ flex: 1 }}><Text style={[rd.choiceTitle, { color: Colors.danger }]}>Remove</Text><Text style={rd.choiceSub}>Untag yourself from this debt</Text></View>
+                        <View style={{ flex: 1 }}><Text style={[rd.choiceTitle, { color: Colors.danger }]}>Remove</Text><Text style={rd.choiceSub}>Untag yourself from this debt</Text></View>
           </TouchableOpacity>
         )}
         {(isTaggedViewer || canPayAsPersonB) && recording?.status !== 'paid' && (
           <TouchableOpacity style={rd.choiceRow} activeOpacity={0.8} onPress={() => { setShowAddChoice(false); openPayModal(); }}>
-            <View style={[rd.choiceIcon, { backgroundColor: DC.accent1 + '22' }]}><Ionicons name="cash-outline" size={20} color={DC.accent1} /></View>
-            <View style={{ flex: 1 }}><Text style={rd.choiceTitle}>Make Payment</Text><Text style={rd.choiceSub}>Record a partial or full payment</Text></View>
-            <Ionicons name="chevron-forward" size={14} color={Colors.faint} />
+                        <View style={{ flex: 1 }}><Text style={rd.choiceTitle}>Make Payment</Text><Text style={rd.choiceSub}>Record a partial or full payment</Text></View>
           </TouchableOpacity>
         )}
         {(isTaggedViewer || canPayAsPersonB) && recording?.status === 'paid' && (
           <TouchableOpacity style={rd.choiceRow} activeOpacity={0.8} onPress={() => { setShowAddChoice(false); router.push({ pathname: '/(app)/add-recording', params: { name: recording?.name, amount: String(recording?.amount ?? ''), spaceId: recording?.space_id, date: recording?.transaction_date, type: 'expense' } } as any); }}>
-            <View style={[rd.choiceIcon, { backgroundColor: DC.accent1 + '22' }]}><Ionicons name="download-outline" size={20} color={DC.accent1} /></View>
-            <View style={{ flex: 1 }}><Text style={rd.choiceTitle}>Save to My Account</Text><Text style={rd.choiceSub}>Create an expense in your own space</Text></View>
-            <Ionicons name="chevron-forward" size={14} color={Colors.faint} />
+                        <View style={{ flex: 1 }}><Text style={rd.choiceTitle}>Save to My Account</Text><Text style={rd.choiceSub}>Create an expense in your own space</Text></View>
           </TouchableOpacity>
         )}
         {(isTaggedViewer || canPayAsPersonB) && linkedPayments.length > 0 && (
           <TouchableOpacity style={rd.choiceRow} activeOpacity={0.8} onPress={() => { setShowAddChoice(false); setDeletePaymentListModal(true); }}>
-            <View style={[rd.choiceIcon, { backgroundColor: Colors.dangerBg }]}><Ionicons name="trash-outline" size={20} color={Colors.danger} /></View>
-            <View style={{ flex: 1 }}><Text style={[rd.choiceTitle, { color: Colors.danger }]}>Delete Payments</Text><Text style={rd.choiceSub}>Remove payment records you made</Text></View>
-            <Ionicons name="chevron-forward" size={14} color={Colors.faint} />
+                        <View style={{ flex: 1 }}><Text style={[rd.choiceTitle, { color: Colors.danger }]}>Delete Payments</Text><Text style={rd.choiceSub}>Remove payment records you made</Text></View>
           </TouchableOpacity>
         )}
       </BottomSheet>
@@ -2551,12 +2395,9 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
           autoFocus
         />
         <TouchableOpacity style={[rd.doneBtn, { opacity: !splitBillName.trim() ? 0.4 : 1 }]} onPress={createAndLinkSplitBill} disabled={!splitBillName.trim()}>
-          <Ionicons name="add-circle-outline" size={15} color={ACCENT_DARK} />
           <Text style={rd.doneBtnText}>create new split bill</Text>
         </TouchableOpacity>
-
       </BottomSheet>
-
       {tooltip && (
         <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setTooltip(null)} activeOpacity={1}>
           <View style={rd.tooltip}>
@@ -2564,7 +2405,6 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
           </View>
         </TouchableOpacity>
       )}
-
       <ShareModal
         visible={saveImageModal}
         onClose={() => { setSaveImageModal(false); setLinkCopied(false); }}
@@ -2577,7 +2417,6 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
         onShare={generateShare}
         onSaveImage={saveAsImage}
       />
-
       {/* Link receipt modal */}
       <BottomSheet visible={linkReceiptModal} onClose={() => setLinkReceiptModal(false)} sub="receipt" title="link a receipt">
         <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 8 }}>
@@ -2586,12 +2425,10 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
           ) : (
             linkReceiptEntries.map((entry: any) => (
               <TouchableOpacity key={entry.id} style={formStyles.listItem} onPress={() => linkReceiptToRecording(entry)}>
-                <Ionicons name="folder-outline" size={18} color={ACCENT_DARK} />
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontFamily: Brand.font.heading, fontSize: 13, color: Colors.text }} numberOfLines={1}>{entry.note ?? 'untitled'}</Text>
                   <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: Colors.muted }}>{new Date(entry.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</Text>
                 </View>
-                <Ionicons name="link-outline" size={14} color={ACCENT_DARK} />
               </TouchableOpacity>
             ))
           )}
@@ -2602,7 +2439,6 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
           </TouchableOpacity>
         </View>
       </BottomSheet>
-
       <PayModal
         visible={payModal}
         onClose={() => setPayModal(false)}
@@ -2632,7 +2468,6 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
         setSpaceId={setPaySpaceId}
         defaultSpaceId={recording?.space_id ?? null}
       />
-
       {/* Mark as complete confirm modal */}
       <ConfirmModal
         visible={markClosedConfirm}
@@ -2644,7 +2479,6 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
           { label: 'mark complete', onPress: confirmMarkClosed },
         ]}
       />
-
       {/* Delete confirm modal */}
       <ConfirmModal
         visible={deleteConfirm}
@@ -2684,7 +2518,6 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
       >
         {deleteError ? <Text style={{ fontFamily: AppFont.regular, fontSize: 12, color: '#E74C3C', textAlign: 'center', lineHeight: 18 }}>{deleteError}</Text> : null}
       </ConfirmModal>
-
       <ConfirmModal
         visible={!!deletePaymentConfirm}
         onClose={() => setDeletePaymentConfirm(null)}
@@ -2695,16 +2528,13 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
           { label: 'delete', onPress: () => deletePaymentConfirm && confirmDeletePayment(deletePaymentConfirm), destructive: true },
         ]}
       />
-
       {deleteLoading && (
         <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}>
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16 }}>
-            <AnimatedIcon set="line-md" icon="beer-twotone-loop" size={64} color="#9cd7d2" />
             <Text style={{ fontFamily: AppFont.regular, fontSize: 16, color: '#000000' }}>deleting{deleteDots}</Text>
           </View>
         </BlurView>
       )}
-
       <CollectModal
         visible={collectModal}
         onClose={() => setCollectModal(false)}
@@ -2734,7 +2564,6 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
         setSpaceId={setCollectSpaceId}
         defaultSpaceId={recording?.space_id ?? null}
       />
-
       <ReceivableModal
         visible={receivableModal}
         onClose={() => setReceivableModal(false)}
@@ -2751,7 +2580,6 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
         getAmount={getReceivableAmount}
         onConfirm={confirmCreateReceivable}
       />
-
       <CollectDueModal
         visible={collectDueModal}
         onClose={() => setCollectDueModal(false)}
@@ -2781,13 +2609,12 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
         chargeCategoryId={collectDueChargeCategoryId}
         setChargeCategoryId={setCollectDueChargeCategoryId}
       />
-
       <ConfirmModal
         visible={cancelDueConfirm}
         onClose={() => setCancelDueConfirm(false)}
         title="cancel due tag"
         message={Number(recording?.paid_amount ?? 0) > 0
-          ? 'cannot cancel — payments have already been collected against this due.'
+          ? 'cannot cancel � payments have already been collected against this due.'
           : recording?.tagged_friend_user_id
             ? 'this will cancel the due tag, remove the pending request from your friend, and delete their debt if they already accepted.'
             : 'this will remove the due tag from this expense.'}
@@ -2798,7 +2625,6 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
           { label: cancelDueLoading ? '...' : 'cancel due', onPress: confirmCancelDue, destructive: true, disabled: cancelDueLoading },
         ]}
       />
-
       {/* Mark as complete modal */}
       <BottomSheet visible={markCompleteModal} onClose={() => setMarkCompleteModal(false)} title="mark as complete" height="45%">
         {markCompleteModal && (() => {
@@ -2859,7 +2685,6 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
           );
         })()}
       </BottomSheet>
-
       {/* Delete payment list modal (Person B) */}
       <BottomSheet visible={deletePaymentListModal} onClose={() => setDeletePaymentListModal(false)} title="delete payments">
         {(() => {
@@ -2885,64 +2710,52 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
         })()}
         <View style={{ height: 8 }} />
       </BottomSheet>
-
       {copiedToast && (
         <View style={rd.toast} pointerEvents="none">
-          <Ionicons name="checkmark-circle" size={16} color={Colors.white} />
           <Text style={rd.toastText}>link copied to clipboard</Text>
         </View>
       )}
-
       {/* Add receipt modal */}
       <BottomSheet visible={addReceiptModal} onClose={() => setAddReceiptModal(false)} sub="recording" title="add receipt" height="30%">
         <TouchableOpacity style={rd.doneBtn} onPress={addReceiptFromCamera}>
-          <Ionicons name="camera-outline" size={18} color={ACCENT_DARK} />
           <Text style={rd.doneBtnText}>camera</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[rd.doneBtn, { backgroundColor: Colors.surface, marginTop: 8 }]} onPress={addReceiptFromGallery}>
-          <Ionicons name="images-outline" size={18} color={Colors.text} />
           <Text style={[rd.doneBtnText, { color: Colors.text }]}>gallery</Text>
         </TouchableOpacity>
       </BottomSheet>
-
-      {/* Edit recording modal — new recording modal design */}
+      {/* Edit recording modal � new recording modal design */}
       <Modal visible={editModal} animationType="slide" transparent statusBarTranslucent onRequestClose={() => { setEditModal(false); setEditError(''); }}>
         <BlurView intensity={60} tint="light" style={StyleSheet.absoluteFill} />
         <View style={{ flex: 1 }}>
           <SafeAreaView style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.88)' }}>
             <View style={{ flex: 1, paddingHorizontal: DC.pagePadding, paddingTop: 16 }}>
-
               {/* Header */}
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 16 }}>
                 <Text style={{ fontFamily: AppFont.bold, fontSize: 22, color: DC.accent1, letterSpacing: -0.5 }}>Edit Recording</Text>
                 <TouchableOpacity onPress={() => { setEditModal(false); setEditError(''); }} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
                   <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.06)', alignItems: 'center', justifyContent: 'center' }}>
-                    <Text style={{ fontFamily: AppFont.bold, fontSize: 14, color: DC.pageText }}>✕</Text>
+                    <Text style={{ fontFamily: AppFont.bold, fontSize: 14, color: DC.pageText }}>?</Text>
                   </View>
                 </TouchableOpacity>
               </View>
-
               <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: 12, paddingBottom: 40 }}>
                 {editError ? <Text style={{ fontFamily: AppFont.regular, fontSize: 12, color: Colors.expense }}>{editError}</Text> : null}
-
                 {/* Name */}
                 <View style={em.field}>
                   <Text style={em.label}>Name</Text>
                   <TextInput style={em.input} placeholder="recording name" placeholderTextColor={Colors.faint} value={editName} onChangeText={setEditName} autoFocus />
                 </View>
-
                 {/* Amount */}
                 <View style={em.field}>
                   <Text style={em.label}>Amount {editAmountLocked && <Text style={{ color: Colors.muted, textTransform: 'none', fontFamily: AppFont.regular }}>(locked)</Text>}</Text>
                   <TextInput style={[em.input, editAmountLocked && { color: Colors.muted }]} placeholder="0.00" placeholderTextColor={Colors.faint} value={editAmount} onChangeText={setEditAmount} keyboardType="decimal-pad" editable={!editAmountLocked} />
                 </View>
-
                 {/* Date */}
                 <View style={em.field}>
                   <Text style={em.label}>Date</Text>
                   <TextInput style={em.input} placeholder="YYYY-MM-DD" placeholderTextColor={Colors.faint} value={editDate} onChangeText={setEditDate} />
                 </View>
-
                 {/* Category */}
                 <View style={em.field}>
                   <Text style={em.label}>Category</Text>
@@ -2950,26 +2763,21 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                     <Text style={[em.selectorText, !editCategoryId && { color: Colors.faint }]}>
                       {editCategoryId ? (editCategories.find(c => c.id === editCategoryId)?.name ?? 'select') : 'optional'}
                     </Text>
-                    <Ionicons name="chevron-down" size={13} color={Colors.faint} />
                   </TouchableOpacity>
                 </View>
-
                 {/* Notes */}
                 <View style={em.field}>
                   <Text style={em.label}>Notes</Text>
                   <TextInput style={[em.input, { minHeight: 60, textAlignVertical: 'top' }]} placeholder="optional" placeholderTextColor={Colors.faint} value={editNotes} onChangeText={setEditNotes} multiline />
                 </View>
-
                 {/* Receipts */}
                 <View style={{ gap: 8 }}>
                   <Text style={em.label}>Receipts</Text>
                   <View style={{ flexDirection: 'row', gap: 8 }}>
                     <TouchableOpacity style={rd.doneBtn} onPress={async () => { const { status } = await ImagePicker.requestCameraPermissionsAsync(); if (status !== 'granted') return; const r = await ImagePicker.launchCameraAsync({ quality: 1 }); if (!r.canceled && r.assets[0]) setEditNewPhotoUris(prev => [...prev, r.assets[0].uri]); }} activeOpacity={0.8}>
-                      <Ionicons name="camera-outline" size={14} color={ACCENT_DARK} />
                       <Text style={rd.doneBtnText}>Camera</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={rd.doneBtn} onPress={async () => { const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync(); if (status !== 'granted') return; const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsMultipleSelection: true, quality: 1 }); if (!r.canceled) setEditNewPhotoUris(prev => [...prev, ...r.assets.map(a => a.uri)]); }} activeOpacity={0.8}>
-                      <Ionicons name="images-outline" size={14} color={Colors.text} />
                       <Text style={[rd.doneBtnText, { color: Colors.text }]}>Gallery</Text>
                     </TouchableOpacity>
                   </View>
@@ -2980,7 +2788,6 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                           <View style={{ position: 'relative' }}>
                             <Image source={{ uri: p.url }} style={{ width: 64, height: 64, borderRadius: 8 }} resizeMode="cover" />
                             <TouchableOpacity style={{ position: 'absolute', top: -6, right: -6 }} onPress={() => { supabase.from('receipt_photos').delete().eq('id', p.id); setReceiptPhotos(prev => prev.filter(r => r.id !== p.id)); }}>
-                              <Ionicons name="close-circle" size={18} color="#111" />
                             </TouchableOpacity>
                           </View>
                         </TouchableOpacity>
@@ -2989,22 +2796,18 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                         <View key={`new-${i}`} style={{ position: 'relative' }}>
                           <Image source={{ uri }} style={{ width: 64, height: 64, borderRadius: 8 }} resizeMode="cover" />
                           <TouchableOpacity style={{ position: 'absolute', top: -6, right: -6 }} onPress={() => setEditNewPhotoUris(prev => prev.filter((_, idx) => idx !== i))}>
-                            <Ionicons name="close-circle" size={18} color="#111" />
                           </TouchableOpacity>
                         </View>
                       ))}
                     </ScrollView>
                   )}
                 </View>
-
                 {/* Reassign Transaction */}
                 {recording?.type === 'expense' && recording?.is_due && Number(recording?.paid_amount ?? 0) === 0 && (
                   <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10 }} onPress={() => { setEditModal(false); openTagFriendModal(); }} activeOpacity={0.7}>
-                    <Ionicons name="person-add-outline" size={18} color={DC.accent1} />
                     <Text style={{ fontFamily: AppFont.semiBold, fontSize: 13, color: DC.accent1 }}>Reassign Transaction</Text>
                   </TouchableOpacity>
                 )}
-
                 {/* Space */}
                 <View style={em.field}>
                   <Text style={em.label}>Space</Text>
@@ -3012,10 +2815,8 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                     <Text style={[em.selectorText, !editSpaceId && { color: Colors.faint }]}>
                       {editSpaceId ? (availableSpaces.find(s => s.id === editSpaceId)?.name ?? 'select') : 'none'}
                     </Text>
-                    <Ionicons name="chevron-down" size={13} color={Colors.faint} />
                   </TouchableOpacity>
                 </View>
-
                 {/* Account */}
                 <View style={em.field}>
                   <Text style={em.label}>Account</Text>
@@ -3027,12 +2828,10 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                         style={[em.accountRow, !editAccountId && em.accountRowActive]}
                         onPress={() => setEditAccountId('')}
                       >
-                        <Ionicons name={!editAccountId ? 'radio-button-on' : 'radio-button-off'} size={16} color={!editAccountId ? DC.accent1 : Colors.faint} />
                         <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.muted }}>none</Text>
                       </TouchableOpacity>
                       {editAccounts.map(acc => (
                         <TouchableOpacity key={acc.id} style={[em.accountRow, editAccountId === acc.id && em.accountRowActive]} onPress={() => setEditAccountId(acc.id)}>
-                          <Ionicons name={editAccountId === acc.id ? 'radio-button-on' : 'radio-button-off'} size={16} color={editAccountId === acc.id ? DC.accent1 : Colors.faint} />
                           <View style={{ flex: 1 }}>
                             <Text style={{ fontFamily: AppFont.semiBold, fontSize: 13, color: DC.pageText }}>{acc.account_name}</Text>
                             <Text style={{ fontFamily: AppFont.regular, fontSize: 10, color: Colors.muted }}>{acc.bank}</Text>
@@ -3042,7 +2841,6 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                     </View>
                   )}
                 </View>
-
                 {/* Save */}
                 <TouchableOpacity
                   style={[rd.doneBtn, !editDate && { opacity: 0.4 }]}
@@ -3063,11 +2861,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                 <GooeyLoader size={140} />
               ) : (
                 <View style={{ backgroundColor: '#fff', borderRadius: 20, padding: 32, alignItems: 'center', minWidth: 240 }}>
-                  {editPhotoUploadState === 'success' ? (
-                    <AnimatedIcon icon="line-md:check-all" size={52} />
-                  ) : (
-                    <Ionicons name="close-circle" size={52} color="#ef4444" />
-                  )}
+
                   <Text style={{ fontFamily: AppFont.semiBold, fontSize: 15, color: '#333', marginTop: 12, textAlign: 'center' }}>
                     {editPhotoUploadState === 'success' ? 'Photo uploaded successfully' : editPhotoError || 'Failed to upload photo'}
                   </Text>
@@ -3076,7 +2870,6 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                     onPress={() => setEditPhotoUploadState(null)}
                     activeOpacity={0.7}
                   >
-                    <Ionicons name="close" size={20} color="#666" />
                   </TouchableOpacity>
                 </View>
               )}
@@ -3084,7 +2877,6 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
           </View>
         )}
       </Modal>
-
       {/* Edit category picker */}
       <BottomSheet visible={showEditCategoryModal} onClose={() => setShowEditCategoryModal(false)} sub="recording" title="category">
         <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 320 }}>
@@ -3092,7 +2884,6 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
             style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 10 }}
             onPress={() => { setEditCategoryId(null); setShowEditCategoryModal(false); }}
           >
-            <Ionicons name={!editCategoryId ? 'checkmark-circle' : 'ellipse-outline'} size={18} color={!editCategoryId ? ACCENT_DARK : Colors.faint} />
             <Text style={{ fontFamily: Brand.font.mono, fontSize: 13, color: Colors.muted }}>none</Text>
           </TouchableOpacity>
           {editCategories.map(cat => (
@@ -3101,16 +2892,13 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
               style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 10 }}
               onPress={() => { setEditCategoryId(cat.id); setShowEditCategoryModal(false); }}
             >
-              <Ionicons name={editCategoryId === cat.id ? 'checkmark-circle' : 'ellipse-outline'} size={18} color={editCategoryId === cat.id ? ACCENT_DARK : Colors.faint} />
               <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: cat.color, justifyContent: 'center', alignItems: 'center' }}>
-                <Ionicons name={cat.icon} size={11} color={Colors.text} />
               </View>
               <Text style={{ fontFamily: Brand.font.mono, fontSize: 13, color: Colors.text }}>{cat.name}</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
       </BottomSheet>
-
       {/* Edit space picker */}
       <BottomSheet visible={showEditSpaceModal} onClose={() => setShowEditSpaceModal(false)} sub="recording" title="space">
         <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 320 }}>
@@ -3118,7 +2906,6 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
             style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 10 }}
             onPress={() => { setEditSpaceId(null); setShowEditSpaceModal(false); }}
           >
-            <Ionicons name={!editSpaceId ? 'checkmark-circle' : 'ellipse-outline'} size={18} color={!editSpaceId ? ACCENT_DARK : Colors.faint} />
             <Text style={{ fontFamily: Brand.font.mono, fontSize: 13, color: Colors.muted }}>none</Text>
           </TouchableOpacity>
           {availableSpaces.map(sp => (
@@ -3127,17 +2914,14 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
               style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 10 }}
               onPress={() => { setEditSpaceId(sp.id); setShowEditSpaceModal(false); }}
             >
-              <Ionicons name={editSpaceId === sp.id ? 'checkmark-circle' : 'ellipse-outline'} size={18} color={editSpaceId === sp.id ? ACCENT_DARK : Colors.faint} />
               <Text style={{ fontFamily: Brand.font.mono, fontSize: 13, color: Colors.text }}>{sp.name}</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
       </BottomSheet>
-
       {/* Photo viewer modal */}
       <Modal visible={photoModal} transparent animationType="fade" onRequestClose={() => setPhotoModal(false)}>
         <SafeAreaView style={{ flex: 1, backgroundColor: DC.photoViewerBg }}>
-
           {/* 1. Header */}
           <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: DC.pagePadding, paddingTop: 12, paddingBottom: 8 }}>
             <View style={{ flex: 1, alignItems: "center" }}>
@@ -3145,21 +2929,16 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
               <Text style={{ fontFamily: AppFont.bold, fontSize: 15, color: DC.pageText }} numberOfLines={1}>{recording?.name ?? ""}</Text>
             </View>
             <TouchableOpacity onPress={() => setPhotoModal(false)} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }} style={{ position: "absolute", right: DC.pagePadding }}>
-              <Ionicons name="close" size={22} color={DC.pageText} />
             </TouchableOpacity>
           </View>
-
-          {/* 2. Photo + arrows â€” fixed height container */}
+          {/* 2. Photo + arrows — fixed height container */}
           <View style={{ height: 420, justifyContent: "center", alignItems: "center", position: "relative" }}>
             <TouchableOpacity onPress={() => setPhotoModalIndex(i => i - 1)} disabled={photoModalIndex === 0} style={{ position: "absolute", left: 12, zIndex: 10, width: 36, height: 36, borderRadius: 18, backgroundColor: DC.photoViewerNav, justifyContent: "center", alignItems: "center", opacity: photoModalIndex === 0 ? 0.3 : 1 }}>
-              <Ionicons name="chevron-back" size={20} color={DC.pageText} />
             </TouchableOpacity>
             <Image source={{ uri: receiptPhotos[photoModalIndex]?.url ?? "" }} style={{ width: width - 80, height: 400, borderRadius: 12 }} resizeMode="contain" />
             <TouchableOpacity onPress={() => setPhotoModalIndex(i => i + 1)} disabled={photoModalIndex === receiptPhotos.length - 1} style={{ position: "absolute", right: 12, zIndex: 10, width: 36, height: 36, borderRadius: 18, backgroundColor: DC.photoViewerNav, justifyContent: "center", alignItems: "center", opacity: photoModalIndex === receiptPhotos.length - 1 ? 0.3 : 1 }}>
-              <Ionicons name="chevron-forward" size={20} color={DC.pageText} />
             </TouchableOpacity>
           </View>
-
           {/* 3. Action buttons (owner only) */}
           {isOwner && (
             <View style={{ flexDirection: "row", justifyContent: "center", gap: 12, paddingVertical: 16 }}>
@@ -3171,7 +2950,6 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
               </TouchableOpacity>
             </View>
           )}
-
           {/* 4. Dot indicators */}
           <View style={{ flexDirection: "row", justifyContent: "center", gap: 6, paddingBottom: 12 }}>
             {receiptPhotos.map((_, i) => (
@@ -3180,7 +2958,6 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
               </TouchableOpacity>
             ))}
           </View>
-
           {/* 5. Thumbnail strip */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: DC.pagePadding, gap: 8, paddingBottom: 16 }}>
             {receiptPhotos.map((p, i) => (
@@ -3189,7 +2966,6 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
               </TouchableOpacity>
             ))}
           </ScrollView>
-
           {/* Photo delete confirm */}
           {photoDeleteConfirm && (
             <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.3)' }}>
@@ -3222,7 +2998,6 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
               </View>
             </View>
           )}
-
           {/* Floating upload loading overlay */}
           {uploadingPhoto && (
             <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', pointerEvents: 'none' as any }}>
@@ -3232,10 +3007,8 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
               </View>
             </View>
           )}
-
         </SafeAreaView>
       </Modal>
-
       {/* Tag friend modal */}
       <BottomSheet visible={tagFriendModal} onClose={() => { setTagFriendModal(false); setTagError(''); }} title="tag a friend">
         {tagError ? <Text style={{ fontFamily: Brand.font.mono, fontSize: 12, color: Colors.expense, marginBottom: 8 }}>{tagError}</Text> : null}
@@ -3246,14 +3019,13 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
         />
         <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 8 }}>select friend</Text>
         {tagFriends.length === 0 ? (
-          <Text style={{ fontFamily: Brand.font.mono, fontSize: 13, color: Colors.muted, marginBottom: 16 }}>no friends yet — add friends in Contacts first</Text>
+          <Text style={{ fontFamily: Brand.font.mono, fontSize: 13, color: Colors.muted, marginBottom: 16 }}>no friends yet � add friends in Contacts first</Text>
         ) : (
           <ScrollView style={{ maxHeight: 200 }} showsVerticalScrollIndicator={false}>
             {tagFriends.map(f => {
               const alreadyTagged = existingTags.some((t: any) => t.data?.friendId === f.id);
               return (
                 <TouchableOpacity key={f.id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 10, opacity: alreadyTagged ? 0.4 : 1 }} onPress={() => !alreadyTagged && setTagSelectedFriend(f)} disabled={alreadyTagged}>
-                  <Ionicons name={tagSelectedFriend?.id === f.id ? 'checkmark-circle' : 'ellipse-outline'} size={20} color={tagSelectedFriend?.id === f.id ? ACCENT_DARK : Colors.faint} />
                   <Text style={{ fontFamily: Brand.font.heading, fontSize: 14, color: Colors.text, flex: 1 }}>{f.name}</Text>
                   {alreadyTagged && <Text style={{ fontFamily: Brand.font.mono, fontSize: 10, color: Colors.muted }}>already tagged</Text>}
                 </TouchableOpacity>
@@ -3265,7 +3037,6 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
           {tagLoading ? <ActivityIndicator color={ACCENT_DARK} size="small" /> : <Text style={rd.doneBtnText}>send tag request</Text>}
         </TouchableOpacity>
       </BottomSheet>
-
       {/* Owes-you edit modal */}
       <BottomSheet visible={owesYouEditModal} onClose={() => setOwesYouEditModal(false)} title="who owes you">
         {owesYouLoading ? (
@@ -3293,10 +3064,9 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                         {filteredFriends.map(f => (
                           <TouchableOpacity key={f.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border }} onPress={() => saveOwesYouPerson(f.name, f.id)} activeOpacity={0.75}>
                             <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: ACCENT + '33', alignItems: 'center', justifyContent: 'center' }}>
-                              <Ionicons name="people-outline" size={14} color={ACCENT_DARK} />
                             </View>
                             <Text style={{ fontFamily: Brand.font.mono, fontSize: 14, color: Colors.text, flex: 1 }}>{f.name}</Text>
-                            {recording?.person_name === f.name && <Ionicons name="checkmark" size={14} color={ACCENT_DARK} />}
+                            
                           </TouchableOpacity>
                         ))}
                       </>
@@ -3307,10 +3077,9 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                         {filteredContacts.map(n => (
                           <TouchableOpacity key={n} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border }} onPress={() => saveOwesYouPerson(n, null)} activeOpacity={0.75}>
                             <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.borderMid }}>
-                              <Ionicons name="person-outline" size={14} color={Colors.muted} />
                             </View>
                             <Text style={{ fontFamily: Brand.font.mono, fontSize: 14, color: Colors.text, flex: 1 }}>{n}</Text>
-                            {recording?.person_name === n && <Ionicons name="checkmark" size={14} color={ACCENT_DARK} />}
+                            
                           </TouchableOpacity>
                         ))}
                       </>
@@ -3330,7 +3099,6 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                 onPress={removeOwesYouPerson}
                 disabled={Number(recording?.paid_amount ?? 0) > 0}
               >
-                <Ionicons name="person-remove-outline" size={14} color={Number(recording?.paid_amount ?? 0) > 0 ? Colors.muted : Colors.danger} />
                 <Text style={[rd.doneBtnText, { color: Number(recording?.paid_amount ?? 0) > 0 ? Colors.muted : Colors.danger }]}>
                   {Number(recording?.paid_amount ?? 0) > 0 ? 'cannot remove — payment collected' : 'remove person'}
                 </Text>
@@ -3339,7 +3107,6 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
           </>
         )}
       </BottomSheet>
-
       {/* Write-off modal */}
       <BottomSheet visible={writeOffModal} onClose={() => setWriteOffModal(false)} title="write off">
         {writeOffModal && (() => {
@@ -3381,14 +3148,12 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
           );
         })()}
       </BottomSheet>
-
-      {/* Loading overlay — shown while recording data is fetching */}
+      {/* Loading overlay � shown while recording data is fetching */}
       {!recording && (
         <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}>
           <GooeyLoader />
         </BlurView>
       )}
-
       {/* Hidden WebView for image capture - native only */}
       {captureHtml && Platform.OS !== 'web' && (() => {
         const { WebView } = require('react-native-webview');
@@ -3406,7 +3171,6 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
     </Animated.View>
   );
 }
-
 const rd = StyleSheet.create({
   // Container
   header:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: PAGE, paddingTop: 16, paddingBottom: 16, gap: 10, backgroundColor: '#1A1A1A', borderBottomWidth: 1, borderBottomColor: '#333' },
@@ -3416,7 +3180,6 @@ const rd = StyleSheet.create({
   amountBadgeText: { fontFamily: Brand.font.monoBold, fontSize: 13 },
   scroll:     { paddingBottom: 100, backgroundColor: Colors.white },
   actionBtn:  { width: 36, height: 36, borderRadius: 18, backgroundColor: '#eeeeee', alignItems: 'center', justifyContent: 'center' },
-
   // Info card
   infoCard: { marginHorizontal: DC.pagePadding, borderRadius: 16, backgroundColor: '#F8F8F8', padding: 16, marginTop: 8 },
   tagInfoRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#eeeeee' },
@@ -3431,68 +3194,55 @@ const rd = StyleSheet.create({
   notesBlock: { marginTop: 16, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#eeeeee', gap: 4 },
   notesLabel: { fontFamily: AppFont.semiBold, fontSize: 10, color: '#999999', textTransform: 'uppercase', letterSpacing: 0.5 },
   notesValue: { fontFamily: AppFont.regular, fontSize: 13, color: '#111111', lineHeight: 18 },
-
   // Choice rows (actions sheet)
   choiceRow:   { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: DC.cardBorder },
   choiceIcon:  { width: 40, height: 40, borderRadius: Radius.md, justifyContent: 'center', alignItems: 'center' },
   choiceTitle: { fontFamily: AppFont.semiBold, fontSize: 14, color: DC.pageText },
   choiceSub:   { fontFamily: AppFont.regular, fontSize: 11, color: DC.pageTextMuted, marginTop: 2 },
-
   // Hero (kept for compat but unused)
   heroBlock:  { paddingHorizontal: DC.pagePadding, paddingTop: 12, paddingBottom: 4 },
   heroLabel:  { fontFamily: Brand.font.monoBold, fontSize: 10, color: ACCENT_DARK, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 2 },
   heroDate:   { fontFamily: Brand.font.mono, fontSize: 11, color: Colors.muted, marginTop: 1 },
-
   // Summary grid
   summaryGrid:  { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: DC.pagePadding, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border },
   summaryCell:  { width: '50%', paddingVertical: 8, paddingRight: 8 },
   summaryLabel: { fontFamily: Brand.font.mono, fontSize: 10, color: Colors.muted, letterSpacing: 0.4, textTransform: 'uppercase', marginBottom: 3 },
   summaryValue: { fontFamily: Brand.font.monoBold, fontSize: 13, color: Colors.text },
-
   // Section headers
   sectionDivider: { height: 1, backgroundColor: DC.cardBorder, marginHorizontal: DC.pagePadding, marginVertical: 4 },
   sectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: DC.pagePadding, paddingTop: 20, paddingBottom: 6 },
   sectionLabel: { fontFamily: AppFont.bold, fontSize: 12, color: '#999999', textTransform: 'uppercase', letterSpacing: 0.8 },
   sectionBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: Radius.pill, backgroundColor: '#9cd7d222' },
   sectionBtnText: { fontFamily: AppFont.semiBold, fontSize: 12, color: '#5dc4bb' },
-
   // Section rows
   sectionRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: DC.pagePadding, paddingTop: 20, paddingBottom: 8 },
   sectionHeader:  { ...Brand.type.sectionHeader },
   sectionAddBtn:  { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: Radius.pill, backgroundColor: ACCENT + '44' },
   sectionAddText: { fontFamily: Brand.font.heading, fontSize: 11, color: ACCENT_DARK },
-
   // List rows
   recRow:     { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13 },
   recIconWrap:{ width: 34, height: 34, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
   recMid:     { flex: 1, gap: 2 },
   recName:    { fontFamily: AppFont.semiBold, fontSize: 13, color: DC.pageText },
   recDate:    { fontFamily: AppFont.regular, fontSize: 10, color: DC.pageTextMuted },
-
   // Info rows
   infoRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border },
   infoLabel:  { fontFamily: Brand.font.mono, fontSize: 11, color: Colors.muted, width: 80, flexShrink: 0 },
   infoValue:  { fontFamily: Brand.font.monoBold, fontSize: 12, color: Colors.text, flex: 1, textAlign: 'right' },
-
   // Action chips
   actionChip:     { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: Radius.pill, backgroundColor: ACCENT + '44' },
   actionChipText: { fontFamily: Brand.font.heading, fontSize: 11, color: ACCENT_DARK },
-
   // Empty
   emptyWrap:  { alignItems: 'center', gap: 8, paddingVertical: 16, paddingHorizontal: DC.pagePadding },
-
   // Done button
   doneBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: DC.btnBg, borderRadius: Radius.pill, paddingVertical: 14, marginTop: 8, borderWidth: DC.btnBorderWidth },
   doneBtnText: { fontFamily: AppFont.semiBold, fontSize: 13, color: DC.btnText },
-
   // Toast
   toast:      { position: 'absolute', bottom: 48, alignSelf: 'center', backgroundColor: Colors.text, borderRadius: Radius.pill, paddingVertical: 10, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', gap: 8 },
   toastText:  { fontFamily: Brand.font.mono, fontSize: 12, color: Colors.white },
-
   // Tooltip
   tooltip:     { position: 'absolute', top: '50%', alignSelf: 'center', backgroundColor: Colors.text, borderRadius: Radius.sm, paddingVertical: 6, paddingHorizontal: 12 },
   tooltipText: { fontFamily: Brand.font.mono, fontSize: 11, color: Colors.white },
-
   // Tag input (people modal)
   tagInputWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, borderWidth: 1, borderColor: Colors.borderMid, borderRadius: Radius.md, padding: 8, minHeight: 44, marginBottom: 12 },
   tagChip:      { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: ACCENT + '44', borderRadius: Radius.pill, paddingVertical: 4, paddingLeft: 10, paddingRight: 6 },
@@ -3502,7 +3252,6 @@ const rd = StyleSheet.create({
   contactRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.border },
   contactName:  { fontFamily: Brand.font.mono, fontSize: 13, color: Colors.text },
 });
-
 const rdTag = StyleSheet.create({
   payRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
@@ -3512,7 +3261,6 @@ const rdTag = StyleSheet.create({
   payRowDate: { fontFamily: AppFont.regular, fontSize: 11, color: '#999999', marginTop: 2 },
   payRowAmount: { fontFamily: AppFont.bold, fontSize: 14, color: '#111111' },
 });
-
 const em = StyleSheet.create({
   field:       { gap: 6 },
   label:       { fontFamily: AppFont.semiBold, fontSize: 11, color: DC.pageTextMuted, textTransform: 'uppercase' as const, letterSpacing: 0.6 },
@@ -3523,7 +3271,6 @@ const em = StyleSheet.create({
   accountRow:  { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 12, paddingVertical: 12, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: Colors.border },
   accountRowActive: { backgroundColor: DC.pageActionBg },
 });
-
 const styles = StyleSheet.create({
   personRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
   removeBtn: { padding: 4 },
@@ -3536,13 +3283,4 @@ const styles = StyleSheet.create({
   subitemFormRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 8, marginLeft: 4 },
   subitemFormInputRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
 });
-
-
-
-
-
-
-
-
-
 

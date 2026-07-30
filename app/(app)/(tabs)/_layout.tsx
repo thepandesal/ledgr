@@ -1,8 +1,7 @@
 import { View, TouchableOpacity, Text, StyleSheet, Animated, Platform, SafeAreaView, ScrollView, useWindowDimensions, Clipboard, TextInput, ActivityIndicator, Modal, Switch, Image } from 'react-native';
+import NavIcon from '@/components/ui/NavIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
 import { useState, useRef, memo, useCallback, useEffect }from 'react';
-import AnimatedIcon from '@/components/ui/AnimatedIcon';
 import { BlurView } from 'expo-blur';
 import GooeyLoader from '@/components/ui/GooeyLoader';
 import HomeScreen from './home';
@@ -56,7 +55,6 @@ const BUBBLE_ACTIVE_BG = '#EEF2FB'; // bubble active item bg
 const MAIN_TABS = [
   { key: 'home',                label: 'Home',          icon: 'home-outline' },
   { key: 'accounts',            label: 'Accounts',      icon: 'wallet-outline' },
-  { key: 'bill-split',          label: 'Split Bill',    icon: 'people-outline' },
   { key: 'notifications-tab',   label: 'Notifications', icon: 'notifications-outline' },
   { key: 'others',              label: 'Others',        icon: 'apps-outline' },
 ];
@@ -293,7 +291,6 @@ function ProfileScreen() {
         <View style={p.card}>
           {/* Name */}
           <View style={p.row}>
-            <View style={p.rowIcon}><AnimatedIcon set="basil" icon="user-solid" size={16} color={Colors.muted} /></View>
             <View style={p.rowBody}>
               <Text style={p.rowLabel}>Name</Text>
               <Text style={p.rowValue}>{userName || '—'}</Text>
@@ -302,7 +299,6 @@ function ProfileScreen() {
           <View style={p.divider} />
           {/* Email */}
           <View style={p.row}>
-            <View style={p.rowIcon}><AnimatedIcon set="basil" icon="gmail-solid" size={16} color={Colors.muted} /></View>
             <View style={p.rowBody}>
               <Text style={p.rowLabel}>Email</Text>
               <Text style={p.rowValue}>{email || '—'}</Text>
@@ -311,7 +307,6 @@ function ProfileScreen() {
           <View style={p.divider} />
           {/* Subscription */}
           <View style={p.row}>
-            <View style={p.rowIcon}><AnimatedIcon set="basil" icon="lightning-solid" size={16} color={Colors.muted} /></View>
             <View style={p.rowBody}>
               <Text style={p.rowLabel}>Subscription</Text>
               <Text style={[p.rowValue, { color: HEADER_BG }]}>Free</Text>
@@ -320,31 +315,23 @@ function ProfileScreen() {
           <View style={p.divider} />
           {/* Profile Code */}
           <View style={p.row}>
-            <View style={p.rowIcon}><AnimatedIcon set="basil" icon="id-card-solid" size={16} color={Colors.muted} /></View>
             <View style={p.rowBody}>
               <Text style={p.rowLabel}>Profile Code</Text>
               <Text style={[p.rowValue, { fontFamily: AppFont.bold, letterSpacing: 1.5 }]}>{profileCode || '—'}</Text>
             </View>
-            <TouchableOpacity onPress={copyCode} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <AnimatedIcon set="basil" icon="clipboard-solid" size={18} color={Colors.muted} />
-            </TouchableOpacity>
+
           </View>
           <View style={p.divider} />
           {/* Default Currency */}
           <TouchableOpacity style={p.row} onPress={() => setShowCurrencyModal(true)} activeOpacity={0.7}>
-            <View style={p.rowIcon}>
-              <AnimatedIcon set="circle-flags" icon={CURRENCIES.find(c => c.code === defaultCurrency)?.flag ?? 'us'} size={24} />
-            </View>
             <View style={p.rowBody}>
               <Text style={p.rowLabel}>Default Currency</Text>
               <Text style={p.rowValue}>{CURRENCIES.find(c => c.code === defaultCurrency)?.country ?? ''} - {defaultCurrency}</Text>
             </View>
-            <Ionicons name="chevron-forward" size={16} color={Colors.faint} />
           </TouchableOpacity>
           <View style={p.divider} />
           {/* Require Tag Approval */}
           <View style={p.row}>
-            <View style={p.rowIcon}><AnimatedIcon set="basil" icon="shield-solid" size={16} color={Colors.muted} /></View>
             <View style={p.rowBody}>
               <Text style={p.rowLabel}>Require Approval Before Tagging</Text>
               <Text style={[p.rowValue, { fontSize: 10, color: Colors.faint }]}>when OFF, friends can tag you automatically</Text>
@@ -369,8 +356,7 @@ function ProfileScreen() {
             (showAllFriends ? friends : friends.slice(0, 3)).map((f, i, arr) => (
               <View key={f.id}>
                 <View style={[p.row, i === arr.length - 1 && p.rowLast]}>
-                  <View style={p.rowIcon}><AnimatedIcon set="basil" icon="user-solid" size={16} color={Colors.muted} /></View>
-                  <Text style={p.rowValue}>{f.name}</Text>
+                    <Text style={p.rowValue}>{f.name}</Text>
                 </View>
                 {i < arr.length - 1 && <View style={p.divider} />}
               </View>
@@ -389,7 +375,6 @@ function ProfileScreen() {
               {friendRequests.map((req, i) => (
                 <View key={req.id}>
                   <View style={[p.row, { gap: 10 }]}>
-                    <View style={p.rowIcon}><AnimatedIcon set="basil" icon="user-solid" size={16} color={Colors.muted} /></View>
                     <Text style={[p.rowValue, { flex: 1 }]}>{req.name}</Text>
                     <TouchableOpacity
                       style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: Radius.pill, backgroundColor: HEADER_BG + '33', opacity: respondingId === req.id ? 0.5 : 1 }}
@@ -423,7 +408,6 @@ function ProfileScreen() {
               {outgoingRequests.map((req, i) => (
                 <View key={req.id || req.receiverId}>
                   <View style={p.row}>
-                    <View style={p.rowIcon}><AnimatedIcon set="basil" icon="user-solid" size={16} color={Colors.muted} /></View>
                     <Text style={[p.rowValue, { flex: 1 }]}>{req.name}</Text>
                     <Text style={{ fontFamily: AppFont.regular, fontSize: 11, color: Colors.faint, fontStyle: 'italic' }}>pending</Text>
                   </View>
@@ -445,7 +429,6 @@ function ProfileScreen() {
             contacts.slice(0, 3).map((c, i, arr) => (
               <View key={c}>
                 <View style={[p.row, i === arr.length - 1 && p.rowLast]}>
-                  <View style={p.rowIcon}><AnimatedIcon set="basil" icon="contacts-solid" size={16} color={Colors.muted} /></View>
                   <Text style={p.rowValue}>{c}</Text>
                 </View>
                 {i < arr.length - 1 && <View style={p.divider} />}
@@ -529,7 +512,6 @@ function ProfileScreen() {
                   </TouchableOpacity>
                 </View>
                 <View style={p.searchRow}>
-                  <Ionicons name="search-outline" size={14} color={Colors.faint} />
                   <TextInput
                     style={p.searchInput}
                     placeholder="search country or currency..."
@@ -538,11 +520,7 @@ function ProfileScreen() {
                     onChangeText={setCurrencySearch}
                     autoFocus
                   />
-                  {currencySearch.length > 0 && (
-                    <TouchableOpacity onPress={() => setCurrencySearch('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                      <Ionicons name="close-circle" size={14} color={Colors.faint} />
-                    </TouchableOpacity>
-                  )}
+
                 </View>
                 <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
                   {CURRENCIES.filter(c =>
@@ -557,12 +535,10 @@ function ProfileScreen() {
                       onPress={() => { setDefaultCurrency(c.code); setShowCurrencyModal(false); setCurrencySearch(''); }}
                       activeOpacity={0.75}
                     >
-                      <AnimatedIcon set="circle-flags" icon={c.flag} size={32} />
                       <View style={{ flex: 1 }}>
                         <Text style={p.currencyCode}>{c.country}</Text>
                         <Text style={p.currencyLabel}>{c.code} · {c.symbol} · {c.label}</Text>
                       </View>
-                      {defaultCurrency === c.code && <Ionicons name="checkmark" size={16} color={HEADER_BG} />}
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
@@ -650,6 +626,10 @@ export default function TabsLayout() {
   const [tourVisible, setTourVisible] = useState(false);
   const [tourStep, setTourStep] = useState(0);
   const [tourLoading, setTourLoading] = useState(false);
+  const [showNotifDropdown, setShowNotifDropdown] = useState(false);
+  const [notifList, setNotifList] = useState<any[]>([]);
+  const [notifLoading, setNotifLoading] = useState(false);
+  const [notifTotal, setNotifTotal] = useState(0);
 
   const setBlur = (v: boolean) => {
     setBlurActive(v);
@@ -1033,6 +1013,25 @@ export default function TabsLayout() {
     }
   };
 
+  const toggleNotifDropdown = async () => {
+    if (showNotifDropdown) { setShowNotifDropdown(false); return; }
+    setNotifLoading(true);
+    setShowNotifDropdown(true);
+    const { data } = await supabase
+      .from('notifications')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(7);
+    const { count } = await supabase
+      .from('notifications')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId);
+    setNotifList(data ?? []);
+    setNotifTotal(count ?? 0);
+    setNotifLoading(false);
+  };
+
   const isOthersActive = OTHERS_ITEMS.some(i => i.key === activeTab) || othersOpen;
   const isNotifTabActive = activeTab === 'notifications-page';
 
@@ -1096,12 +1095,67 @@ export default function TabsLayout() {
               <Text style={s.homeHeaderGreeting}>Hello, <Text style={s.homeHeaderName}>{userName?.split(' ')[0]?.charAt(0).toUpperCase() + userName?.split(' ')[0]?.slice(1) || 'There'}</Text></Text>
               <TouchableOpacity onPress={triggerHomeDateEdit} activeOpacity={0.7} style={s.homeDateRow} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                 <Text style={s.homeDateValue}>{homeDateLabel.toUpperCase()}</Text>
-                <Ionicons name="chevron-down" size={10} color="#b5b4a4" />
               </TouchableOpacity>
             </View>
-            <TouchableOpacity onPress={() => switchTab('notifications-page')} activeOpacity={0.7} style={{ marginLeft: 'auto' }}>
-              <AnimatedIcon set="line-md" icon="bell" size={26} color="#464646" />
+
+            <TouchableOpacity onPress={toggleNotifDropdown} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <NavIcon name="notifications" size={24} color="#000" />
+              {unreadCount > 0 && (
+                <View style={s.notifBadge}>
+                  <Text style={s.notifBadgeText}>{unreadCount > 9 ? '9+' : String(unreadCount)}</Text>
+                </View>
+              )}
             </TouchableOpacity>
+            {showNotifDropdown && (
+              <>
+                <TouchableOpacity style={s.notifOverlay} onPress={() => setShowNotifDropdown(false)} activeOpacity={1} />
+                <View style={s.notifDropdown}>
+                  <View style={s.notifArrow} />
+                  <View style={s.notifCard}>
+                    <View style={s.notifContent}>
+                      {notifLoading ? (
+                        <ActivityIndicator color="#000" style={{ paddingVertical: 20 }} />
+                      ) : notifList.length === 0 ? (
+                        <Text style={s.notifEmptyText}>no notifications</Text>
+                      ) : (
+                        <>
+                          {(() => {
+                            const latestDate = notifList[0]?.created_at?.slice(0, 10);
+                            const latest: any[] = [];
+                            const rest: any[] = [];
+                            notifList.forEach(n => {
+                              if (n.created_at?.slice(0, 10) === latestDate) latest.push(n);
+                              else rest.push(n);
+                            });
+                            return (
+                              <>
+                                <Text style={s.notifSectionLabel}>{new Date(latestDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</Text>
+                                {latest.map(n => (
+                                  <TouchableOpacity key={n.id} style={s.notifItem} activeOpacity={0.7}>
+                                    <Text style={s.notifItemTitle} numberOfLines={1}>{n.title}</Text>
+                                    {n.body ? <Text style={s.notifItemBody} numberOfLines={1}>{n.body}</Text> : null}
+                                  </TouchableOpacity>
+                                ))}
+                                {rest.length > 0 && <Text style={s.notifSectionLabel}>others</Text>}
+                                {rest.map(n => (
+                                  <TouchableOpacity key={n.id} style={s.notifItem} activeOpacity={0.7}>
+                                    <Text style={s.notifItemTitle} numberOfLines={1}>{n.title}</Text>
+                                    {n.body ? <Text style={s.notifItemBody} numberOfLines={1}>{n.body}</Text> : null}
+                                  </TouchableOpacity>
+                                ))}
+                              </>
+                            );
+                          })()}
+                          <TouchableOpacity style={s.notifViewAll} onPress={() => { setShowNotifDropdown(false); switchTab('notifications-page'); }} activeOpacity={0.7}>
+                            <Text style={s.notifViewAllText}>view notifications</Text>
+                          </TouchableOpacity>
+                        </>
+                      )}
+                    </View>
+                  </View>
+                </View>
+              </>
+            )}
           </View>
         ) : (
           <Animated.View style={{ opacity: titleAnim }}>
@@ -1288,21 +1342,13 @@ function BubbleContent({ items, activeTab, onPress, unreadCount }: {
             onPress={() => onPress(item)}
             activeOpacity={0.7}
           >
-            <View style={[s.bubbleIconWrap, isActive && s.bubbleIconWrapActive]}>
-              <Ionicons name={item.icon as any} size={16} color={isActive ? NAV_ACCENT : Colors.text} />
-              {showBadge && (
-                <View style={s.bubbleBadge}>
-                  <Text style={s.navBadgeText}>{unreadCount > 9 ? '9+' : String(unreadCount)}</Text>
-                </View>
-              )}
-            </View>
+            <View style={[s.bubbleIconWrap, isActive && s.bubbleIconWrapActive]} />
             <Text style={[s.bubbleItemLabel, isActive && s.bubbleItemLabelActive]}>{item.label}</Text>
             {showBadge && (
               <View style={s.bubbleBadgeLabel}>
                 <Text style={s.bubbleBadgeLabelText}>{unreadCount > 9 ? '9+' : String(unreadCount)}</Text>
               </View>
             )}
-            <Ionicons name="chevron-forward" size={12} color={Colors.faint} style={{ marginLeft: showBadge ? 0 : 'auto' }} />
           </TouchableOpacity>
         );
       })}
@@ -1333,11 +1379,41 @@ const s = StyleSheet.create({
   wave:         { display: 'none' as any },
   addBtn:       { display: 'none' as any },
 
+  notifBadge: {
+    position: 'absolute', top: -4, right: -6,
+    minWidth: 18, height: 18, borderRadius: 9,
+    backgroundColor: '#ed6a6a', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4,
+  },
+  notifBadgeText: { fontFamily: AppFont.semiBold, fontSize: 10, color: '#fff', lineHeight: 16 },
+  notifOverlay: {
+    position: 'absolute', top: -1000, left: -1000, right: -1000, bottom: -1000, zIndex: 998,
+  },
+  notifDropdown: {
+    position: 'absolute', top: 56, right: 14, left: 14, zIndex: 999,
+  },
+  notifArrow: {
+    alignSelf: 'flex-end', marginRight: 12,
+    width: 0, height: 0,
+    borderLeftWidth: 8, borderRightWidth: 8, borderBottomWidth: 8,
+    borderLeftColor: 'transparent', borderRightColor: 'transparent', borderBottomColor: '#fff',
+  },
+  notifCard: {
+    borderRadius: 16, borderWidth: 1, borderColor: '#d0d0d0',
+    backgroundColor: 'rgba(255,255,255,0.85)', overflow: 'hidden',
+  },
+  notifContent: { paddingVertical: 8 },
+  notifEmptyText: { fontFamily: 'InclusiveSans-Regular', fontSize: 13, color: '#999', textAlign: 'center', paddingVertical: 20 },
+  notifItem: { paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 0.5, borderBottomColor: '#e8e8e8' },
+  notifItemTitle: { fontFamily: 'InclusiveSans-Medium', fontSize: 12, color: '#111' },
+  notifItemBody: { fontFamily: 'InclusiveSans-Regular', fontSize: 11, color: '#666', marginTop: 2 },
+  notifSectionLabel: { fontFamily: 'InclusiveSans-Medium', fontSize: 10, color: '#999', textTransform: 'uppercase', letterSpacing: 1, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4 },
+  notifViewAll: { paddingVertical: 12, alignItems: 'center' },
+  notifViewAllText: { fontFamily: 'InclusiveSans-Medium', fontSize: 12, color: '#111' },
   navBadgeText: { fontFamily: AppFont.semiBold, fontSize: 9, color: '#fff', lineHeight: 14 },
 
   // Bubble
   bubbleWrap: {
-    position: 'absolute', bottom: 72, left: 20, right: 20,
+    position: 'absolute', bottom: 100, left: 20, right: 20,
     borderRadius: Radius.xl, overflow: 'hidden', zIndex: 100,
     borderWidth: 1, borderColor: Colors.border,
   },

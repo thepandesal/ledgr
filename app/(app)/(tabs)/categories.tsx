@@ -2,9 +2,7 @@ import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, TextInput, ActivityIndicator,
 } from 'react-native';
 import { supabase } from '../../../src/lib/supabase';
-import { Ionicons } from '@expo/vector-icons';
-import AnimatedIcon from '@/components/ui/AnimatedIcon';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useUser } from '../../../src/hooks/useUser';
 import type { Category } from '../../../src/types';
@@ -12,13 +10,16 @@ import BottomSheet from '@/components/ui/BottomSheet';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import { Colors, Radius, Spacing } from '@/components/ui/theme';
 import { Brand } from '../../../src/lib/brand';
+import { AppFont } from '../../../src/lib/fonts';
 
 const PASTEL_COLORS = ['#FFB3B3', '#FFD9B3', '#FFFAB3', '#B3FFB3', '#B3FFE0', '#B3F0FF', '#B3C6FF', '#D9B3FF', '#FFB3F0', '#FFB3C6'];
 const SUGGESTED_ICONS = ['fast-food-outline', 'car-outline', 'flash-outline', 'home-outline', 'musical-notes-outline', 'heart-outline', 'cart-outline', 'save-outline', 'airplane-outline', 'briefcase-outline', 'cafe-outline', 'fitness-outline', 'gift-outline', 'school-outline', 'phone-portrait-outline', 'ellipsis-horizontal-outline'];
 
+const PREVIEW_LIMIT = 3;
+
 export default function CategoriesScreen() {
   const queryClient = useQueryClient();
-  const { userId } = useUser();
+  const { userId, defaultCurrency } = useUser();
   const [modal, setModal] = useState(false);
   const [menuModal, setMenuModal] = useState(false);
   const [selected, setSelected] = useState<Category | null>(null);
@@ -27,6 +28,17 @@ export default function CategoriesScreen() {
   const [icon, setIcon] = useState(SUGGESTED_ICONS[0]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  const toggleExpand = (id: string) => {
+    setExpanded(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   const { data: categories = [] } = useQuery<Category[]>({
     queryKey: ['categories', userId],
@@ -36,6 +48,41 @@ export default function CategoriesScreen() {
     },
     enabled: !!userId,
   });
+
+  const now = new Date();
+  const from = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+  const to = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()}`;
+
+  const { data: recordings = [] } = useQuery({
+    queryKey: ['categories-recordings', userId, from],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('recordings')
+        .select('id, name, type, amount, transaction_date, currency, category_id, spaces:space_id(name)')
+        .eq('user_id', userId)
+        .neq('status', 'voided')
+        .neq('is_system_generated', true)
+        .gte('transaction_date', from)
+        .lte('transaction_date', to)
+        .not('category_id', 'is', null)
+        .order('transaction_date', { ascending: false });
+      return (data ?? []).map((r: any) => ({
+        ...r,
+        space: Array.isArray(r.spaces) ? r.spaces[0] : r.spaces,
+      }));
+    },
+    enabled: !!userId,
+  });
+
+  const grouped = useMemo(() => {
+    const map: Record<string, typeof recordings> = {};
+    recordings.forEach(r => {
+      const cid = r.category_id;
+      if (!map[cid]) map[cid] = [];
+      map[cid].push(r);
+    });
+    return map;
+  }, [recordings]);
 
   const openAdd = () => { setName(''); setColor(PASTEL_COLORS[0]); setIcon(SUGGESTED_ICONS[0]); setError(''); setModal(true); };
 
@@ -59,23 +106,49 @@ export default function CategoriesScreen() {
     <SafeAreaView style={s.container}>
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
         <View style={s.list}>
-          {categories.map(cat => (
-            <View key={cat.id} style={s.catRow}>
-              <View style={[s.catIcon, { backgroundColor: Brand.color.headerBg }]}>
-                {cat.icon === 'cart-outline'
-                  ? <AnimatedIcon set="svg-spinners" icon="3-dots-bounce" size={20} color={Brand.color.headerText} />
-                  : <Ionicons name={cat.icon as any} size={16} color={Brand.color.headerText} />}
+          {categories.map(cat => {
+            const catRecordings = grouped[cat.id] ?? [];
+            const isExpanded = expanded.has(cat.id);
+            const visible = isExpanded ? catRecordings : catRecordings.slice(0, PREVIEW_LIMIT);
+            const hasMore = catRecordings.length > PREVIEW_LIMIT;
+            return (
+              <View key={cat.id} style={s.card}>
+                {/* Card header */}
+                <TouchableOpacity
+                  style={s.cardHeader}
+                  onPress={() => { setSelected(cat); setMenuModal(true); }}
+                  activeOpacity={0.7}
+                >
+
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.cardName}>{cat.name}</Text>
+                    <Text style={s.cardCount}>{catRecordings.length} recording{catRecordings.length !== 1 ? 's' : ''}</Text>
+                  </View>
+
+                </TouchableOpacity>
+
+                {/* Recordings list */}
+                {visible.map((r, i) => (
+                  <View key={r.id} style={[s.recRow, i === visible.length - 1 && !(hasMore && !isExpanded) && s.recRowLast]}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.recName} numberOfLines={1}>{r.name}</Text>
+                      {r.space?.name && <Text style={s.recSub}>{r.space.name}</Text>}
+                    </View>
+                    <Text style={s.recAmount}>{r.currency ?? defaultCurrency} {fmt(Number(r.amount))}</Text>
+                  </View>
+                ))}
+
+                {/* Expand / collapse */}
+                {hasMore && (
+                  <TouchableOpacity style={s.expandBtn} onPress={() => toggleExpand(cat.id)} activeOpacity={0.7}>
+                    <Text style={s.expandText}>{isExpanded ? 'show less' : `show ${catRecordings.length - PREVIEW_LIMIT} more`}</Text>
+                  </TouchableOpacity>
+                )}
               </View>
-              <Text style={s.catName}>{cat.name}</Text>
-              {cat.is_default && <Text style={s.defaultBadge}>default</Text>}
-              <TouchableOpacity onPress={() => { setSelected(cat); setMenuModal(true); }} style={s.menuBtn}>
-                <Ionicons name="ellipsis-vertical" size={15} color={Colors.muted} />
-              </TouchableOpacity>
-            </View>
-          ))}
+            );
+          })}
           {categories.length === 0 && (
             <View style={s.emptyWrap}>
-              <Ionicons name="pricetag-outline" size={32} color={Colors.faint} />
               <Text style={Brand.type.emptyText}>no categories yet</Text>
             </View>
           )}
@@ -84,9 +157,7 @@ export default function CategoriesScreen() {
         <Text style={[Brand.type.footer, { marginTop: 32 }]}>managed by LEDGR</Text>
       </ScrollView>
 
-      <TouchableOpacity style={s.fab} onPress={openAdd} activeOpacity={0.8}>
-        <Ionicons name="add" size={22} color={Brand.color.accentText} />
-      </TouchableOpacity>
+
 
       <BottomSheet visible={modal} onClose={() => setModal(false)} title="new category">
         {error ? <Text style={s.error}>{error}</Text> : null}
@@ -106,16 +177,8 @@ export default function CategoriesScreen() {
           ))}
         </View>
         <Text style={s.label}>icon</Text>
-        <View style={s.iconRow}>
-          {SUGGESTED_ICONS.map(i => (
-            <TouchableOpacity key={i} style={[s.iconBtn, icon === i && s.iconBtnSelected]} onPress={() => setIcon(i)}>
-              <Ionicons name={i as any} size={20} color={icon === i ? Brand.color.accentText : Colors.muted} />
-            </TouchableOpacity>
-          ))}
-        </View>
         <Text style={s.label}>preview</Text>
         <View style={[s.preview, { backgroundColor: color }]}>
-          <Ionicons name={icon as any} size={16} color={Colors.text} />
           <Text style={s.previewText}>{name || 'my category'}</Text>
         </View>
         <TouchableOpacity
@@ -145,14 +208,38 @@ const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.white },
   scroll:    { paddingHorizontal: Spacing.page, paddingTop: 20, paddingBottom: 80 },
 
-  list:    { gap: Brand.spacing.gap },
+  list:      { gap: 12 },
   emptyWrap: { alignItems: 'center', gap: 12, paddingVertical: 48 },
 
-  catRow:   { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: Brand.spacing.card, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  catIcon:  { width: 32, height: 32, borderRadius: Brand.radius.avatar, justifyContent: 'center', alignItems: 'center' },
-  catName:  { ...Brand.type.cardTitle, flex: 1 },
-  defaultBadge: { ...Brand.type.cardMeta, backgroundColor: Colors.surface, paddingHorizontal: 8, paddingVertical: 2, borderRadius: Brand.radius.btn },
-  menuBtn:  { padding: 4 },
+  card: {
+    backgroundColor: Colors.white,
+    borderRadius: Radius.lg,
+    borderWidth: 1, borderColor: Colors.border,
+    overflow: 'hidden',
+  },
+  cardHeader: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingVertical: 14, paddingHorizontal: 14,
+  },
+  cardIcon:  { width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
+  cardName:  { fontFamily: AppFont.incMedium, fontSize: 13, color: '#3a3a34', letterSpacing: 0.5 },
+  cardCount: { fontFamily: AppFont.regular, fontSize: 10, color: Colors.faint, marginTop: 1 },
+
+  recRow: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingVertical: 10, paddingHorizontal: 14, paddingLeft: 56,
+    borderTopWidth: 1, borderTopColor: Colors.border,
+  },
+  recRowLast: { borderBottomWidth: 0 },
+  recName: { fontFamily: AppFont.regular, fontSize: 12, color: Colors.text },
+  recSub:  { fontFamily: AppFont.regular, fontSize: 10, color: Colors.faint, marginTop: 1 },
+  recAmount: { fontFamily: AppFont.bold, fontSize: 12, color: Colors.text },
+
+  expandBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4,
+    paddingVertical: 8, borderTopWidth: 1, borderTopColor: Colors.border,
+  },
+  expandText: { fontFamily: AppFont.regular, fontSize: 11, color: '#888583' },
 
   fab: {
     position: 'absolute', bottom: 24, right: 24,

@@ -1,7 +1,6 @@
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
 import { Colors, Fonts } from '../components/ui/theme';
 import { Brand } from '../src/lib/brand';
 
@@ -108,9 +107,7 @@ export default function LegalScreen() {
   return (
     <SafeAreaView style={s.container} edges={['top', 'bottom']}>
       <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Ionicons name="arrow-back" size={20} color={Colors.text} />
-        </TouchableOpacity>
+
         <Text style={s.title}>{showPrivacy ? 'privacy policy' : 'terms of service'}</Text>
         <View style={{ width: 20 }} />
       </View>

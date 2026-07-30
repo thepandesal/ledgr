@@ -31,6 +31,10 @@ export default function RootLayout() {
     'CormorantGaramond-Regular': require('../assets/CormorantGaramond-Regular.ttf'),
     'CormorantGaramond-Bold':    require('../assets/CormorantGaramond-Bold.ttf'),
     'Aujournuit-Regular':     require('../assets/Aujournuit-Regular.ttf'),
+    'InclusiveSans-Regular':  require('../assets/InclusiveSans-Regular.ttf'),
+    'InclusiveSans-Medium':   require('../assets/InclusiveSans-Medium.ttf'),
+    'InclusiveSans-SemiBold': require('../assets/InclusiveSans-SemiBold.ttf'),
+    'InclusiveSans-Bold':     require('../assets/InclusiveSans-Bold.ttf'),
   });
 
   const router = useRouter();

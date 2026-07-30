@@ -2,7 +2,6 @@ import {
   View, Text, StyleSheet, ScrollView, SafeAreaView,
   TouchableOpacity, RefreshControl, TextInput,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useUser } from '../../src/hooks/useUser';
@@ -70,7 +69,6 @@ export default function ContactsPanel({ onClose }: Props) {
       <PageHeader title="Contacts" onBack={onClose} titleColor={TEAL} />
 
       <View style={st.searchWrap}>
-        <Ionicons name="search-outline" size={13} color={Colors.faint} />
         <TextInput
           style={st.searchInput}
           placeholder="search contacts..."
@@ -78,11 +76,7 @@ export default function ContactsPanel({ onClose }: Props) {
           value={search}
           onChangeText={setSearch}
         />
-        {search.length > 0 && (
-          <TouchableOpacity onPress={() => setSearch('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="close" size={13} color={Colors.faint} />
-          </TouchableOpacity>
-        )}
+
       </View>
 
       {isLoading ? (
@@ -113,7 +107,6 @@ export default function ContactsPanel({ onClose }: Props) {
                     <Text style={st.avatarText}>{c.name.charAt(0).toUpperCase()}</Text>
                   </View>
                   <Text style={st.rowName}>{c.name}</Text>
-                  <Ionicons name="ellipsis-horizontal" size={15} color={Colors.muted} />
                 </TouchableOpacity>
               ))}
             </View>

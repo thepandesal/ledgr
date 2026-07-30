@@ -2,7 +2,6 @@ import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Image, Touchable
 import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../src/lib/supabase';
-import { Ionicons } from '@expo/vector-icons';
 import { Colors, Radius } from '@/components/ui/theme';
 import { Brand } from '../../src/lib/brand';
 
@@ -175,7 +174,6 @@ export default function SplitSharePage() {
   if (loading) return <View style={s.center}><ActivityIndicator color={ACCENT_DARK} /></View>;
   if (notFound || !recording) return (
     <View style={s.center}>
-      <Ionicons name="search-outline" size={36} color={Colors.borderMid} />
       <Text style={s.emptyText}>split not found</Text>
     </View>
   );
@@ -210,13 +208,7 @@ export default function SplitSharePage() {
               const checkColor = fullyPaid ? '#4CAF50' : partiallyPaid ? '#FFAB91' : 'transparent';
               return (
               <View key={i} style={s.row}>
-                <View style={[s.rowIconWrap, { backgroundColor: fullyPaid ? '#4CAF5022' : partiallyPaid ? '#FFAB9122' : ACCENT + '44' }]}>
-                  <Ionicons
-                    name={fullyPaid || partiallyPaid ? 'checkmark-circle' : 'person-outline'}
-                    size={15}
-                    color={fullyPaid ? '#4CAF50' : partiallyPaid ? '#FFAB91' : ACCENT_DARK}
-                  />
-                </View>
+
                 <View style={{ flex: 1 }}>
                   <Text style={s.rowName}>{p.name}</Text>
                   {partiallyPaid && (
@@ -234,9 +226,6 @@ export default function SplitSharePage() {
             })}
             {/* Total row */}
             <View style={[s.row, { backgroundColor: ACCENT + '44' }]}>
-              <View style={[s.rowIconWrap, { backgroundColor: ACCENT }]}>
-                <Ionicons name="calculator-outline" size={15} color={ACCENT_DARK} />
-              </View>
               <Text style={[s.rowName, { fontFamily: Brand.font.monoBold, color: ACCENT_DARK }]}>total</Text>
               <Text style={[s.rowAmount, { color: ACCENT_DARK }]}>{fmt(grandTotal)}</Text>
             </View>
@@ -307,9 +296,7 @@ export default function SplitSharePage() {
           <Text style={s.sectionHeader}>receipt</Text>
           {receiptPhotos.length === 0 && !receiptLoading ? (
             <TouchableOpacity style={s.actionBtn} onPress={openReceipt} activeOpacity={0.8}>
-              <Ionicons name="receipt-outline" size={15} color={ACCENT_DARK} />
               <Text style={s.actionBtnText}>view receipt photos</Text>
-              <Ionicons name="chevron-forward" size={13} color={ACCENT_DARK} />
             </TouchableOpacity>
           ) : receiptLoading ? (
             <ActivityIndicator color={ACCENT_DARK} style={{ marginVertical: 12 }} />
@@ -322,9 +309,7 @@ export default function SplitSharePage() {
                     style={{ width: 120, height: 160, borderRadius: Radius.md, backgroundColor: Colors.surface }}
                     resizeMode="cover"
                   />
-                  <View style={{ position: 'absolute', bottom: 6, right: 6, backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 99, padding: 4 }}>
-                    <Ionicons name="expand-outline" size={12} color="#fff" />
-                  </View>
+
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -337,15 +322,13 @@ export default function SplitSharePage() {
           <View style={s.listBlock}>
             {payments.map((acc: any, i: number) => (
               <View key={i} style={s.payRow}>
-                <View style={[s.rowIconWrap, { backgroundColor: ACCENT }]}>
-                  <Ionicons name="card-outline" size={15} color={ACCENT_DARK} />
-                </View>
+
                 <View style={{ flex: 1, gap: 2 }}>
                   <Text style={s.payBank}>{acc.bank || ''}</Text>
                   <Text style={s.payHolder}>{acc.holder_name || acc.account_name || ''}</Text>
                   <TouchableOpacity style={s.copyRow} onPress={() => copyAccountNumber(acc.account_number ?? '', i)} activeOpacity={0.7}>
                     <Text style={s.payNumber}>{acc.account_number ?? ''}</Text>
-                    <Ionicons name={copiedAccIdx === i ? 'checkmark' : 'copy-outline'} size={12} color={copiedAccIdx === i ? ACCENT_DARK : Colors.muted} />
+
                   </TouchableOpacity>
                 </View>
                 {acc.qr_code && (
@@ -363,13 +346,10 @@ export default function SplitSharePage() {
         {showUrlBar ? (
           <View style={s.urlBar}>
             <TextInput style={s.urlInput} value={shareUrl} editable selectTextOnFocus autoFocus caretHidden={false} />
-            <TouchableOpacity onPress={() => setShowUrlBar(false)} style={{ padding: 6 }}>
-              <Ionicons name="close" size={16} color={Colors.muted} />
-            </TouchableOpacity>
+
           </View>
         ) : (
           <TouchableOpacity style={s.shareBtn} onPress={handleShare} activeOpacity={0.8}>
-            <Ionicons name="share-outline" size={15} color={ACCENT_DARK} />
             <Text style={s.shareBtnText}>share this bill</Text>
           </TouchableOpacity>
         )}
@@ -382,9 +362,7 @@ export default function SplitSharePage() {
       {/* Zoom lightbox */}
       <Modal visible={!!zoomPhoto} transparent animationType="fade" onRequestClose={() => setZoomPhoto(null)}>
         <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', justifyContent: 'center', alignItems: 'center' }} activeOpacity={1} onPress={() => setZoomPhoto(null)}>
-          <TouchableOpacity style={{ position: 'absolute', top: 52, right: 24, zIndex: 10, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 99, padding: 8 }} onPress={() => setZoomPhoto(null)}>
-            <Ionicons name="close" size={22} color="#fff" />
-          </TouchableOpacity>
+
           {zoomPhoto && (
             <Image
               source={{ uri: zoomPhoto }}

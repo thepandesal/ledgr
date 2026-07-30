@@ -3,7 +3,6 @@ import {
   TouchableOpacity, RefreshControl, TextInput, Modal,
 } from 'react-native';
 import { useState, useMemo, useEffect } from 'react';
-import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useUser } from '../../src/hooks/useUser';
 import { supabase } from '../../src/lib/supabase';
@@ -16,20 +15,16 @@ import GooeyLoader from '@/components/ui/GooeyLoader';
 import { BlurView } from 'expo-blur';
 import { isReminderDueToday, reminderFrequencyLabel } from '../../src/lib/reminderUtils';
 import BottomSheet from '@/components/ui/BottomSheet';
-
 const TEAL = '#9cd7d2';
 const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const todayStr = new Date().toISOString().split('T')[0];
-
 interface Props { onClose: () => void; }
-
 export default function RemindersPanel({ onClose }: Props) {
   const { userId } = useUser();
   const { openRecording, switchTab } = useNav();
   const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'paused'>('all');
-
   // Action modal state
   const [selectedReminder, setSelectedReminder] = useState<any>(null);
   const [showActions, setShowActions] = useState(false);
@@ -45,11 +40,9 @@ export default function RemindersPanel({ onClose }: Props) {
   const [moveMode, setMoveMode] = useState<'copy' | 'move'>('move');
   const [selectedSpaceId, setSelectedSpaceId] = useState('');
   const [moveSaving, setMoveSaving] = useState(false);
-
   const now = new Date();
   const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
   const monthEnd   = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()}`;
-
   const { data: reminders = [], isLoading: loadingReminders } = useQuery({
     queryKey: ['reminders-panel', userId],
     queryFn: async () => {
@@ -65,7 +58,6 @@ export default function RemindersPanel({ onClose }: Props) {
     },
     enabled: !!userId,
   });
-
   const { data: fulfilledRecs = [], isLoading: loadingRecs } = useQuery({
     queryKey: ['reminders-panel-recs', userId],
     queryFn: async () => {
@@ -80,7 +72,6 @@ export default function RemindersPanel({ onClose }: Props) {
     },
     enabled: !!userId,
   });
-
   const { data: spaces = [] } = useQuery({
     queryKey: ['spaces-list', userId],
     queryFn: async () => {
@@ -89,7 +80,6 @@ export default function RemindersPanel({ onClose }: Props) {
     },
     enabled: !!userId,
   });
-
   useEffect(() => {
     if (!userId) return;
     const channel = supabase
@@ -103,7 +93,6 @@ export default function RemindersPanel({ onClose }: Props) {
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [userId, queryClient]);
-
   const onRefresh = async () => {
     setRefreshing(true);
     await Promise.all([
@@ -112,9 +101,7 @@ export default function RemindersPanel({ onClose }: Props) {
     ]);
     setRefreshing(false);
   };
-
   const isLoading = loadingReminders || loadingRecs;
-
   const fulfilledMap = useMemo(() => {
     const map: Record<string, any[]> = {};
     fulfilledRecs.forEach((r: any) => {
@@ -123,20 +110,16 @@ export default function RemindersPanel({ onClose }: Props) {
     });
     return map;
   }, [fulfilledRecs]);
-
   const filtered = reminders.filter((r: any) => statusFilter === 'all' || r.status === statusFilter);
   // Fulfilled = has a recording with paid/received status this month
   const fulfilledFully = (id: string) => fulfilledMap[id]?.some((r: any) => r.status === 'paid' || r.status === 'received') ?? false;
   // Partial = has recordings this month but none are fully paid/received
   const fulfilledPartially = (id: string) => !fulfilledFully(id) && (fulfilledMap[id]?.length ?? 0) > 0;
-
   const fulfilled   = filtered.filter((r: any) => r.status === 'active' && fulfilledFully(r.id));
   const ongoing     = filtered.filter((r: any) => r.status === 'active' && !fulfilledFully(r.id) && fulfilledPartially(r.id));
   const notYet      = filtered.filter((r: any) => r.status === 'active' && !fulfilledFully(r.id) && !fulfilledPartially(r.id));
   const paused      = filtered.filter((r: any) => r.status === 'paused');
-
   const openActions = (r: any) => { setSelectedReminder(r); setShowActions(true); };
-
   const handleFulfill = async () => {
     if (!selectedReminder || !fulfillAmount) return;
     setFulfillSaving(true);
@@ -163,14 +146,12 @@ export default function RemindersPanel({ onClose }: Props) {
     setFulfillYear(String(today.getFullYear()));
     queryClient.invalidateQueries({ queryKey: ['reminders-panel-recs', userId] });
   };
-
   const handleDelete = async () => {
     if (!selectedReminder) return;
     await supabase.from('recording_reminders').delete().eq('id', selectedReminder.id);
     setShowActions(false);
     queryClient.invalidateQueries({ queryKey: ['reminders-panel', userId] });
   };
-
   const handleMoveOrCopy = async () => {
     if (!selectedReminder || !selectedSpaceId) return;
     setMoveSaving(true);
@@ -184,7 +165,6 @@ export default function RemindersPanel({ onClose }: Props) {
     setShowMoveModal(false);
     queryClient.invalidateQueries({ queryKey: ['reminders-panel', userId] });
   };
-
   const renderFulfilledCard = (r: any, i: number, arr: any[]) => {
     const recs = fulfilledMap[r.id] ?? [];
     return (
@@ -213,12 +193,10 @@ export default function RemindersPanel({ onClose }: Props) {
       </TouchableOpacity>
     );
   };
-
   const renderSimpleRow = (r: any, i: number, arr: any[]) => {
     const hasPartial = fulfilledPartially(r.id);
     const partialRecs = fulfilledMap[r.id] ?? [];
     const isLast = i === arr.length - 1;
-
     if (hasPartial) {
       return (
         <TouchableOpacity key={r.id} style={[st.card, isLast && { marginBottom: 0 }]} activeOpacity={0.85} onPress={() => openActions(r)}>
@@ -244,7 +222,6 @@ export default function RemindersPanel({ onClose }: Props) {
         </TouchableOpacity>
       );
     }
-
     return (
       <TouchableOpacity key={r.id} style={[st.row, isLast && st.rowLast]} activeOpacity={0.7} onPress={() => openActions(r)}>
         <View style={{ flex: 1, gap: 3 }}>
@@ -261,15 +238,12 @@ export default function RemindersPanel({ onClose }: Props) {
       </TouchableOpacity>
     );
   };
-
   return (
     <SafeAreaView style={st.root}>
       <PageHeader title="Reminders" onBack={onClose} titleColor={TEAL} right={
         <TouchableOpacity onPress={() => { switchTab('reminders'); onClose(); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Ionicons name="add" size={22} color={TEAL} />
         </TouchableOpacity>
       } />
-
       <View style={st.filterRow}>
         {(['all', 'active', 'paused'] as const).map(f => (
           <TouchableOpacity key={f} style={[st.filterBtn, statusFilter === f && st.filterBtnActive]} onPress={() => setStatusFilter(f)} activeOpacity={0.7}>
@@ -277,7 +251,6 @@ export default function RemindersPanel({ onClose }: Props) {
           </TouchableOpacity>
         ))}
       </View>
-
       {isLoading ? (
         <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}><GooeyLoader /></BlurView>
       ) : filtered.length === 0 ? (
@@ -285,28 +258,24 @@ export default function RemindersPanel({ onClose }: Props) {
       ) : (
         <ScrollView contentContainerStyle={st.scroll} showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
-
           {fulfilled.length > 0 && (
             <>
               <Text style={st.sectionTitle}>Fulfilled</Text>
               {fulfilled.map((r, i) => renderFulfilledCard(r, i, fulfilled))}
             </>
           )}
-
           {ongoing.length > 0 && (
             <>
               <Text style={st.sectionTitle}>Ongoing</Text>
               <View style={st.list}>{ongoing.map((r, i) => renderSimpleRow(r, i, ongoing))}</View>
             </>
           )}
-
           {paused.length > 0 && (
             <>
               <Text style={[st.sectionTitle, { color: Colors.muted }]}>Paused</Text>
               <View style={st.list}>{paused.map((r, i) => renderSimpleRow(r, i, paused))}</View>
             </>
           )}
-
           {notYet.length > 0 && (
             <>
               <Text style={[st.sectionTitle, { color: Colors.muted }]}>Not Yet Fulfilled</Text>
@@ -315,7 +284,6 @@ export default function RemindersPanel({ onClose }: Props) {
           )}
         </ScrollView>
       )}
-
       {/* ── Actions modal ── */}
       <BottomSheet visible={showActions} onClose={() => setShowActions(false)} title={selectedReminder?.name ?? 'reminder'}>
         <TouchableOpacity style={st.actionRow} activeOpacity={0.7} onPress={() => { setShowActions(false); setFulfillAmount(''); setShowFulfillModal(true); }}>
@@ -335,7 +303,6 @@ export default function RemindersPanel({ onClose }: Props) {
           <Text style={st.actionSub}>recordings created from this reminder are kept</Text>
         </TouchableOpacity>
       </BottomSheet>
-
       {/* ── Fulfill modal ── */}
       <BottomSheet visible={showFulfillModal} onClose={() => setShowFulfillModal(false)} title="fulfill reminder">
         {/* Info */}
@@ -351,7 +318,6 @@ export default function RemindersPanel({ onClose }: Props) {
             <Text style={{ fontFamily: AppFont.regular, fontSize: 12, color: '#111111' }}>{selectedReminder?.recording_type}</Text>
           </View>
         </View>
-
         {/* Existing recordings this month */}
         {selectedReminder && (fulfilledMap[selectedReminder.id] ?? []).length > 0 && (
           <>
@@ -368,7 +334,6 @@ export default function RemindersPanel({ onClose }: Props) {
             <View style={{ height: 16 }} />
           </>
         )}
-
         {/* Partial / Complete toggle */}
         <Text style={[st.modalLabel, { marginBottom: 8 }]}>Payment Type</Text>
         <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
@@ -379,7 +344,6 @@ export default function RemindersPanel({ onClose }: Props) {
             <Text style={[st.toggleBtnText, fulfillIsPartial && st.toggleBtnTextActive]}>Partial</Text>
           </TouchableOpacity>
         </View>
-
         {/* Date */}
         <Text style={[st.modalLabel, { marginBottom: 8 }]}>Transaction Date</Text>
         <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
@@ -391,7 +355,6 @@ export default function RemindersPanel({ onClose }: Props) {
               activeOpacity={0.8}
             >
               <Text style={st.dropdownText}>{['January','February','March','April','May','June','July','August','September','October','November','December'][parseInt(fulfillMonth) - 1]}</Text>
-              <Ionicons name={showMonthDropdown ? 'chevron-up' : 'chevron-down'} size={14} color={Colors.muted} />
             </TouchableOpacity>
             {showMonthDropdown && (
               <View style={st.dropdownList}>
@@ -418,7 +381,6 @@ export default function RemindersPanel({ onClose }: Props) {
             <TextInput style={st.dateInput} value={fulfillYear} onChangeText={setFulfillYear} keyboardType="number-pad" maxLength={4} placeholder="YYYY" placeholderTextColor={Colors.faint} />
           </View>
         </View>
-
         <Text style={st.modalLabel}>Amount</Text>
         <TextInput
           style={st.modalInput}
@@ -438,7 +400,6 @@ export default function RemindersPanel({ onClose }: Props) {
           <Text style={st.modalBtnText}>{fulfillSaving ? 'saving...' : 'Record'}</Text>
         </TouchableOpacity>
       </BottomSheet>
-
       {/* ── Move/Copy modal ── */}
       <BottomSheet visible={showMoveModal} onClose={() => setShowMoveModal(false)} title={moveMode === 'move' ? 'Move to Space' : 'Copy to Space'}>
         <Text style={st.modalLabel}>Select Space</Text>
@@ -466,7 +427,6 @@ export default function RemindersPanel({ onClose }: Props) {
     </SafeAreaView>
   );
 }
-
 const st = StyleSheet.create({
   root:   { flex: 1, backgroundColor: Colors.white },
   scroll: { paddingHorizontal: DC.pagePadding, paddingBottom: 80 },
@@ -477,7 +437,6 @@ const st = StyleSheet.create({
   filterBtnTextActive: { color: '#ffffff', fontFamily: AppFont.semiBold },
   sectionTitle: { fontFamily: AppFont.bold, fontSize: 13, color: '#111111', textTransform: 'uppercase', letterSpacing: 0.6, marginTop: 20, marginBottom: 8 },
   list: { gap: 0 },
-
   card:       { borderWidth: 1, borderColor: Colors.border, borderRadius: 12, marginBottom: 10, overflow: 'hidden' },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderBottomWidth: 1, borderBottomColor: Colors.border },
   cardName:   { fontFamily: AppFont.semiBold, fontSize: 14, color: '#111111' },
@@ -487,7 +446,6 @@ const st = StyleSheet.create({
   recName:    { fontFamily: AppFont.regular, fontSize: 13, color: '#111111' },
   recMeta:    { fontFamily: AppFont.regular, fontSize: 11, color: Colors.muted },
   recAmount:  { fontFamily: AppFont.bold, fontSize: 13, color: '#111111' },
-
   row:     { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 12 },
   rowLast: { borderBottomWidth: 0 },
   rowName: { fontFamily: AppFont.regular, fontSize: 14, color: '#111111' },
@@ -495,11 +453,9 @@ const st = StyleSheet.create({
   badge:   { alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 2, borderRadius: Radius.pill },
   badgeText: { fontFamily: AppFont.semiBold, fontSize: 10 },
   statusDot: { width: 8, height: 8, borderRadius: 4 },
-
   actionRow:  { paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.border },
   actionText: { fontFamily: AppFont.semiBold, fontSize: 15, color: '#111111' },
   actionSub:  { fontFamily: AppFont.regular, fontSize: 11, color: Colors.muted, marginTop: 2 },
-
   modalLabel: { fontFamily: AppFont.semiBold, fontSize: 11, color: DC.pageTextMuted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8 },
   modalInput: { fontFamily: AppFont.regular, fontSize: 16, color: DC.pageText, backgroundColor: Colors.surface, borderRadius: Radius.lg, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1, borderColor: Colors.borderMid, marginBottom: 16 },
   modalBtn:   { backgroundColor: DC.btnBg, borderRadius: Radius.pill, paddingVertical: 14, alignItems: 'center' },
@@ -517,7 +473,7 @@ const st = StyleSheet.create({
   dropdownItemText:   { fontFamily: AppFont.regular, fontSize: 14, color: DC.pageText },
   dropdownItemTextActive: { fontFamily: AppFont.semiBold, color: '#4f9289' },
   dateInput:       { fontFamily: AppFont.regular, fontSize: 15, color: DC.pageText, backgroundColor: Colors.surface, borderRadius: Radius.lg, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1, borderColor: Colors.borderMid, textAlign: 'center' },
-
   empty:     { flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 80 },
   emptyText: { fontFamily: AppFont.regular, fontSize: 13, color: Colors.muted },
 });
+

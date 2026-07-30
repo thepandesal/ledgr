@@ -2,7 +2,6 @@ import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
   SafeAreaView, ActivityIndicator,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../src/lib/supabase';
@@ -166,8 +165,7 @@ export default function NotificationsScreen({ isActive }: { isActive?: boolean }
       {loading ? (
         <ActivityIndicator color={ACCENT_DARK} style={{ marginTop: 40 }} />
       ) : notifications.length === 0 ? (
-        <View style={s.emptyWrap}>
-          <Ionicons name="notifications-off-outline" size={36} color={Colors.faint} />
+          <View style={s.emptyWrap}>
           <Text style={s.emptyText}>no notifications yet</Text>
         </View>
       ) : (
@@ -187,9 +185,7 @@ export default function NotificationsScreen({ isActive }: { isActive?: boolean }
                     activeOpacity={0.8}
                     onPress={() => handleTap(n)}
                   >
-                    <View style={[s.iconWrap, highlighted && s.iconWrapHighlighted]}>
-                      <Ionicons name={icon as any} size={18} color={highlighted ? ACCENT_DARK : Colors.muted} />
-                    </View>
+
                     <View style={s.mid}>
                       <Text style={[s.rowTitle, highlighted && s.rowTitleHighlighted]} numberOfLines={1}>{n.title}</Text>
                       {n.body ? <Text style={s.rowBody} numberOfLines={2}>{n.body}</Text> : null}
