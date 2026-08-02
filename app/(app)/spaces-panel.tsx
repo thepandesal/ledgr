@@ -14,10 +14,8 @@ import { useExchangeRates } from '../../src/lib/useExchangeRates';
 import GooeyLoader from '@/components/ui/GooeyLoader';
 import { BlurView } from 'expo-blur';
 import BottomSheet from '@/components/ui/BottomSheet';
-import { SvgXml } from 'react-native-svg';
+import TopHeader from '@/components/ui/TopHeader';
 
-const SVG_BACK = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12"><path fill="currentColor" d="M10.5 6a.75.75 0 0 0-.75-.75H3.81l1.97-1.97a.75.75 0 0 0-1.06-1.06L1.47 5.47a.75.75 0 0 0 0 1.06l3.25 3.25a.75.75 0 0 0 1.06-1.06L3.81 6.75h5.94A.75.75 0 0 0 10.5 6" /></svg>`;
-const SVG_ADD  = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10s10-4.477 10-10S17.523 2 12 2m5 11h-4v4h-2v-4H7v-2h4V7h2v4h4z" /></svg>`;
 
 const TEAL = '#9cd7d2';
 const fmt = (n: number | undefined | null) => (n ?? 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
@@ -165,25 +163,17 @@ export default function SpacesPanel({ onClose }: Props) {
 
   return (
     <SafeAreaView style={st.root}>
-      {/* ── Frozen header ── */}
-      <View style={st.frozen}>
-        <TouchableOpacity onPress={onClose} activeOpacity={0.7} style={{ marginBottom: 12 }}>
-          <SvgXml xml={SVG_BACK} width={14} height={14} color="#666" />
-        </TouchableOpacity>
-        <View style={st.titleRow}>
-          <Text style={st.title}>FOLDERS</Text>
-          <TouchableOpacity onPress={openCreate} activeOpacity={0.7}>
-            <SvgXml xml={SVG_ADD} width={26} height={26} color="#373737" />
-          </TouchableOpacity>
-        </View>
-        <View style={st.divider} />
-      </View>
+      <TopHeader title="Folders" onBack={onClose} centered />
 
       {isLoading ? (
         <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}><GooeyLoader /></BlurView>
       ) : (
         <ScrollView contentContainerStyle={st.scroll} showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
+
+          <TouchableOpacity onPress={openCreate} activeOpacity={0.7} style={st.addBtn}>
+            <Text style={st.addBtnText}>+ New Folder</Text>
+          </TouchableOpacity>
 
           {/* Uncategorized */}
           <TouchableOpacity
@@ -316,12 +306,10 @@ export default function SpacesPanel({ onClose }: Props) {
 
 const st = StyleSheet.create({
   root:   { flex: 1, backgroundColor: '#fff' },
-  frozen: { paddingHorizontal: DC.pagePadding, paddingTop: 28, backgroundColor: '#fff' },
-  divider: { height: 1, backgroundColor: '#d2d2d2', marginTop: 20 },
-  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  title:    { ...DC.typography.pageTitle },
-
   scroll: { paddingHorizontal: DC.pagePadding, paddingTop: 20, paddingBottom: 80 },
+
+  addBtn:     { alignSelf: 'flex-end', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999, backgroundColor: '#111111', marginBottom: 20 },
+  addBtnText: { fontFamily: AppFont.semiBold, fontSize: 12, color: '#ffffff' },
 
   sectionHeader: { ...DC.typography.sectionHeader, marginTop: 24, marginBottom: 10 },
 

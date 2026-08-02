@@ -41,8 +41,10 @@ export default function RecordScreen({ isActive }: { isActive?: boolean }) {
   const [entry, setEntry] = useState('');
   const [prev, setPrev] = useState<number | null>(null);
   const [op, setOp] = useState<string | null>(null);
-  const [category, setCategory] = useState<string>('food');
+  const [category, setCategory] = useState<string>('');
   const [userCategories, setUserCategories] = useState<any[]>([]);
+  const [spaceId, setSpaceId] = useState<string | null>(null);
+  const [spaces, setSpaces] = useState<{ id: string; name: string }[]>([]);
   const [saving, setSaving] = useState(false);
   const [showLoader, setShowLoader] = useState(false);
   const [error, setError] = useState('');
@@ -52,6 +54,9 @@ export default function RecordScreen({ isActive }: { isActive?: boolean }) {
     if (!userId) return;
     supabase.from('categories').select('id,name').eq('user_id', userId)
       .then(({ data }) => setUserCategories(data ?? []));
+    supabase.from('spaces').select('id,name').eq('user_id', userId).neq('is_active', false)
+      .order('sort_order', { ascending: true, nullsFirst: false })
+      .then(({ data }) => setSpaces(data ?? []));
   }, [userId]);
 
   const current = entry !== '' ? parseFloat(entry) : (prev ?? 0);
@@ -128,6 +133,7 @@ export default function RecordScreen({ isActive }: { isActive?: boolean }) {
         type,
         amount: amountVal,
         transaction_date: new Date().toISOString().split('T')[0],
+        space_id: spaceId ?? null,
         category_id: matched?.id ?? null,
         status,
         currency: defaultCurrency,
@@ -139,7 +145,7 @@ export default function RecordScreen({ isActive }: { isActive?: boolean }) {
       queryClient.invalidateQueries({ queryKey: ['home-recent', userId] });
       queryClient.invalidateQueries({ queryKey: ['home-shared', userId] });
       queryClient.invalidateQueries({ queryKey: ['recordings-panel', userId] });
-      setEntry(''); setPrev(null); setOp(null); setIsLoan(false);
+      setEntry(''); setPrev(null); setOp(null); setIsLoan(false); setSpaceId(null);
       setShowLoader(true);
       setSaved(true);
     } catch (e: any) {
@@ -214,7 +220,7 @@ export default function RecordScreen({ isActive }: { isActive?: boolean }) {
         </View>
 
         {/* ── Categories ── */}
-        <Text style={s.catLabel}>Categories</Text>
+        <Text style={[s.catLabel, { marginTop: 28 }]}>Categories</Text>
         <View style={s.catGrid}>
           {CATEGORIES.map(c => {
             const selected = category === c.key;
@@ -222,7 +228,7 @@ export default function RecordScreen({ isActive }: { isActive?: boolean }) {
               <TouchableOpacity
                 key={c.key}
                 style={[s.catChip, selected && s.catChipOn]}
-                onPress={() => { setCategory(c.key); setError(''); setSaved(false); }}
+                onPress={() => { setCategory(selected ? '' : c.key); setError(''); setSaved(false); }}
                 activeOpacity={0.8}
               >
                 <CatIcon name={c.key} color={selected ? '#ffffff' : '#000000'} size={17} />
@@ -231,6 +237,28 @@ export default function RecordScreen({ isActive }: { isActive?: boolean }) {
             );
           })}
         </View>
+
+        {/* ── Folders ── */}
+        {spaces.length > 0 && (
+          <>
+            <Text style={[s.catLabel, { marginTop: 28 }]}>Folders</Text>
+            <View style={s.catGrid}>
+              {spaces.map(sp => {
+                const selected = spaceId === sp.id;
+                return (
+                  <TouchableOpacity
+                    key={sp.id}
+                    style={[s.catChip, selected && s.catChipOn]}
+                    onPress={() => { setSpaceId(selected ? null : sp.id); setError(''); setSaved(false); }}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[s.catName, selected && s.catNameOn]} numberOfLines={1}>{sp.name}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </>
+        )}
 
         {error ? <Text style={s.errorText}>{error}</Text> : null}
 

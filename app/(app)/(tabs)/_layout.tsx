@@ -735,9 +735,21 @@ export default function TabsLayout() {
     const incoming = slideAnims[key];
     const outgoing = slideAnims[prev];
 
-    // Instant swap — no animation between different tabs
-    outgoing?.setValue(winWidthRef.current);
-    incoming?.setValue(0);
+    // Slide animation for profile, instant swap for other tabs
+    if (prev === 'profile') {
+      // Slide profile out before switching
+      outgoing?.setValue(0);
+      Animated.timing(outgoing!, { toValue: winWidthRef.current, duration: 260, useNativeDriver: true }).start();
+      incoming?.setValue(0);
+    } else {
+      outgoing?.setValue(winWidthRef.current);
+      if (key === 'profile') {
+        incoming?.setValue(winWidthRef.current);
+        Animated.timing(incoming!, { toValue: 0, duration: 300, useNativeDriver: true }).start();
+      } else {
+        incoming?.setValue(0);
+      }
+    }
 
     // Restore saved panel state for the incoming tab
     const saved = tabStacks.current[key];
@@ -812,8 +824,20 @@ export default function TabsLayout() {
         .in('status', ['new']);
       return;
     }
+    // If already on this tab, close all panels to return to base screen
+    if (key === activeTabRef.current) {
+      closeRecordingsPanel();
+      closeSpacesPanel();
+      closeReceivablesPanel();
+      closeRemindersPanel();
+      closeLoansPanel();
+      closeTopSpending();
+      closeSpace();
+      closeRecording();
+      return;
+    }
     switchTab(key);
-  }, [othersOpen, closeOthers, openOthers, switchTab, userId]);
+  }, [othersOpen, closeOthers, openOthers, switchTab, userId, closeRecordingsPanel, closeSpacesPanel, closeReceivablesPanel, closeRemindersPanel, closeLoansPanel, closeTopSpending, closeSpace, closeRecording]);
 
   // Consume any pending tab set before this layout mounted (e.g. from detail screen nav)
   useEffect(() => {
@@ -912,7 +936,9 @@ export default function TabsLayout() {
         {activeTab === 'home' ? (
           <View style={s.homeHeaderRow}>
             <View style={s.homeHeaderTextCol}>
-              <Text style={s.homeHeaderGreeting}>Hello, <Text style={s.homeHeaderName}>{userName?.split(' ')[0]?.charAt(0).toUpperCase() + userName?.split(' ')[0]?.slice(1) || 'There'}!</Text></Text>
+              <TouchableOpacity onPress={() => switchTab('profile')} activeOpacity={0.7}>
+                <Text style={s.homeHeaderGreeting}>Hello, <Text style={s.homeHeaderName}>{userName?.split(' ')[0]?.charAt(0).toUpperCase() + userName?.split(' ')[0]?.slice(1) || 'There'}!</Text></Text>
+              </TouchableOpacity>
               <TouchableOpacity onPress={triggerHomeDateEdit} activeOpacity={0.7} style={s.homeDateRow} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                 <Text style={s.homeDateValue}>{homeDateLabel}</Text>
                 <NavIcon name="create-outline" size={14} color="#373737" />

@@ -36,7 +36,6 @@ export default function BottomNav() {
   return (
     <View style={s.wrap}>
       <View style={[s.pill, { paddingBottom: insets.bottom || 10 }]}>
-        <View style={s.basin} />
 
         {TABS.map(tab => {
           if (tab.key === 'record') return <View key={tab.key} style={s.spacer} />;
@@ -74,7 +73,6 @@ export default function BottomNav() {
         >
           <NavIcon name="add" size={28} color="#fff" />
         </TouchableOpacity>
-        <Text style={[s.addLabel, activeTab === 'record' && s.addLabelActive]}>Record</Text>
       </View>
     </View>
   );
@@ -102,23 +100,6 @@ const s = StyleSheet.create({
     shadowRadius: 8,
     elevation: 10,
   },
-  basin: {
-    position: 'absolute',
-    top: 0,
-    left: '50%',
-    marginLeft: -40,
-    width: 80,
-    height: 40,
-    borderBottomLeftRadius: 40,
-    borderBottomRightRadius: 40,
-    backgroundColor: 'transparent',
-    zIndex: 0,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
   item: {
     flex: 1,
     alignItems: 'center',
@@ -131,7 +112,7 @@ const s = StyleSheet.create({
   },
   addBtn: {
     position: 'absolute',
-    bottom: 34,
+    bottom: 16,
     left: '50%',
     marginLeft: -(ADD_SIZE / 2),
     width: ADD_SIZE,
