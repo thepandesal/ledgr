@@ -54,7 +54,7 @@ const s = StyleSheet.create({
   },
   side:    { width: 80, flexDirection: 'row', alignItems: 'center' },
   center:  { flex: 1, alignItems: 'center' },
-  brand:   { fontFamily: 'MuseoModerno_Regular', fontSize: 11, color: DC.pageTextMuted, letterSpacing: 2, marginBottom: -4 },
+  brand:   { fontFamily: 'MuseoModerno-Regular', fontSize: 11, color: DC.pageTextMuted, letterSpacing: 2, marginBottom: -4 },
   title:   { fontFamily: AppFont.bold, fontSize: 24, color: DC.accent1, letterSpacing: -0.5 },
   actionBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: DC.cardBg, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: DC.cardBorder },
 });

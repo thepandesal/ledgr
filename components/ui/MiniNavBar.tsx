@@ -61,8 +61,8 @@ const s = StyleSheet.create({
   bar:         { flexDirection: 'row', backgroundColor: Colors.white, borderTopWidth: 1, borderTopColor: Colors.border, height: 64, paddingTop: 8 },
   item:        { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 3 },
   iconWrap:    { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
-  label:       { fontFamily: 'ChillaxRegular', fontSize: 10, color: NAV_INACTIVE, letterSpacing: 0.4 },
-  labelActive: { fontFamily: 'ChillaxMedium', fontSize: 10, color: NAV_ACCENT },
+  label:       { fontFamily: 'Poppins-Regular', fontSize: 10, color: NAV_INACTIVE, letterSpacing: 0.4 },
+  labelActive: { fontFamily: 'Poppins-Medium', fontSize: 10, color: NAV_ACCENT },
   badge:       { position: 'absolute', top: -2, right: -4, minWidth: 16, height: 16, borderRadius: 8, backgroundColor: '#ed6a6a', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
-  badgeText:   { fontFamily: 'ChillaxMedium', fontSize: 9, color: '#fff', lineHeight: 14 },
+  badgeText:   { fontFamily: 'Poppins-Medium', fontSize: 9, color: '#fff', lineHeight: 14 },
 });

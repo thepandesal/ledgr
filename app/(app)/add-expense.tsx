@@ -490,7 +490,7 @@ const s = StyleSheet.create({
     marginTop: 16, marginBottom: 16,
   },
   title: {
-    fontFamily: 'Aujournuit-Regular', fontSize: 17, color: '#000000',
+    fontFamily: 'Poppins-Medium', fontSize: 17, color: '#000000',
     letterSpacing: 0.4,
   },
 
@@ -506,15 +506,15 @@ const s = StyleSheet.create({
     borderRadius: Radius.pill, borderWidth: 1, borderColor: BORDER,
   },
   modePillActive: { backgroundColor: '#464646' },
-  modePillText:     { fontFamily: 'InclusiveSans-Regular', fontSize: 12, color: '#464646' },
-  modePillTextActive: { fontFamily: 'InclusiveSans-SemiBold', fontSize: 12, color: '#fff' },
+  modePillText:     { fontFamily: 'Poppins-Regular', fontSize: 12, color: '#464646' },
+  modePillTextActive: { fontFamily: 'Poppins-SemiBold', fontSize: 12, color: '#fff' },
 
   // ── Toggle row ──
   toggleRow: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
     height: 36, marginBottom: 0.5,
   },
-  toggleLabel: { fontFamily: 'InclusiveSans-Regular', fontSize: 11, color: '#464646', letterSpacing: 0.3 },
+  toggleLabel: { fontFamily: 'Poppins-Regular', fontSize: 11, color: '#464646', letterSpacing: 0.3 },
   toggleDisabled: { opacity: 0.35 },
   toggleLabelDisabled: { opacity: 0.5 },
 
@@ -535,7 +535,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 14,
     borderRadius: Radius.pill, borderWidth: 1, borderColor: BORDER,
   },
-  pillDropdownText: { fontFamily: 'InclusiveSans-Regular', fontSize: 11, color: '#464646', letterSpacing: 0.6 },
+  pillDropdownText: { fontFamily: 'Poppins-Regular', fontSize: 11, color: '#464646', letterSpacing: 0.6 },
 
   overlayList: {
     borderRadius: Radius.lg, borderWidth: 1, borderColor: BORDER,
@@ -547,8 +547,8 @@ const s = StyleSheet.create({
     borderBottomWidth: 0.5, borderBottomColor: BORDER,
   },
   overlayItemActive: { backgroundColor: '#f9f9f9' },
-  overlayItemText:     { fontFamily: 'InclusiveSans-Regular', fontSize: 11, color: '#464646', letterSpacing: 0.6 },
-  overlayItemTextActive: { fontFamily: 'InclusiveSans-Regular', fontSize: 11, color: '#000' },
+  overlayItemText:     { fontFamily: 'Poppins-Regular', fontSize: 11, color: '#464646', letterSpacing: 0.6 },
+  overlayItemTextActive: { fontFamily: 'Poppins-Regular', fontSize: 11, color: '#000' },
 
   // ── Date row ──
   dateRow: { flexDirection: 'row', gap: 8 },
@@ -558,10 +558,10 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: BORDER, borderRadius: Radius.lg,
     backgroundColor: '#fff', padding: 16, marginTop: 12,
   },
-  fieldLabel: { fontFamily: 'InclusiveSans-SemiBold', fontSize: 11, color: '#464646', letterSpacing: 0.6, marginBottom: 6 },
+  fieldLabel: { fontFamily: 'Poppins-SemiBold', fontSize: 11, color: '#464646', letterSpacing: 0.6, marginBottom: 6 },
   textInput: {
     height: 36, borderRadius: Radius.pill, borderWidth: 1, borderColor: BORDER,
-    paddingHorizontal: 14, fontSize: 16, fontFamily: 'InclusiveSans-Regular', color: '#000',
+    paddingHorizontal: 14, fontSize: 16, fontFamily: 'Poppins-Regular', color: '#000',
   },
 
   // ── Amount ──
@@ -571,10 +571,10 @@ const s = StyleSheet.create({
     paddingHorizontal: 14,
     borderRadius: Radius.pill, borderWidth: 1, borderColor: BORDER,
   },
-  currencyText: { fontFamily: 'Inter-SemiBold', fontSize: 12, color: '#464646' },
+  currencyText: { fontFamily: 'Poppins-SemiBold', fontSize: 12, color: '#464646' },
   amountInput: {
     flex: 1, height: 36, borderRadius: Radius.pill, borderWidth: 1, borderColor: BORDER,
-    paddingHorizontal: 14, fontSize: 16, fontFamily: 'Inter-Regular', color: '#000', minWidth: 0,
+    paddingHorizontal: 14, fontSize: 16, fontFamily: 'Poppins-Regular', color: '#000', minWidth: 0,
   },
 
   // ── Person search ──
@@ -584,7 +584,7 @@ const s = StyleSheet.create({
     borderRadius: Radius.pill, borderWidth: 1, borderColor: BORDER,
   },
   personInput: {
-    flex: 1, fontSize: 16, fontFamily: 'InclusiveSans-Regular', color: '#000',
+    flex: 1, fontSize: 16, fontFamily: 'Poppins-Regular', color: '#000',
     paddingVertical: 0,
   },
 
@@ -606,5 +606,5 @@ const s = StyleSheet.create({
     backgroundColor: '#3a3a34',
     justifyContent: 'center', alignItems: 'center',
   },
-  submitText: { fontFamily: 'InclusiveSans-Regular', fontSize: 13, color: '#fff' },
+  submitText: { fontFamily: 'Poppins-Regular', fontSize: 13, color: '#fff' },
 });

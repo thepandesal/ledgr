@@ -20,21 +20,16 @@ const queryClient = new QueryClient({
 });
 
 export default function RootLayout() {
+  console.log('[boot] RootLayout mounted');
+  console.time('[boot] fonts');
   const [fontsLoaded, fontError] = useFonts({
-    'Inter-Regular':   require('../assets/Inter_18pt-Regular.ttf'),
-    'Inter-Medium':    require('../assets/Inter_18pt-Medium.ttf'),
-    'Inter-SemiBold':  require('../assets/Inter_18pt-SemiBold.ttf'),
-    'Inter-Bold':      require('../assets/Inter_18pt-Bold.ttf'),
-    'MuseoModerno-Black':   require('../assets/MuseoModerno-Black.ttf'),
-    'MuseoModerno-Medium':  require('../assets/MuseoModerno-Medium.ttf'),
-    'MuseoModerno-Regular': require('../assets/MuseoModerno-Regular.ttf'),
-    'CormorantGaramond-Regular': require('../assets/CormorantGaramond-Regular.ttf'),
-    'CormorantGaramond-Bold':    require('../assets/CormorantGaramond-Bold.ttf'),
-    'Aujournuit-Regular':     require('../assets/Aujournuit-Regular.ttf'),
-    'InclusiveSans-Regular':  require('../assets/InclusiveSans-Regular.ttf'),
-    'InclusiveSans-Medium':   require('../assets/InclusiveSans-Medium.ttf'),
-    'InclusiveSans-SemiBold': require('../assets/InclusiveSans-SemiBold.ttf'),
-    'InclusiveSans-Bold':     require('../assets/InclusiveSans-Bold.ttf'),
+    'Poppins-Regular':  require('../assets/Poppins-Regular.ttf'),
+    'Poppins-Medium':   require('../assets/Poppins-Medium.ttf'),
+    'Poppins-SemiBold': require('../assets/Poppins-SemiBold.ttf'),
+    'Poppins-Bold':     require('../assets/Poppins-Bold.ttf'),
+    'MuseoModerno-ExtraBold': require('../assets/MuseoModerno-ExtraBold.ttf'),
+    'MuseoModerno-Medium':    require('../assets/MuseoModerno-Medium.ttf'),
+    'MuseoModerno-Regular':   require('../assets/MuseoModerno-Regular.ttf'),
   });
 
   const router = useRouter();
@@ -71,10 +66,11 @@ export default function RootLayout() {
   }, []);
 
   useEffect(() => {
-    if (!fontsLoaded && !fontError) return;
+    console.time('[boot] auth');
     let initialEventReceived = false;
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (typeof __DEV__ !== 'undefined' && __DEV__) console.log('[auth] event:', String(event).replace(/[\r\n]/g, ' '));
+      console.timeEnd('[boot] auth');
+      console.log('[boot] auth event:', event);
       const path = typeof window !== 'undefined' && typeof window.location !== 'undefined' ? window.location.pathname : '';
       if (path.startsWith('/split/')) { setReady(true); return; }
 
@@ -116,7 +112,7 @@ export default function RootLayout() {
       }
     });
     return () => subscription.unsubscribe();
-  }, [fontsLoaded, fontError]);
+  }, []);
 
   if ((!fontsLoaded && !fontError) || !ready) {
     return (
@@ -125,6 +121,9 @@ export default function RootLayout() {
       </View>
     );
   }
+
+  console.timeEnd('[boot] fonts');
+  console.log('[boot] rendering app');
 
   return (
     <QueryClientProvider client={queryClient}>

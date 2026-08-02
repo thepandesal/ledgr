@@ -948,7 +948,7 @@ const s = StyleSheet.create({
   container:  { flex: 1, backgroundColor: Colors.white },
   topSection: { paddingHorizontal: 25, paddingTop: 20, paddingBottom: 12 },
   titleRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  title:      { fontFamily: 'CalSans', fontSize: 28, color: Colors.text, letterSpacing: -0.8 },
+  title:      { fontFamily: 'Poppins-Bold', fontSize: 28, color: Colors.text, letterSpacing: -0.8 },
   addRecBtn:  { width: 36, height: 36, borderRadius: 18, backgroundColor: ACCENT, alignItems: 'center', justifyContent: 'center' },
 
   sheet:    { flex: 1, backgroundColor: Colors.white },
@@ -978,8 +978,8 @@ const s = StyleSheet.create({
   row:         { backgroundColor: Colors.white, borderRadius: Radius.xl, flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14 },
   rowIconWrap: { width: 46, height: 46, borderRadius: 23, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.surface },
   rowMid:      { flex: 1, gap: 2 },
-  rowType:     { fontFamily: 'ChillaxRegular', fontSize: 10, color: Colors.muted, letterSpacing: 0.4, textTransform: 'uppercase' },
-  rowName:     { fontFamily: 'ChillaxMedium',  fontSize: 14, color: Colors.text, letterSpacing: 0.1, lineHeight: 20 },
+  rowType:     { fontFamily: 'Poppins-Regular', fontSize: 10, color: Colors.muted, letterSpacing: 0.4, textTransform: 'uppercase' },
+  rowName:     { fontFamily: 'Poppins-Medium',  fontSize: 14, color: Colors.text, letterSpacing: 0.1, lineHeight: 20 },
   rowSpace:    { fontFamily: Fonts.mono,        fontSize: 11, color: Colors.faint, letterSpacing: 0.2 },
   rowAmount:   { fontFamily: Fonts.monoBold,    fontSize: 15, letterSpacing: -0.4 },
 

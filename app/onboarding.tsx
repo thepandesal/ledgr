@@ -82,7 +82,7 @@ const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#ffffff' },
   scroll: { paddingHorizontal: 24, paddingTop: 60, paddingBottom: 40 },
   sectionHeader: {
-    fontFamily: 'Aujournuit-Regular',
+    fontFamily: 'Poppins-Medium',
     fontSize: 20,
     color: '#000000',
     letterSpacing: 0.4,
@@ -90,14 +90,14 @@ const s = StyleSheet.create({
     marginTop: 24,
   },
   title: {
-    fontFamily: 'Aujournuit-Regular',
+    fontFamily: 'Poppins-Medium',
     fontSize: 28,
     color: '#000000',
     letterSpacing: 0.4,
     marginBottom: 32,
   },
   input: {
-    fontFamily: 'Inter-Regular',
+    fontFamily: 'Poppins-Regular',
     fontSize: 16,
     color: '#3a3a34',
     borderWidth: 1,
@@ -128,7 +128,7 @@ const s = StyleSheet.create({
     backgroundColor: '#f0f0f0',
   },
   error: {
-    fontFamily: 'Inter-Regular',
+    fontFamily: 'Poppins-Regular',
     fontSize: 13,
     color: '#e74c3c',
     textAlign: 'center',
@@ -142,5 +142,5 @@ const s = StyleSheet.create({
     marginTop: 32,
   },
   buttonDisabled: { opacity: 0.4 },
-  buttonText: { fontFamily: 'Inter-SemiBold', fontSize: 15, color: '#ffffff', letterSpacing: 1.5 },
+  buttonText: { fontFamily: 'Poppins-SemiBold', fontSize: 15, color: '#ffffff', letterSpacing: 1.5 },
 });

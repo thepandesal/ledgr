@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import type { User } from '@supabase/supabase-js';
@@ -26,30 +26,41 @@ async function registerPushToken(_userId: string) {
   // expo-notifications not installed locally
 }
 
-/**
- * useUser
- * Fetches and caches the current Supabase auth user.
- * Replaces the repeated supabase.auth.getUser() pattern across screens.
- *
- * Usage:
- *   const { user, userId, userName } = useUser();
- */
+// ── Singleton session cache — shared across all useUser() callers ──
+let _user: User | null = null;
+let _loading = true;
+let _listeners: Array<() => void> = [];
+let _initialized = false;
+
+function notifyListeners() { _listeners.forEach(fn => fn()); }
+
+function initSession() {
+  if (_initialized) return;
+  _initialized = true;
+  supabase.auth.getSession().then(({ data: { session } }) => {
+    _user = session?.user ?? null;
+    _loading = false;
+    if (session?.user?.id) registerPushToken(session.user.id);
+    notifyListeners();
+  });
+  supabase.auth.onAuthStateChange((_, session) => {
+    _user = session?.user ?? null;
+    notifyListeners();
+  });
+}
+
 export function useUser(): UseUserResult {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [, rerender] = useState(0);
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      setLoading(false);
-      if (session?.user?.id) registerPushToken(session.user.id);
-    });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
-      setUser(session?.user ?? null);
-    });
-    return () => subscription.unsubscribe();
+    initSession();
+    const fn = () => rerender(n => n + 1);
+    _listeners.push(fn);
+    return () => { _listeners = _listeners.filter(l => l !== fn); };
   }, []);
+
+  const user = _user;
 
   const { data: settings } = useQuery({
     queryKey: ['user-settings', user?.id],
@@ -100,6 +111,6 @@ export function useUser(): UseUserResult {
     setDefaultCurrency,
     requireTagApproval: settings?.require_tag_approval ?? false,
     setRequireTagApproval,
-    loading,
+    loading: _loading,
   };
 }

@@ -141,13 +141,13 @@ export default function LegalScreen() {
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.white },
   header:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  title:     { fontFamily: 'ChillaxMedium', fontSize: 16, color: Colors.text },
+  title:     { fontFamily: 'Poppins-Medium', fontSize: 16, color: Colors.text },
   tabs:      { flexDirection: 'row', paddingHorizontal: 24, paddingTop: 16, gap: 8 },
   tab:       { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999, backgroundColor: Colors.input },
   tabActive: { backgroundColor: Brand.color.accent },
-  tabText:   { fontFamily: 'ChillaxRegular', fontSize: 13, color: Colors.muted },
-  tabTextActive: { fontFamily: 'ChillaxMedium', fontSize: 13, color: Colors.text },
+  tabText:   { fontFamily: 'Poppins-Regular', fontSize: 13, color: Colors.muted },
+  tabTextActive: { fontFamily: 'Poppins-Medium', fontSize: 13, color: Colors.text },
   scroll:    { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 48 },
-  updated:   { fontFamily: 'DMSans_400Regular', fontSize: 11, color: Colors.muted, marginBottom: 16 },
-  body:      { fontFamily: 'DMSans_400Regular', fontSize: 13, color: Colors.text, lineHeight: 22 },
+  updated:   { fontFamily: 'Poppins-Regular', fontSize: 11, color: Colors.muted, marginBottom: 16 },
+  body:      { fontFamily: 'Poppins-Regular', fontSize: 13, color: Colors.text, lineHeight: 22 },
 });

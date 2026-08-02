@@ -153,7 +153,7 @@ const s = StyleSheet.create({
 
   overlay:      { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'center', alignItems: 'center' },
   card:         { backgroundColor: Colors.white, borderRadius: 20, padding: 20, width: 300, maxHeight: '80%' },
-  cardTitle:    { fontFamily: 'CalSans', fontSize: 20, color: Colors.text, marginBottom: 16 },
+  cardTitle:    { fontFamily: 'Poppins-Bold', fontSize: 20, color: Colors.text, marginBottom: 16 },
 
   fieldLabel:   { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 6, marginTop: 12 },
   fieldBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: Colors.surface, borderRadius: Radius.md, paddingHorizontal: 14, paddingVertical: 11, borderWidth: 1, borderColor: Colors.borderMid },

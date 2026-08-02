@@ -1,0 +1,81 @@
+            {items.length === 0 ? (
+              <View style={s.dottedCard}>
+                <View style={s.emptyRow}>
+                  <Text style={s.emptyText}>{filledPeople.length === 0 ? 'add people first' : 'no items yet'}</Text>
+                </View>
+              </View>
+            ) : (() => {
+              const recGroups: { recId: string | null; recName: string; recIdx: number; recAmount: number; items: any[] }[] = [];
+              items.forEach((item: any) => {
+                const key = item.recording_id ?? null;
+                const existing = recGroups.find(g => g.recId === key);
+                if (existing) { existing.items.push(item); }
+                else {
+                  const lr = linkedRecordings.find((l: any) => l.recording?.id === key);
+                  recGroups.push({ recId: key, recName: lr?.recording?.name ?? 'manual', recIdx: recGroups.length + 1, recAmount: Number(lr?.amount_contributed ?? 0), items: [item] });
+                }
+              });
+              linkedRecordings.forEach((lr: any) => {
+                if (!recGroups.find(g => g.recId === lr.recording?.id)) {
+                  recGroups.push({ recId: lr.recording?.id ?? null, recName: lr.recording?.name ?? '-', recIdx: recGroups.length + 1, recAmount: Number(lr.amount_contributed ?? 0), items: [] });
+                }
+              });
+              return (
+                <View style={{ gap: 8 }}>
+                  {recGroups.map((group) => {
+                    const hasSubitems = group.items.length > 1;
+                    const singleItem = group.items.length === 1 ? group.items[0] : null;
+                    return (
+                      <View key={group.recId ?? 'manual'} style={s.dottedCard}>
+                        {hasSubitems ? (
+                          <>
+                            <View style={s.itemParentRow}>
+                              <Text style={s.itemParentNum}>{group.recIdx}</Text>
+                              <Text style={[s.subItemName, { flex: 1 }]} numberOfLines={1}>{group.recName}</Text>
+                              {billStatus === 'ongoing' && (
+                                <TouchableOpacity onPress={() => deleteItem(group.items[0].id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                                  <SvgXml xml={SVG_CLOSE} width={18} height={18} color={DC.pageTextMuted} />
+                                </TouchableOpacity>
+                              )}
+                            </View>
+                            {group.items.map((item: any) => {
+                              const deduct = isDeductType(item.recording_type);
+                              return (
+                                <TouchableOpacity key={item.id} style={s.subItemRow} onPress={() => openAssign(item)} activeOpacity={0.8}>
+                                  <View style={s.subItemBar} />
+                                  <View style={{ flex: 1 }}>
+                                    <Text style={s.subItemName} numberOfLines={1}>{item.name}</Text>
+                                    <Text style={[s.subItemPeople, { fontStyle: 'italic' }]} numberOfLines={1}>{(item.people ?? []).length > 0 ? item.people.join(', ') : 'tap to assign'}</Text>
+                                  </View>
+                                  <Text style={s.subItemAmount}>{deduct ? '- ' : ''}{fmt(Number(item.cost))}</Text>
+                                </TouchableOpacity>
+                              );
+                            })}
+                          </>
+                        ) : singleItem ? (
+                          <TouchableOpacity style={s.itemParentRow} onPress={() => openAssign(singleItem)} activeOpacity={0.8}>
+                            <Text style={s.itemParentNum}>{group.recIdx}</Text>
+                            <View style={{ flex: 1 }}>
+                              <Text style={s.subItemName} numberOfLines={1}>{singleItem.name}</Text>
+                              <Text style={[s.subItemPeople, { fontStyle: 'italic' }]} numberOfLines={1}>{(singleItem.people ?? []).length > 0 ? singleItem.people.join(', ') : 'tap to assign'}</Text>
+                            </View>
+                            <Text style={s.subItemAmount}>{isDeductType(singleItem.recording_type) ? '- ' : ''}{fmt(Number(singleItem.cost))}</Text>
+                            {billStatus === 'ongoing' && (
+                              <TouchableOpacity onPress={() => deleteItem(singleItem.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                                <SvgXml xml={SVG_CLOSE} width={18} height={18} color={DC.pageTextMuted} />
+                              </TouchableOpacity>
+                            )}
+                          </TouchableOpacity>
+                        ) : (
+                          <View style={s.itemParentRow}>
+                            <Text style={s.itemParentNum}>{group.recIdx}</Text>
+                            <Text style={[s.subItemName, { flex: 1 }]} numberOfLines={1}>{group.recName}</Text>
+                            <Text style={s.subItemPeople}>no items yet</Text>
+                          </View>
+                        )}
+                      </View>
+                    );
+                  })}
+                </View>
+              );
+            })()}

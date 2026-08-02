@@ -1,0 +1,327 @@
+﻿      </ScrollView>
+
+      {/* Loading overlay */}
+      {isLoading && (
+        <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}>
+          <GooeyLoader />
+        </BlurView>
+      )}
+
+      <BottomSheet visible={showDateSheet} onClose={() => setShowDateSheet(false)} title="date range">
+        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 20 }}>
+          <TouchableOpacity style={[s.chip, draftPickerMonth === new Date().getMonth() && draftPickerYear === new Date().getFullYear() && draftMode === 'monthly' && s.chipActive]} onPress={() => { setDraftMode('monthly'); setDraftPickerMonth(new Date().getMonth()); setDraftPickerYear(new Date().getFullYear()); }} activeOpacity={0.75}>
+            <Text style={[s.chipText, draftPickerMonth === new Date().getMonth() && draftPickerYear === new Date().getFullYear() && draftMode === 'monthly' && s.chipTextActive]}>This Month</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[s.chip, draftMode === 'monthly' && !(draftPickerMonth === new Date().getMonth() && draftPickerYear === new Date().getFullYear()) && s.chipActive]} onPress={() => setDraftMode('monthly')} activeOpacity={0.75}>
+            <Text style={[s.chipText, draftMode === 'monthly' && !(draftPickerMonth === new Date().getMonth() && draftPickerYear === new Date().getFullYear()) && s.chipTextActive]}>Monthly</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[s.chip, draftMode === '3months' && s.chipActive]} onPress={() => setDraftMode('3months')} activeOpacity={0.75}>
+            <Text style={[s.chipText, draftMode === '3months' && s.chipTextActive]}>3 Months</Text>
+          </TouchableOpacity>
+        </View>
+
+        {draftMode === 'monthly' && !(draftPickerMonth === new Date().getMonth() && draftPickerYear === new Date().getFullYear()) && (
+          <View style={{ flexDirection: 'row', gap: 12 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={s.sheetLabel}>Month</Text>
+              <ScrollView style={s.dropCol} showsVerticalScrollIndicator={false} nestedScrollEnabled>
+                {MONTHS.map((m, i) => (
+                  <TouchableOpacity key={m} style={[s.dropItem, draftPickerMonth === i && s.dropItemActive]} onPress={() => setDraftPickerMonth(i)} activeOpacity={0.75}>
+                    <Text style={[s.dropText, draftPickerMonth === i && s.dropTextActive]}>{m}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={s.sheetLabel}>Year</Text>
+              <ScrollView style={s.dropCol} showsVerticalScrollIndicator={false} nestedScrollEnabled>
+                {YEARS.map(y => (
+                  <TouchableOpacity key={y} style={[s.dropItem, draftPickerYear === y && s.dropItemActive]} onPress={() => setDraftPickerYear(y)} activeOpacity={0.75}>
+                    <Text style={[s.dropText, draftPickerYear === y && s.dropTextActive]}>{y}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          </View>
+        )}
+
+        {draftMode === '3months' && (() => {
+          const autoTo = new Date(draftFromYear, draftFromMonth + 2, 1);
+          return (
+            <>
+              <Text style={s.sheetLabel}>From</Text>
+              <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16 }}>
+                <View style={{ flex: 1 }}>
+                  <ScrollView style={s.dropCol} showsVerticalScrollIndicator={false} nestedScrollEnabled>
+                    {MONTHS.map((m, i) => (
+                      <TouchableOpacity key={m} style={[s.dropItem, draftFromMonth === i && s.dropItemActive]} onPress={() => setDraftFromMonth(i)} activeOpacity={0.75}>
+                        <Text style={[s.dropText, draftFromMonth === i && s.dropTextActive]}>{m}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <ScrollView style={s.dropCol} showsVerticalScrollIndicator={false} nestedScrollEnabled>
+                    {YEARS.map(y => (
+                      <TouchableOpacity key={y} style={[s.dropItem, draftFromYear === y && s.dropItemActive]} onPress={() => setDraftFromYear(y)} activeOpacity={0.75}>
+                        <Text style={[s.dropText, draftFromYear === y && s.dropTextActive]}>{y}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+              </View>
+              <Text style={s.sheetLabel}>Until (auto)</Text>
+              <Text style={{ fontFamily: 'Poppins-SemiBold', fontSize: 14, color: '#4f9289', marginBottom: 16 }}>
+                {MONTHS[autoTo.getMonth()]} {autoTo.getFullYear()}
+              </Text>
+            </>
+          );
+        })()}
+
+        <TouchableOpacity
+          style={s.applyBtn}
+          activeOpacity={0.8}
+          onPress={() => {
+            setDateMode(draftMode);
+            setPickerMonth(draftPickerMonth);
+            setPickerYear(draftPickerYear);
+            setRangeFromMonth(draftFromMonth);
+            setRangeFromYear(draftFromYear);
+            setShowDateSheet(false);
+          }}
+        >
+          <Text style={s.applyBtnText}>Apply</Text>
+        </TouchableOpacity>
+      </BottomSheet>
+
+      <BottomSheet visible={!!spaceChoice} onClose={() => setSpaceChoice(null)} title={spaceChoice?.name ?? ''}>
+        <TouchableOpacity style={s.choiceRow} activeOpacity={0.8} onPress={() => { const sp = spaceChoice; setSpaceChoice(null); openRecordingsPanel({ spaceId: sp!.id, spaceName: sp!.name }); }}>
+          <View style={{ flex: 1 }}>
+            <Text style={s.choiceTitle}>View Recordings</Text>
+            <Text style={s.choiceSub}>browse this space's recordings</Text>
+          </View>
+        </TouchableOpacity>
+        <TouchableOpacity style={[s.choiceRow, { borderBottomWidth: 0 }]} activeOpacity={0.8} onPress={() => { const sp = spaceChoice; setSpaceChoice(null); openSpace(sp!.id, sp!.name, true); }}>
+          <View style={{ flex: 1 }}>
+            <Text style={s.choiceTitle}>Edit Space</Text>
+            <Text style={s.choiceSub}>rename, archive, or delete</Text>
+          </View>
+        </TouchableOpacity>
+      </BottomSheet>
+
+      <BottomSheet visible={addAccountSheet} onClose={() => { setAddAccountSheet(false); setAccBank(''); setAccName(''); setAccNumber(''); setAccHolder(''); setAccError(''); }} title="add account">
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <View style={{ gap: 10, paddingBottom: 16 }}>
+            <TextInput style={{ borderWidth: 1, borderColor: '#e0e0e0', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 10, fontFamily: 'Poppins-Regular', fontSize: 13, color: '#111' }} placeholder="bank" placeholderTextColor={Colors.faint} value={accBank} onChangeText={setAccBank} />
+            <TextInput style={{ borderWidth: 1, borderColor: '#e0e0e0', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 10, fontFamily: 'Poppins-Regular', fontSize: 13, color: '#111' }} placeholder="account name" placeholderTextColor={Colors.faint} value={accName} onChangeText={setAccName} />
+            <TextInput style={{ borderWidth: 1, borderColor: '#e0e0e0', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 10, fontFamily: 'Poppins-Regular', fontSize: 13, color: '#111' }} placeholder="account number" placeholderTextColor={Colors.faint} value={accNumber} onChangeText={setAccNumber} keyboardType="numeric" />
+            <TextInput style={{ borderWidth: 1, borderColor: '#e0e0e0', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 10, fontFamily: 'Poppins-Regular', fontSize: 13, color: '#111' }} placeholder="account holder" placeholderTextColor={Colors.faint} value={accHolder} onChangeText={setAccHolder} />
+            {accError ? <Text style={{ color: '#e74c3c', fontSize: 12 }}>{accError}</Text> : null}
+            <TouchableOpacity style={{ backgroundColor: TEAL, borderRadius: 8, paddingVertical: 12, alignItems: 'center', opacity: accLoading ? 0.6 : 1 }} disabled={accLoading} onPress={async () => {
+              if (!accBank.trim() || !accName.trim() || !accNumber.trim()) { setAccError('bank, account name and number are required.'); return; }
+              setAccLoading(true); setAccError('');
+              const { error: err } = await supabase.from('accounts').insert({ user_id: userId, bank: accBank.trim(), account_name: accName.trim(), account_number: accNumber.trim(), holder_name: accHolder.trim() || accName.trim(), account_type: 'Savings', account_details: '', color: Colors.border });
+              setAccLoading(false);
+              if (err) { setAccError(err.message); return; }
+              setAddAccountSheet(false); setAccBank(''); setAccName(''); setAccNumber(''); setAccHolder(''); setAccError('');
+              queryClient.invalidateQueries({ queryKey: ['accounts'] });
+            }}>
+              <Text style={{ color: '#fff', fontWeight: '600', textAlign: 'center' }}>{accLoading ? 'saving...' : 'save account'}</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </BottomSheet>
+
+      <BottomSheet visible={addContactSheet} onClose={() => setAddContactSheet(false)} title="add a contact">
+        <TouchableOpacity style={s.choiceRow} activeOpacity={0.8} onPress={() => { setAddContactSheet(false); openFriendsPanel(); }}>
+          <View style={{ flex: 1 }}>
+            <Text style={s.choiceTitle}>Add a Friend</Text>
+            <Text style={s.choiceSub}>connect with other Ledgr users</Text>
+          </View>
+        </TouchableOpacity>
+        <TouchableOpacity style={[s.choiceRow, { borderBottomWidth: 0 }]} activeOpacity={0.8} onPress={() => { setAddContactSheet(false); openContactsPanel(); }}>
+          <View style={{ flex: 1 }}>
+            <Text style={s.choiceTitle}>Add a Manual Contact</Text>
+            <Text style={s.choiceSub}>add someone without an account</Text>
+          </View>
+        </TouchableOpacity>
+      </BottomSheet>
+    </SafeAreaView>
+  );
+}
+
+function SectionHeader({ title, onSeeMore, seeMoreLabel, onArrowRight, onAdd, titleStyle }: { title: string; onSeeMore?: () => void; seeMoreLabel?: string; onArrowRight?: () => void; onAdd?: () => void; titleStyle?: any }) {
+  return (
+    <View style={s.sectionRow}>
+      <Text style={[s.sectionTitle, titleStyle]}>{title}</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+
+        {onSeeMore && (
+          <TouchableOpacity onPress={onSeeMore} activeOpacity={0.7} style={s.seeMoreRow}>
+            <Text style={s.seeMoreText}>{seeMoreLabel ?? 'see all'}</Text>
+          </TouchableOpacity>
+        )}
+        {onArrowRight && (
+          <TouchableOpacity onPress={onArrowRight} activeOpacity={0.7} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Text style={{ fontFamily: 'Poppins-Bold', fontSize: 8, color: '#3a3a34', letterSpacing: 1.5, textTransform: 'uppercase' }}>VIEW ALL</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    </View>
+  );
+}
+
+function SeeMore({ total, shown, onPress, alwaysShow }: { total: number; shown: number; onPress: () => void; alwaysShow?: boolean }) {
+  const remaining = total - shown;
+  if (!alwaysShow && remaining <= 0) return null;
+  const label = remaining > 0 ? `see ${remaining} more...` : 'see all';
+  return (
+    <TouchableOpacity onPress={onPress} activeOpacity={0.7} style={s.seeMoreRow}>
+      <Text style={s.seeMoreText}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
+
+function makeScrollDragHandler(ref: React.RefObject<any>) {
+  return (e: any) => {
+    const el = ref.current as unknown as HTMLElement;
+    if (!el) return;
+    const startX = e.nativeEvent?.pageX ?? e.pageX ?? e.changedTouches?.[0]?.pageX;
+    if (startX == null) return;
+    const scrollLeft = el.scrollLeft;
+    const onMove = (ev: MouseEvent | TouchEvent) => {
+      const pageX = 'changedTouches' in ev ? ev.changedTouches[0].pageX : (ev as MouseEvent).pageX;
+      el.scrollLeft = scrollLeft - (pageX - startX);
+    };
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove as any);
+      document.removeEventListener('mouseup', onUp);
+      document.removeEventListener('touchmove', onMove as any);
+      document.removeEventListener('touchend', onUp);
+      el.style.cursor = 'grab';
+    };
+    el.style.cursor = 'grabbing';
+    document.addEventListener('mousemove', onMove as any);
+    document.addEventListener('mouseup', onUp);
+    document.addEventListener('touchmove', onMove as any, { passive: true } as any);
+    document.addEventListener('touchend', onUp);
+  };
+}
+
+function EmptyRow({ label, onPress }: { label: string; onPress?: () => void }) {
+  return (
+    <TouchableOpacity onPress={onPress} activeOpacity={onPress ? 0.7 : 1} style={s.emptyRow}>
+      <Text style={[s.emptyText, onPress && { color: '#9cd7d2' }]}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
+
+const s = StyleSheet.create({
+  root:   { flex: 1, backgroundColor: '#fffffd' },
+  scroll: { paddingHorizontal: 28, paddingTop: 20, paddingBottom: 80 },
+
+  // Section header
+  sectionRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 0, marginBottom: 20 },
+  sectionTitle:{ fontFamily: 'Poppins-Medium', fontSize: 17, color: '#000000', letterSpacing: 0.4 },
+  divider:     { height: 1, backgroundColor: '#d2d2d2', marginTop: 20, marginBottom: 20 },
+  seeMoreRow:  { paddingHorizontal: 12, paddingVertical: 7, borderRadius: DC.pageActionRadius, backgroundColor: '#ebf7f6' },
+  seeMoreText: { fontFamily: 'Poppins-Regular', fontSize: 11, color: '#4f9289' },
+
+  // RECORDS rows
+  recRow:      { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#d2d2d2', borderStyle: 'dotted' },
+  recIconCircle:{ width: 32, height: 32, borderRadius: 16, borderWidth: 1, borderColor: '#c9c7c3', alignItems: 'center', justifyContent: 'center' },
+  recRowName:  { fontFamily: 'Poppins-Medium', fontSize: 12, color: '#3a3a34', letterSpacing: 0.5, textTransform: 'capitalize' },
+  recRowSub:   { fontFamily: 'Poppins-Regular', fontSize: 9, color: '#b5b4a4', marginTop: 4 },
+  recRowAmount:{ fontFamily: 'Poppins-Regular', fontSize: 11, color: '#3a3a34', letterSpacing: 0.3 },
+  recMoreRow:  { paddingVertical: 6 },
+  recMoreText: { fontFamily: 'Poppins-Regular', fontSize: 11, color: '#2a2a26' },
+
+  // Reminder pill
+  reminderPill:       { width: 120, paddingHorizontal: 14, paddingVertical: 16, borderRadius: 100, borderWidth: 1, borderColor: '#d2d2d2', backgroundColor: 'transparent', alignItems: 'center', gap: 4 },
+  reminderPillName:   { fontFamily: 'Poppins-Regular', fontSize: 11, color: '#2a2a26', letterSpacing: 0.5 },
+  reminderPillType:   { fontFamily: 'Poppins-Regular', fontSize: 9, color: '#2a2a26', fontStyle: 'italic' },
+
+  // Empty
+  emptyRow:  { paddingVertical: 12 },
+  emptyText: { fontFamily: 'Poppins-Regular', fontSize: 12, color: Colors.faint },
+
+  // Spaces album
+  spaceAlbum: { gap: 10, paddingBottom: 4 },
+  spaceCard: {
+    width: 90,
+    alignItems: 'center',
+    gap: 1,
+  },
+  spaceCardName: { fontFamily: 'Poppins-Bold', fontSize: 10, color: '#111111', textAlign: 'center', marginTop: -6 },
+  spaceCardAmount: { fontFamily: 'Poppins-Bold', fontSize: 11, color: '#111111', textAlign: 'center', lineHeight: 14 },
+  spaceCardSub: { fontFamily: 'Poppins-Regular', fontSize: 9, color: '#999999', textAlign: 'center', lineHeight: 12 },
+  spaceCardAllTime: { fontFamily: 'Poppins-Regular', fontSize: 9, color: '#555555', textAlign: 'center', fontStyle: 'italic', lineHeight: 12 },
+  spaceCardGoal: { fontFamily: 'Poppins-Regular', fontSize: 9, color: '#bbbbbb', textAlign: 'center', fontStyle: 'italic', lineHeight: 12 },
+
+  // Folder cards
+  folderSubtitle: { fontFamily: 'Poppins-Bold', fontSize: 10, color: '#3a3a34', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 20 },
+  savingsCard: {
+    width: 200,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#d2d2d2',
+    borderRadius: 14,
+    paddingHorizontal: 22,
+    paddingVertical: 18,
+    gap: 0,
+  },
+  expenseCard: {
+    width: 200,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#d2d2d2',
+    borderRadius: 14,
+    paddingHorizontal: 22,
+    paddingVertical: 18,
+    gap: 0,
+  },
+  folderCardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  folderCardName: { fontFamily: 'Poppins-Bold', fontSize: 11, color: '#3a3a34', flex: 1, letterSpacing: 0.3, textTransform: 'uppercase' },
+  folderLabelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
+  folderCardLabel: { fontFamily: 'Poppins-Regular', fontSize: 9, color: '#888888', letterSpacing: 0.3 },
+  folderCardValue: { fontFamily: 'Poppins-SemiBold', fontSize: 10, color: '#3a3a34', letterSpacing: 0.3 },
+  savingsBadge: { backgroundColor: '#e5f5e8', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 100 },
+  savingsBadgeText: { fontFamily: 'Poppins-Medium', fontSize: 9, color: '#0a550f' },
+  expenseBadge: { backgroundColor: '#f9f0ec', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 100 },
+  expenseBadgeText: { fontFamily: 'Poppins-Medium', fontSize: 9, color: '#ff5757' },
+
+  receivableName: { fontFamily: 'Poppins-Regular', fontSize: 12, color: '#111111', textAlign: 'center', marginTop: 4 },
+  receivableAmount: { fontFamily: 'Poppins-Bold', fontSize: 11, color: '#111111', textAlign: 'center', lineHeight: 14 },
+  receivableUnpaid: { fontFamily: 'Poppins-Regular', fontSize: 9, color: '#999999', textAlign: 'center', fontStyle: 'italic', lineHeight: 12 },
+
+  // Shared list rows
+  list: { gap: 0 },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  rowName:      { fontFamily: 'Poppins-Medium', fontSize: 13, color: '#111111', letterSpacing: 0.5 },
+  rowSub:       { fontFamily: 'Poppins-Regular', fontSize: 10, color: '#999999' },
+  rowValue:     { fontFamily: 'Poppins-Bold', fontSize: 11, color: '#111111' },
+  rowLast:     { borderBottomWidth: 0 },
+  rowValueBold: { fontFamily: 'Poppins-Bold', fontSize: 12, color: '#111111' },
+  choiceRow:   { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
+  choiceTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 14, color: '#111111' },
+  choiceSub:   { fontFamily: 'Poppins-Regular', fontSize: 11, color: '#999999', marginTop: 2 },
+  chip:        { paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: '#f5f5f5', borderWidth: 1, borderColor: '#eeeeee' },
+  chipActive:  { backgroundColor: '#ebf7f6', borderColor: '#9cd7d2' },
+  chipText:    { fontFamily: 'Poppins-Regular', fontSize: 13, color: '#666666' },
+  chipTextActive: { fontFamily: 'Poppins-SemiBold', fontSize: 13, color: '#4f9289' },
+  sheetLabel:  { fontFamily: 'Poppins-SemiBold', fontSize: 11, color: '#999999', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8 },
+  dropCol:      { height: 160, backgroundColor: '#f5f5f5', borderRadius: 8 },
+  dropItem:     { paddingVertical: 10, paddingHorizontal: 12 },
+  dropItemActive: { backgroundColor: '#ebf7f6', borderRadius: 6 },
+  dropText:     { fontFamily: 'Poppins-Regular', fontSize: 13, color: '#666666' },
+  dropTextActive: { fontFamily: 'Poppins-SemiBold', fontSize: 13, color: '#4f9289' },
+  applyBtn:     { backgroundColor: '#4f9289', borderRadius: Radius.pill, paddingVertical: 14, alignItems: 'center', marginTop: 20 },
+  applyBtnText: { fontFamily: 'Poppins-SemiBold', fontSize: 15, color: '#ffffff' },
+});

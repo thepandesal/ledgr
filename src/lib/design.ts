@@ -15,7 +15,7 @@ export const DC = {
   pageBg:           '#ffffff',
   pageText:         '#111111',
   pageTextMuted:    '#555555',
-  pagePadding:      28,         // horizontal padding for all pages
+  pagePadding:      34,         // horizontal padding for all pages
   letterSpacing:    0.3,        // subtle letter spacing for all text
 
   // Header
@@ -182,9 +182,228 @@ export const DC = {
   chipPaddingV:     8,
   chipFontSize:     13,
 
-  // Form row
+  // Row
   rowLabelSize:     14,                     // row label font size
   rowLabelColor:    '#111111',              // row label color
   rowBorderColor:   '#d1d1d1',              // row bottom border color
   rowPaddingV:      13,                     // row vertical padding
-} as const;
+
+  // ── Back button (standard across all pages) ────────────────────────────
+  // Usage: <TouchableOpacity onPress={handleBack}><SvgXml xml={SVG_BACK} width={14} height={14} color={DC.backBtn.color} /></TouchableOpacity>
+  backBtn: {
+    color: '#666666',
+    width: 14,
+    height: 14,
+    marginBottom: 12,
+  },
+
+  // ── Components ───────────────────────────────────────────────────────────
+  // All interactive elements share the same height (controlHeight).
+  // Use these on any page for consistent component styling.
+  controlHeight: 38,
+  controlRadius: 999,
+  controlBorder: '#d2d2d2' as string,
+  rowDivider: {
+    height: 0.5,
+    backgroundColor: '#f0f0f0' as string,
+  },
+  dottedCard: {
+    borderWidth: 1.5,
+    borderColor: '#aaaaaa' as string,
+    borderStyle: 'dashed' as const,
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    marginBottom: 8,
+  },
+
+  // Two-option segment toggle (Date / Category)
+  segment: {
+    wrap: {
+      flexDirection: 'row' as const,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: '#d2d2d2' as string,
+      overflow: 'hidden' as const,
+      position: 'relative' as const,
+      height: 38,
+    },
+    active: {
+      position: 'absolute' as const,
+      top: 2, bottom: 2,
+      width: '50%' as any,
+      borderRadius: 999,
+      backgroundColor: '#8c52ff' as string,
+    },
+    btn: {
+      width: 80, height: 38,
+      alignItems: 'center' as const,
+      justifyContent: 'center' as const,
+      zIndex: 1,
+      paddingVertical: 0,
+    },
+    textInactive: {
+      fontFamily: 'Poppins-Regular' as string,
+      fontSize: 11,
+      lineHeight: 38,
+      color: '#373737' as string,
+      includeFontPadding: false,
+    },
+    textActive: {
+      fontFamily: 'Poppins-SemiBold' as string,
+      fontSize: 11,
+      lineHeight: 38,
+      color: '#ffffff' as string,
+      includeFontPadding: false,
+    },
+  },
+
+  // Standard pill button (Filters, Generate Statement, etc.)
+  button: {
+    base: {
+      height: 38,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: '#d2d2d2' as string,
+      paddingHorizontal: 16,
+      alignItems: 'center' as const,
+      justifyContent: 'center' as const,
+    },
+    active: {
+      height: 38,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: '#8c52ff' as string,
+      paddingHorizontal: 16,
+      backgroundColor: '#8c52ff' as string,
+      alignItems: 'center' as const,
+      justifyContent: 'center' as const,
+    },
+    textInactive: {
+      fontFamily: 'Poppins-Regular' as string,
+      fontSize: 11,
+      color: '#373737' as string,
+      textAlignVertical: 'center' as const,
+      includeFontPadding: false,
+    },
+    textActive: {
+      fontFamily: 'Poppins-SemiBold' as string,
+      fontSize: 11,
+      color: '#ffffff' as string,
+      textAlignVertical: 'center' as const,
+      includeFontPadding: false,
+    },
+  },
+
+  // Textbox / search input
+  textbox: {
+    wrap: {
+      height: 38,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: '#d2d2d2' as string,
+      paddingHorizontal: 16,
+      justifyContent: 'center' as const,
+    },
+    input: {
+      fontFamily: 'Poppins-Regular' as string,
+      fontSize: 11,
+      color: '#373737' as string,
+      paddingVertical: 0,
+    },
+  },
+
+  // Circle icon button (edit, folder, trash, add, etc.)
+  circleBtn: {
+    base: {
+      width: 38, height: 38,
+      borderRadius: 19,
+      borderWidth: 1,
+      borderColor: '#d2d2d2' as string,
+      alignItems: 'center' as const,
+      justifyContent: 'center' as const,
+    },
+    active: {
+      width: 38, height: 38,
+      borderRadius: 19,
+      borderWidth: 1,
+      borderColor: '#8c52ff' as string,
+      backgroundColor: '#8c52ff' as string,
+      alignItems: 'center' as const,
+      justifyContent: 'center' as const,
+    },
+    ghost: {
+      width: 38, height: 38,
+      borderRadius: 19,
+      backgroundColor: '#f0ebff' as string,
+      alignItems: 'center' as const,
+      justifyContent: 'center' as const,
+    },
+    ghostSm: {
+      width: 28, height: 28,
+      borderRadius: 14,
+      backgroundColor: '#f0ebff' as string,
+      alignItems: 'center' as const,
+      justifyContent: 'center' as const,
+    },
+    // Smaller add button for section headers
+    addSm: {
+      width: 28, height: 28,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: '#d2d2d2' as string,
+      alignItems: 'center' as const,
+      justifyContent: 'center' as const,
+    },
+  },
+
+  // ── Typography ───────────────────────────────────────────────────────────
+  typography: {
+    sectionHeader: {
+      fontFamily: 'Poppins-Bold' as string,
+      fontSize:   11,
+      color:      '#373737',
+      includeFontPadding: false,
+    },
+    sectionBody: {
+      fontFamily: 'Poppins-Regular' as string,
+      fontSize:   11,
+      color:      '#373737',
+      lineHeight: 16,
+    },
+    subContent: {
+      fontFamily: 'Poppins-Regular' as string,
+      fontSize:   9,
+      color:      '#373737',
+      lineHeight: 14,
+    },
+    label: {
+      fontFamily: 'Poppins-Regular' as string,
+      fontSize:   11,
+      color:      '#373737',
+      lineHeight: 16,
+    },
+    muted: {
+      fontFamily: 'Poppins-Regular' as string,
+      fontSize:   11,
+      color:      '#aaaaaa',
+      lineHeight: 16,
+    },
+    amount: {
+      fontFamily: 'Poppins-Bold' as string,
+      fontSize:   11,
+      color:      '#373737',
+      lineHeight: 16,
+    },
+    goBack: {
+      fontFamily: 'Poppins-Regular' as string,
+      fontSize:   11,
+      color:      '#666666',
+    },
+    pageTitle: {
+      fontFamily: 'Poppins-Bold' as string,
+      fontSize:   20,
+      color:      '#373737',
+    },
+  },
+};

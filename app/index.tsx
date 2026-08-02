@@ -2,7 +2,9 @@ import {
   View, Text, TouchableOpacity, StyleSheet,
   ActivityIndicator, Dimensions, Platform,
 } from 'react-native';
+import { WebView } from 'react-native-webview';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LEDGR_LOGO_SVG_DATA_URI } from '../src/lib/ledgrLogoBase64';
 import { useRouter } from 'expo-router';
 import { supabase } from '../src/lib/supabase';
 import { useEffect, useRef, useState } from 'react';
@@ -17,30 +19,12 @@ import Animated, {
 
 WebBrowser.maybeCompleteAuthSession();
 
-const { width, height } = Dimensions.get('window');
+const { height } = Dimensions.get('window');
 
 const ANIM_DONE_MS = 2000;
 const SLIDE_DURATION = 600;
 const FADE_DURATION = 500;
 const FADE_DELAY = SLIDE_DURATION + 100;
-
-const SVG_HTML = `<!DOCTYPE html>
-<html>
-<head>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  html, body { width: 100%; height: 100%; background: #ffffff; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-  img { width: 80vw; max-width: 360px; height: auto; }
-</style>
-</head>
-<body>
-  <img src="data:image/svg+xml;base64,__SVG_BASE64__" />
-</body>
-</html>`;
-
-// Inline SVG for web platform
-const SVG_DATA_URI = require('../assets/ledgr-logo-animated.svg');
 
 export default function LoginScreen() {
   const [loading, setLoading] = useState<'google' | 'apple' | null>(null);
@@ -55,17 +39,14 @@ export default function LoginScreen() {
   useEffect(() => {
     const t = setTimeout(() => {
       setPhase('transition');
-      // Slide logo up just a little
       logoTranslateY.value = withTiming(height * 0.02, {
         duration: SLIDE_DURATION,
         easing: Easing.out(Easing.cubic),
       });
-      // Fade in buttons
       contentOpacity.value = withDelay(
         FADE_DELAY,
         withTiming(1, { duration: FADE_DURATION }),
       );
-      // Fade in legal text slightly after buttons
       legalOpacity.value = withDelay(
         FADE_DELAY + 200,
         withTiming(1, { duration: FADE_DURATION }),
@@ -112,52 +93,33 @@ export default function LoginScreen() {
     setLoading(null);
   };
 
-  const renderLogo = () => {
-    return null; // rendered inline below
-  };
-
-  // Decode data URI to get raw SVG markup for inline rendering (required for Safari animation support)
-  const svgMarkup = Platform.OS === 'web'
-    ? (() => {
-        try {
-          const raw = SVG_DATA_URI;
-          if (raw.startsWith('data:image/svg+xml;base64,')) {
-            return atob(raw.split(',')[1]);
-          }
-          if (raw.startsWith('data:image/svg+xml;utf8,') || raw.startsWith('data:image/svg+xml;charset=utf-8,')) {
-            return decodeURIComponent(raw.split(',')[1]);
-          }
-          return raw; // fallback: treat as plain SVG string
-        } catch { return ''; }
-      })()
-    : '';
-
   return (
     <SafeAreaView style={s.container} edges={['bottom']}>
       <View style={s.wrapper}>
 
-        {/* Animated logo */}
+        {/* Wordmark */}
         <Animated.View style={[s.logoWrap, logoStyle]}>
+          <Text style={s.wordmark}>LEDGR</Text>
+          <Text style={s.tagline}>Tracking money made easy.</Text>
+
+          {/* Logo */}
           {Platform.OS === 'web' ? (
-            <div
-              dangerouslySetInnerHTML={{ __html: svgMarkup }}
-              style={{ width: '80%', maxWidth: 360 } as any}
+            <img
+              src={LEDGR_LOGO_SVG_DATA_URI}
+              alt="LEDGR logo"
+              style={{ width: '100%', maxWidth: 500, aspectRatio: 1, display: 'block', marginTop: 8 }}
             />
           ) : (
-            (() => {
-              const WebView = require('react-native-webview').WebView;
-              return (
-                <WebView
-                  source={{ html: buildWebViewHtml() }}
-                  style={s.webview}
-                  scrollEnabled={false}
-                  pointerEvents="none"
-                  originWhitelist={['*']}
-                  backgroundColor="transparent"
-                  androidLayerType="hardware"
-                />
-              );
-            })()
+            <WebView
+              originWhitelist={['*']}
+              source={{
+                html: `<!DOCTYPE html><html><body style="margin:0;background:transparent"><img src="${LEDGR_LOGO_SVG_DATA_URI}" style="width:100%;height:100%;object-fit:contain" /></body></html>`,
+              }}
+              style={s.logoImg}
+              pointerEvents="none"
+              setSupportMultipleWindows={false}
+              scrollEnabled={false}
+            />
           )}
         </Animated.View>
 
@@ -212,34 +174,22 @@ export default function LoginScreen() {
   );
 }
 
-function buildWebViewHtml() {
-  // Read SVG file as raw string for embedding in WebView
-  const fs = require('fs');
-  const path = require('path');
-  try {
-    const svgPath = path.join(__dirname, '..', 'assets', 'ledgr-logo-animated.svg');
-    const svgContent = fs.readFileSync(svgPath, 'utf8');
-    const b64 = btoa(unescape(encodeURIComponent(svgContent)));
-    return `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>*{margin:0;padding:0;box-sizing:border-box}html,body{width:100%;height:100%;background:transparent;display:flex;align-items:center;justify-content:center;overflow:hidden}img{width:100%;height:auto}</style></head><body><img src="data:image/svg+xml;base64,${b64}"/></body></html>`;
-  } catch {
-    return '';
-  }
-}
-
 const s = StyleSheet.create({
   container:  { flex: 1, backgroundColor: '#fdfdfd' },
   wrapper:    { flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 40 },
   logoWrap:   { alignItems: 'center', justifyContent: 'center', width: '100%' },
-  webview:    { width: width * 0.8, height: width * 0.4, backgroundColor: 'transparent', marginBottom: -width * 0.15 },
-  content:    { width: '100%', paddingHorizontal: 32, marginTop: 60 },
+  wordmark:   { fontFamily: AppFont.brand, fontSize: 28, color: '#8c52ff', letterSpacing: 0 },
+  tagline:    { fontFamily: AppFont.medium, fontSize: 15, color: '#373737', marginTop: 4 },
+  logoImg:    { width: '100%', maxWidth: 500, aspectRatio: 1, marginTop: 8 },
+  content:    { width: '100%', paddingHorizontal: 32, marginTop: 20 },
   buttons:    { gap: 12 },
   button: {
     borderRadius: 999,
     paddingVertical: 16,
     alignItems: 'center',
-    backgroundColor: '#111111',
+    backgroundColor: '#373737',
   },
-  buttonText: { fontFamily: AppFont.semiBold, fontSize: 15, color: '#ffffff', letterSpacing: 1.5 },
+  buttonText: { fontFamily: AppFont.regular, fontSize: 15, color: '#ffffff', letterSpacing: 1.5 },
   legal:      { textAlign: 'center', fontFamily: AppFont.regular, fontSize: 11, color: Colors.muted, marginTop: 24, lineHeight: 18, paddingHorizontal: 32 },
-  legalLink:  { color: Colors.cyan, fontFamily: AppFont.semiBold },
+  legalLink:  { color: '#8c52ff', fontFamily: AppFont.semiBold },
 });

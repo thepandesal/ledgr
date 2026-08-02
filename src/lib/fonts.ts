@@ -4,20 +4,16 @@
  * Single place to control the app font.
  * To switch fonts, change AppFont values here — no other files need to change.
  *
- * Current font: Google Sans
- * Brand font (LEDGR wordmark): MuseoModerno_Black — never changes
+ * Current font: Poppins
+ * Brand font (LEDGR wordmark): MuseoModerno-ExtraBold — never changes
  */
 
 export const AppFont = {
-  regular:    'Inter-Regular',
-  medium:     'Inter-Medium',
-  semiBold:   'Inter-SemiBold',
-  bold:       'Inter-Bold',
-  brand:      'MuseoModerno_Black',
-  brandLight: 'MuseoModerno_Regular',
-  brandMedium:'MuseoModerno_Medium',
-  incRegular: 'InclusiveSans-Regular',
-  incMedium:  'InclusiveSans-Medium',
-  incSemiBold:'InclusiveSans-SemiBold',
-  incBold:    'InclusiveSans-Bold',
+  regular:     'Poppins-Regular',
+  medium:      'Poppins-Medium',
+  semiBold:    'Poppins-SemiBold',
+  bold:        'Poppins-Bold',
+  brand:       'MuseoModerno-ExtraBold',
+  brandLight:  'MuseoModerno-Regular',
+  brandMedium: 'MuseoModerno-Medium',
 } as const;

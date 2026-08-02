@@ -1,0 +1,52 @@
+const s = StyleSheet.create({
+  // Part 14: root, scroll, divider
+  root:   { flex: 1, backgroundColor: DC.pageBg },
+  scroll: { paddingHorizontal: DC.pagePadding, paddingTop: 20, paddingBottom: 80 },
+  divider: { height: DC.rowDivider.height, backgroundColor: DC.rowDivider.backgroundColor, marginTop: 28, marginBottom: 28 },
+
+  // Part 15: section header + view button
+  sectionRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  sectionTitle: { fontFamily: 'Poppins-Bold', fontSize: 17, color: DC.pageText },
+  viewBtn:      { backgroundColor: '#8c52ff', borderRadius: 999, paddingHorizontal: 16, paddingVertical: 7 },
+  viewBtnText:  { fontFamily: 'Poppins-SemiBold', fontSize: 11, color: '#ffffff' },
+
+  // Part 16: shared row styles
+  recRow:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10 },
+  recRowName:  { fontFamily: 'Poppins-Bold', fontSize: 13, color: DC.pageText },
+  recRowSub:   { fontFamily: 'Poppins-Regular', fontSize: 11, color: DC.pageTextMuted, marginTop: 2 },
+  recRowAmount: { fontFamily: 'Poppins-Regular', fontSize: 13, color: DC.pageText },
+
+  // Part 17: reminders
+  reminderRow: { paddingVertical: 10 },
+
+  // Part 18: folders
+  folderSubtitle: { fontFamily: 'Poppins-Bold', fontSize: 12, color: '#8c52ff', marginBottom: 8 },
+  folderRow:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10 },
+
+  // Part 19: loans
+  loanCard:       { width: 80, alignItems: 'center', gap: 3 },
+  loanAvatar:     { width: 44, height: 44, borderRadius: 22, backgroundColor: '#ede9ff', alignItems: 'center', justifyContent: 'center' },
+  loanAvatarText: { fontFamily: 'Poppins-Bold', fontSize: 13, color: '#8c52ff' },
+  loanName:       { fontFamily: 'Poppins-Regular', fontSize: 10, color: DC.pageText, textAlign: 'center' },
+  loanLabel:      { fontFamily: 'Poppins-Regular', fontSize: 9, color: DC.pageTextMuted, textAlign: 'center' },
+  loanAmount:     { fontFamily: 'Poppins-Bold', fontSize: 11, textAlign: 'center' },
+
+  // Part 20: empty + bottom sheet styles
+  emptyRow:  { paddingVertical: 12 },
+  emptyText: { fontFamily: 'Poppins-Regular', fontSize: 12, color: Colors.faint },
+  choiceRow:   { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
+  choiceTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 14, color: '#111111' },
+  choiceSub:   { fontFamily: 'Poppins-Regular', fontSize: 11, color: '#999999', marginTop: 2 },
+  chip:        { paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: '#f5f5f5', borderWidth: 1, borderColor: '#eeeeee' },
+  chipActive:  { backgroundColor: '#ebf7f6', borderColor: '#9cd7d2' },
+  chipText:    { fontFamily: 'Poppins-Regular', fontSize: 13, color: '#666666' },
+  chipTextActive: { fontFamily: 'Poppins-SemiBold', fontSize: 13, color: '#4f9289' },
+  sheetLabel:  { fontFamily: 'Poppins-SemiBold', fontSize: 11, color: '#999999', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8 },
+  dropCol:     { height: 160, backgroundColor: '#f5f5f5', borderRadius: 8 },
+  dropItem:    { paddingVertical: 10, paddingHorizontal: 12 },
+  dropItemActive: { backgroundColor: '#ebf7f6', borderRadius: 6 },
+  dropText:    { fontFamily: 'Poppins-Regular', fontSize: 13, color: '#666666' },
+  dropTextActive: { fontFamily: 'Poppins-SemiBold', fontSize: 13, color: '#4f9289' },
+  applyBtn:    { backgroundColor: '#4f9289', borderRadius: Radius.pill, paddingVertical: 14, alignItems: 'center', marginTop: 20 },
+  applyBtnText: { fontFamily: 'Poppins-SemiBold', fontSize: 15, color: '#ffffff' },
+});

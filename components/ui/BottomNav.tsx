@@ -1,8 +1,6 @@
-import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { BlurView } from 'expo-blur';
-import { useState, useRef } from 'react';
 import { AppFont } from '@/src/lib/fonts';
 import { useNav } from '@/src/lib/NavContext';
 import NavIcon from './NavIcons';
@@ -10,7 +8,7 @@ import NavIcon from './NavIcons';
 const TABS = [
   { key: 'home',              label: 'Home',          icon: 'home-outline' },
   { key: 'accounts',           label: 'Accounts',      icon: 'wallet-outline' },
-  { key: 'add',               label: '',               icon: 'add' },
+  { key: 'record',            label: 'Record',        icon: 'add' },
   { key: 'notifications-tab', label: 'Notifications', icon: 'notifications-outline' },
   { key: 'others',            label: 'Others',        icon: 'apps-outline' },
 ];
@@ -21,22 +19,10 @@ const NAV_INACTIVE = 'rgba(0,0,0,0.35)';
 
 const ADD_SIZE = 56;
 
-const MENU_ITEMS = [
-  { label: 'Create a Record',     route: '/(app)/add-recording' },
-  { label: 'Create Split Bill',   route: '/(app)/split-bill' },
-  { label: 'Create a Folder',     route: null },
-  { label: 'Add an Account',      route: null },
-  { label: 'Add a Category',      route: null },
-];
-
 export default function BottomNav() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { activeTab, handleNavPress, unreadCount, switchTab } = useNav();
-  const [showMenu, setShowMenu] = useState(false);
-  const [subMenu, setSubMenu] = useState<string | null>(null);
-  const menuAnim = useRef(new Animated.Value(0)).current;
-  const fadeAnim = useRef(new Animated.Value(1)).current;
+  const { activeTab, handleNavPress, unreadCount } = useNav();
 
   const handlePress = (key: string) => {
     if (router.canDismiss()) {
@@ -47,104 +33,13 @@ export default function BottomNav() {
     }
   };
 
-  const openMenu = () => {
-    setSubMenu(null);
-    setShowMenu(true);
-    Animated.timing(menuAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start();
-  };
-
-  const closeMenu = () => {
-    Animated.timing(menuAnim, { toValue: 0, duration: 150, useNativeDriver: true }).start(() => {
-      setShowMenu(false);
-      setSubMenu(null);
-    });
-  };
-
-  const handleMenuItem = (item: typeof MENU_ITEMS[0]) => {
-    if (item.label === 'Create a Record') {
-      Animated.timing(fadeAnim, { toValue: 0, duration: 120, useNativeDriver: true }).start(() => {
-        setSubMenu('record');
-        Animated.timing(fadeAnim, { toValue: 1, duration: 120, useNativeDriver: true }).start();
-      });
-      return;
-    }
-    closeMenu();
-    if (item.route) {
-      router.push(item.route as any);
-    } else if (item.label === 'Add an Account') {
-      switchTab('accounts');
-    } else if (item.label === 'Add a Category') {
-      switchTab('categories');
-    } else if (item.label === 'Create a Folder') {
-      switchTab('home');
-    }
-  };
-
-  const handleAddPress = () => {
-    if (showMenu) {
-      closeMenu();
-    } else {
-      openMenu();
-    }
-  };
-
   return (
     <View style={s.wrap}>
-
-
-      {/* Menu modal — just above the nav */}
-      {showMenu && (
-        <>
-          <TouchableOpacity style={s.overlay} onPress={closeMenu} activeOpacity={1} />
-          <Animated.View
-            style={[
-              s.menuWrap,
-              {
-                opacity: menuAnim,
-                transform: [{ translateY: menuAnim.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }],
-                bottom: 110 + (insets.bottom || 10),
-              },
-            ]}
-          >
-            <BlurView intensity={80} tint="light" style={s.menuBlur}>
-              <Animated.View style={[s.menuContent, { opacity: fadeAnim }]}>
-                {subMenu === 'record' ? (
-                  <View style={s.menuGrid}>
-                    <TouchableOpacity style={s.menuPill} onPress={() => { closeMenu(); router.push({ pathname: '/(app)/add-recording', params: { type: 'income' } } as any); }} activeOpacity={0.8}>
-                      <Text style={s.menuPillText}>Money In</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={s.menuPill} onPress={() => { closeMenu(); router.push({ pathname: '/(app)/add-recording', params: { type: 'expense' } } as any); }} activeOpacity={0.8}>
-                      <Text style={s.menuPillText}>Money Out</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={[s.menuPill, s.menuPillLast]} onPress={() => { Animated.timing(fadeAnim, { toValue: 0, duration: 120, useNativeDriver: true }).start(() => { setSubMenu(null); Animated.timing(fadeAnim, { toValue: 1, duration: 120, useNativeDriver: true }).start(); }); }} activeOpacity={0.8}>
-                      <Text style={s.menuPillText}>Back</Text>
-                    </TouchableOpacity>
-                  </View>
-                ) : (
-                  <View style={s.menuGrid}>
-                    {MENU_ITEMS.map((item, i) => (
-                      <TouchableOpacity
-                        key={item.label}
-                        style={[s.menuPill, i === MENU_ITEMS.length - 1 && s.menuPillLast]}
-                        onPress={() => handleMenuItem(item)}
-                        activeOpacity={0.8}
-                      >
-                        <Text style={s.menuPillText}>{item.label}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
-              </Animated.View>
-            </BlurView>
-          </Animated.View>
-        </>
-      )}
-
       <View style={[s.pill, { paddingBottom: insets.bottom || 10 }]}>
         <View style={s.basin} />
 
         {TABS.map(tab => {
-          if (tab.key === 'add') return <View key={tab.key} style={s.spacer} />;
+          if (tab.key === 'record') return <View key={tab.key} style={s.spacer} />;
 
           const isActive = activeTab === tab.key;
           const iconName = tab.key === 'notifications-tab' ? 'notifications' : tab.key;
@@ -171,10 +66,15 @@ export default function BottomNav() {
           );
         })}
 
-        {/* Floating add button */}
-        <TouchableOpacity style={s.addBtn} onPress={handleAddPress} activeOpacity={0.8}>
+        {/* Floating add button — opens Record quick-add tab */}
+        <TouchableOpacity
+          style={[s.addBtn, activeTab === 'record' && s.addBtnActive]}
+          onPress={() => handlePress('record')}
+          activeOpacity={0.8}
+        >
           <NavIcon name="add" size={28} color="#fff" />
         </TouchableOpacity>
+        <Text style={[s.addLabel, activeTab === 'record' && s.addLabelActive]}>Record</Text>
       </View>
     </View>
   );
@@ -187,53 +87,6 @@ const s = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 999,
-  },
-  overlay: {
-    position: 'absolute',
-    top: -1000,
-    left: -1000,
-    right: -1000,
-    bottom: 0,
-    zIndex: 998,
-  },
-  menuWrap: {
-    position: 'absolute',
-    left: 16,
-    right: 16,
-    zIndex: 1000,
-  },
-  menuBlur: {
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#d0d0d0',
-    overflow: 'hidden',
-  },
-  menuContent: {
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-  },
-  menuGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  menuPill: {
-    backgroundColor: '#3a3a34',
-    borderRadius: 999,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    alignItems: 'center',
-    width: '48%',
-    flexGrow: 1,
-  },
-  menuPillLast: {
-    flexGrow: 0,
-    alignSelf: 'center',
-  },
-  menuPillText: {
-    fontFamily: 'InclusiveSans-Medium',
-    fontSize: 12,
-    color: '#ffffff',
   },
   pill: {
     flexDirection: 'row',
@@ -293,6 +146,24 @@ const s = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 8,
     elevation: 8,
+  },
+  addBtnActive: {
+    backgroundColor: '#8c52ff',
+  },
+  addLabel: {
+    position: 'absolute',
+    bottom: 10,
+    left: 0,
+    right: 0,
+    textAlign: 'center',
+    fontFamily: AppFont.regular,
+    fontSize: 10,
+    color: NAV_INACTIVE,
+    letterSpacing: 0.3,
+  },
+  addLabelActive: {
+    fontFamily: AppFont.semiBold,
+    color: NAV_ACTIVE,
   },
   iconWrap: {
     position: 'relative',

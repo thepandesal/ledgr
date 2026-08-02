@@ -1,0 +1,48 @@
+
+function SectionHeader({ title, onArrowRight }: { title: string; onArrowRight?: () => void }) {
+  return (
+    <View style={s.sectionRow}>
+      <Text style={s.sectionTitle}>{title}</Text>
+      {onArrowRight && (
+        <TouchableOpacity onPress={onArrowRight} activeOpacity={0.8} style={s.viewBtn}>
+          <Text style={s.viewBtnText}>View</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+}
+
+function makeScrollDragHandler(ref: React.RefObject<any>) {
+  return (e: any) => {
+    const el = ref.current as unknown as HTMLElement;
+    if (!el) return;
+    const startX = e.nativeEvent?.pageX ?? e.pageX ?? e.changedTouches?.[0]?.pageX;
+    if (startX == null) return;
+    const scrollLeft = el.scrollLeft;
+    const onMove = (ev: MouseEvent | TouchEvent) => {
+      const pageX = 'changedTouches' in ev ? ev.changedTouches[0].pageX : (ev as MouseEvent).pageX;
+      el.scrollLeft = scrollLeft - (pageX - startX);
+    };
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove as any);
+      document.removeEventListener('mouseup', onUp);
+      document.removeEventListener('touchmove', onMove as any);
+      document.removeEventListener('touchend', onUp);
+      el.style.cursor = 'grab';
+    };
+    el.style.cursor = 'grabbing';
+    document.addEventListener('mousemove', onMove as any);
+    document.addEventListener('mouseup', onUp);
+    document.addEventListener('touchmove', onMove as any, { passive: true } as any);
+    document.addEventListener('touchend', onUp);
+  };
+}
+
+function EmptyRow({ label, onPress }: { label: string; onPress?: () => void }) {
+  return (
+    <TouchableOpacity onPress={onPress} activeOpacity={onPress ? 0.7 : 1} style={s.emptyRow}>
+      <Text style={[s.emptyText, onPress && { color: '#9cd7d2' }]}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
+

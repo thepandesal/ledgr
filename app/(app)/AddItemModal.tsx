@@ -158,10 +158,7 @@ export default function AddItemModal({
               </View>
             )}
 
-            {/* Add subitem */}
-            <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 8 }} onPress={() => addSubitemForm(itemIdx)}>
-              <Text style={{ fontFamily: Fonts.mono, fontSize: 11, color: Colors.cyan }}>add subitem</Text>
-            </TouchableOpacity>
+            {/* Add subitem — only active from the edit item modal subitems tab */}
           </View>
         );
       })}

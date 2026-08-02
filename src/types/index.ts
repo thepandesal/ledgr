@@ -32,7 +32,16 @@ export interface Account {
   bank: string;
   account_number: string;
   account_type: string;
+  wallet_type: 'bank' | 'credit_card' | 'cash' | 'e_wallet';
   qr_code: string | null;
+  color: string;
+  created_at: string;
+}
+
+export interface Bank {
+  id: string;
+  user_id: string;
+  name: string;
   color: string;
   created_at: string;
 }

@@ -347,7 +347,7 @@ export default function SplitBillScreen() {
               <Text style={styles.totalAmount}>{parseFloat(amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
               {billStatus === 'closed' && (
                 <TouchableOpacity style={{ marginTop: 8 }} onPress={handleToggleStatus}>
-                  <Text style={{ fontFamily: 'DMSans_600SemiBold', fontSize: 12, color: 'rgba(255,255,255,0.9)' }}>reopen</Text>
+                  <Text style={{ fontFamily: 'Poppins-SemiBold', fontSize: 12, color: 'rgba(255,255,255,0.9)' }}>reopen</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -460,20 +460,20 @@ export default function SplitBillScreen() {
                         </View>
                         <View style={{ flex: 1 }}>
                           <Text style={styles.breakdownName}>{p.name}</Text>
-                          <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 11, color: '#8a8a8a' }}>
+                          <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 11, color: '#8a8a8a' }}>
                             owes: {fmt(p.total)}
                             {p.paid > 0 && ` · paid: ${fmt(p.paid)}`}
                             {!fullyPaid && p.total > 0 && ` · left: ${fmt(remaining)}`}
                           </Text>
                           {allTimeBal !== undefined && (
-                            <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 10, color: allTimeBal < 0 ? '#e74c3c' : '#00bf63' }}>
+                            <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 10, color: allTimeBal < 0 ? '#e74c3c' : '#00bf63' }}>
                               {allTimeBal < 0 ? 'you owe' : 'owed'} all time: {fmt(Math.abs(allTimeBal))}
                             </Text>
                           )}
                         </View>
                         {fullyPaid && (
                           <View style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: '#f0fdf4' }}>
-                            <Text style={{ fontFamily: 'DMSans_600SemiBold', fontSize: 11, color: '#00bf63' }}>paid</Text>
+                            <Text style={{ fontFamily: 'Poppins-SemiBold', fontSize: 11, color: '#00bf63' }}>paid</Text>
                           </View>
                         )}
                         {billStatus === 'ongoing' && !fullyPaid && p.total > 0 && (
@@ -491,11 +491,11 @@ export default function SplitBillScreen() {
                             {personPays.slice().sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
                               .map((pay: any, pi: number) => (
                                 <View key={pay.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4 }}>
-                                  <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 10, color: '#8a8a8a' }}>
+                                  <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 10, color: '#8a8a8a' }}>
                                     {new Date(pay.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                                   </Text>
-                                  <Text style={{ fontFamily: 'DMSans_700Bold', fontSize: 12, color: '#00bf63', flex: 1 }}>{fmt(Number(pay.amount))}</Text>
-                                  {pay.status === 'cancelled' && <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 9, color: '#8a8a8a' }}>cancelled</Text>}
+                                  <Text style={{ fontFamily: 'Poppins-Bold', fontSize: 12, color: '#00bf63', flex: 1 }}>{fmt(Number(pay.amount))}</Text>
+                                  {pay.status === 'cancelled' && <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 9, color: '#8a8a8a' }}>cancelled</Text>}
                                 </View>
                               ))}
                           </View>
@@ -578,7 +578,7 @@ export default function SplitBillScreen() {
                   onPress={() => setCloseSpaceId(sp.id)}
                 >
                   <Text style={{
-                    fontFamily: 'DMSans_600SemiBold', fontSize: 12,
+                    fontFamily: 'Poppins-SemiBold', fontSize: 12,
                     color: closeSpaceId === sp.id ? '#00bf63' : '#1c1d1d',
                   }}>{sp.name}</Text>
                 </TouchableOpacity>
@@ -651,59 +651,59 @@ const styles = StyleSheet.create({
   backBtn: { width: 32 },
   deleteBtn: { width: 32, alignItems: 'flex-end' },
   headerCenter: { flex: 1, alignItems: 'center' },
-  title: { fontFamily: 'DMSans_700Bold', fontSize: 16, color: '#1c1d1d' },
-  subtitle: { fontFamily: 'DMSans_400Regular', fontSize: 12, color: '#8a8a8a', marginTop: 1 },
+  title: { fontFamily: 'Poppins-Bold', fontSize: 16, color: '#1c1d1d' },
+  subtitle: { fontFamily: 'Poppins-Regular', fontSize: 12, color: '#8a8a8a', marginTop: 1 },
   body: { padding: 20, gap: 8, paddingBottom: 60 },
   totalCard: { backgroundColor: '#00bf63', borderRadius: 16, padding: 16, alignItems: 'center', marginBottom: 8 },
-  totalLabel: { fontFamily: 'DMSans_400Regular', fontSize: 12, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: 0.5 },
-  totalAmount: { fontFamily: 'DMSans_700Bold', fontSize: 28, color: '#ffffff', marginTop: 4 },
-  sectionTitle: { fontFamily: 'DMSans_700Bold', fontSize: 14, color: '#1c1d1d', marginTop: 8, marginBottom: 4 },
+  totalLabel: { fontFamily: 'Poppins-Regular', fontSize: 12, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: 0.5 },
+  totalAmount: { fontFamily: 'Poppins-Bold', fontSize: 28, color: '#ffffff', marginTop: 4 },
+  sectionTitle: { fontFamily: 'Poppins-Bold', fontSize: 14, color: '#1c1d1d', marginTop: 8, marginBottom: 4 },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8, marginBottom: 4 },
-  availableText: { fontFamily: 'DMSans_600SemiBold', fontSize: 13, color: '#00bf63' },
+  availableText: { fontFamily: 'Poppins-SemiBold', fontSize: 13, color: '#00bf63' },
   addBtnDisabled: { opacity: 0.4 },
   peopleRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
   personChip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#ffffff', borderRadius: 999, paddingVertical: 6, paddingHorizontal: 12, borderWidth: 1, borderColor: '#e8e8e8' },
-  personChipText: { fontFamily: 'DMSans_600SemiBold', fontSize: 13, color: '#1c1d1d' },
+  personChipText: { fontFamily: 'Poppins-SemiBold', fontSize: 13, color: '#1c1d1d' },
   addRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
-  input: { backgroundColor: '#ffffff', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontFamily: 'DMSans_400Regular', fontSize: 14, color: '#1c1d1d', borderWidth: 1, borderColor: '#e8e8e8' },
+  input: { backgroundColor: '#ffffff', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontFamily: 'Poppins-Regular', fontSize: 14, color: '#1c1d1d', borderWidth: 1, borderColor: '#e8e8e8' },
   addBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#00bf63', justifyContent: 'center', alignItems: 'center' },
   suggestions: { backgroundColor: '#ffffff', borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: '#e8e8e8' },
   suggestion: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#f5f5f5' },
-  suggestionText: { fontFamily: 'DMSans_400Regular', fontSize: 14, color: '#1c1d1d' },
-  friendsLabel: { fontFamily: 'DMSans_700Bold', fontSize: 11, color: '#b0b0b0', textTransform: 'uppercase', letterSpacing: 0.6, marginTop: 10, marginBottom: 6 },
+  suggestionText: { fontFamily: 'Poppins-Regular', fontSize: 14, color: '#1c1d1d' },
+  friendsLabel: { fontFamily: 'Poppins-Bold', fontSize: 11, color: '#b0b0b0', textTransform: 'uppercase', letterSpacing: 0.6, marginTop: 10, marginBottom: 6 },
   friendsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 4 },
   friendChip: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#ffffff', borderRadius: 999, paddingVertical: 7, paddingHorizontal: 12, borderWidth: 1, borderColor: '#e8e8e8' },
   friendAvatar: { width: 22, height: 22, borderRadius: 11, backgroundColor: '#00bf6322', justifyContent: 'center', alignItems: 'center' },
-  friendAvatarText: { fontFamily: 'DMSans_700Bold', fontSize: 11, color: '#00bf63' },
-  friendChipText: { fontFamily: 'DMSans_600SemiBold', fontSize: 13, color: '#1c1d1d' },
+  friendAvatarText: { fontFamily: 'Poppins-Bold', fontSize: 11, color: '#00bf63' },
+  friendChipText: { fontFamily: 'Poppins-SemiBold', fontSize: 13, color: '#1c1d1d' },
   itemCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ffffff', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: '#e8e8e8' },
   itemLeft: { flex: 1 },
-  itemName: { fontFamily: 'DMSans_600SemiBold', fontSize: 14, color: '#1c1d1d' },
-  itemAssigned: { fontFamily: 'DMSans_400Regular', fontSize: 12, color: '#b0b0b0', marginTop: 2 },
+  itemName: { fontFamily: 'Poppins-SemiBold', fontSize: 14, color: '#1c1d1d' },
+  itemAssigned: { fontFamily: 'Poppins-Regular', fontSize: 12, color: '#b0b0b0', marginTop: 2 },
   itemRight: { alignItems: 'flex-end', gap: 4 },
-  itemAmount: { fontFamily: 'DMSans_700Bold', fontSize: 14, color: '#1c1d1d' },
+  itemAmount: { fontFamily: 'Poppins-Bold', fontSize: 14, color: '#1c1d1d' },
   breakdownCard: {
     backgroundColor: '#ffffff', borderRadius: 14, padding: 14,
     borderWidth: 1, borderColor: '#e8e8e8', marginBottom: 8,
   },
   breakdownTop: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   breakdownAvatar: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#00bf63', justifyContent: 'center', alignItems: 'center' },
-  breakdownAvatarText: { fontFamily: 'DMSans_700Bold', fontSize: 14, color: '#ffffff' },
-  breakdownName: { fontFamily: 'DMSans_600SemiBold', fontSize: 14, color: '#1c1d1d' },
+  breakdownAvatarText: { fontFamily: 'Poppins-Bold', fontSize: 14, color: '#ffffff' },
+  breakdownName: { fontFamily: 'Poppins-SemiBold', fontSize: 14, color: '#1c1d1d' },
   payBtn: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, backgroundColor: '#00bf6322' },
-  payBtnText: { fontFamily: 'DMSans_600SemiBold', fontSize: 12, color: '#00bf63' },
+  payBtnText: { fontFamily: 'Poppins-SemiBold', fontSize: 12, color: '#00bf63' },
   unassignedRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 4 },
-  unassignedText: { fontFamily: 'DMSans_400Regular', fontSize: 13, color: '#e67e22' },
+  unassignedText: { fontFamily: 'Poppins-Regular', fontSize: 13, color: '#e67e22' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'center', alignItems: 'center' },
   modalBox: { backgroundColor: '#ffffff', borderRadius: 20, padding: 24, width: '85%', gap: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.1, shadowRadius: 20, elevation: 10 },
-  modalTitle: { fontFamily: 'DMSans_700Bold', fontSize: 16, color: '#1c1d1d' },
-  modalSub: { fontFamily: 'DMSans_400Regular', fontSize: 13, color: '#8a8a8a' },
+  modalTitle: { fontFamily: 'Poppins-Bold', fontSize: 16, color: '#1c1d1d' },
+  modalSub: { fontFamily: 'Poppins-Regular', fontSize: 13, color: '#8a8a8a' },
   assignAllBtn: { backgroundColor: '#f0fdf4', borderRadius: 10, paddingVertical: 10, alignItems: 'center', borderWidth: 1, borderColor: '#00bf63' },
-  assignAllText: { fontFamily: 'DMSans_600SemiBold', fontSize: 13, color: '#00bf63' },
+  assignAllText: { fontFamily: 'Poppins-SemiBold', fontSize: 13, color: '#00bf63' },
   personRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#f5f5f5' },
-  personRowText: { fontFamily: 'DMSans_400Regular', fontSize: 15, color: '#1c1d1d' },
-  personRowTextActive: { fontFamily: 'DMSans_600SemiBold', color: '#00bf63' },
+  personRowText: { fontFamily: 'Poppins-Regular', fontSize: 15, color: '#1c1d1d' },
+  personRowTextActive: { fontFamily: 'Poppins-SemiBold', color: '#00bf63' },
   doneBtn: { backgroundColor: '#00bf63', borderRadius: 999, paddingVertical: 12, alignItems: 'center', marginTop: 4 },
-  doneBtnText: { fontFamily: 'DMSans_600SemiBold', fontSize: 14, color: '#ffffff' },
+  doneBtnText: { fontFamily: 'Poppins-SemiBold', fontSize: 14, color: '#ffffff' },
 });
 

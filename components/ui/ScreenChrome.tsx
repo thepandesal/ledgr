@@ -69,10 +69,10 @@ const s = StyleSheet.create({
 
   header: { backgroundColor: HEADER_BG, paddingHorizontal: Spacing.page, paddingBottom: 16, flexDirection: 'row', alignItems: 'center', gap: 10, borderBottomWidth: 1, borderBottomColor: '#333', zIndex: 10 },
   headerBtn:   { width: 36, height: 36, borderRadius: 18, backgroundColor: '#B6E1DE22', alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { flex: 1, fontFamily: 'CalSans', fontSize: 20, color: HEADER_TEXT, letterSpacing: -0.3, textAlign: 'center' },
+  headerTitle: { flex: 1, fontFamily: 'Poppins-Bold', fontSize: 20, color: HEADER_TEXT, letterSpacing: -0.3, textAlign: 'center' },
 
   navBar: { flexDirection: 'row', backgroundColor: Colors.white, borderTopWidth: 1, borderTopColor: Colors.border, height: 64, paddingTop: 8 },
   navItem: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 3 },
   navIconWrap: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
-  navLabel: { fontFamily: 'ChillaxRegular', fontSize: 10, color: NAV_INACTIVE, letterSpacing: 0.4 },
+  navLabel: { fontFamily: 'Poppins-Regular', fontSize: 10, color: NAV_INACTIVE, letterSpacing: 0.4 },
 });

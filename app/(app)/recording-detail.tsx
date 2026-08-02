@@ -1,10 +1,12 @@
+import { SvgXml } from 'react-native-svg';
 import GooeyLoader from '@/components/ui/GooeyLoader';
 import { BlurView } from 'expo-blur';
 import AddItemModal from './AddItemModal';
 import { setPendingFocusDate } from '../../src/lib/focusDate';
 import { useScreenAnim } from '@/components/ui/ScreenWrapper';
-import PageHeader from '@/components/ui/PageHeader';
+import TopHeader from '@/components/ui/TopHeader';
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Animated, Dimensions, ScrollView, TextInput, Modal, Platform, Image, Share, Alert, ActivityIndicator } from 'react-native';
+const { width } = Dimensions.get('window');
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../../src/lib/supabase';
@@ -25,6 +27,7 @@ import { Brand } from '../../src/lib/brand';
 import { DC } from '../../src/lib/design';
 import { AppFont } from '../../src/lib/fonts';
 import { writeOff } from '../../src/lib/writeOff';
+import { computeSplitTotals } from '../../src/lib/splitBillUtils';
 import { useUser } from '../../src/hooks/useUser';
 import { useNav } from '../../src/lib/NavContext';
 import { useQueryClient } from '@tanstack/react-query';
@@ -32,7 +35,9 @@ const ACCENT      = Brand.color.accent;
 const ACCENT_DARK = Brand.color.accentDark;
 const PEACH       = '#FFAB91';
 const PAGE        = 20;
-const { width } = Dimensions.get('window');
+const SVG_BACK = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12"><path fill="currentColor" d="M10.5 6a.75.75 0 0 0-.75-.75H3.81l1.97-1.97a.75.75 0 0 0-1.06-1.06L1.47 5.47a.75.75 0 0 0 0 1.06l3.25 3.25a.75.75 0 0 0 1.06-1.06L3.81 6.75h5.94A.75.75 0 0 0 10.5 6" /></svg>`;
+const SVG_EDIT = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="currentColor" d="M12.85 6.91L2.71 17.045l-.7 4.075a.74.74 0 0 0 .21.655c.14.14.335.22.53.22c.04 0 .085 0 .125-.01l4.075-.7l10.14-10.14l-4.24-4.24zm8.27-4.03A3 3 0 0 0 19 2c-.8 0-1.555.31-2.12.88l-2.97 2.97l4.24 4.24l2.97-2.97C21.685 6.555 22 5.8 22 5s-.31-1.555-.88-2.12" /></svg>`;
+const SVG_VIEW = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="4" fill="currentColor" /><path fill="currentColor" d="M30.94 15.66A16.69 16.69 0 0 0 16 5A16.69 16.69 0 0 0 1.06 15.66a1 1 0 0 0 0 .68A16.69 16.69 0 0 0 16 27a16.69 16.69 0 0 0 14.94-10.66a1 1 0 0 0 0-.68M16 22.5a6.5 6.5 0 1 1 6.5-6.5a6.51 6.51 0 0 1-6.5 6.5" /></svg>`;
 const MAX_NAME_CHARS = 18;
 const MAX_ITEM_NAME = 20;
 interface Subitem { id: string; name: string; cost: number; people: string[]; }
@@ -347,6 +352,7 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
     setItemForms(prev => { const n = [...prev]; n[itemIdx] = { ...n[itemIdx], subitemForms: n[itemIdx].subitemForms.filter((_, idx) => idx !== subIdx) }; return n; });
   // -- Linked split bill ----------------------------------------------------
   const [linkedSplitBill, setLinkedSplitBill] = useState<{ id: string; name: string } | null>(null);
+  const [splitBillPerPerson, setSplitBillPerPerson] = useState<{ name: string; total: number }[]>([]);
   const [chargedFromSplitBill, setChargedFromSplitBill] = useState<{ id: string; name: string } | null>(null);
   const [relatedSplitBillPayments, setRelatedSplitBillPayments] = useState<any[]>([]);
   const [splitBillModal, setSplitBillModal] = useState(false);
@@ -378,7 +384,15 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
       .maybeSingle();
     if (data?.split_bills) {
       const sb = Array.isArray(data.split_bills) ? data.split_bills[0] : data.split_bills;
-      if (sb) setLinkedSplitBill(sb);
+      if (sb) {
+        setLinkedSplitBill(sb);
+        const { data: splitItems } = await supabase
+          .from('split_items').select('id, cost, people, recording_type, parent_item_id').eq('split_bill_id', sb.id);
+        if (splitItems) {
+          const totals = computeSplitTotals(splitItems);
+          setSplitBillPerPerson(Object.entries(totals).map(([name, total]) => ({ name, total })));
+        }
+      }
     }
   };
   const createAndLinkSplitBill = async () => {
@@ -393,12 +407,28 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
     await supabase.from('split_bill_recordings').insert({
       split_bill_id: bill.id, recording_id: recordingId, amount_contributed: recording.amount,
     });
+    await supabase.from('split_items').insert({
+      split_bill_id: bill.id,
+      recording_id: recordingId,
+      user_id: user.id,
+      name: recording.name,
+      cost: recording.amount,
+      recording_type: recording.type,
+    });
     setSplitBillModal(false);
     openSplitBill(bill.id, bill.name);
   };
   const linkToExistingSplitBill = async (bill: any) => {
     await supabase.from('split_bill_recordings').insert({
       split_bill_id: bill.id, recording_id: recordingId, amount_contributed: recording?.amount ?? 0,
+    });
+    await supabase.from('split_items').insert({
+      split_bill_id: bill.id,
+      recording_id: recordingId,
+      user_id: userId,
+      name: recording?.name,
+      cost: recording?.amount ?? 0,
+      recording_type: recording?.type,
     });
     setSplitBillModal(false);
     openSplitBill(bill.id, bill.name);
@@ -618,8 +648,9 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
   // Realtime listener for tag status changes (B accepts/declines)
   useEffect(() => {
     if (!recordingId || !userId) return;
+    const channelName = `tag-status-${recordingId}-${Date.now()}`;
     const channel = supabase
-      .channel(`tag-status-${recordingId}`)
+      .channel(channelName)
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
@@ -679,7 +710,7 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
   useEffect(() => {
     if (!recordingId) return;
     const channel = supabase
-      .channel(`recording-live-${recordingId}`)
+      .channel(`recording-live-${recordingId}-${Date.now()}`)
       .on('postgres_changes', {
         event: 'UPDATE',
         schema: 'public',
@@ -2109,231 +2140,153 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
   const PREVIEW_LIMIT = 4;
   const visiblePeople = filledPeople.slice(0, PREVIEW_LIMIT);
   const extraCount = filledPeople.length - PREVIEW_LIMIT;
+  const [overpaymentModal, setOverpaymentModal] = useState(false);
+  const [overpaymentAmount, setOverpaymentAmount] = useState(0);
   return (
     <Animated.View style={[{ flex: 1, backgroundColor: Colors.white }, { transform: [{ translateX: slideAnim }] }]}>
       <SafeAreaView style={{ flex: 1 }}>
-        {/* Header */}
-        <PageHeader
-          title={recording?.name ?? ''}
+        <TopHeader
+          title="Record"
+          subtitle={recording?.name ?? ''}
           onBack={handleBack}
-          titleColor="#9cd7d2"
+          centered
         />
+
         <ScrollView contentContainerStyle={rd.scroll} showsVerticalScrollIndicator={false} style={{ backgroundColor: Colors.white }}>
-          <View style={{ height: 8 }} />
-          {/* Actions row */}
-          <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 8, paddingHorizontal: DC.pagePadding, marginBottom: 8 }}>
-            <TouchableOpacity style={rd.actionBtn} onPress={() => { if (recordingId) Clipboard.setStringAsync(recordingId); }} activeOpacity={0.8}>
-            </TouchableOpacity>
-            {isOwner && (recording?.closed_by || recording?.status === 'closed') && (
-              <TouchableOpacity style={rd.actionBtn} onPress={async () => { await supabase.from('recordings').update({ closed_by: null }).eq('id', recordingId); setRecording((prev: any) => prev ? { ...prev, closed_by: null } : prev); }} activeOpacity={0.8}>
-              </TouchableOpacity>
-            )}
+
+          {/* General Information */}
+          <View style={rd.sectionRow}>
+            <Text style={rd.sectionLabel}>General Information</Text>
             {isOwner && (
-              <TouchableOpacity style={rd.actionBtn} onPress={() => setShowAddChoice(true)} activeOpacity={0.8}>
-              </TouchableOpacity>
+ <TouchableOpacity style={rd.editCircleBtn} onPress={openEditModal} activeOpacity={0.7}><SvgXml xml={SVG_EDIT} width={16} height={16} color={DC.circleBtn.active.borderColor} /></TouchableOpacity>
             )}
           </View>
-          {/* Info card */}
-          <View style={rd.infoCard}>
-            <View style={rd.tagInfoRow}>
-              <Text style={rd.tagInfoLabel}>Transaction Name</Text>
-              <Text style={rd.tagInfoValue}>{recording?.name ?? '�'}</Text>
+          <View style={rd.dottedCard}>
+            <View style={rd.infoRow}>
+              <Text style={rd.infoLabel}>Amount</Text>
+              <Text style={rd.infoValue}>{displayAmount()}</Text>
             </View>
-            <View style={rd.tagInfoRow}>
-              <Text style={rd.tagInfoLabel}>Date</Text>
-              <Text style={rd.tagInfoValue}>{recording ? formatDate(recording.transaction_date) : '�'}</Text>
+            <View style={rd.rowDivider} />
+            <View style={rd.infoRow}>
+              <Text style={rd.infoLabel}>Date</Text>
+              <Text style={rd.infoValue}>{recording ? formatDate(recording.transaction_date) : ''}</Text>
             </View>
-            <View style={rd.tagInfoRow}>
-              <Text style={rd.tagInfoLabel}>Amount</Text>
-              <Text style={rd.tagInfoValue}>
-                {Number(recording?.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-              </Text>
+            <View style={rd.rowDivider} />
+            <View style={rd.infoRow}>
+              <Text style={rd.infoLabel}>Status</Text>
+              <Text style={rd.infoValue}>{displayStatus()}</Text>
             </View>
-            <View style={rd.tagInfoRow}>
-              <Text style={rd.tagInfoLabel}>Payment Status</Text>
-              <Text style={rd.tagInfoValue}>
-                {!recording ? '�' : recording.status === 'paid' ? 'Fully Paid' : recording.status === 'partial' ? 'Partially Paid' : recording.status === 'unpaid' ? 'Unpaid' : recording.status ?? '�'}
-              </Text>
+            <View style={rd.rowDivider} />
+            <View style={rd.infoRow}>
+              <Text style={rd.infoLabel}>Created By</Text>
+              <Text style={rd.infoValue}>{creatorName || ''}</Text>
             </View>
-            <View style={rd.tagInfoRow}>
-              <Text style={rd.tagInfoLabel}>Recording Status</Text>
-              <Text style={rd.tagInfoValue}>{recording?.closed_by || recording?.status === 'closed' ? 'Closed' : 'Open'}</Text>
+            <View style={[rd.infoRow, rd.infoRowLast]}>
+              <Text style={rd.infoLabel}>Borrower</Text>
+              <Text style={rd.infoValue}>{recording?.person_name || 'record is not a loan'}</Text>
             </View>
-            <View style={rd.tagInfoRow}>
-              <Text style={rd.tagInfoLabel}>Created By</Text>
-              <Text style={rd.tagInfoValue}>{creatorName || (isTaggedViewer ? (recording as any)?.tagged_by_user_id : recording?.user_id) || '�'}</Text>
-            </View>
-            {recording?.person_name && (
-            <View style={rd.tagInfoRow}>
-              <Text style={rd.tagInfoLabel}>Loaner</Text>
-              <Text style={rd.tagInfoValue}>{recording.person_name}</Text>
-            </View>
-            )}
-            <View style={rd.tagInfoRow}>
-              <Text style={rd.tagInfoLabel}>Payments Made</Text>
-              <Text style={rd.tagInfoValue}>{linkedPayments.length}</Text>
-            </View>
-            {recording?.closed_by && (
-              <View style={rd.tagInfoRow}>
-                <Text style={rd.tagInfoLabel}>Closed By</Text>
-                <Text style={rd.tagInfoValue}>{recording.closed_by}</Text>
-              </View>
-            )}
           </View>
-          {/* Related Records section */}
-          {trackingExpense && (
-            <>
-              <View style={rd.sectionDivider} />
-              <View style={rd.sectionRow}>
-                <Text style={rd.sectionLabel}>Related Records</Text>
-              </View>
-              <View style={{ paddingHorizontal: DC.pagePadding }}>
-                <TouchableOpacity style={rd.recRow} onPress={() => openRecording(trackingExpense.id)} activeOpacity={0.7}>
-                                    <View style={rd.recMid}>
-                    <Text style={rd.recName} numberOfLines={1}>{trackingExpense.name}</Text>
-                    <Text style={rd.recDate}>{new Date(trackingExpense.transaction_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</Text>
-                  </View>
-                  <Text style={{ fontFamily: AppFont.semiBold, fontSize: 13, color: DC.accent1 }}>
-                    {Number(trackingExpense.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </>
-          )}
-          {/* SPLIT BILL section */}
-          {!((recording?.type === 'debt' || recording?.type === 'due' || recording?.is_due) && !linkedSplitBill) && (
-            <View style={rd.sectionDivider} />
-          )}
-          {!((recording?.type === 'debt' || recording?.type === 'due' || recording?.is_due) && !linkedSplitBill) && (
-            <View style={rd.sectionRow}>
-              <Text style={rd.sectionLabel}>Split Bill</Text>
-              <TouchableOpacity style={rd.sectionBtn} onPress={() => linkedSplitBill ? openSplitBill(linkedSplitBill.id, linkedSplitBill.name) : openSplitBillModal()} activeOpacity={0.8}>
-                <Text style={rd.sectionBtnText}>{linkedSplitBill ? 'View' : 'Create'}</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-          {/* RECEIPTS section */}
           <View style={rd.sectionRow}>
             <Text style={rd.sectionLabel}>Receipts</Text>
+            {isOwner && (
+              <TouchableOpacity style={rd.editCircleBtn} onPress={() => setAddReceiptModal(true)} activeOpacity={0.7}>
+                <SvgXml xml={SVG_EDIT} width={16} height={16} color={DC.circleBtn.active.borderColor} />
+              </TouchableOpacity>
+            )}
           </View>
-          {receiptPhotos.length > 0 ? (
-            <View style={{ paddingHorizontal: DC.pagePadding }}>
+          <View style={[rd.dottedCard, { padding: 12 }]}>
+            {receiptPhotos.length > 0 ? (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
                 {receiptPhotos.slice(0, 2).map((p, i) => (
                   <TouchableOpacity key={p.id} onPress={() => { setPhotoModalIndex(i); setPhotoModal(true); }} activeOpacity={0.8}>
-                    <Image source={{ uri: p.url }} style={{ width: 80, height: 80, borderRadius: 8 }} resizeMode="cover" />
+                    <Image source={{ uri: p.url }} style={{ width: 72, height: 72, borderRadius: 8 }} resizeMode="cover" />
                   </TouchableOpacity>
                 ))}
                 {receiptPhotos.length > 2 && (
                   <TouchableOpacity onPress={() => { setPhotoModalIndex(0); setPhotoModal(true); }} activeOpacity={0.8}>
-                    <View style={{ width: 80, height: 80, borderRadius: 8, backgroundColor: '#F0F0F0', alignItems: 'center', justifyContent: 'center' }}>
-                      <Text style={{ fontFamily: AppFont.semiBold, fontSize: 14, color: '#666' }}>+{receiptPhotos.length - 2} more</Text>
+                    <View style={{ width: 72, height: 72, borderRadius: 8, backgroundColor: '#f0f0f0', alignItems: 'center', justifyContent: 'center' }}>
+                      <Text style={{ ...DC.typography.sectionHeader }}>+{receiptPhotos.length - 2}</Text>
                     </View>
                   </TouchableOpacity>
                 )}
               </ScrollView>
-            </View>
-          ) : (
-            <View style={{ paddingHorizontal: DC.pagePadding }}>
-              <Text style={{ fontFamily: AppFont.regular, fontSize: 12, color: Colors.muted }}>none</Text>
-            </View>
-          )}
-          {/* section divider */}
-          {/* Payments / Collections */}
-          <View style={rd.sectionDivider} />
-          <View style={rd.sectionRow}>
-            <Text style={rd.sectionLabel}>Payment</Text>
+            ) : (
+              <Text style={{ ...DC.typography.muted }}>no receipts</Text>
+            )}
           </View>
-          {linkedPayments.length > 0 ? (
-            <View style={{ paddingHorizontal: DC.pagePadding }}>
-              {[...linkedPayments].reverse().map((p: any, i: number) => (
-                <TouchableOpacity key={p.id} style={[rdTag.payRow, i === linkedPayments.length - 1 && { borderBottomWidth: 0 }]} onPress={() => !p.is_write_off && openRecording(p.id)} activeOpacity={0.7}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={rdTag.payRowName} numberOfLines={1}>
-                      Payment {linkedPayments.length - i}
-                    </Text>
-                    <Text style={rdTag.payRowDate}>{formatDate(p.transaction_date)}</Text>
-                    <Text style={rdTag.payRowDate}>{p.person_name || (p.user_id === userId ? 'You' : (p.payment_to ?? 'Someone'))}</Text>
-                  </View>
-                  <Text style={rdTag.payRowAmount}>{Number(p.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
-                  {!p.is_write_off && (p.user_id === userId || p.payment_to === userId) && (
-                    <TouchableOpacity
-                      style={{ marginLeft: 8, padding: 6, borderRadius: 6, backgroundColor: Colors.dangerBg }}
-                      onPress={() => setDeletePaymentConfirm(p.id)}
-                    >
+
+          {/* Split Bill */}
+          {/* Split Bill */}
+            <>
+              <View style={rd.sectionRow}>
+                <Text style={rd.sectionLabel}>Split Bill</Text>
+                {isOwner && (
+                  linkedSplitBill ? (
+                    <TouchableOpacity style={rd.editCircleBtn} onPress={() => openSplitBill(linkedSplitBill.id, linkedSplitBill.name)} activeOpacity={0.7}>
+                      <SvgXml xml={SVG_VIEW} width={16} height={16} color={DC.circleBtn.active.borderColor} />
                     </TouchableOpacity>
-                  )}
-                </TouchableOpacity>
-              ))}
-            </View>
-          ) : (
-            <View style={{ paddingHorizontal: DC.pagePadding }}>
-              <Text style={{ fontFamily: AppFont.regular, fontSize: 12, color: Colors.muted }}>none</Text>
-            </View>
-          )}
-          {/* Split bill collections */}
-          {splitBillPayments.length > 0 && (
-            <>
-              <View style={rd.sectionDivider} />
-              <View style={rd.sectionRow}>
-                <Text style={rd.sectionLabel}>Split Bill Collections</Text>
+                  ) : (
+                    <TouchableOpacity style={rd.editCircleBtn} onPress={openSplitBillModal} activeOpacity={0.7}>
+                      <Text style={{ fontFamily: 'Poppins-Bold', fontSize: 16, color: DC.circleBtn.active.borderColor, lineHeight: 20 }}>+</Text>
+                    </TouchableOpacity>
+                  )
+                )}
               </View>
-              <View style={{ paddingHorizontal: DC.pagePadding }}>
-                {splitBillPayments.map((p: any) => (
-                  <View key={p.id} style={rd.recRow}>
-                                        <View style={rd.recMid}>
-                      <Text style={rd.recName}>{p.person_name}</Text>
-                      <Text style={rd.recDate}>{new Date(p.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</Text>
-                    </View>
-                    <Text style={{ fontFamily: AppFont.semiBold, fontSize: 13, color: DC.accent1 }}>
-                      {Number(p.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                    </Text>
+              <View style={rd.dottedCard}>
+                {!linkedSplitBill ? (
+                  <View style={rd.infoRow}>
+                    <Text style={{ ...DC.typography.muted }}>no split bill linked</Text>
                   </View>
-                ))}
+                ) : splitBillPerPerson.length === 0 ? (
+                  <View style={rd.infoRow}>
+                    <Text style={{ ...DC.typography.muted }}>no items assigned yet</Text>
+                  </View>
+                ) : (
+                  splitBillPerPerson.map((p, i) => (
+                    <View key={p.name}>
+                      <View style={rd.personRow}>
+                        <View style={rd.personAvatar}>
+                          <Text style={rd.personAvatarText}>{p.name.charAt(0).toUpperCase()}</Text>
+                        </View>
+                        <Text style={rd.personName}>{p.name}</Text>
+                        <Text style={[rd.personAmount, { color: p.total < 0 ? '#e53935' : rd.personAmount.color }]}>
+                          {p.total < 0 ? '- ' : ''}{Math.abs(p.total).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        </Text>
+                      </View>
+                      {i < splitBillPerPerson.length - 1 && <View style={rd.rowDivider} />}
+                    </View>
+                  ))
+                )}
               </View>
             </>
-          )}
-          {/* Related records � payments charged to this expense from a split bill */}
-          {relatedSplitBillPayments.length > 0 && (
-            <>
-              <View style={rd.sectionDivider} />
-              <View style={rd.sectionRow}>
-                <Text style={rd.sectionLabel}>Related Records</Text>
-              </View>
-              <View style={{ paddingHorizontal: DC.pagePadding }}>
-                {relatedSplitBillPayments.map((p: any) => (
-                  <TouchableOpacity
-                    key={p.id}
-                    style={[rd.recRow, p.status === 'cancelled' && { opacity: 0.45 }]}
-                    onPress={() => {
-                      if (chargedFromSplitBill) {
-                        openSplitBill(chargedFromSplitBill.id, chargedFromSplitBill.name);
-                      }
-                    }}
-                    activeOpacity={chargedFromSplitBill ? 0.7 : 1}
-                  >
-                    <View style={rd.recIconWrap}>
+
+                    {/* Payments */}
+          <View style={rd.sectionRow}>
+            <Text style={rd.sectionLabel}>Payments</Text>
+          </View>
+          <View style={rd.dottedCard}>
+            {linkedPayments.length > 0 ? (
+              [...linkedPayments].reverse().map((p: any, i: number) => (
+                <View key={p.id}>
+                  <TouchableOpacity style={rd.personRow} onPress={() => !p.is_write_off && openRecording(p.id)} activeOpacity={0.7}>
+                    <View style={rd.personAvatar}><Text style={rd.personAvatarText}>{p.user_id === userId ? 'Y' : (p.person_name ?? '?').charAt(0).toUpperCase()}</Text></View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={rd.personName} numberOfLines={1}>{p.person_name || (p.user_id === userId ? 'You' : 'Someone')}</Text>
+                      <Text style={{ ...DC.typography.subContent }}>{formatDate(p.transaction_date)}</Text>
                     </View>
-                    <View style={rd.recMid}>
-                      <Text style={[rd.recName, p.status === 'cancelled' && { textDecorationLine: 'line-through', color: Colors.muted }]}>
-                        {p.person_name}
-                      </Text>
-                      <Text style={rd.recDate}>
-                        {new Date(p.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                        {p.status === 'cancelled' ? ' � cancelled' : ''}
-                        {chargedFromSplitBill ? ` � ${chargedFromSplitBill.name}` : ''}
-                      </Text>
-                    </View>
-                    <Text style={{ fontFamily: AppFont.semiBold, fontSize: 13, color: p.status === 'cancelled' ? DC.pageTextMuted : DC.accent1 }}>
-                      {Number(p.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                    </Text>
-                    
+                    <Text style={rd.personAmount}>{Number(p.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
                   </TouchableOpacity>
-                ))}
+                  {i < linkedPayments.length - 1 && <View style={rd.rowDivider} />}
+                </View>
+              ))
+            ) : (
+              <View style={rd.personRow}>
+                <Text style={{ ...DC.typography.muted }}>no payments</Text>
               </View>
-            </>
-          )}
-          <View style={{ height: 20 }} />
+            )}
+          </View>
+
+          <View style={{ height: 40 }} />
         </ScrollView>
       </SafeAreaView>
       {/* Actions bottom sheet */}
@@ -2925,7 +2878,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
           {/* 1. Header */}
           <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: DC.pagePadding, paddingTop: 12, paddingBottom: 8 }}>
             <View style={{ flex: 1, alignItems: "center" }}>
-              <Text style={{ fontFamily: "MuseoModerno_Regular", fontSize: 11, color: DC.pageTextMuted, letterSpacing: 2 }}>LEDGR</Text>
+              <Text style={{ fontFamily: "MuseoModerno-Regular", fontSize: 11, color: DC.pageTextMuted, letterSpacing: 2 }}>LEDGR</Text>
               <Text style={{ fontFamily: AppFont.bold, fontSize: 15, color: DC.pageText }} numberOfLines={1}>{recording?.name ?? ""}</Text>
             </View>
             <TouchableOpacity onPress={() => setPhotoModal(false)} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }} style={{ position: "absolute", right: DC.pagePadding }}>
@@ -3173,13 +3126,39 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
 }
 const rd = StyleSheet.create({
   // Container
-  header:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: PAGE, paddingTop: 16, paddingBottom: 16, gap: 10, backgroundColor: '#1A1A1A', borderBottomWidth: 1, borderBottomColor: '#333' },
-  backBtn:    { width: 34, height: 34, borderRadius: 17, backgroundColor: '#B6E1DE22', alignItems: 'center', justifyContent: 'center' },
-  title:      { flex: 1, fontFamily: Brand.font.display, fontSize: 20, color: '#B6E1DE', letterSpacing: -0.3, textAlign: 'center' },
+  header:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: DC.pagePadding, paddingTop: 28, paddingBottom: 14 },
+  title:      { fontFamily: 'Poppins-SemiBold', fontSize: 15, color: DC.pageText, textAlign: 'center' },
+  titleSub:   { fontFamily: 'Poppins-Regular', fontSize: 11, color: DC.pageTextMuted, fontStyle: 'italic', textAlign: 'center' },
   amountBadge:     { backgroundColor: '#B6E1DE22', borderRadius: Radius.pill, paddingHorizontal: 12, paddingVertical: 5 },
   amountBadgeText: { fontFamily: Brand.font.monoBold, fontSize: 13 },
-  scroll:     { paddingBottom: 100, backgroundColor: Colors.white },
+  scroll:     { paddingTop: 8, paddingBottom: 100, backgroundColor: Colors.white },
   actionBtn:  { width: 36, height: 36, borderRadius: 18, backgroundColor: '#eeeeee', alignItems: 'center', justifyContent: 'center' },
+
+  // New header
+  topHeader:       { paddingHorizontal: DC.pagePadding, paddingTop: 28, paddingBottom: 20 },
+  titleRow:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  topHeaderBack:   { ...DC.typography.goBack, marginBottom: 8 },
+  topHeaderLabel:  { ...DC.typography.pageTitle, marginBottom: 4 },
+  topHeaderTitle:  { fontFamily: 'Poppins-Regular', fontSize: 16, color: DC.pageText, flex: 1, marginRight: 8 },
+  topHeaderAmount: { fontFamily: 'Poppins-Bold', fontSize: 16, color: DC.pageText },
+
+  // Dotted card
+  dottedCard:  { borderWidth: 1, borderColor: '#aaaaaa', borderStyle: 'dashed' as const, borderRadius: 10, marginBottom: 8, marginHorizontal: DC.pagePadding, paddingHorizontal: 14 },
+  infoRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 46, borderBottomWidth: DC.rowDivider.height, borderBottomColor: DC.rowDivider.backgroundColor, marginHorizontal: -14, paddingHorizontal: 14 },
+  infoRowLast: { borderBottomWidth: 0 },
+  infoLabel:   { ...DC.typography.sectionHeader },
+  infoValue:   { ...DC.typography.sectionBody, textAlign: 'right' as const, flex: 1, marginLeft: 16 },
+  rowDivider:  { height: DC.rowDivider.height, backgroundColor: DC.rowDivider.backgroundColor, marginHorizontal: -14 },
+
+  // Edit circle button
+  editCircleBtn: { ...DC.circleBtn.ghostSm },
+
+  // Person rows
+  personRow:       { flexDirection: 'row', alignItems: 'center', height: 52, gap: 10 },
+  personAvatar:    { width: 32, height: 32, borderRadius: 16, backgroundColor: '#efe9ff', alignItems: 'center', justifyContent: 'center' },
+  personAvatarText:{ ...DC.typography.sectionHeader, color: '#8c52ff' },
+  personName:      { ...DC.typography.sectionBody, flex: 1 },
+  personAmount:    { ...DC.typography.amount },
   // Info card
   infoCard: { marginHorizontal: DC.pagePadding, borderRadius: 16, backgroundColor: '#F8F8F8', padding: 16, marginTop: 8 },
   tagInfoRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#eeeeee' },
@@ -3209,13 +3188,11 @@ const rd = StyleSheet.create({
   summaryLabel: { fontFamily: Brand.font.mono, fontSize: 10, color: Colors.muted, letterSpacing: 0.4, textTransform: 'uppercase', marginBottom: 3 },
   summaryValue: { fontFamily: Brand.font.monoBold, fontSize: 13, color: Colors.text },
   // Section headers
-  sectionDivider: { height: 1, backgroundColor: DC.cardBorder, marginHorizontal: DC.pagePadding, marginVertical: 4 },
-  sectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: DC.pagePadding, paddingTop: 20, paddingBottom: 6 },
-  sectionLabel: { fontFamily: AppFont.bold, fontSize: 12, color: '#999999', textTransform: 'uppercase', letterSpacing: 0.8 },
-  sectionBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: Radius.pill, backgroundColor: '#9cd7d222' },
-  sectionBtnText: { fontFamily: AppFont.semiBold, fontSize: 12, color: '#5dc4bb' },
-  // Section rows
-  sectionRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: DC.pagePadding, paddingTop: 20, paddingBottom: 8 },
+  sectionDivider: { height: DC.rowDivider.height, backgroundColor: DC.rowDivider.backgroundColor, marginHorizontal: DC.pagePadding, marginVertical: 4 },
+  sectionRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: DC.pagePadding, paddingTop: 20, paddingBottom: 12 },
+  sectionLabel:   { ...DC.typography.sectionHeader },
+  sectionBtn:     { ...DC.button.base, paddingHorizontal: 12 },
+  sectionBtnText: { ...DC.button.textInactive },
   sectionHeader:  { ...Brand.type.sectionHeader },
   sectionAddBtn:  { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: Radius.pill, backgroundColor: ACCENT + '44' },
   sectionAddText: { fontFamily: Brand.font.heading, fontSize: 11, color: ACCENT_DARK },
@@ -3225,10 +3202,6 @@ const rd = StyleSheet.create({
   recMid:     { flex: 1, gap: 2 },
   recName:    { fontFamily: AppFont.semiBold, fontSize: 13, color: DC.pageText },
   recDate:    { fontFamily: AppFont.regular, fontSize: 10, color: DC.pageTextMuted },
-  // Info rows
-  infoRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  infoLabel:  { fontFamily: Brand.font.mono, fontSize: 11, color: Colors.muted, width: 80, flexShrink: 0 },
-  infoValue:  { fontFamily: Brand.font.monoBold, fontSize: 12, color: Colors.text, flex: 1, textAlign: 'right' },
   // Action chips
   actionChip:     { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: Radius.pill, backgroundColor: ACCENT + '44' },
   actionChipText: { fontFamily: Brand.font.heading, fontSize: 11, color: ACCENT_DARK },
@@ -3283,4 +3256,9 @@ const styles = StyleSheet.create({
   subitemFormRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 8, marginLeft: 4 },
   subitemFormInputRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
 });
+
+
+
+
+
 

@@ -1,10 +1,13 @@
 import { View, TouchableOpacity, Text, StyleSheet, Animated, Platform, SafeAreaView, ScrollView, useWindowDimensions, Clipboard, TextInput, ActivityIndicator, Modal, Switch, Image } from 'react-native';
+import { SvgXml } from 'react-native-svg';
+import TopHeader from '@/components/ui/TopHeader';
 import NavIcon from '@/components/ui/NavIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useRef, memo, useCallback, useEffect }from 'react';
 import { BlurView } from 'expo-blur';
 import GooeyLoader from '@/components/ui/GooeyLoader';
 import HomeScreen from './home';
+import RecordScreen from './record';
 import AccountsScreen from './accounts';
 import BillSplitScreen from './bill-split';
 import ReceiptsScreen from './receipts';
@@ -59,6 +62,7 @@ const MAIN_TABS = [
   { key: 'others',              label: 'Others',        icon: 'apps-outline' },
 ];
 
+const SVG_BACK = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12"><path fill="currentColor" d="M10.5 6a.75.75 0 0 0-.75-.75H3.81l1.97-1.97a.75.75 0 0 0-1.06-1.06L1.47 5.47a.75.75 0 0 0 0 1.06l3.25 3.25a.75.75 0 0 0 1.06-1.06L3.81 6.75h5.94A.75.75 0 0 0 10.5 6" /></svg>`;
 const TAB_META: Record<string, { title: string; subtitle: string }> = {
   accounts:      { title: 'accounts',   subtitle: 'your saved payment methods'      },
   dashboard:     { title: 'activities', subtitle: 'all your recordings in one place' },
@@ -84,11 +88,12 @@ const OTHERS_ITEMS = [
   { key: 'receivables', label: 'Receivables', icon: 'arrow-undo-outline',    route: '/(app)/receivables' },
 ];
 
-const SLIDE_KEYS = ['home', 'accounts', 'dashboard', 'categories', 'receipts', 'bill-split', 'contacts', 'notifications-page', 'reminders', 'profile'];
+const SLIDE_KEYS = ['home', 'accounts', 'record', 'dashboard', 'categories', 'receipts', 'bill-split', 'contacts', 'notifications-page', 'reminders', 'profile'];
 
 const PROFILE_DANGER   = '#FFAB91';
 const PROFILE_DANGEBG  = '#FFF5F2';
 const MemoHome       = memo(HomeScreen);
+const MemoRecord     = memo(RecordScreen);
 const MemoAccounts   = memo(AccountsScreen);
 const MemoBillSplit  = memo(BillSplitScreen);
 const MemoReceipts   = memo(ReceiptsScreen);
@@ -100,6 +105,7 @@ const MemoReminders      = memo(RemindersScreen);
 
 const SCREENS: Record<string, (isActive: boolean) => React.ReactNode> = {
   home:                 (isActive) => <MemoHome isActive={isActive} />,
+  record:               (isActive) => <MemoRecord isActive={isActive} />,
   accounts:             (isActive) => <MemoAccounts isActive={isActive} />,
   dashboard:            (isActive) => <MemoDashboard isActive={isActive} />,
   categories:           (isActive) => <MemoCategories isActive={isActive} />,
@@ -107,6 +113,13 @@ const SCREENS: Record<string, (isActive: boolean) => React.ReactNode> = {
   receipts:             (isActive) => <MemoReceipts isActive={isActive} />,
   contacts:             (isActive) => <MemoContacts isActive={isActive} />,
   reminders:            (isActive) => <MemoReminders isActive={isActive} />,
+};
+
+// Tracks which tabs have been visited at least once — for lazy mounting
+const useVisited = (activeTab: string) => {
+  const visited = useRef<Set<string>>(new Set(SLIDE_KEYS));
+  useEffect(() => { visited.current.add(activeTab); }, [activeTab]);
+  return visited;
 };
 
 const CURRENCIES = [
@@ -134,6 +147,7 @@ const CURRENCIES = [
 
 function ProfileScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { switchTab, openContactsPanel, openFriendsPanel } = useNav();
   const { user, userId, userName, profileCode, defaultCurrency, setDefaultCurrency, requireTagApproval, setRequireTagApproval } = useUser();
   const [codeCopied, setCodeCopied] = useState(false);
@@ -272,231 +286,71 @@ function ProfileScreen() {
 
   return (
     <View style={p.container}>
+      <TopHeader
+        title="Profile"
+        subtitle={userName ?? ''}
+        onBack={() => switchTab('home')}
+        topInset={insets.top}
+        centered
+      />
       <ScrollView contentContainerStyle={p.scroll} showsVerticalScrollIndicator={false}>
 
-        {/* Avatar */}
-        <View style={p.avatarSection}>
-          <View style={p.avatar}>
-            <Text style={p.avatarText}>{userName ? userName.charAt(0).toUpperCase() : '?'}</Text>
+        {/* Personal Information */}
+        <Text style={p.sectionLabel}>Personal Information</Text>
+        <View style={p.card}>
+          <View style={p.row}>
+            <Text style={p.rowLabel}>Name</Text>
+            <Text style={p.rowValue}>{userName || '—'}</Text>
           </View>
-          <Text style={p.name}>{userName || 'My Account'}</Text>
-          <Text style={p.email}>{email}</Text>
-          <TouchableOpacity style={p.logoutBtn} onPress={handleLogout} activeOpacity={0.8}>
-            <Text style={p.logoutText}>Log Out</Text>
-          </TouchableOpacity>
+          <View style={p.rowDivider} />
+          <View style={p.row}>
+            <Text style={p.rowLabel}>Email</Text>
+            <Text style={p.rowValue} numberOfLines={1}>{email || '—'}</Text>
+          </View>
         </View>
 
-        {/* General Information */}
-        <Text style={p.sectionLabel}>General Information</Text>
+        {/* Account Information */}
+        <Text style={p.sectionLabel}>Account Information</Text>
         <View style={p.card}>
-          {/* Name */}
           <View style={p.row}>
-            <View style={p.rowBody}>
-              <Text style={p.rowLabel}>Name</Text>
-              <Text style={p.rowValue}>{userName || '—'}</Text>
-            </View>
+            <Text style={p.rowLabel}>Account Code</Text>
+            <Text style={p.rowValue}>{profileCode || '—'}</Text>
           </View>
-          <View style={p.divider} />
-          {/* Email */}
-          <View style={p.row}>
-            <View style={p.rowBody}>
-              <Text style={p.rowLabel}>Email</Text>
-              <Text style={p.rowValue}>{email || '—'}</Text>
-            </View>
-          </View>
-          <View style={p.divider} />
-          {/* Subscription */}
-          <View style={p.row}>
-            <View style={p.rowBody}>
-              <Text style={p.rowLabel}>Subscription</Text>
-              <Text style={[p.rowValue, { color: HEADER_BG }]}>Free</Text>
-            </View>
-          </View>
-          <View style={p.divider} />
-          {/* Profile Code */}
-          <View style={p.row}>
-            <View style={p.rowBody}>
-              <Text style={p.rowLabel}>Profile Code</Text>
-              <Text style={[p.rowValue, { fontFamily: AppFont.bold, letterSpacing: 1.5 }]}>{profileCode || '—'}</Text>
-            </View>
-
-          </View>
-          <View style={p.divider} />
-          {/* Default Currency */}
+          <View style={p.rowDivider} />
           <TouchableOpacity style={p.row} onPress={() => setShowCurrencyModal(true)} activeOpacity={0.7}>
-            <View style={p.rowBody}>
-              <Text style={p.rowLabel}>Default Currency</Text>
-              <Text style={p.rowValue}>{CURRENCIES.find(c => c.code === defaultCurrency)?.country ?? ''} - {defaultCurrency}</Text>
-            </View>
+            <Text style={p.rowLabel}>Currency</Text>
+            <Text style={p.rowValue}>{defaultCurrency}</Text>
           </TouchableOpacity>
-          <View style={p.divider} />
-          {/* Require Tag Approval */}
+          <View style={p.rowDivider} />
           <View style={p.row}>
-            <View style={p.rowBody}>
-              <Text style={p.rowLabel}>Require Approval Before Tagging</Text>
-              <Text style={[p.rowValue, { fontSize: 10, color: Colors.faint }]}>when OFF, friends can tag you automatically</Text>
-            </View>
+            <Text style={p.rowLabel}>Subscription</Text>
+            <Text style={p.rowValue}>Free</Text>
+          </View>
+          <View style={p.rowDivider} />
+          <View style={p.row}>
+            <Text style={p.rowLabel}>Require Approval{`\n`}Before Tagging?</Text>
             <Switch
               value={requireTagApproval}
               onValueChange={setRequireTagApproval}
-              trackColor={{ false: Colors.border, true: HEADER_BG + '66' }}
-              thumbColor={requireTagApproval ? HEADER_BG : Colors.faint}
+              trackColor={{ false: Colors.border, true: '#8c52ff66' }}
+              thumbColor={requireTagApproval ? '#8c52ff' : Colors.faint}
             />
           </View>
         </View>
 
-        {/* Friends */}
-        <Text style={p.sectionLabel}>Friends</Text>
-        <View style={p.card}>
-          {friends.length === 0 ? (
-            <View style={[p.row, p.rowLast]}>
-              <Text style={[p.rowValue, { color: Colors.faint }]}>no friends yet</Text>
-            </View>
-          ) : (
-            (showAllFriends ? friends : friends.slice(0, 3)).map((f, i, arr) => (
-              <View key={f.id}>
-                <View style={[p.row, i === arr.length - 1 && p.rowLast]}>
-                    <Text style={p.rowValue}>{f.name}</Text>
-                </View>
-                {i < arr.length - 1 && <View style={p.divider} />}
-              </View>
-            ))
-          )}
+        {/* Action buttons */}
+        <View style={p.actionBtns}>
+          <TouchableOpacity style={p.deleteBtn} onPress={() => { setShowDeleteModal(true); setDeleteConfirmText(''); setDeleteError(''); }} activeOpacity={0.8}>
+            <Text style={p.deleteBtnText}>Delete Account</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={p.logoutBtn} onPress={handleLogout} activeOpacity={0.8}>
+            <Text style={p.logoutBtnText}>Log Out</Text>
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity style={p.seeMoreBtn} onPress={openFriendsPanel} activeOpacity={0.7}>
-          <Text style={p.seeMoreText}>{friends.length > 3 ? `see ${friends.length - 3} more...` : 'see all'}</Text>
-        </TouchableOpacity>
-
-        {/* Pending friend requests (incoming) */}
-        {friendRequests.length > 0 && (
-          <>
-            <Text style={[p.sectionLabel, { marginTop: 8 }]}>Pending Requests</Text>
-            <View style={p.card}>
-              {friendRequests.map((req, i) => (
-                <View key={req.id}>
-                  <View style={[p.row, { gap: 10 }]}>
-                    <Text style={[p.rowValue, { flex: 1 }]}>{req.name}</Text>
-                    <TouchableOpacity
-                      style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: Radius.pill, backgroundColor: HEADER_BG + '33', opacity: respondingId === req.id ? 0.5 : 1 }}
-                      onPress={() => respondToRequest(req.id, true)}
-                      disabled={respondingId === req.id}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={{ fontFamily: AppFont.semiBold, fontSize: 12, color: HEADER_BG }}>Accept</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: Radius.pill, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border, opacity: respondingId === req.id ? 0.5 : 1 }}
-                      onPress={() => respondToRequest(req.id, false)}
-                      disabled={respondingId === req.id}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={{ fontFamily: AppFont.regular, fontSize: 12, color: Colors.muted }}>Decline</Text>
-                    </TouchableOpacity>
-                  </View>
-                  {i < friendRequests.length - 1 && <View style={p.divider} />}
-                </View>
-              ))}
-            </View>
-          </>
-        )}
-
-        {/* Outgoing friend requests */}
-        {outgoingRequests.length > 0 && (
-          <>
-            <Text style={[p.sectionLabel, { marginTop: 8 }]}>Outgoing Requests</Text>
-            <View style={p.card}>
-              {outgoingRequests.map((req, i) => (
-                <View key={req.id || req.receiverId}>
-                  <View style={p.row}>
-                    <Text style={[p.rowValue, { flex: 1 }]}>{req.name}</Text>
-                    <Text style={{ fontFamily: AppFont.regular, fontSize: 11, color: Colors.faint, fontStyle: 'italic' }}>pending</Text>
-                  </View>
-                  {i < outgoingRequests.length - 1 && <View style={p.divider} />}
-                </View>
-              ))}
-            </View>
-          </>
-        )}
-
-        {/* Contacts */}
-        <Text style={p.sectionLabel}>Contacts</Text>
-        <View style={p.card}>
-          {contacts.length === 0 ? (
-            <View style={[p.row, p.rowLast]}>
-              <Text style={[p.rowValue, { color: Colors.faint }]}>no contacts yet</Text>
-            </View>
-          ) : (
-            contacts.slice(0, 3).map((c, i, arr) => (
-              <View key={c}>
-                <View style={[p.row, i === arr.length - 1 && p.rowLast]}>
-                  <Text style={p.rowValue}>{c}</Text>
-                </View>
-                {i < arr.length - 1 && <View style={p.divider} />}
-              </View>
-            ))
-          )}
-        </View>
-        <TouchableOpacity style={p.seeMoreBtn} onPress={openContactsPanel} activeOpacity={0.7}>
-          <Text style={p.seeMoreText}>{contacts.length > 3 ? `see ${contacts.length - 3} more...` : 'see all'}</Text>
-        </TouchableOpacity>
-
-        {/* Delete */}
-        <TouchableOpacity style={p.deleteBtn} onPress={() => { setShowDeleteModal(true); setDeleteConfirmText(''); setDeleteError(''); }} activeOpacity={0.8}>
-          <Text style={p.deleteText}>Delete Account</Text>
-        </TouchableOpacity>
 
       </ScrollView>
 
-      {/* Toast */}
-      {toastVisible && (
-        <Animated.View style={[p.toast, { opacity: toastAnim }]}>
-          <Text style={p.toastText}>copied to clipboard</Text>
-        </Animated.View>
-      )}
-
-      {/* Loading overlay */}
-      {profileLoading && (
-        <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}>
-          <GooeyLoader />
-        </BlurView>
-      )}
-
-      {/* Add Friend modal */}
-      {showAddFriend && (
-        <View style={p.modalOverlay}>
-          <View style={p.modalBox}>
-            <Text style={p.modalTitle}>Add Friend</Text>
-            <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.muted, marginBottom: 12 }}>Enter their profile code to send a friend request.</Text>
-            <TextInput
-              style={p.deleteInput}
-              value={addFriendCode}
-              onChangeText={v => { setAddFriendCode(v); setAddFriendError(''); }}
-              placeholder="e.g. ABC123"
-              placeholderTextColor={Colors.faint}
-              autoCapitalize="characters"
-              autoFocus
-            />
-            {addFriendError ? <Text style={[p.deleteErrorText, { marginBottom: 8 }]}>{addFriendError}</Text> : null}
-            <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
-              <TouchableOpacity style={[p.modalCancelBtn, { flex: 1 }]} onPress={() => setShowAddFriend(false)} activeOpacity={0.8}>
-                <Text style={p.modalCancelText}>cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[p.deleteConfirmBtn, { backgroundColor: HEADER_BG, opacity: (!addFriendCode.trim() || addFriendLoading) ? 0.4 : 1 }]}
-                onPress={sendFriendRequest}
-                disabled={!addFriendCode.trim() || addFriendLoading}
-                activeOpacity={0.8}
-              >
-                {addFriendLoading
-                  ? <ActivityIndicator color="#fff" size="small" />
-                  : <Text style={p.deleteConfirmText}>Send Request</Text>}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      )}
-
-      {/* ── Currency picker modal ── */}
+      {/* Currency picker modal */}
       {showCurrencyModal && (
         <Modal visible animationType="slide" transparent statusBarTranslucent onRequestClose={() => { setShowCurrencyModal(false); setCurrencySearch(''); }}>
           <BlurView intensity={60} tint="light" style={StyleSheet.absoluteFill} />
@@ -512,15 +366,7 @@ function ProfileScreen() {
                   </TouchableOpacity>
                 </View>
                 <View style={p.searchRow}>
-                  <TextInput
-                    style={p.searchInput}
-                    placeholder="search country or currency..."
-                    placeholderTextColor={Colors.faint}
-                    value={currencySearch}
-                    onChangeText={setCurrencySearch}
-                    autoFocus
-                  />
-
+                  <TextInput style={p.searchInput} placeholder="search country or currency..." placeholderTextColor={Colors.faint} value={currencySearch} onChangeText={setCurrencySearch} autoFocus />
                 </View>
                 <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
                   {CURRENCIES.filter(c =>
@@ -529,12 +375,7 @@ function ProfileScreen() {
                     c.code.toLowerCase().includes(currencySearch.toLowerCase()) ||
                     c.label.toLowerCase().includes(currencySearch.toLowerCase())
                   ).map(c => (
-                    <TouchableOpacity
-                      key={c.code}
-                      style={[p.currencyRow, defaultCurrency === c.code && p.currencyRowActive]}
-                      onPress={() => { setDefaultCurrency(c.code); setShowCurrencyModal(false); setCurrencySearch(''); }}
-                      activeOpacity={0.75}
-                    >
+                    <TouchableOpacity key={c.code} style={[p.currencyRow, defaultCurrency === c.code && p.currencyRowActive]} onPress={() => { setDefaultCurrency(c.code); setShowCurrencyModal(false); setCurrencySearch(''); }} activeOpacity={0.75}>
                       <View style={{ flex: 1 }}>
                         <Text style={p.currencyCode}>{c.country}</Text>
                         <Text style={p.currencyLabel}>{c.code} · {c.symbol} · {c.label}</Text>
@@ -548,38 +389,21 @@ function ProfileScreen() {
         </Modal>
       )}
 
-      {/* ── Delete account confirmation modal ── */}
+      {/* Delete account modal */}
       {showDeleteModal && (
         <View style={p.modalOverlay}>
           <View style={p.modalBox}>
             <Text style={p.modalTitle}>delete account</Text>
-            <Text style={p.deleteWarning}>
-              this will permanently delete your account and ALL your data — recordings, spaces, receipts, reminders, everything. this cannot be undone.
-            </Text>
+            <Text style={p.deleteWarning}>this will permanently delete your account and ALL your data. this cannot be undone.</Text>
             <Text style={p.deletePrompt}>type "delete" to confirm</Text>
-            <TextInput
-              style={p.deleteInput}
-              value={deleteConfirmText}
-              onChangeText={v => { setDeleteConfirmText(v); setDeleteError(''); }}
-              placeholder="delete"
-              placeholderTextColor={Colors.faint}
-              autoCapitalize="none"
-              autoFocus
-            />
+            <TextInput style={p.deleteInput} value={deleteConfirmText} onChangeText={v => { setDeleteConfirmText(v); setDeleteError(''); }} placeholder="delete" placeholderTextColor={Colors.faint} autoCapitalize="none" autoFocus />
             {deleteError ? <Text style={p.deleteErrorText}>{deleteError}</Text> : null}
             <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
               <TouchableOpacity style={[p.modalCancelBtn, { flex: 1 }]} onPress={() => setShowDeleteModal(false)} disabled={deleting} activeOpacity={0.8}>
                 <Text style={p.modalCancelText}>cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[p.deleteConfirmBtn, (deleting || deleteConfirmText.toLowerCase() !== 'delete') && { opacity: 0.4 }]}
-                onPress={handleDeleteAccount}
-                disabled={deleting || deleteConfirmText.toLowerCase() !== 'delete'}
-                activeOpacity={0.8}
-              >
-                {deleting
-                  ? <ActivityIndicator color="#fff" size="small" />
-                  : <Text style={p.deleteConfirmText}>delete forever</Text>}
+              <TouchableOpacity style={[p.deleteConfirmBtn, (deleting || deleteConfirmText.toLowerCase() !== 'delete') && { opacity: 0.4 }]} onPress={handleDeleteAccount} disabled={deleting || deleteConfirmText.toLowerCase() !== 'delete'} activeOpacity={0.8}>
+                {deleting ? <ActivityIndicator color="#fff" size="small" /> : <Text style={p.deleteConfirmText}>delete forever</Text>}
               </TouchableOpacity>
             </View>
           </View>
@@ -802,6 +626,7 @@ export default function TabsLayout() {
   const closeFriendsPanel = useCallback(() => { Animated.timing(friendsPanelAnim, { toValue: winWidthRef.current, duration: 260, useNativeDriver: true }).start(() => { setFriendsPanelOpen(false); }); }, []);
 
   const [homeDateLabel, setHomeDateLabel] = useState('');
+  const visited = useVisited(activeTab);
 
   const fetchUnread = useCallback(async () => {
     if (!userId) return;
@@ -1083,18 +908,14 @@ export default function TabsLayout() {
     <View style={s.container}>
 
       {/* ── Shared flat header ── */}
-      <View style={[s.waveBg, { paddingTop: insets.top + 28 }]}>
+      {activeTab !== 'profile' && activeTab !== 'accounts' && <View style={[s.waveBg, { paddingTop: insets.top + 28 }]}>
         {activeTab === 'home' ? (
           <View style={s.homeHeaderRow}>
-            <TouchableOpacity onPress={() => switchTab('profile')} activeOpacity={0.7} style={{ marginTop: 4 }}>
-              <View style={s.faceCircle}>
-                <Image source={FACE_IMAGES[user?.user_metadata?.avatar_index ?? 0]} style={{ width: 48, height: 48, borderRadius: 24 }} />
-              </View>
-            </TouchableOpacity>
             <View style={s.homeHeaderTextCol}>
-              <Text style={s.homeHeaderGreeting}>Hello, <Text style={s.homeHeaderName}>{userName?.split(' ')[0]?.charAt(0).toUpperCase() + userName?.split(' ')[0]?.slice(1) || 'There'}</Text></Text>
+              <Text style={s.homeHeaderGreeting}>Hello, <Text style={s.homeHeaderName}>{userName?.split(' ')[0]?.charAt(0).toUpperCase() + userName?.split(' ')[0]?.slice(1) || 'There'}!</Text></Text>
               <TouchableOpacity onPress={triggerHomeDateEdit} activeOpacity={0.7} style={s.homeDateRow} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Text style={s.homeDateValue}>{homeDateLabel.toUpperCase()}</Text>
+                <Text style={s.homeDateValue}>{homeDateLabel}</Text>
+                <NavIcon name="create-outline" size={14} color="#373737" />
               </TouchableOpacity>
             </View>
 
@@ -1162,7 +983,8 @@ export default function TabsLayout() {
             <Text style={s.pageTitle}>Hi, {userName?.split(' ')[0] || 'there'}!</Text>
           </Animated.View>
         )}
-      </View>
+      </View>}
+      {(activeTab === 'profile' || activeTab === 'accounts') && <View style={{ height: 0 }} />}
 
       <View style={s.content}>
         {/* Slideable screens */}
@@ -1172,7 +994,9 @@ export default function TabsLayout() {
             style={[s.screen, { transform: [{ translateX: slideAnims[key] }], zIndex: activeTab === key ? 10 : 0 }]}
             pointerEvents={activeTab === key ? 'auto' : 'none'}
           >
-            {key === 'profile' ? <MemoProfile /> : key === 'notifications-page' ? <MemoNotifications isActive={activeTab === 'notifications-page'} /> : SCREENS[key]?.(activeTab === key)}
+            {visited.current.has(key) && (
+              key === 'profile' ? <MemoProfile /> : key === 'notifications-page' ? <MemoNotifications isActive={activeTab === 'notifications-page'} /> : SCREENS[key]?.(activeTab === key)
+            )}
           </Animated.View>
         ))}
       </View>
@@ -1216,13 +1040,15 @@ export default function TabsLayout() {
         </Animated.View>
       )}
 
-      {/* Top Spending panel — always mounted, shown/hidden via transform */}
-      <Animated.View
-        style={[s.screen, s.panel, { transform: [{ translateX: topSpendingAnim }], zIndex: 50 }]}
-        pointerEvents={activeTab === 'home' && topSpendingOpen ? 'auto' : 'none'}
-      >
-        <CategoriesPanel onClose={closeTopSpending} />
-      </Animated.View>
+      {/* Top Spending panel — mounted on first open */}
+      {topSpendingOpen && (
+        <Animated.View
+          style={[s.screen, s.panel, { transform: [{ translateX: topSpendingAnim }], zIndex: 50 }]}
+          pointerEvents={activeTab === 'home' && topSpendingOpen ? 'auto' : 'none'}
+        >
+          <CategoriesPanel onClose={closeTopSpending} />
+        </Animated.View>
+      )}
 
       {/* Recordings panel — conditionally rendered like space/recording panels */}
       {recordingsPanelOpen && (
@@ -1241,22 +1067,28 @@ export default function TabsLayout() {
       )}
 
       {/* Loans panel */}
-      <Animated.View style={[s.screen, s.panel, { transform: [{ translateX: loansPanelAnim }], zIndex: 55 }]}
-        pointerEvents={loansPanelOpen ? 'auto' : 'none'}>
-        <LoansPanel onClose={closeLoansPanel} />
-      </Animated.View>
+      {loansPanelOpen && (
+        <Animated.View style={[s.screen, s.panel, { transform: [{ translateX: loansPanelAnim }], zIndex: 55 }]}
+          pointerEvents="auto">
+          <LoansPanel onClose={closeLoansPanel} />
+        </Animated.View>
+      )}
 
       {/* Receivables panel */}
-      <Animated.View style={[s.screen, s.panel, { transform: [{ translateX: receivablesPanelAnim }], zIndex: 55 }]}
-        pointerEvents={receivablesPanelOpen ? 'auto' : 'none'}>
-        <PeoplePanel onClose={closeReceivablesPanel} initialPerson={receivablesInitialPerson} />
-      </Animated.View>
+      {receivablesPanelOpen && (
+        <Animated.View style={[s.screen, s.panel, { transform: [{ translateX: receivablesPanelAnim }], zIndex: 55 }]}
+          pointerEvents="auto">
+          <PeoplePanel onClose={closeReceivablesPanel} initialPerson={receivablesInitialPerson} />
+        </Animated.View>
+      )}
 
       {/* Reminders panel */}
-      <Animated.View style={[s.screen, s.panel, { transform: [{ translateX: remindersPanelAnim }], zIndex: 55 }]}
-        pointerEvents={remindersPanelOpen ? 'auto' : 'none'}>
-        <RemindersPanel onClose={closeRemindersPanel} />
-      </Animated.View>
+      {remindersPanelOpen && (
+        <Animated.View style={[s.screen, s.panel, { transform: [{ translateX: remindersPanelAnim }], zIndex: 55 }]}
+          pointerEvents="auto">
+          <RemindersPanel onClose={closeRemindersPanel} />
+        </Animated.View>
+      )}
 
       {/* Contacts panel */}
       {contactsPanelOpen && (
@@ -1368,12 +1200,10 @@ const s = StyleSheet.create({
   pageTitle:    { fontFamily: AppFont.bold, fontSize: 18, color: DC.pageText, letterSpacing: 0.3 },
   homeHeaderRow:       { flexDirection: 'row', alignItems: 'center', gap: 10, width: '100%' },
   homeHeaderTextCol:   { flex: 1, justifyContent: 'center' },
-  faceCircle:          { width: 60, height: 60, borderRadius: 30, borderWidth: 3, borderColor: '#c9c7c3', alignItems: 'center', justifyContent: 'center' },
-  homeHeaderGreeting:  { fontFamily: 'Aujournuit-Regular', fontSize: 22, color: '#000000' },
-  homeHeaderName:      { fontFamily: 'Aujournuit-Regular', fontSize: 22, color: '#000000' },
-  homeDateRow:         { flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: 4 },
-  homeDateLabel:       { fontFamily: 'Inter-Bold', fontSize: 11, color: '#b5b4a4' },
-  homeDateValue:       { fontFamily: 'Inter-Bold', fontSize: 10, color: '#b5b4a4', textTransform: 'uppercase', letterSpacing: 1.5 },
+  homeHeaderGreeting:  { fontFamily: 'Poppins-Regular', fontSize: 18, color: '#373737' },
+  homeHeaderName:      { fontFamily: 'Poppins-Bold', fontSize: 18, color: '#373737' },
+  homeDateRow:         { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 1 },
+  homeDateValue:       { fontFamily: 'Poppins-Regular', fontSize: 12, color: '#373737' },
   pageSubtitle: { display: 'none' as any },
   waveTitleRow: { alignItems: 'center' },
   wave:         { display: 'none' as any },
@@ -1402,13 +1232,13 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.85)', overflow: 'hidden',
   },
   notifContent: { paddingVertical: 8 },
-  notifEmptyText: { fontFamily: 'InclusiveSans-Regular', fontSize: 13, color: '#999', textAlign: 'center', paddingVertical: 20 },
+  notifEmptyText: { fontFamily: 'Poppins-Regular', fontSize: 13, color: '#999', textAlign: 'center', paddingVertical: 20 },
   notifItem: { paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 0.5, borderBottomColor: '#e8e8e8' },
-  notifItemTitle: { fontFamily: 'InclusiveSans-Medium', fontSize: 12, color: '#111' },
-  notifItemBody: { fontFamily: 'InclusiveSans-Regular', fontSize: 11, color: '#666', marginTop: 2 },
-  notifSectionLabel: { fontFamily: 'InclusiveSans-Medium', fontSize: 10, color: '#999', textTransform: 'uppercase', letterSpacing: 1, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4 },
+  notifItemTitle: { fontFamily: 'Poppins-Medium', fontSize: 12, color: '#111' },
+  notifItemBody: { fontFamily: 'Poppins-Regular', fontSize: 11, color: '#666', marginTop: 2 },
+  notifSectionLabel: { fontFamily: 'Poppins-Medium', fontSize: 10, color: '#999', textTransform: 'uppercase', letterSpacing: 1, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4 },
   notifViewAll: { paddingVertical: 12, alignItems: 'center' },
-  notifViewAllText: { fontFamily: 'InclusiveSans-Medium', fontSize: 12, color: '#111' },
+  notifViewAllText: { fontFamily: 'Poppins-Medium', fontSize: 12, color: '#111' },
   navBadgeText: { fontFamily: AppFont.semiBold, fontSize: 9, color: '#fff', lineHeight: 14 },
 
   // Bubble
@@ -1423,101 +1253,57 @@ const s = StyleSheet.create({
   bubbleItemBorder:   { borderBottomWidth: 1, borderBottomColor: Colors.border },
   bubbleIconWrap:       { width: 32, height: 32, borderRadius: Radius.md, backgroundColor: Colors.surface, justifyContent: 'center', alignItems: 'center' },
   bubbleIconWrapActive: { backgroundColor: BUBBLE_ACTIVE_BG },
-  bubbleItemLabel:       { fontFamily: 'ChillaxRegular', fontSize: 14, color: Colors.text },
-  bubbleItemLabelActive: { fontFamily: 'ChillaxMedium',  fontSize: 14, color: NAV_ACCENT },
+  bubbleItemLabel:       { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.text },
+  bubbleItemLabelActive: { fontFamily: 'Poppins-Medium',  fontSize: 14, color: NAV_ACCENT },
   bubbleBadge:           { position: 'absolute', top: -4, right: -4, minWidth: 16, height: 16, borderRadius: 8, backgroundColor: '#ed6a6a', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
   bubbleBadgeLabel:      { marginLeft: 'auto', minWidth: 20, height: 20, borderRadius: 10, backgroundColor: '#ed6a6a', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },
-  bubbleBadgeLabelText:  { fontFamily: 'ChillaxMedium', fontSize: 10, color: '#fff', lineHeight: 14 },
+  bubbleBadgeLabelText:  { fontFamily: 'Poppins-Medium', fontSize: 10, color: '#fff', lineHeight: 14 },
 });
 
 const p = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.white },
-  scroll:    { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 100, gap: 12 },
+  container:  { flex: 1, backgroundColor: Colors.white },
+  scroll:     { paddingHorizontal: DC.pagePadding, paddingTop: 20, paddingBottom: 120 },
 
-  // ── Avatar
-  avatarSection: { alignItems: 'center', gap: 6, paddingVertical: 24 },
-  avatar: {
-    width: 72, height: 72, borderRadius: 36,
-    backgroundColor: HEADER_BG,
-    justifyContent: 'center', alignItems: 'center',
-    marginBottom: 4,
-  },
-  avatarText: { fontFamily: AppFont.bold, fontSize: 28, color: HEADER_TEXT },
-  name:  { fontFamily: AppFont.bold, fontSize: 22, color: Colors.text, letterSpacing: -0.3 },
-  email: { fontFamily: AppFont.regular, fontSize: 12, color: Colors.muted },
+  header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 },
+  title:        { ...DC.typography.pageTitle },
+  avatarCircle: { width: 48, height: 48, borderRadius: 24, overflow: 'hidden', borderWidth: 2, borderColor: '#d2d2d2' },
 
-  // ── Info rows (same style as accounts cards)
-  card: {
-    backgroundColor: Colors.white,
-    borderRadius: 0,
-    borderTopWidth: 1, borderTopColor: Colors.border,
-  },
-  row:     { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 16, paddingHorizontal: 4, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  rowLast: { borderBottomWidth: 0 },
-  rowIcon: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.surface, justifyContent: 'center', alignItems: 'center' },
-  rowBody: { flex: 1, gap: 2 },
-  rowLabel: { fontFamily: AppFont.semiBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.3, textTransform: 'uppercase' },
-  rowValue: { fontFamily: AppFont.regular, fontSize: 14, color: Colors.text },
-  divider:  { height: 0 }, // kept for compat but unused
+  sectionLabel: { ...DC.typography.sectionHeader, marginTop: 16, marginBottom: 10 },
 
-  sectionLabel: { fontFamily: AppFont.semiBold, fontSize: 11, color: Colors.muted, textTransform: 'uppercase', letterSpacing: 0.6, marginTop: 8, marginBottom: 4 },
-  seeMoreBtn:  { alignSelf: 'center', marginTop: 10, paddingHorizontal: DC.pageActionPaddingH, paddingVertical: DC.pageActionPaddingV, borderRadius: DC.pageActionRadius, backgroundColor: DC.pageActionBg, borderWidth: DC.pageActionBorderWidth },
-  seeMoreText: { fontFamily: AppFont.regular, fontSize: DC.dropdownFontSize, color: DC.pageActionText },
+  card:       { borderWidth: 1.5, borderColor: '#aaaaaa', borderStyle: 'dashed', borderRadius: 10, marginBottom: 20, overflow: 'hidden' },
+  row:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, height: 52 },
+  rowDivider: { height: DC.rowDivider.height, backgroundColor: DC.rowDivider.backgroundColor },
+  rowLabel:   { ...DC.typography.sectionHeader },
+  rowValue:   { ...DC.typography.sectionBody, textAlign: 'right', flex: 1, marginLeft: 16 },
 
-  // ── Action buttons
-  logoutBtn: {
-    alignSelf: 'stretch',
-    alignItems: 'center', justifyContent: 'center',
-    backgroundColor: Colors.surface, borderRadius: Radius.pill,
-    borderWidth: 1, borderColor: Colors.border,
-    paddingVertical: 14, marginTop: 12,
-  },
-  logoutText: { fontFamily: AppFont.regular, fontSize: 14, color: Colors.text },
-
-  deleteBtn: {
-    alignItems: 'center', justifyContent: 'center',
-    backgroundColor: PROFILE_DANGEBG, borderRadius: Radius.pill,
-    borderWidth: 1, borderColor: PROFILE_DANGER,
-    paddingVertical: 14,
-  },
-  deleteText: { fontFamily: AppFont.regular, fontSize: 14, color: PROFILE_DANGER },
-
-  // ── Modals
-  modalOverlay: {
-    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center', zIndex: 200, padding: 24,
-  },
-  modalBox: {
-    backgroundColor: Colors.white, borderRadius: Radius.xl, padding: 24, width: '100%',
-  },
-  modalTitle: { fontFamily: AppFont.bold, fontSize: 18, color: Colors.text, marginBottom: 16, letterSpacing: -0.3 },
-  modalCancelBtn: {
-    backgroundColor: Colors.surface, borderRadius: Radius.pill,
-    paddingVertical: 12, alignItems: 'center', borderWidth: 1, borderColor: Colors.border,
-  },
-  modalCancelText: { fontFamily: AppFont.regular, fontSize: 13, color: Colors.muted },
+  actionBtns:   { flexDirection: 'row', gap: 12, marginBottom: 20 },
+  deleteBtn:     { ...DC.button.base, flex: 1, backgroundColor: '#e53935', borderColor: '#e53935' },
+  deleteBtnText: { ...DC.button.textActive },
+  logoutBtn:     { ...DC.button.base, flex: 1, backgroundColor: '#8c52ff', borderColor: '#8c52ff' },
+  logoutBtnText: { ...DC.button.textActive },
 
   // Currency picker
-  currencyRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    paddingVertical: 12, paddingHorizontal: 8, borderRadius: Radius.md,
-  },
+  currencyRow:       { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 8, borderRadius: 8 },
   currencyRowActive: { backgroundColor: Colors.surface },
-  currencySymbol: { fontFamily: AppFont.bold, fontSize: 18, color: Colors.text, width: 28, textAlign: 'center' },
-  currencyCode:   { fontFamily: AppFont.bold, fontSize: 13, color: Colors.text },
-  currencyLabel:  { fontFamily: AppFont.regular, fontSize: 11, color: Colors.muted },
-  searchRow:  { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: Colors.surface, borderRadius: Radius.lg, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: Colors.borderMid, marginBottom: 12 },
-  searchInput:{ flex: 1, fontFamily: AppFont.regular, fontSize: 13, color: Colors.text, padding: 0 },
+  currencyCode:      { fontFamily: AppFont.bold, fontSize: 13, color: Colors.text },
+  currencyLabel:     { fontFamily: AppFont.regular, fontSize: 11, color: Colors.muted },
+  searchRow:         { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: Colors.surface, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: Colors.borderMid, marginBottom: 12 },
+  searchInput:       { flex: 1, fontFamily: AppFont.regular, fontSize: 13, color: Colors.text, padding: 0 },
 
-  // Delete confirmation
-  deleteWarning:     { fontFamily: AppFont.regular, fontSize: 13, color: Colors.muted, lineHeight: 20, marginBottom: 16 },
-  deletePrompt:      { fontFamily: AppFont.bold, fontSize: 11, color: Colors.text, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
-  deleteInput:       { fontFamily: AppFont.regular, fontSize: 15, color: Colors.text, backgroundColor: Colors.surface, borderRadius: Radius.lg, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1, borderColor: Colors.borderMid },
-  deleteErrorText:   { fontFamily: AppFont.regular, fontSize: 12, color: PROFILE_DANGER, marginTop: 6 },
-  deleteConfirmBtn:  { flex: 1, backgroundColor: PROFILE_DANGER, borderRadius: Radius.pill, paddingVertical: 12, alignItems: 'center' },
-  deleteConfirmText: { fontFamily: AppFont.semiBold, fontSize: 13, color: '#fff' },
-  toast: { position: 'absolute', bottom: 24, right: 20, backgroundColor: '#111111', borderRadius: Radius.pill, paddingHorizontal: 16, paddingVertical: 10 },
-  toastText: { fontFamily: AppFont.regular, fontSize: 12, color: '#ffffff' },
+  // Delete modal
+  modalOverlay:    { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center', zIndex: 200, padding: 24 },
+  modalBox:        { backgroundColor: Colors.white, borderRadius: 20, padding: 24, width: '100%' },
+  modalTitle:      { fontFamily: AppFont.bold, fontSize: 18, color: Colors.text, marginBottom: 16 },
+  modalCancelBtn:  { ...DC.button.base, flex: 1 },
+  modalCancelText: { ...DC.button.textInactive },
+  deleteWarning:   { fontFamily: AppFont.regular, fontSize: 13, color: Colors.muted, lineHeight: 20, marginBottom: 16 },
+  deletePrompt:    { fontFamily: AppFont.bold, fontSize: 11, color: Colors.text, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
+  deleteInput:     { fontFamily: AppFont.regular, fontSize: 15, color: Colors.text, backgroundColor: Colors.surface, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1, borderColor: Colors.borderMid },
+  deleteErrorText: { fontFamily: AppFont.regular, fontSize: 12, color: PROFILE_DANGER, marginTop: 6 },
+  deleteConfirmBtn:  { ...DC.button.base, flex: 1, backgroundColor: PROFILE_DANGER, borderColor: PROFILE_DANGER },
+  deleteConfirmText: { ...DC.button.textActive },
+  toast:    { position: 'absolute', bottom: 24, right: 20, backgroundColor: '#111', borderRadius: 999, paddingHorizontal: 16, paddingVertical: 10 },
+  toastText:{ fontFamily: AppFont.regular, fontSize: 12, color: '#fff' },
 });
 
 

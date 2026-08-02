@@ -5,12 +5,12 @@
  *
  * Rules:
  * - Sheet: white bg, borderTopRadius 24, padding 24, height '90%'
- * - Header: ChillaxMedium sub 11px #929090 + CalSans title 26px #425252
+ * - Header: Poppins-Medium sub 11px #929090 + Poppins-Bold title 26px #425252
  * - Inputs: white bg, borderRadius 10, border #e8e8e8, RobotoMono 16px #425252
  * - Section labels: RobotoMono 10px #929090 uppercase
  * - Cancel btn: #f5f5f5 bg, #8a8a8a text
  * - Primary btn: #425252 bg, white text
- * - Both buttons: borderRadius 999, paddingVertical 13, flex 1, RobotoMono_700Bold 13px
+ * - Both buttons: borderRadius 999, paddingVertical 13, flex 1, Poppins-Bold 13px
  */
 
 import { StyleSheet } from 'react-native';

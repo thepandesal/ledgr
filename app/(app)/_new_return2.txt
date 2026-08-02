@@ -1,0 +1,399 @@
+  return (
+    <Animated.View style={[{ flex: 1, backgroundColor: '#ffffff' }, { transform: [{ translateX: slideAnim }] }]}>
+      <SafeAreaView style={{ flex: 1 }}>
+
+        {/* ── Header ── */}
+        <View style={s.header}>
+          {/* Back arrow — same pattern as recordings panel */}
+          <TouchableOpacity onPress={handleBack} activeOpacity={0.7} style={{ marginBottom: 12 }}>
+            <SvgXml xml={SVG_BACK} width={14} height={14} color="#666" />
+          </TouchableOpacity>
+          <View style={s.titleRow}>
+            <View>
+              <Text style={s.title}>SPLIT BILL</Text>
+              <Text style={s.subtitle}>{String(name)}</Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              {/* Ellipsis — actions */}
+              <TouchableOpacity style={s.ellipsisBtn} onPress={() => setActionsModal(true)} activeOpacity={0.7}>
+                <SvgXml xml={SVG_ELLIPSIS} width={14} height={14} color={DC.pageText} />
+              </TouchableOpacity>
+              {/* Next */}
+              <TouchableOpacity
+                style={[s.nextBtn, wizardStep === 3 && { opacity: 0.4 }]}
+                activeOpacity={0.8}
+                disabled={wizardStep === 3}
+                onPress={() => { if (wizardStep < 3) setWizardStep((wizardStep + 1) as 1 | 2 | 3); }}
+              >
+                <Text style={s.nextBtnText}>Next</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Step indicator */}
+          <View style={s.stepRow}>
+            {(['Items', 'Payments', 'Share'] as const).map((label, idx) => {
+              const step = (idx + 1) as 1 | 2 | 3;
+              const active = wizardStep === step;
+              const done = wizardStep > step;
+              return (
+                <View key={label} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  {idx > 0 && <View style={[s.stepDash, done && s.stepDashDone]} />}
+                  <TouchableOpacity style={{ alignItems: 'center', gap: 4 }} onPress={() => setWizardStep(step)} activeOpacity={0.7}>
+                    <View style={[s.stepCircle, active && s.stepCircleActive]}>
+                      <Text style={[s.stepNum, active && s.stepNumActive]}>{step}</Text>
+                    </View>
+                    <Text style={[s.stepLabel, active && s.stepLabelActive]}>{label}</Text>
+                  </TouchableOpacity>
+                </View>
+              );
+            })}
+          </View>
+          {/* Full-width divider under steps */}
+          <View style={s.stepDivider} />
+        </View>
+
+        {/* ── Step 1: Items ── */}
+        {wizardStep === 1 && (
+          <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+
+            {/* Add People */}
+            <View style={s.sectionRow}>
+              <Text style={s.sectionHeader}>Add People</Text>
+              {billStatus === 'ongoing' && (
+                <TouchableOpacity style={s.addCircleBtn} onPress={() => { setTagInputVal(''); setContactsVisible(5); setAddPersonModal(true); }} activeOpacity={0.7}>
+                  <Text style={s.addCircleBtnText}>+</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            <View style={s.dottedCard}>
+              {filledPeople.length === 0 ? (
+                <View style={s.emptyRow}><Text style={s.emptyText}>no people yet — tap +</Text></View>
+              ) : (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 16, paddingVertical: 12 }}>
+                  {people.slice(0, peopleVisible).map((p: any) => (
+                    <View key={p.id} style={{ alignItems: 'center', gap: 6 }}>
+                      <View style={s.personAvatar}>
+                        <Text style={s.personAvatarText}>{p.person_name.charAt(0).toUpperCase()}</Text>
+                      </View>
+                      <Text style={s.personName} numberOfLines={1}>{p.person_name}</Text>
+                      {billStatus === 'ongoing' && (
+                        <TouchableOpacity onPress={() => removePerson(p.id)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+                          <Text style={{ fontSize: 10, color: DC.pageTextMuted }}>✕</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  ))}
+                  {people.length > peopleVisible && (
+                    <TouchableOpacity style={{ alignItems: 'center', gap: 6 }} onPress={() => setPeopleVisible(v => v + 10)}>
+                      <View style={[s.personAvatar, { backgroundColor: DC.cardBg }]}>
+                        <Text style={[s.personAvatarText, { color: DC.pageTextMuted, fontSize: 12 }]}>+{people.length - peopleVisible}</Text>
+                      </View>
+                      <Text style={s.personName}>Others</Text>
+                    </TouchableOpacity>
+                  )}
+                </ScrollView>
+              )}
+            </View>
+
+            {/* Add Recording */}
+            <View style={s.sectionRow}>
+              <Text style={s.sectionHeader}>
+                Add Recording{' '}
+                <Text style={{ fontFamily: 'Poppins-Regular', color: DC.pageTextMuted }}>(optional)</Text>
+              </Text>
+              {billStatus === 'ongoing' && (
+                <TouchableOpacity style={s.addCircleBtn} onPress={openAddRecording} activeOpacity={0.7}>
+                  <Text style={s.addCircleBtnText}>+</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            {linkedRecordings.length > 0 && (
+              <View style={s.dottedCard}>
+                {linkedRecordings.map((lr: any, idx: number) => (
+                  <View key={lr.id}>
+                    <TouchableOpacity
+                      style={s.recRow}
+                      activeOpacity={0.8}
+                      onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: lr.recording?.id } } as any)}
+                    >
+                      <View style={s.recNumWrap}>
+                        <Text style={s.recNum}>{idx + 1}</Text>
+                      </View>
+                      <Text style={s.recName} numberOfLines={1}>{lr.recording?.name ?? '—'}</Text>
+                      <Text style={s.recAmount}>{fmt(Number(lr.amount_contributed))}</Text>
+                    </TouchableOpacity>
+                    {idx < linkedRecordings.length - 1 && <View style={s.divider} />}
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {/* Add Items */}
+            <View style={s.sectionRow}>
+              <Text style={s.sectionHeader}>Add Items</Text>
+              {billStatus === 'ongoing' && (
+                <TouchableOpacity
+                  style={[s.addCircleBtn, filledPeople.length === 0 && { opacity: 0.4 }]}
+                  onPress={openAddItem}
+                  disabled={filledPeople.length === 0}
+                  activeOpacity={0.7}
+                >
+                  <Text style={s.addCircleBtnText}>+</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            {items.length === 0 ? (
+              <View style={s.dottedCard}>
+                <View style={s.emptyRow}>
+                  <Text style={s.emptyText}>{filledPeople.length === 0 ? 'add people first' : 'no items yet'}</Text>
+                </View>
+              </View>
+            ) : (
+              <View style={s.dottedCard}>
+                {(() => {
+                  const recGroups: { recId: string | null; recName: string; recIdx: number; recAmount: number; items: any[] }[] = [];
+                  items.forEach((item: any) => {
+                    const key = item.recording_id ?? null;
+                    const existing = recGroups.find(g => g.recId === key);
+                    if (existing) { existing.items.push(item); }
+                    else {
+                      const lr = linkedRecordings.find((l: any) => l.recording?.id === key);
+                      recGroups.push({
+                        recId: key,
+                        recName: lr?.recording?.name ?? 'manual',
+                        recIdx: recGroups.length + 1,
+                        recAmount: Number(lr?.amount_contributed ?? 0),
+                        items: [item],
+                      });
+                    }
+                  });
+                  // Also show recordings with no items yet
+                  linkedRecordings.forEach((lr: any, lrIdx: number) => {
+                    const alreadyIn = recGroups.find(g => g.recId === lr.recording?.id);
+                    if (!alreadyIn) {
+                      recGroups.push({
+                        recId: lr.recording?.id ?? null,
+                        recName: lr.recording?.name ?? '—',
+                        recIdx: recGroups.length + 1,
+                        recAmount: Number(lr.amount_contributed ?? 0),
+                        items: [],
+                      });
+                    }
+                  });
+                  return recGroups.map((group, gi) => (
+                    <View key={group.recId ?? 'manual'}>
+                      {gi > 0 && <View style={s.divider} />}
+                      <View style={[s.recRow, { paddingVertical: 10 }]}>
+                        <View style={s.recNumWrap}>
+                          <Text style={s.recNum}>{group.recIdx}</Text>
+                        </View>
+                        <Text style={[s.recName, { fontFamily: 'Poppins-Bold' }]} numberOfLines={1}>{group.recName}</Text>
+                        {group.recAmount > 0 && <Text style={s.recAmount}>{fmt(group.recAmount)}</Text>}
+                      </View>
+                      {group.items.length === 0 ? (
+                        <View style={{ paddingLeft: 40, paddingBottom: 10 }}>
+                          <Text style={s.emptyText}>no items yet — tap + to add</Text>
+                        </View>
+                      ) : group.items.map((item: any) => {
+                        const deduct = isDeductType(item.recording_type);
+                        return (
+                          <TouchableOpacity key={item.id} onPress={() => openAssign(item)} activeOpacity={0.8}>
+                            <View style={s.subItemRow}>
+                              <View style={s.subItemBar} />
+                              <View style={{ flex: 1 }}>
+                                <Text style={s.subItemName} numberOfLines={1}>{item.name}</Text>
+                                <Text style={s.subItemPeople} numberOfLines={1}>
+                                  {(item.people ?? []).length > 0 ? item.people.join(', ') : 'tap to assign'}
+                                </Text>
+                              </View>
+                              <Text style={s.subItemAmount}>{deduct ? '- ' : ''}{fmt(Number(item.cost))}</Text>
+                              {billStatus === 'ongoing' && (
+                                <TouchableOpacity onPress={() => deleteItem(item.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                                  <Text style={{ fontSize: 12, color: DC.pageTextMuted, marginLeft: 8 }}>✕</Text>
+                                </TouchableOpacity>
+                              )}
+                            </View>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  ));
+                })()}
+              </View>
+            )}
+            <View style={{ height: 40 }} />
+          </ScrollView>
+        )}
+
+        {/* ── Step 2: Payments ── */}
+        {wizardStep === 2 && (
+          <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+
+            {/* Per Person Pay */}
+            <View style={s.sectionRow}>
+              <Text style={s.sectionHeader}>Per Person Pay</Text>
+            </View>
+            <View style={s.dottedCard}>
+              {filledPeople.length === 0 ? (
+                <View style={s.emptyRow}><Text style={s.emptyText}>add people and items first</Text></View>
+              ) : (() => {
+                const totals = computeTotals();
+                return filledPeople.map((p, idx) => {
+                  const owed = totals[p] ?? 0;
+                  const amtColor = owed < 0 ? '#e53935' : DC.pageText;
+                  return (
+                    <View key={p}>
+                      <View style={s.payPersonRow}>
+                        <View style={s.payAvatar}>
+                          <Text style={s.payAvatarText}>{p.charAt(0).toUpperCase()}</Text>
+                        </View>
+                        <Text style={s.payPersonName}>{p}</Text>
+                        <Text style={[s.payPersonAmount, { color: amtColor }]}>
+                          {owed < 0 ? '- ' : ''}{fmt(Math.abs(owed))}
+                        </Text>
+                      </View>
+                      {idx < filledPeople.length - 1 && <View style={s.divider} />}
+                    </View>
+                  );
+                });
+              })()}
+            </View>
+
+            {/* Payment History */}
+            <View style={s.sectionRow}>
+              <Text style={s.sectionHeader}>Payment History</Text>
+            </View>
+            <View style={s.dottedCard}>
+              {filledPeople.length === 0 ? (
+                <View style={s.emptyRow}><Text style={s.emptyText}>no payment history yet</Text></View>
+              ) : (() => {
+                const totals = computeTotals();
+                return filledPeople.map((p, idx) => {
+                  const owed = Math.abs(totals[p] ?? 0);
+                  const amtColor = (totals[p] ?? 0) < 0 ? '#e53935' : DC.pageText;
+                  const personPayments = activePayments.filter((pay: any) => pay.person_name === p);
+                  const paid = personPayments.reduce((s: number, pay: any) => s + Number(pay.amount), 0);
+                  const fullyPaid = owed > 0 && paid >= owed - 0.01;
+                  return (
+                    <View key={p}>
+                      <View style={s.payPersonRow}>
+                        <View style={s.payAvatar}>
+                          <Text style={s.payAvatarText}>{p.charAt(0).toUpperCase()}</Text>
+                        </View>
+                        <Text style={s.payPersonName}>{p}</Text>
+                        <Text style={[s.payPersonAmount, { color: amtColor }]}>
+                          {(totals[p] ?? 0) < 0 ? '- ' : ''}{fmt(Math.abs(totals[p] ?? 0))}
+                        </Text>
+                        {!fullyPaid && billStatus === 'ongoing' && (
+                          <TouchableOpacity style={s.addPayBtn} onPress={() => openPaymentModal(p)} activeOpacity={0.7}>
+                            <Text style={s.addPayBtnText}>+</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                      {personPayments.map((pay: any, pi: number) => (
+                        <View key={pay.id} style={s.paySubRow}>
+                          <Text style={s.paySubLabel}>Payment {pi + 1}</Text>
+                          <Text style={s.paySubAmount}>{fmt(Number(pay.amount))}</Text>
+                        </View>
+                      ))}
+                      {idx < filledPeople.length - 1 && <View style={s.divider} />}
+                    </View>
+                  );
+                });
+              })()}
+            </View>
+
+            {/* Wallet — payment accounts for the share link */}
+            <View style={s.sectionRow}>
+              <Text style={s.sectionHeader}>Wallet</Text>
+              <TouchableOpacity style={s.addCircleBtn} onPress={async () => {
+                const { data: accs } = await supabase.from('accounts').select('id, account_name, bank, account_number, qr_code').eq('user_id', userId).order('account_name');
+                setShareAccounts(accs ?? []);
+                if (shareRow) {
+                  setShareSelectedIds(shareRow.data?.account_ids ?? []);
+                }
+                openShareModal();
+              }} activeOpacity={0.7}>
+                <Text style={s.addCircleBtnText}>+</Text>
+              </TouchableOpacity>
+            </View>
+            {shareAccounts.filter((a: any) => shareSelectedIds.includes(a.id)).length === 0 ? (
+              <View style={s.dottedCard}>
+                <View style={s.emptyRow}><Text style={s.emptyText}>no accounts added — tap + to add</Text></View>
+              </View>
+            ) : (
+              <View style={s.dottedCard}>
+                {shareAccounts.filter((a: any) => shareSelectedIds.includes(a.id)).map((acc: any, idx: number) => (
+                  <View key={acc.id}>
+                    <View style={s.walletRow}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={s.walletBank}>{acc.bank}</Text>
+                        <Text style={s.walletHolder}>{acc.account_name}</Text>
+                        <Text style={s.walletNumber}>{acc.account_number}</Text>
+                      </View>
+                      {acc.qr_code ? (
+                        <Image source={{ uri: acc.qr_code }} style={s.walletQr} resizeMode="contain" />
+                      ) : null}
+                    </View>
+                    {idx < shareAccounts.filter((a: any) => shareSelectedIds.includes(a.id)).length - 1 && <View style={s.divider} />}
+                  </View>
+                ))}
+              </View>
+            )}
+
+            <View style={{ height: 40 }} />
+          </ScrollView>
+        )}
+
+        {/* ── Step 3: Share ── */}
+        {wizardStep === 3 && (
+          <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+            <View style={s.sectionRow}>
+              <Text style={s.sectionHeader}>Share as</Text>
+            </View>
+            <View style={{ flexDirection: 'row', gap: 32, paddingHorizontal: DC.pagePadding, paddingTop: 8 }}>
+              {/* Link */}
+              <TouchableOpacity
+                style={{ alignItems: 'center', gap: 8 }}
+                onPress={async () => {
+                  if (!shareRow) { await generateLink(); }
+                  await copyShareLink();
+                }}
+                activeOpacity={0.8}
+              >
+                <SvgXml xml={SVG_LINK} width={32} height={32} color={DC.pageText} />
+                <Text style={s.shareLabel}>Link</Text>
+              </TouchableOpacity>
+              {/* Image */}
+              <TouchableOpacity style={{ alignItems: 'center', gap: 8 }} onPress={saveAsImage} activeOpacity={0.8}>
+                <SvgXml xml={SVG_IMAGE} width={32} height={32} color={DC.pageText} />
+                <Text style={s.shareLabel}>Image</Text>
+              </TouchableOpacity>
+            </View>
+            {shareCopied && (
+              <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 11, color: DC.accent1, paddingHorizontal: DC.pagePadding, marginTop: 8 }}>link copied!</Text>
+            )}
+            <View style={{ height: 40 }} />
+          </ScrollView>
+        )}
+
+      </SafeAreaView>
+
+      {/* ── Actions bottom sheet (ellipsis) ── */}
+      <BottomSheet visible={actionsModal} onClose={() => setActionsModal(false)} title="actions">
+        <TouchableOpacity style={s.actionSheetRow} onPress={() => { setActionsModal(false); openShareModal(); }} activeOpacity={0.8}>
+          <Text style={s.actionSheetText}>manage payment accounts</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={s.actionSheetRow} onPress={() => { setActionsModal(false); handleToggleStatus(); }} activeOpacity={0.8}>
+          <Text style={s.actionSheetText}>{billStatus === 'closed' ? 'reopen bill' : 'close bill'}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={s.actionSheetRow} onPress={() => { setActionsModal(false); openEditName(); }} activeOpacity={0.8}>
+          <Text style={s.actionSheetText}>rename</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={s.actionSheetRow} onPress={() => { setActionsModal(false); setDeleteSplitModal(true); }} activeOpacity={0.8}>
+          <Text style={[s.actionSheetText, { color: '#e53935' }]}>delete split bill</Text>
+        </TouchableOpacity>
+      </BottomSheet>
+
+      {/* ── All existing bottom sheets below (unchanged) ── */}

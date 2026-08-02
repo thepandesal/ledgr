@@ -1,0 +1,108 @@
+  return (
+    <SafeAreaView style={s.root}>
+      <ScrollView
+        contentContainerStyle={s.scroll}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      >
+        {/* Recent Transactions */}
+        <SectionHeader title="Recent Transactions" onArrowRight={() => openRecordingsPanel()} />
+        {recent.length === 0 ? <EmptyRow label="no recordings" /> : (
+          <View>
+            {recent.slice(0, 3).map((r: any) => (
+              <TouchableOpacity key={r.id} style={s.recRow} activeOpacity={0.7} onPress={() => openRecording(r.id)}>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.recRowName} numberOfLines={1}>{r.name.split(' ').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')}</Text>
+                  <Text style={s.recRowSub}>{r.space?.name ?? 'No Folder'}</Text>
+                  <Text style={s.recRowSub}>{formatDateLabel(r.transaction_date)}</Text>
+                </View>
+                <Text style={s.recRowAmount}>{fmt(Number(r.amount))}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+        <View style={s.divider} />
+        {/* Reminders */}
+        <SectionHeader title="Reminders" onArrowRight={() => openRemindersPanel()} />
+        {reminders.length === 0 ? <EmptyRow label="no reminders" /> : (
+          <View>
+            {reminders.map((r: any) => (
+              <View key={r.id} style={s.reminderRow}>
+                <Text style={s.recRowName}>{r.name}</Text>
+                <Text style={s.recRowSub}>{r.recording_type === 'expense' ? 'Expense' : 'Income'}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+        <View style={s.divider} />
+        {/* Folders */}
+        <SectionHeader title="Folders" onArrowRight={openSpacesPanel} />
+        {spaces.length === 0 ? <EmptyRow label="no folders" /> : (() => {
+          const savingsSpaces = spaces.filter((sp: any) => sp.space_type === 'savings');
+          const expenseSpaces = spaces.filter((sp: any) => sp.space_type !== 'savings');
+          return (
+            <>
+              {savingsSpaces.length > 0 && (
+                <>
+                  <Text style={s.folderSubtitle}>Savings</Text>
+                  {savingsSpaces.map((sp: any) => (
+                    <TouchableOpacity key={sp.id} style={s.folderRow} activeOpacity={0.7} onPress={() => setSpaceChoice({ id: sp.id, name: sp.name })}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={s.recRowName}>{sp.name}</Text>
+                        <Text style={s.recRowSub}>Goal: {fmt(sp.budget ?? 0)}</Text>
+                        <Text style={s.recRowSub}>Up to date: {fmt(sp.monthNet ?? 0)}</Text>
+                      </View>
+                      <Text style={s.recRowAmount}>{fmt(sp.spent ?? 0)}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </>
+              )}
+              {expenseSpaces.length > 0 && (
+                <>
+                  <Text style={[s.folderSubtitle, savingsSpaces.length > 0 && { marginTop: 16 }]}>Expense</Text>
+                  {expenseSpaces.map((sp: any) => (
+                    <TouchableOpacity key={sp.id} style={s.folderRow} activeOpacity={0.7} onPress={() => setSpaceChoice({ id: sp.id, name: sp.name })}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={s.recRowName}>{sp.name}</Text>
+                        <Text style={s.recRowSub}>Budget: {fmt(sp.budget ?? 0)}</Text>
+                      </View>
+                      <Text style={[s.recRowAmount, (sp.spent ?? 0) > 0 && { color: DC.btnDangerBg }]}>
+                        {(sp.spent ?? 0) > 0 ? ('- ' + fmt(sp.spent)) : fmt(sp.spent ?? 0)}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </>
+              )}
+            </>
+          );
+        })()}
+        <View style={s.divider} />
+        {/* Loans */}
+        <SectionHeader title="Loans" onArrowRight={() => openReceivablesPanel()} />
+        {peopleSummary.length === 0 ? <EmptyRow label="no active loans" /> : (
+          <View
+            ref={peopleScrollRef}
+            style={{ overflow: 'hidden', flexDirection: 'row', cursor: 'grab' } as any}
+            onMouseDown={makeScrollDragHandler(peopleScrollRef)}
+            onTouchStart={makeScrollDragHandler(peopleScrollRef)}
+          >
+            <View style={{ flexDirection: 'row', gap: 16, paddingBottom: 4 }}>
+              {peopleSummary.map((p: any) => {
+                const isNegative = p.net < 0;
+                const absNet = Math.abs(p.net);
+                const initials = p.person.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase();
+                return (
+                  <TouchableOpacity key={p.person} style={s.loanCard} activeOpacity={0.7} onPress={() => openReceivablesPanel(p.person)}>
+                    <View style={s.loanAvatar}>
+                      <Text style={s.loanAvatarText}>{initials}</Text>
+                    </View>
+                    <Text style={s.loanName} numberOfLines={1}>{p.person}</Text>
+                    <Text style={s.loanLabel}>{isNegative ? 'You Owe:' : 'Owes You:'}</Text>
+                    <Text style={[s.loanAmount, { color: isNegative ? DC.btnDangerBg : DC.incomeColor }]}>{fmt(absNet)}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        )}
+      </ScrollView>

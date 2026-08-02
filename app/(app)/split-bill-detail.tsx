@@ -2,6 +2,7 @@ import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
   SafeAreaView, Animated, Dimensions, ActivityIndicator, TextInput, Platform, Image, Modal,
 } from 'react-native';
+import { SvgXml } from 'react-native-svg';
 import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
@@ -19,8 +20,16 @@ import { Brand } from '../../src/lib/brand';
 import { DC } from '../../src/lib/design';
 import { AppFont } from '../../src/lib/fonts';
 import { ocrReceiptImage, parseReceiptText, type ParsedItem } from '../../src/lib/receiptParser';
-import { CalSansBase64, ChillaxMediumBase64, ChillaxBoldBase64 } from '../../src/lib/fontBase64';
+import { PoppinsBoldBase64, PoppinsMediumBase64, PoppinsSemiBoldBase64 } from '../../src/lib/fontBase64';
 import PaymentModal, { type PaymentItem } from './payment-modal';
+import { computeSplitTotals } from '../../src/lib/splitBillUtils';
+const SVG_BACK   = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12"><path fill="currentColor" d="M10.5 6a.75.75 0 0 0-.75-.75H3.81l1.97-1.97a.75.75 0 0 0-1.06-1.06L1.47 5.47a.75.75 0 0 0 0 1.06l3.25 3.25a.75.75 0 0 0 1.06-1.06L3.81 6.75h5.94A.75.75 0 0 0 10.5 6" /></svg>`;
+const SVG_FORWARD = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12"><path fill="currentColor" d="M1.5 6a.75.75 0 0 1 .75-.75h5.94L6.22 3.28a.75.75 0 0 1 1.06-1.06l3.25 3.25a.75.75 0 0 1 0 1.06L7.28 9.78a.75.75 0 0 1-1.06-1.06l1.97-1.97H2.25A.75.75 0 0 1 1.5 6" /></svg>`;
+const SVG_CHECK_ONE = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><defs><mask id="chk"><g fill="none" stroke-linejoin="round" stroke-width="4"><path fill="#fff" stroke="#fff" d="M24 44a19.94 19.94 0 0 0 14.142-5.858A19.94 19.94 0 0 0 44 24a19.94 19.94 0 0 0-5.858-14.142A19.94 19.94 0 0 0 24 4A19.94 19.94 0 0 0 9.858 9.858A19.94 19.94 0 0 0 4 24a19.94 19.94 0 0 0 5.858 14.142A19.94 19.94 0 0 0 24 44Z"/><path stroke="#000" stroke-linecap="round" d="m16 24l6 6l12-12"/></g></mask></defs><path fill="currentColor" d="M0 0h48v48H0z" mask="url(#chk)"/></svg>`;
+const SVG_LINK   = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.213 9.787a3.39 3.39 0 0 0-4.795 0l-3.425 3.426a3.39 3.39 0 0 0 4.795 4.794l.321-.304m-.321-4.49a3.39 3.39 0 0 0 4.795 0l3.424-3.426a3.39 3.39 0 0 0-4.794-4.795l-1.028.961" /></svg>`;
+const SVG_IMAGE  = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><g fill="currentColor"><path d="M7.25 8a1.25 1.25 0 1 1 2.5 0a1.25 1.25 0 0 1-2.5 0" /><path d="M9.367 2.25h5.266c1.092 0 1.958 0 2.655.057c.714.058 1.317.18 1.869.46a4.75 4.75 0 0 1 2.075 2.077c.281.55.403 1.154.461 1.868c.057.697.057 1.563.057 2.655v5.266c0 1.092 0 1.958-.057 2.655c-.058.714-.18 1.317-.46 1.869a4.75 4.75 0 0 1-2.076 2.075c-.552.281-1.155.403-1.869.461c-.697.057-1.563.057-2.655.057H9.367c-1.092 0-1.958 0-2.655-.057c-.714-.058-1.317-.18-1.868-.46a4.75 4.75 0 0 1-2.076-2.076c-.281-.552-.403-1.155-.46-1.869c-.058-.697-.058-1.563-.058-2.655V9.367c0-1.092 0-1.958.057-2.655c.058-.714.18-1.317.46-1.868a4.75 4.75 0 0 1 2.077-2.076c.55-.281 1.154-.403 1.868-.461c.697-.057 1.563-.057 2.655-.057M3.75 13.753v.847c0 1.133 0 1.937.052 2.566c.05.62.147 1.005.302 1.31a3.25 3.25 0 0 0 1.42 1.42c.305.155.69.251 1.31.302c.389.032.845.044 1.404.049c-.046-1.392.167-2.71.593-3.92c-1.12-1.606-2.98-2.641-5.08-2.574m16.5-3.084c-5.863-.493-10.727 3.874-10.511 9.581h4.86c1.133 0 1.937 0 2.566-.052c.62-.05 1.005-.147 1.31-.302a3.25 3.25 0 0 0 1.42-1.42c.155-.305.251-.69.302-1.31c.052-.63.052-1.434.052-2.566z" /></g></svg>`;
+const SVG_ELLIPSIS = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8"><path fill="currentColor" d="M0 3v2h2V3zm3 0v2h2V3zm3 0v2h2V3z" /></svg>`;
+const SVG_CLOSE    = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2c5.523 0 10 4.477 10 10s-4.477 10-10 10S2 17.523 2 12S6.477 2 12 2m3.535 6.465a1 1 0 0 0-1.414 0L12 10.585l-2.121-2.12a1 1 0 1 0-1.414 1.414L10.585 12l-2.12 2.121a1 1 0 1 0 1.414 1.414L12 13.415l2.121 2.12a1 1 0 0 0 1.414-1.414L13.415 12l2.12-2.121a1 1 0 0 0 0-1.414" /></svg>`;
 const ACCENT      = Brand.color.accent;      // light mint — backgrounds/chips only
 const ACCENT_DARK = Brand.color.accentDark;  // #2A7A6F — text/icons on white
 const ACCENT_TEXT = Brand.color.accentText;  // dark text ON accent bg
@@ -110,7 +119,7 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
     await confirmDeleteSplit();
   };
   // ── Load linked recordings ────────────────────────────────────────────────
-  const { userId, defaultCurrency } = useUser();
+  const { userId, defaultCurrency, userName } = useUser();
   // ── All-time loan/due balance per person (where you stand) ─────────────
   const { data: personBalances = {} } = useQuery({
     queryKey: ['person-loan-balances', userId],
@@ -138,38 +147,7 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
     enabled: !!userId,
   });
   // ── People state ─────────────────────────────────────────────────────────
-  const [addPersonModal, setAddPersonModal] = useState(false);
-  const [tagInputVal, setTagInputVal] = useState('');
-  const suppressSubmitRef = useRef(false);
   const [contacts, setContacts] = useState<string[]>([]);
-  const [contactsVisible, setContactsVisible] = useState(5);
-  const [peopleVisible, setPeopleVisible] = useState(10);
-  const [pendingInvitePerson, setPendingInvitePerson] = useState<{ name: string; friendId: string } | null>(null);
-  const [sendingInvite, setSendingInvite] = useState(false);
-  const sendInvite = async (personName: string, friendId: string, amount: number) => {
-    setSendingInvite(true);
-    await supabase.from('split_bill_invites').insert({
-      split_bill_id: splitBillId,
-      inviter_user_id: userId,
-      invitee_user_id: friendId,
-      person_name: personName,
-      amount,
-      status: 'pending',
-    });
-    await supabase.from('notifications').insert({
-      user_id: friendId,
-      type: 'split_bill_invite',
-      title: `${userName} has tagged you on a split bill`,
-      body: `${String(name)} — your share is ${amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}. tap to see`,
-      message: `${String(name)} — your share is ${amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}. tap to see`,
-      data: { splitBillId, splitBillName: String(name) },
-      is_read: false,
-      status: 'new',
-    });
-    queryClient.invalidateQueries({ queryKey: ['split-bill-invites', splitBillId] });
-    setSendingInvite(false);
-    setPendingInvitePerson(null);
-  };
   // ── Receipt state ─────────────────────────────────────────────────────────
   const [linkedReceipt, setLinkedReceipt]   = useState<any>(null);
   const [receiptPhotos, setReceiptPhotos]   = useState<{ id: string; url: string }[]>([]);
@@ -261,94 +239,7 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
     }
   };
   useEffect(() => { if (splitBillId) loadLinkedReceipt(); }, [splitBillId]);
-  const { data: people = [], refetch: refetchPeople } = useQuery({
-    queryKey: ['split-bill-people', splitBillId],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('bill_splits')
-        .select('id, person_name')
-        .eq('split_bill_id', splitBillId)
-        .order('created_at');
-      return data ?? [];
-    },
-    enabled: !!splitBillId,
-  });
-  const filledPeople = people.map((p: any) => p.person_name);
-  // ── My invite (as invitee) ──────────────────────────────────────────────────
-  const { data: myInvite, refetch: refetchMyInvite } = useQuery<any>({
-    queryKey: ['my-split-bill-invite', splitBillId, userId],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('split_bill_invites')
-        .select('id, person_name, amount, status')
-        .eq('split_bill_id', splitBillId)
-        .eq('invitee_user_id', userId)
-        .maybeSingle();
-      return data ?? null;
-    },
-    enabled: !!splitBillId && !!userId,
-  });
-  const [acceptModal, setAcceptModal] = useState(false);
-  const [acceptSpaces, setAcceptSpaces] = useState<any[]>([]);
-  const [acceptCategories, setAcceptCategories] = useState<any[]>([]);
-  const [acceptSpaceId, setAcceptSpaceId] = useState('');
-  const [acceptCategoryId, setAcceptCategoryId] = useState('');
-  const [acceptSaving, setAcceptSaving] = useState(false);
-  const openAcceptModal = async () => {
-    const [{ data: spaces }, { data: cats }] = await Promise.all([
-      supabase.from('spaces').select('id, name').eq('user_id', userId).eq('is_active', true).order('name'),
-      supabase.from('categories').select('id, name').eq('user_id', userId).order('name'),
-    ]);
-    setAcceptSpaces(spaces ?? []);
-    setAcceptCategories(cats ?? []);
-    setAcceptSpaceId(spaces?.[0]?.id ?? '');
-    setAcceptCategoryId('');
-    setAcceptModal(true);
-  };
-  const confirmAccept = async () => {
-    if (!myInvite || !acceptSpaceId) return;
-    setAcceptSaving(true);
-    const today = new Date().toISOString().split('T')[0];
-    const { data: rec } = await supabase.from('recordings').insert({
-      user_id: userId,
-      space_id: acceptSpaceId,
-      name: String(name),
-      type: 'debt',
-      amount: myInvite.amount,
-      transaction_date: today,
-      status: 'unpaid',
-      category_id: acceptCategoryId || null,
-    }).select('id').single();
-    await supabase.from('split_bill_invites').update({
-      status: 'accepted',
-      accepted_space_id: acceptSpaceId,
-      accepted_category_id: acceptCategoryId || null,
-      created_recording_id: rec?.id ?? null,
-    }).eq('id', myInvite.id);
-    queryClient.invalidateQueries({ queryKey: ['split-bill-invites', splitBillId] });
-    queryClient.invalidateQueries({ queryKey: ['my-split-bill-invite', splitBillId, userId] });
-    setAcceptSaving(false);
-    setAcceptModal(false);
-  };
-  const confirmDecline = async () => {
-    if (!myInvite) return;
-    await supabase.from('split_bill_invites').update({ status: 'declined' }).eq('id', myInvite.id);
-    queryClient.invalidateQueries({ queryKey: ['split-bill-invites', splitBillId] });
-    refetchMyInvite();
-  };
-  const { data: invites = [] } = useQuery<{ person_name: string; status: string }[]>({
-    queryKey: ['split-bill-invites', splitBillId],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('split_bill_invites')
-        .select('person_name, status')
-        .eq('split_bill_id', splitBillId);
-      return data ?? [];
-    },
-    enabled: !!splitBillId,
-  });
-  const getInviteStatus = (personName: string) =>
-    invites.find(i => i.person_name.toLowerCase() === personName.toLowerCase())?.status ?? null;
+
   // ── Friends list (for invite matching) ─────────────────────────────────────────────
   const { data: friends = [] } = useQuery<{ id: string; name: string }[]>({
     queryKey: ['friends', userId],
@@ -371,120 +262,157 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
     },
     enabled: !!userId,
   });
-  // find a friend whose name matches the typed name
-  const findMatchingFriend = (name: string) =>
-    friends.find(f => f.name.toLowerCase() === name.trim().toLowerCase()) ?? null;
   useEffect(() => {
     if (!userId) return;
     supabase.from('contacts').select('name').eq('user_id', userId).order('name')
       .then(({ data }) => { if (data) setContacts(data.map((c: any) => c.name)); });
   }, [userId]);
-  const savePerson = async (name: string) => {
-    if (!name.trim() || filledPeople.some(p => p.toLowerCase() === name.trim().toLowerCase())) return;
-    await supabase.from('bill_splits').insert({ split_bill_id: splitBillId, user_id: userId, person_name: name.trim() });
-    // save to contacts too
-    const exists = contacts.includes(name.trim());
-    if (!exists) {
-      await supabase.from('contacts').insert({ user_id: userId, name: name.trim() });
-      setContacts(prev => [...prev, name.trim()].sort());
-    }
-    refetchPeople();
-  };
-  const removePerson = async (id: string) => {
-    await supabase.from('bill_splits').delete().eq('id', id);
-    refetchPeople();
-  };
-  const handleAddPersonSubmit = async () => {
-    if (suppressSubmitRef.current) { suppressSubmitRef.current = false; return; }
-    const personName = tagInputVal.trim();
-    if (!personName) return;
-    await savePerson(personName);
-    setTagInputVal('');
-    // check if this name matches a friend — if so, prompt invite
-    const match = findMatchingFriend(personName);
-    const alreadyInvited = invites.some(i => i.person_name.toLowerCase() === personName.toLowerCase());
-    if (match && !alreadyInvited) {
-      setPendingInvitePerson({ name: personName, friendId: match.id });
-    }
-  };
-  // ── Add recording state ──────────────────────────────────────────────────
-  const [addRecModal, setAddRecModal] = useState(false);
   const [allRecordings, setAllRecordings] = useState<any[]>([]);
-  const [recTab, setRecTab] = useState<'debt' | 'due' | 'expense' | 'income'>('expense');
-  const [recSearch, setRecSearch] = useState('');
-  const [recDays, setRecDays] = useState<30 | 60 | 180 | 365 | null>(30);
-  const [recShowMore, setRecShowMore] = useState(false);
-  const REC_TABS: { key: 'debt' | 'due' | 'expense' | 'income'; label: string }[] = [
-    { key: 'expense', label: 'expense' },
-    { key: 'due',     label: 'due' },
-    { key: 'debt',    label: 'debt' },
-    { key: 'income',  label: 'income' },
+  // ── New unified Add Item modal state ──────────────────────────────────
+  const [newItemModal, setNewItemModal] = useState(false);
+  const [newItemStep, setNewItemStep] = useState<'choice' | 'form' | 'pick-recording'>('choice');
+  const [newItemFromRecording, setNewItemFromRecording] = useState<any>(null); // null = manual
+  const [newItemName, setNewItemName] = useState('');
+  const [newItemAmount, setNewItemAmount] = useState('');
+  const [newItemPeople, setNewItemPeople] = useState<string[]>([]);
+  const [newItemTab, setNewItemTab] = useState<'assign' | 'subitems'>('assign');
+  const [newItemSubitems, setNewItemSubitems] = useState<{ name: string; amount: string; people: string[] }[]>([]);
+  const [newItemPeopleSearch, setNewItemPeopleSearch] = useState('');
+  const [newItemRecSearch, setNewItemRecSearch] = useState('');
+  const [newItemRecShowMore, setNewItemRecShowMore] = useState(false);
+  const [newItemSaving, setNewItemSaving] = useState(false);
+  // All contacts + friends merged for assign people
+  const allPeopleForAssign = [
+    ...friends.map(f => f.name),
+    ...contacts.filter(c => !friends.some(f => f.name.toLowerCase() === c.toLowerCase())),
   ];
-  const REC_RANGES: { value: 30 | 60 | 180 | 365 | null; label: string }[] = [
-    { value: 30, label: 'this month' },
-    { value: 60, label: '60 days' },
-    { value: 180, label: '180 days' },
-    { value: 365, label: '1 year' },
-    { value: null, label: 'all time' },
-  ];
-  const openAddRecording = async () => {
-    const linkedIds = linkedRecordings.map((lr: any) => lr.recording?.id);
-    const { data } = await supabase
-      .from('recordings')
-      .select('id, name, amount, type, transaction_date, status, is_due')
-      .eq('user_id', userId)
-      .in('type', ['expense', 'due', 'debt', 'income'])
-      .order('transaction_date', { ascending: false })
-      .limit(200);
-    setAllRecordings((data ?? []).filter((r: any) => !linkedIds.includes(r.id) && r.type !== 'debt' && r.type !== 'due' && !r.is_due));
-    setRecTab('expense');
-    setRecSearch('');
-    setRecDays(30);
-    setRecShowMore(false);
-    setAddRecModal(true);
+  const openNewItemModal = () => {
+    setNewItemStep('choice');
+    setNewItemFromRecording(null);
+    setNewItemName('');
+    setNewItemAmount('');
+    setNewItemPeople([]);
+    setNewItemTab('assign');
+    setNewItemSubitems([]);
+    setNewItemPeopleSearch('');
+    setNewItemRecSearch('');
+    setNewItemRecShowMore(false);
+    setNewItemModal(true);
   };
-  const linkRecording = async (rec: any) => {
-    await supabase.from('split_bill_recordings').insert({
-      split_bill_id: splitBillId,
-      recording_id: rec.id,
-      amount_contributed: rec.amount,
-    });
-    setAddRecModal(false);
-    queryClient.invalidateQueries({ queryKey: ['split-bill-recordings', splitBillId] });
+  const openNewItemForm = (recording: any | null) => {
+    setNewItemFromRecording(recording);
+    setNewItemName(recording ? recording.name : '');
+    setNewItemAmount(recording ? String(recording.amount) : '');
+    setNewItemPeople([]);
+    setNewItemTab('assign');
+    setNewItemSubitems([]);
+    setNewItemPeopleSearch('');
+    setNewItemStep('form');
   };
-  // Step 1: pick recording → Step 2: add item rows → tap saved item to assign people
-  const [addItemModal, setAddItemModal]           = useState(false);
-  const [itemStep, setItemStep]                   = useState<'pick-type' | 'pick-recording' | 'add-items' | 'manual' | 'parse-choice' | 'parsing' | 'parse-review'>('pick-type');
-  const [selectedRecording, setSelectedRecording] = useState<any>(null);
-  const [itemRows, setItemRows]                   = useState<{ name: string; cost: string }[]>([{ name: '', cost: '' }]);
-  const [savingItem, setSavingItem]               = useState(false);
-  const [manualItemType, setManualItemType]        = useState<'receivable' | 'payable'>('receivable');
-  // ── Receipt parser state ──────────────────────────────────────────────────
-  const [parseReceiptPhotos, setParseReceiptPhotos] = useState<{ id: string; url: string }[]>([]);
-  const [parsedItems, setParsedItems]               = useState<{ name: string; cost: string }[]>([]);
-  const [parsedTotal, setParsedTotal]               = useState<number | null>(null);
-  const [parsePhotoIndex, setParsePhotoIndex]       = useState(0);
-  const [parseEnlargeModal, setParseEnlargeModal]   = useState(false);
-  const [parseLoading, setParseLoading]             = useState(false);
-  const [parseError, setParseError]                 = useState('');
-  const [parseOverBudgetModal, setParseOverBudgetModal] = useState(false);
-  const [editingParsedItem, setEditingParsedItem]   = useState<{ idx: number; field: 'name' | 'cost'; value: string } | null>(null);
-  const [editingExistingItem, setEditingExistingItem] = useState<{ item: any; field: 'name' | 'cost'; value: string } | null>(null);
+  const newItemRecordingBudgetUsed = newItemFromRecording
+    ? items.filter((i: any) => i.recording_id === newItemFromRecording.id).reduce((s: number, i: any) => s + Number(i.cost), 0)
+    : 0;
+  const newItemSubitemsTotal = newItemSubitems.reduce((s, sub) => s + (parseFloat(sub.amount || '0') || 0), 0);
+  const newItemRecordingOver = newItemFromRecording
+    ? newItemSubitemsTotal > Number(newItemFromRecording.amount) - newItemRecordingBudgetUsed + 0.01
+    : false;
+  const saveNewItem = async () => {
+    if (newItemSaving) return;
+    const hasSubitems = newItemSubitems.length > 0;
+    if (!newItemName.trim()) return;
+    if (!hasSubitems && !newItemAmount) return;
+    if (newItemFromRecording && newItemRecordingOver) return;
+    setNewItemSaving(true);
+    const recId = newItemFromRecording?.id ?? null;
+    const recType = newItemFromRecording?.type ?? 'expense';
+    if (hasSubitems) {
+      const validSubs = newItemSubitems.filter(s => s.name.trim() && parseFloat(s.amount || '0') > 0);
+      if (validSubs.length === 0) { setNewItemSaving(false); return; }
+      const parentCost = validSubs.reduce((s, sub) => s + (parseFloat(sub.amount || '0') || 0), 0);
+      const { data: parent, error: parentErr } = await supabase.from('split_items').insert({
+        split_bill_id: splitBillId,
+        recording_id: recId,
+        user_id: userId,
+        name: newItemName.trim(),
+        cost: parentCost,
+        recording_type: recType,
+        people: [],
+      }).select('id').single();
+      if (parentErr) { console.error('parent insert error:', parentErr); setNewItemSaving(false); return; }
+      if (parent?.id) {
+        for (const sub of validSubs) {
+          await supabase.from('split_items').insert({
+            split_bill_id: splitBillId,
+            recording_id: recId,
+            user_id: userId,
+            name: sub.name.trim(),
+            cost: parseFloat(sub.amount || '0'),
+            recording_type: recType,
+            people: sub.people.length ? sub.people : [],
+            parent_item_id: parent.id,
+          });
+        }
+      }
+    } else {
+      await supabase.from('split_items').insert({
+        split_bill_id: splitBillId,
+        recording_id: recId,
+        user_id: userId,
+        name: newItemName.trim(),
+        cost: parseFloat(newItemAmount || '0') || 0,
+        recording_type: recType,
+        people: newItemPeople.length ? newItemPeople : [],
+      });
+    }
+    // If from recording and not yet linked, link it
+    if (recId) {
+      const alreadyLinked = linkedRecordings.some((lr: any) => lr.recording?.id === recId);
+      if (!alreadyLinked) {
+        await supabase.from('split_bill_recordings').insert({
+          split_bill_id: splitBillId,
+          recording_id: recId,
+          amount_contributed: newItemFromRecording.amount,
+        });
+        queryClient.invalidateQueries({ queryKey: ['split-bill-recordings', splitBillId] });
+      }
+    }
+    setNewItemSaving(false);
+    setNewItemModal(false);
+    refetchItems();
+  };
+
   // assign-people sheet (tap an existing item)
   const [assignItem, setAssignItem]   = useState<any>(null);
   const [assignPeople, setAssignPeople] = useState<string[]>([]);
+  // Edit item modal state
+  const [editItemModal, setEditItemModal] = useState(false);
+  const [editItemTarget, setEditItemTarget] = useState<any>(null); // the parent group
+  const [editItemTab, setEditItemTab] = useState<'assign' | 'subitems'>('assign');
+  const [editItemSubSearch, setEditItemSubSearch] = useState('');
+  const [editItemPeopleSearch, setEditItemPeopleSearch] = useState('');
+  // Add subitem modal state
+  const [addSubitemModal, setAddSubitemModal] = useState(false);
+  const [subitemName, setSubitemName] = useState('');
+  const [subitemCost, setSubitemCost] = useState('');
+  const [subitemPeople, setSubitemPeople] = useState<string[]>([]);
+  const [subitemPeopleSearch, setSubitemPeopleSearch] = useState('');
+  const [savingSubitem, setSavingSubitem] = useState(false);
+  const [editingSubitemId, setEditingSubitemId] = useState<string | null>(null);
   const { data: items = [], refetch: refetchItems } = useQuery({
     queryKey: ['split-bill-items', splitBillId],
     queryFn: async () => {
       const { data } = await supabase
         .from('split_items')
-        .select('*')
+        .select('*, parent_item_id')
         .eq('split_bill_id', splitBillId)
         .order('created_at');
       return data ?? [];
     },
     enabled: !!splitBillId,
   });
+  const filledPeople = [...new Set(
+    items.flatMap((i: any) => i.people ?? [])
+  )];
   // receivable / expense = collect from them (+), loan / income / savings = give back (-)
   const isDeductType = (type: string) => type === 'payable' || type === 'debt';
   const totalItemsCost = items.reduce((s: number, i: any) => s + Number(i.cost), 0);
@@ -666,25 +594,132 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
     setAddItemModal(false); refetchItems();
   };
   const openAssign = (item: any) => {
+    const lr = linkedRecordings.find((l: any) => l.recording?.id === item.recording_id);
+    const groupItems = items.filter((i: any) => i.recording_id === item.recording_id);
+    // recAmount: use recording's amount_contributed if available, else sum of all group items
+    const recAmount = lr
+      ? Number(lr.amount_contributed)
+      : groupItems.reduce((s: number, i: any) => s + Number(i.cost), 0);
+    setEditItemTarget({
+      item,
+      recName: lr?.recording?.name ?? item.name,
+      recAmount,
+      isExisting: !!item.recording_id,
+      groupItems,
+    });
+    // Default to subitems tab if subitems exist, otherwise assign
+    const hasExistingSubitems = groupItems.length > 1;
+    setEditItemTab(hasExistingSubitems ? 'subitems' : 'assign');
+    setEditItemSubSearch('');
+    setEditItemPeopleSearch('');
     setAssignItem(item);
     setAssignPeople(item.people ?? []);
+    setEditItemModal(true);
   };
-  const saveAssign = async () => {
-    await supabase.from('split_items').update({ people: assignPeople.length ? assignPeople : null }).eq('id', assignItem.id);
-    setAssignItem(null);
+  const [editItemTabWarnModal, setEditItemTabWarnModal] = useState(false);
+  const [editItemTabPending, setEditItemTabPending] = useState<'assign' | 'subitems' | null>(null);
+  const handleEditItemTabChange = (tab: 'assign' | 'subitems') => {
+    if (tab === editItemTab) return;
+    // Warn if switching away from a tab that has content
+    if (editItemTab === 'assign' && assignPeople.length > 0) {
+      setEditItemTabPending(tab);
+      setEditItemTabWarnModal(true);
+      return;
+    }
+    if (editItemTab === 'subitems') {
+      const subitems = (editItemTarget?.groupItems ?? []).filter((i: any) => i.id !== editItemTarget?.item?.id);
+      if (subitems.length > 0) {
+        setEditItemTabPending(tab);
+        setEditItemTabWarnModal(true);
+        return;
+      }
+    }
+    setEditItemTab(tab);
+  };
+  const confirmEditItemTabChange = async () => {
+    if (!editItemTabPending) return;
+    if (editItemTab === 'assign' && assignPeople.length > 0) {
+      // Clear people assignment on parent item
+      setAssignPeople([]);
+      await supabase.from('split_items').update({ people: null }).eq('id', assignItem.id);
+      refetchItems();
+    }
+    if (editItemTab === 'subitems') {
+      // Delete all subitems
+      const subitems = (editItemTarget?.groupItems ?? []).filter((i: any) => i.id !== editItemTarget?.item?.id);
+      for (const sub of subitems) {
+        await supabase.from('split_items').delete().eq('id', sub.id);
+      }
+      setEditItemTarget((prev: any) => prev ? { ...prev, groupItems: [prev.item] } : prev);
+      await refetchItems();
+    }
+    setEditItemTab(editItemTabPending);
+    setEditItemTabPending(null);
+    setEditItemTabWarnModal(false);
+  };
+  const openAddSubitem = (prefill?: { id: string; name: string; cost: string; people: string[] }) => {
+    setSubitemName(prefill?.name ?? '');
+    setSubitemCost(prefill?.cost ?? '');
+    setSubitemPeople(prefill?.people ?? []);
+    setSubitemPeopleSearch('');
+    setEditingSubitemId(prefill?.id ?? null);
+    setAddSubitemModal(true);
+  };
+  const saveSubitem = async () => {
+    if (!subitemName.trim() || !subitemCost) return;
+    setSavingSubitem(true);
+    const target = editItemTarget;
+    const recId = target?.item?.recording_id ?? null;
+    const recType = target?.item?.recording_type ?? 'receivable';
+    if (editingSubitemId) {
+      await supabase.from('split_items').update({
+        name: subitemName.trim(),
+        cost: parseFloat(subitemCost),
+        people: subitemPeople.length ? subitemPeople : null,
+      }).eq('id', editingSubitemId);
+    } else {
+      // Clear people on parent item since subitems now handle assignment
+      await supabase.from('split_items').update({ people: null }).eq('id', target.item.id);
+      await supabase.from('split_items').insert({
+        split_bill_id: splitBillId,
+        recording_id: recId,
+        user_id: userId,
+        name: subitemName.trim(),
+        cost: parseFloat(subitemCost),
+        recording_type: recType,
+        people: subitemPeople.length ? subitemPeople : null,
+      });
+    }
+    setSavingSubitem(false);
+    setAddSubitemModal(false);
     refetchItems();
+    // Refresh groupItems in editItemTarget
+    const updated = await supabase.from('split_items').select('*').eq('split_bill_id', splitBillId).order('created_at');
+    const allItems = updated.data ?? [];
+    const groupItems = allItems.filter((i: any) => i.recording_id === recId);
+    setEditItemTarget((prev: any) => prev ? { ...prev, groupItems } : prev);
   };
+
   const deleteItem = async (id: string) => {
+    const item = items.find((i: any) => i.id === id);
     await supabase.from('split_items').delete().eq('id', id);
-    refetchItems();
+    if (item?.recording_id) {
+      const remaining = items.filter((i: any) => i.recording_id === item.recording_id && i.id !== id);
+      if (remaining.length === 0) {
+        await supabase.from('split_bill_recordings').delete()
+          .eq('split_bill_id', splitBillId)
+          .eq('recording_id', item.recording_id);
+        queryClient.invalidateQueries({ queryKey: ['split-bill-recordings', splitBillId] });
+      }
+    }
+    await refetchItems();
+    // Refresh groupItems in editItemTarget if modal is open
+    setEditItemTarget((prev: any) => {
+      if (!prev) return prev;
+      return { ...prev, groupItems: prev.groupItems.filter((i: any) => i.id !== id) };
+    });
   };
-  const saveExistingItem = async () => {
-    if (!editingExistingItem) return;
-    const { item, field, value } = editingExistingItem;
-    await supabase.from('split_items').update({ [field]: field === 'cost' ? parseFloat(value) || 0 : value.trim() }).eq('id', item.id);
-    setEditingExistingItem(null);
-    refetchItems();
-  };
+
   // ── Share ──────────────────────────────────────────────────────────────────
   const { data: shareRow, refetch: refetchShareRow } = useQuery({
     queryKey: ['split-bill-share', splitBillId],
@@ -811,14 +846,14 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
         return `<div style="display:flex;align-items:center;gap:12px;padding:13px 16px;border-bottom:1px solid #eef0f0">`+
           `<div style="width:30px;height:30px;border-radius:50%;background:#e8f5f4;display:flex;align-items:center;justify-content:center;flex-shrink:0">`+
           `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2A7A6F" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg></div>`+
-          `<span style="font-family:'Chillax',sans-serif;font-weight:500;font-size:13px;color:#2e3d3d;flex:1">${p}</span>`+
-          `<span style="font-family:'Chillax',sans-serif;font-weight:700;font-size:14px;color:${color}">${total < 0 ? '-' : ''}${fmt2(total)}</span>`+
+          `<span style="font-family:'Poppins',sans-serif;font-weight:500;font-size:13px;color:#2e3d3d;flex:1">${p}</span>`+
+          `<span style="font-family:'Poppins',sans-serif;font-weight:700;font-size:14px;color:${color}">${total < 0 ? '-' : ''}${fmt2(total)}</span>`+
           `</div>`;
       }).join('');
       const totalRowHtml = `<div style="display:flex;align-items:center;gap:12px;padding:13px 16px;background:#e8f5f4">`+
-        `<div style="width:30px;height:30px;border-radius:50%;background:#b6e1de;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:'Chillax',sans-serif;font-weight:700;font-size:12px;color:#2A7A6F">Σ</div>`+
-        `<span style="font-family:'Chillax',sans-serif;font-weight:700;font-size:13px;font-weight:600;color:#2A7A6F;flex:1">total</span>`+
-        `<span style="font-family:'Chillax',sans-serif;font-weight:700;font-size:14px;color:#2A7A6F">${grandTotal < 0 ? '-' : ''}${fmt2(grandTotal)}</span>`+
+        `<div style="width:30px;height:30px;border-radius:50%;background:#b6e1de;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:'Poppins',sans-serif;font-weight:700;font-size:12px;color:#2A7A6F">Σ</div>`+
+        `<span style="font-family:'Poppins',sans-serif;font-weight:700;font-size:13px;font-weight:600;color:#2A7A6F;flex:1">total</span>`+
+        `<span style="font-family:'Poppins',sans-serif;font-weight:700;font-size:14px;color:#2A7A6F">${grandTotal < 0 ? '-' : ''}${fmt2(grandTotal)}</span>`+
         `</div>`;
       // Item rows — matching share page style
             // Group items by recording
@@ -834,7 +869,7 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
       });
       const itemRowsHtml = recGroups.map((group) => {
         const groupHeader = recGroups.length > 1
-          ? `<div style="padding:8px 16px;background:#f0f8f7;font-family:'Chillax',sans-serif;font-weight:700;font-size:10px;color:#2A7A6F;text-transform:uppercase;letter-spacing:0.8px">${group.recName}</div>`
+          ? `<div style="padding:8px 16px;background:#f0f8f7;font-family:'Poppins',sans-serif;font-weight:700;font-size:10px;color:#2A7A6F;text-transform:uppercase;letter-spacing:0.8px">${group.recName}</div>`
           : '';
         const rows = group.items.map((item: any, ii: number) => {
           const d = isDeductType(item.recording_type);
@@ -842,17 +877,17 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
           const people: string[] = item.people ?? [];
           const perPerson = people.length > 0 ? Number(item.cost) / people.length : 0;
           const peopleSection = people.length > 0
-            ? `<div style="font-family:'Chillax',sans-serif;font-weight:500;font-size:11px;color:${color};margin-bottom:4px">${d ? '-' : ''}${perPerson.toLocaleString('en-US', { minimumFractionDigits: 2 })} each</div>`+
+            ? `<div style="font-family:'Poppins',sans-serif;font-weight:500;font-size:11px;color:${color};margin-bottom:4px">${d ? '-' : ''}${perPerson.toLocaleString('en-US', { minimumFractionDigits: 2 })} each</div>`+
               `<div style="display:flex;flex-wrap:wrap;gap:4px">`+
-              people.map((p: string) => `<span style="background:#e8f5f4;border-radius:99px;padding:2px 9px;font-family:'Chillax',sans-serif;font-weight:500;font-size:10px;color:#2A7A6F">${p}</span>`).join('') +
+              people.map((p: string) => `<span style="background:#e8f5f4;border-radius:99px;padding:2px 9px;font-family:'Poppins',sans-serif;font-weight:500;font-size:10px;color:#2A7A6F">${p}</span>`).join('') +
               `</div>`
             : '';
           return `<div style="border-bottom:1px solid #eef0f0;padding:13px 16px;display:flex;align-items:flex-start;gap:12px">`+
-            `<div style="width:28px;height:28px;border-radius:50%;background:#e8f5f4;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:'Chillax',sans-serif;font-weight:700;font-size:12px;color:#2A7A6F;margin-top:1px">${ii + 1}</div>`+
+            `<div style="width:28px;height:28px;border-radius:50%;background:#e8f5f4;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:'Poppins',sans-serif;font-weight:700;font-size:12px;color:#2A7A6F;margin-top:1px">${ii + 1}</div>`+
             `<div style="flex:1">`+
             `<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">`+
-            `<span style="font-family:'Chillax',sans-serif;font-weight:500;font-size:13px;color:#2e3d3d;flex:1;line-height:1.4">${item.name}</span>`+
-            `<span style="font-family:'Chillax',sans-serif;font-weight:700;font-size:14px;color:${color};white-space:nowrap">${d ? '-' : ''}${Number(item.cost).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>`+
+            `<span style="font-family:'Poppins',sans-serif;font-weight:500;font-size:13px;color:#2e3d3d;flex:1;line-height:1.4">${item.name}</span>`+
+            `<span style="font-family:'Poppins',sans-serif;font-weight:700;font-size:14px;color:${color};white-space:nowrap">${d ? '-' : ''}${Number(item.cost).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>`+
             `</div>`+
             (people.length > 0 ? `<div style="margin-top:6px">${peopleSection}</div>` : '') +
             `</div></div>`;
@@ -881,28 +916,28 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
           `<div style="width:30px;height:30px;border-radius:50%;background:#b6e1de;display:flex;align-items:center;justify-content:center;flex-shrink:0">`+
           `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2A7A6F" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg></div>`+
           `<div style="flex:1;display:flex;flex-direction:column;gap:3px">`+
-          `<div style="font-family:'Chillax',sans-serif;font-weight:700;font-size:14px;color:#2e3d3d">${a.bank ?? ''}</div>`+
-          `<div style="font-family:'Chillax',sans-serif;font-weight:500;font-size:10px;color:#929090">${a.holder_name ?? a.account_name ?? ''}</div>`+
-          `<div style="font-family:'Chillax',sans-serif;font-weight:700;font-size:13px;color:#2e3d3d;letter-spacing:0.3px">${a.account_number ?? ''}</div>`+
+          `<div style="font-family:'Poppins',sans-serif;font-weight:700;font-size:14px;color:#2e3d3d">${a.bank ?? ''}</div>`+
+          `<div style="font-family:'Poppins',sans-serif;font-weight:500;font-size:10px;color:#929090">${a.holder_name ?? a.account_name ?? ''}</div>`+
+          `<div style="font-family:'Poppins',sans-serif;font-weight:700;font-size:13px;color:#2e3d3d;letter-spacing:0.3px">${a.account_number ?? ''}</div>`+
           `</div>${qrImg}</div>`;
       }).join('');
       const sectionLabel = (text: string) =>
-        `<div style="font-family:'Chillax',sans-serif;font-weight:500;font-size:11px;color:#929090;letter-spacing:0.6px;text-transform:uppercase;margin:24px 0 10px">${text}</div>`;
+        `<div style="font-family:'Poppins',sans-serif;font-weight:500;font-size:11px;color:#929090;letter-spacing:0.6px;text-transform:uppercase;margin:24px 0 10px">${text}</div>`;
       const block = (inner: string) =>
         `<div style="border:1px solid #eef0f0;border-radius:14px;overflow:hidden">${inner}</div>`;
       const html = `<!DOCTYPE html><html><head><meta charset="utf-8">`+
         `<style>`+
-        `@font-face{font-family:'CalSans';src:url('${CalSansBase64}') format('truetype')}`+
-        `@font-face{font-family:'Chillax';font-weight:500;src:url('${ChillaxMediumBase64}') format('opentype')}`+
-        `@font-face{font-family:'Chillax';font-weight:700;src:url('${ChillaxBoldBase64}') format('opentype')}`+
-        `*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Chillax',sans-serif;font-weight:500;background:#fff;padding:36px 32px;width:480px;margin:0 auto;-webkit-font-smoothing:antialiased}</style>`+
+        `@font-face{font-family:'Poppins';font-weight:700;src:url('${PoppinsBoldBase64}') format('truetype')}`+
+        `@font-face{font-family:'Poppins';font-weight:500;src:url('${PoppinsMediumBase64}') format('truetype')}`+
+        `@font-face{font-family:'Poppins';font-weight:600;src:url('${PoppinsSemiBoldBase64}') format('truetype')}`+
+        `*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Poppins',sans-serif;font-weight:500;background:#fff;padding:36px 32px;width:480px;margin:0 auto;-webkit-font-smoothing:antialiased}</style>`+
         `</head><body>`+
-        `<div style="font-family:'CalSans',serif;font-size:28px;font-weight:400;color:#1a2e2e;letter-spacing:-0.5px;margin-bottom:6px">${String(name).toLowerCase()}</div>`+
-        `<div style="font-family:'Chillax',sans-serif;font-weight:500;font-size:11px;color:#929090;margin-bottom:28px;letter-spacing:0.2px">${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>`+
+        `<div style="font-family:'Poppins',serif;font-size:28px;font-weight:400;color:#1a2e2e;letter-spacing:-0.5px;margin-bottom:6px">${String(name).toLowerCase()}</div>`+
+        `<div style="font-family:'Poppins',sans-serif;font-weight:500;font-size:11px;color:#929090;margin-bottom:28px;letter-spacing:0.2px">${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>`+
         sectionLabel('per person pay') + block(personRowsHtml + totalRowHtml) +
         (items.length > 0 ? sectionLabel('item breakdown') + block(itemRowsHtml) : '') +
         (payRowsHtml ? sectionLabel('payment information') + block(payRowsHtml) : '') +
-        `<div style="font-family:'Chillax',sans-serif;font-weight:500;font-size:10px;color:#c8d0d0;text-align:center;margin-top:32px">generated by LEDGR</div>`+
+        `<div style="font-family:'Poppins',sans-serif;font-weight:500;font-size:10px;color:#c8d0d0;text-align:center;margin-top:32px">generated by LEDGR</div>`+
         `</body></html>`;
       if (Platform.OS !== 'web') {
         const Print = require('expo-print');
@@ -1416,15 +1451,8 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
   };
   // compute per-person totals (reuse across summary + payment)
   const computeTotals = () => {
-    const totals: Record<string, number> = {};
-    filledPeople.forEach(p => { totals[p] = 0; });
-    items.forEach((item: any) => {
-      const deduct = isDeductType(item.recording_type);
-      const pp = (item.people ?? []).length > 0 ? Number(item.cost) / item.people.length : 0;
-      (item.people ?? []).forEach((p: string) => {
-        if (totals[p] !== undefined) totals[p] += deduct ? -pp : pp;
-      });
-    });
+    const totals = computeSplitTotals(items);
+    filledPeople.forEach(p => { if (totals[p] === undefined) totals[p] = 0; });
     return totals;
   };
   // Only active payments count toward paid totals
@@ -1734,1139 +1762,901 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
     await Promise.all([...insertPromises, ...updatePromises]);
     await Promise.all([refetchItems(), refetchPayments(), queryClient.invalidateQueries({ queryKey: ['transactions'] })]);
   };
+  const [wizardStep, setWizardStep] = useState<1 | 2 | 3>(1);
+  const [actionsModal, setActionsModal] = useState(false);
   const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const typeColor = (type: string) => {
     if (type === 'debt') return PEACH;
     return ACCENT_DARK;
   };
   return (
-    <Animated.View style={[{ flex: 1, backgroundColor: Colors.white }, { transform: [{ translateX: slideAnim }] }]}>
-      <SafeAreaView style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-        {/* Header */}
-        <PageHeader
-          title={String(name)}
-          onBack={handleBack}
-          right={
-            billStatus === 'ongoing' ? (
-              <TouchableOpacity onPress={openEditName} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              </TouchableOpacity>
-            ) : undefined
-          }
-        />
-        {/* Actions row */}
-        <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: PAGE, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.border }}>
-          <TouchableOpacity style={s.actionBtn} onPress={openShareModal}>
-            <Text style={s.actionBtnText}>share</Text>
+    <Animated.View style={[{ flex: 1, backgroundColor: '#ffffff' }, { transform: [{ translateX: slideAnim }] }]}>
+      <SafeAreaView style={{ flex: 1 }}>
+
+        {/* ── Reusable top header ── */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: DC.pagePadding, paddingTop: 28, paddingBottom: 14 }}>
+          <TouchableOpacity onPress={handleBack} activeOpacity={0.7}>
+            <SvgXml xml={SVG_BACK} width={DC.backBtn.width} height={DC.backBtn.height} color={DC.backBtn.color} />
           </TouchableOpacity>
-          <TouchableOpacity style={s.actionBtn} onPress={handleToggleStatus}>
-            <Text style={s.actionBtnText}>{billStatus === 'closed' ? 'reopen' : 'close'}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={s.actionBtnDanger} onPress={() => setDeleteSplitModal(true)}>
-            <Text style={s.actionBtnDangerText}>delete</Text>
+          <View style={{ flex: 1, alignItems: 'center' }}>
+            <Text style={{ fontFamily: 'Poppins-SemiBold', fontSize: 15, color: DC.pageText }}>Split Bill</Text>
+            <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 11, color: DC.pageTextMuted, fontStyle: 'italic' }} numberOfLines={1}>{String(name)}</Text>
+          </View>
+          <TouchableOpacity style={s.ellipsisBtn} onPress={() => setActionsModal(true)} activeOpacity={0.7}>
+            <SvgXml xml={SVG_ELLIPSIS} width={14} height={14} color={DC.pageText} />
           </TouchableOpacity>
         </View>
-        <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
-          <View style={{ height: 8 }} />
-          {/* Invite banner — shown to invitee only */}
-          {myInvite && myInvite.status === 'pending' && (
-            <View style={{ backgroundColor: ACCENT + '33', borderRadius: Radius.lg, padding: 16, marginBottom: 12, gap: 8 }}>
-              <Text style={{ fontFamily: AppFont.semiBold, fontSize: 13, color: ACCENT_DARK }}>
-                you've been added to this split bill
-              </Text>
-              <Text style={{ fontFamily: AppFont.regular, fontSize: 11, color: Colors.text }}>
-                your share: {fmt(Number(myInvite.amount))}
-              </Text>
-              <Text style={{ fontFamily: AppFont.regular, fontSize: 11, color: Colors.muted }}>
-                accept to create a debt recording on your end.
-              </Text>
-              <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
-                <TouchableOpacity
-                  style={{ flex: 1, paddingVertical: 10, borderRadius: Radius.pill, backgroundColor: Colors.surface, alignItems: 'center', borderWidth: 1, borderColor: Colors.borderMid }}
-                  onPress={confirmDecline}
-                >
-                  <Text style={{ fontFamily: AppFont.semiBold, fontSize: 12, color: Colors.muted }}>decline</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={{ flex: 2, paddingVertical: 10, borderRadius: Radius.pill, backgroundColor: ACCENT_DARK, alignItems: 'center' }}
-                  onPress={openAcceptModal}
-                >
-                  <Text style={{ fontFamily: AppFont.semiBold, fontSize: 12, color: Colors.white }}>accept</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
-          {myInvite && myInvite.status === 'accepted' && (
-            <View style={{ backgroundColor: ACCENT + '22', borderRadius: Radius.lg, padding: 12, marginBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Text style={{ fontFamily: AppFont.regular, fontSize: 11, color: ACCENT_DARK }}>you accepted this split bill — debt recorded</Text>
-            </View>
-          )}
-          <View style={s.sectionRow}>
-            <Text style={s.sectionHeader}>recordings</Text>
-            {billStatus === 'ongoing' && (
-              <TouchableOpacity onPress={openAddRecording} style={s.sectionAddBtn}>
-                <Text style={{ fontFamily: AppFont.bold, fontSize: 13, color: '#111111' }}>add</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-          {loadingRecs ? (
-            <ActivityIndicator color={ACCENT_DARK} />
-          ) : linkedRecordings.length === 0 ? (
-            <View style={s.emptyWrap}>
-              <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.muted }}>no recordings linked yet</Text>
-            </View>
-          ) : (
-            <View style={s.list}>
-              {linkedRecordings.map((lr: any, recIdx: number) => {
-                  const rec = lr.recording;
-                  const isDone =
-                    (rec?.type === 'expense' && rec?.status === 'paid') ||
-                    (rec?.type === 'due'     && rec?.status === 'paid') ||
-                    (rec?.type === 'debt'    && rec?.status === 'paid');
-                  const isPartial =
-                    (rec?.type === 'expense' && rec?.status === 'partial') ||
-                    (rec?.type === 'due'     && rec?.status === 'partial') ||
-                    (rec?.type === 'debt'    && rec?.status === 'partial');
-                  const actionable = rec?.type === 'expense' || rec?.type === 'due' || rec?.type === 'debt';
-                  return (
-                <TouchableOpacity
-                  key={lr.id}
-                  style={s.recRow}
-                  activeOpacity={0.85}
-                  onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: lr.recording?.id } } as any)}
-                >
-                  <Text style={s.recNum}>{recIdx + 1}</Text>
-                  <View style={s.recMid}>
-                    <Text style={s.recName} numberOfLines={1}>{lr.recording?.name ?? '—'}</Text>
-                    <Text style={s.recDate}>
-                      {rec?.transaction_date
-                        ? new Date(rec.transaction_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-                        : '—'}
-                    </Text>
-                  </View>
-                  <View style={s.recRight}>
-                    <Text style={s.recAmount}>{fmt(Number(lr.amount_contributed))}</Text>
-                    {(() => {
-                      const total = Number(rec?.amount ?? 0);
-                      if (total <= 0) return null;
-                      const ifor = items.filter((i: any) => i.recording_id === rec?.id);
-                      let pa = 0;
-                      if (ifor.length > 0) {
-                        const op: Record<string, number> = {};
-                        ifor.forEach((i: any) => { const pp = (i.people ?? []).length > 0 ? Number(i.cost) / i.people.length : 0; (i.people ?? []).forEach((p: string) => { op[p] = (op[p] ?? 0) + pp; }); });
-                        const cp: Record<string, number> = {};
-                        payments.filter((pay: any) => pay.status !== 'cancelled').forEach((pay: any) => { const ow = op[pay.person_name] ?? 0; if (ow > 0) { const al = cp[pay.person_name] ?? 0; const cr = Math.min(Number(pay.amount), ow - al); if (cr > 0) { cp[pay.person_name] = al + cr; pa += cr; } } });
-                      } else { pa = Number(rec?.paid_amount ?? 0); }
-                      const fc = pa >= total - 0.01;
-                      if (fc) return <Text style={s.recStatus}>{rec?.type === 'due' ? 'fully collected' : 'fully paid'} {fmt(pa)}</Text>;
-                      if (pa > 0) return <Text style={s.recStatus}>partial {fmt(pa)}</Text>;
-                      return null;
-                    })()}
-                  </View>
-                  {actionable && !isDone && billStatus === 'ongoing' && (
-                    <TouchableOpacity
-                      onPress={() => openMarkPaid(lr)}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                      style={{ padding: 4 }}
-                    >
-                    </TouchableOpacity>
-                  )}
-                  {billStatus === 'ongoing' && (
-                    <TouchableOpacity
-                      onPress={() => handleRemoveRecording(lr)}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    >
-                    </TouchableOpacity>
-                  )}
-                </TouchableOpacity>
-                  );
-                })}
-            </View>
-          )}
-          {/* People */}
-          <View style={s.divider} />
-          <View style={s.sectionRow}>
-            <Text style={s.sectionHeader}>people</Text>
-            {billStatus === 'ongoing' && (
-              <TouchableOpacity onPress={() => { setTagInputVal(''); setContactsVisible(5); setAddPersonModal(true); }} style={s.sectionAddBtn}>
-                <Text style={{ fontFamily: AppFont.bold, fontSize: 13, color: '#111111' }}>add</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-          {filledPeople.length === 0 ? (
-            <View style={s.emptyWrap}>
-              <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.muted }}>no people yet — tap add</Text>
-            </View>
-          ) : (
-            <View style={s.chipWrap}>
-              {people.slice(0, peopleVisible).map((p: any) => {
-                const inviteStatus = getInviteStatus(p.person_name);
+        <View style={{ height: 1, backgroundColor: DC.cardDividerColor }} />
+
+        {/* ── Faux header (kept) — frozen ── */}
+        <View style={{ backgroundColor: DC.pageBg }}>
+          {/* Row 2: left arrow + steps + right arrow */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: DC.pagePadding, paddingTop: 16, paddingBottom: 16 }}>
+            <TouchableOpacity
+              onPress={() => { if (wizardStep > 1) setWizardStep((wizardStep - 1) as 1 | 2 | 3); }}
+              disabled={wizardStep === 1}
+              activeOpacity={0.7}
+              style={{ opacity: wizardStep === 1 ? 0.3 : 1 }}
+            >
+              <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 18, color: DC.pageText, lineHeight: 22 }}>{'<'}</Text>
+            </TouchableOpacity>
+            <View style={[s.stepRow, { flex: 1, marginBottom: 0, paddingBottom: 0, justifyContent: 'center' }]}>
+              {(['Items', 'Payments', 'Share'] as const).map((label, idx) => {
+                const step = (idx + 1) as 1 | 2 | 3;
+                const active = wizardStep === step;
+                const done = wizardStep > step;
                 return (
-                <View key={p.id} style={{ position: 'relative' }}>
-                  <View style={s.personChip}>
-                    <Text style={s.personChipText}>{p.person_name}</Text>
-                    {inviteStatus === 'pending'  && null}
-                    {inviteStatus === 'accepted' && null}
-                    {inviteStatus === 'declined' && null}
-                  </View>
-                  {billStatus === 'ongoing' && (
-                    <TouchableOpacity
-                      onPress={() => removePerson(p.id)}
-                      style={{ position: 'absolute', top: -5, right: -5, width: 16, height: 16, borderRadius: 8, backgroundColor: '#ef4444', alignItems: 'center', justifyContent: 'center' }}
-                      hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                    >
+                  <View key={label} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    {idx > 0 && <View style={[s.stepDash, done && s.stepDashDone]} />}
+                    <TouchableOpacity style={{ alignItems: 'center', gap: 4 }} onPress={() => setWizardStep(step)} activeOpacity={0.7}>
+                      <View style={[s.stepCircle, active && s.stepCircleActive]}>
+                        <Text style={[s.stepNum, active && s.stepNumActive]}>{step}</Text>
+                      </View>
+                      <Text style={[s.stepLabel, active && s.stepLabelActive]}>{label}</Text>
                     </TouchableOpacity>
-                  )}
-                </View>
+                  </View>
                 );
               })}
-              {peopleVisible < people.length && (
-                <TouchableOpacity
-                  style={[s.personChip, { backgroundColor: Colors.surface }]}
-                  onPress={() => setPeopleVisible(v => v + 10)}
-                >
-                  <Text style={[s.personChipText, { color: Colors.muted }]}>
-                    +{people.length - peopleVisible} more
-                  </Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => { if (wizardStep < 3) setWizardStep((wizardStep + 1) as 1 | 2 | 3); }}
+              disabled={wizardStep === 3}
+              activeOpacity={0.7}
+              style={{ opacity: wizardStep === 3 ? 0.3 : 1 }}
+            >
+              <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 18, color: DC.pageText, lineHeight: 22 }}>{'>'}</Text>
+            </TouchableOpacity>
+          </View>
+          {/* Divider — end to end */}
+          <View style={{ height: DC.rowDivider.height, backgroundColor: DC.rowDivider.backgroundColor }} />
+        </View>
+
+        {/* ── Step 1: Items ── */}
+        {wizardStep === 1 && (
+          <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+
+            {/* Add Items */}
+            <View style={s.sectionRow}>
+              <Text style={s.sectionHeader}>Items</Text>
+              {billStatus === 'ongoing' && (
+                <TouchableOpacity style={s.addCircleBtn} onPress={openNewItemModal} activeOpacity={0.7}>
+                  <Text style={s.addCircleBtnText}>+</Text>
                 </TouchableOpacity>
               )}
             </View>
-          )}
-          {/* Items */}
-          <View style={s.divider} />
-          <View style={s.sectionRow}>
-            <Text style={s.sectionHeader}>items</Text>
-            {billStatus === 'ongoing' && (
-              <TouchableOpacity
-                onPress={openAddItem}
-                style={[s.sectionAddBtn, filledPeople.length === 0 && { opacity: 0.4 }]}
-                disabled={filledPeople.length === 0}
-              >
-                <Text style={{ fontFamily: AppFont.bold, fontSize: 13, color: '#111111' }}>add</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-          {items.length === 0 ? (
-            <View style={s.emptyWrap}>
-              <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.muted }}>{filledPeople.length === 0 ? 'add people first' : 'no items yet'}</Text>
+            {items.length === 0 ? (
+              <View style={s.dottedCard}>
+                <View style={s.emptyRow}>
+                  <Text style={s.emptyText}>{filledPeople.length === 0 ? 'add people first' : 'no items yet'}</Text>
+                </View>
+              </View>
+            ) : (() => {
+              const recGroups: { recId: string | null; recName: string; recIdx: number; recAmount: number; items: any[] }[] = [];
+              items.forEach((item: any) => {
+                // Group by recording_id if linked, parent_item_id if manual subitem, else own id
+                const key = item.recording_id ?? item.parent_item_id ?? item.id;
+                const existing = recGroups.find(g => g.recId === key);
+                if (existing) { existing.items.push(item); }
+                else {
+                  const lr = linkedRecordings.find((l: any) => l.recording?.id === item.recording_id);
+                  recGroups.push({ recId: key, recName: lr?.recording?.name ?? item.name, recIdx: recGroups.length + 1, recAmount: Number(lr?.amount_contributed ?? 0), items: [item] });
+                }
+              });
+              linkedRecordings.forEach((lr: any) => {
+                if (!recGroups.find(g => g.recId === lr.recording?.id)) {
+                  recGroups.push({ recId: lr.recording?.id ?? null, recName: lr.recording?.name ?? '-', recIdx: recGroups.length + 1, recAmount: Number(lr.amount_contributed ?? 0), items: [] });
+                }
+              });
+              return (
+                <View style={{ gap: 8 }}>
+                  {recGroups.map((group) => {
+                    const hasSubitems = group.items.length > 1;
+                    const singleItem = group.items.length === 1 ? group.items[0] : null;
+                    return (
+                      <TouchableOpacity key={group.recId ?? 'manual'} style={s.dottedCard} onPress={() => { if (group.items.length > 0) openAssign(group.items[0]); }} activeOpacity={0.85}>
+                        {hasSubitems ? (
+                          <>
+                            <View style={s.itemParentRow}>
+                              <Text style={s.itemParentNum}>{group.recIdx}</Text>
+                              <View style={{ flex: 1 }}>
+                                <Text style={[s.subItemName]} numberOfLines={1}>{group.recName}</Text>
+                                {group.recId && linkedRecordings.some((lr: any) => lr.recording?.id === group.recId) && (
+                                  <Text style={{ ...DC.typography.subContent, color: DC.pageTextMuted }}>Record</Text>
+                                )}
+                              </View>
+                              {billStatus === 'ongoing' && (
+                                <TouchableOpacity onPress={() => deleteItem(group.items[0].id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                                  <SvgXml xml={SVG_CLOSE} width={18} height={18} color={DC.pageTextMuted} />
+                                </TouchableOpacity>
+                              )}
+                            </View>
+                            <View style={{ height: DC.rowDivider.height, backgroundColor: DC.rowDivider.backgroundColor, marginHorizontal: -14 }} />
+                            {group.items.slice(1).map((item: any, subIdx: number) => {
+                              const deduct = isDeductType(item.recording_type);
+                              const subitems = group.items.slice(1);
+                              const isFirst = subIdx === 0;
+                              const isLast = subIdx === subitems.length - 1;
+                              const isSingle = subitems.length === 1;
+                              // Bar positioning: single = centered half, first = bottom half, last = top half, middle = full
+                              const barStyle = isSingle
+                                ? { top: '25%' as any, bottom: '25%' as any }
+                                : isFirst
+                                ? { top: '50%' as any, bottom: 0 }
+                                : isLast
+                                ? { top: 0, bottom: '50%' as any }
+                                : { top: 0, bottom: 0 };
+                              return (
+                                <TouchableOpacity key={item.id} style={s.subItemRow} onPress={() => openAssign(item)} activeOpacity={0.8}>
+                                  <View style={[s.subItemBar, barStyle]} />
+                                  <View style={{ flex: 1 }}>
+                                    <Text style={s.subItemName} numberOfLines={1}>{item.name}</Text>
+                                    <Text style={[s.subItemPeople, { fontStyle: 'italic' }]} numberOfLines={1}>{(item.people ?? []).length > 0 ? item.people.join(', ') : 'tap to assign'}</Text>
+                                  </View>
+                                  <Text style={s.subItemAmount}>{deduct ? '- ' : ''}{fmt(Number(item.cost))}</Text>
+                                </TouchableOpacity>
+                              );
+                            })}
+                          </>
+                        ) : singleItem ? (
+                          <TouchableOpacity style={s.itemParentRow} onPress={() => openAssign(singleItem)} activeOpacity={0.8}>
+                            <Text style={s.itemParentNum}>{group.recIdx}</Text>
+                            <View style={{ flex: 1 }}>
+                              <Text style={s.subItemName} numberOfLines={1}>{singleItem.name}</Text>
+                              {singleItem.recording_id && linkedRecordings.some((lr: any) => lr.recording?.id === singleItem.recording_id) && (
+                                <Text style={{ ...DC.typography.subContent, color: DC.pageTextMuted }}>Record</Text>
+                              )}
+                              <Text style={[s.subItemPeople, { fontStyle: 'italic' }]} numberOfLines={1}>{(singleItem.people ?? []).length > 0 ? singleItem.people.join(', ') : 'tap to assign'}</Text>
+                            </View>
+                            <Text style={s.subItemAmount}>{isDeductType(singleItem.recording_type) ? '- ' : ''}{fmt(Number(singleItem.cost))}</Text>
+                            {billStatus === 'ongoing' && (
+                              <TouchableOpacity onPress={() => deleteItem(singleItem.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                                <SvgXml xml={SVG_CLOSE} width={18} height={18} color={DC.pageTextMuted} />
+                              </TouchableOpacity>
+                            )}
+                          </TouchableOpacity>
+                        ) : (
+                          <View style={s.itemParentRow}>
+                            <Text style={s.itemParentNum}>{group.recIdx}</Text>
+                            <Text style={[s.subItemName, { flex: 1 }]} numberOfLines={1}>{group.recName}</Text>
+                            <Text style={s.subItemPeople}>no items yet</Text>
+                          </View>
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              );
+            })()}
+            <View style={{ height: 40 }} />
+          </ScrollView>
+        )}
+
+        {/* ── Step 2: Payments ── */}
+        {wizardStep === 2 && (
+          <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+
+            {/* Per Person Pay */}
+            <View style={s.sectionRow}>
+              <Text style={s.sectionHeader}>Per Person Pay</Text>
             </View>
-          ) : (
-            <View style={s.list}>
-              {items.map((item: any, idx: number) => {
-                const deduct = isDeductType(item.recording_type);
-                const perPerson = item.people?.length > 0 ? Number(item.cost) / item.people.length : 0;
-                return (
-                  <View key={item.id} style={s.itemCard}>
-                    <Text style={s.itemNum}>{idx + 1}</Text>
-                    <TouchableOpacity style={{ flex: 1, gap: 2 }} onPress={() => openAssign(item)} activeOpacity={0.8}>
-                      <Text style={s.itemName} numberOfLines={1}>{item.name}</Text>
-                      <Text style={s.itemCost}>{deduct ? '-' : ''}{fmt(Number(item.cost))}</Text>
-                      {item.people?.length > 0 ? (
-                        <>
-                          <Text style={s.itemSplit}>
-                            {deduct ? '-' : '+'}{perPerson.toLocaleString('en-US', { minimumFractionDigits: 2 })} each
-                          </Text>
-                          <Text style={s.itemSplit} numberOfLines={1}>{item.people.join(', ')}</Text>
-                        </>
-                      ) : (
-                        <Text style={[s.itemSplit, { color: Colors.faint }]}>tap to assign people</Text>
-                      )}
-                    </TouchableOpacity>
-                    {billStatus === 'ongoing' && (
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                        {item.recording_id && (
-                          <TouchableOpacity
-                            style={s.itemEditBtn}
-                            onPress={async () => {
-                              const lr = linkedRecordings.find((l: any) => l.recording?.id === item.recording_id);
-                              if (!lr) return;
-                              setItemRows([{ name: '', cost: '' }]);
-                              setParsedItems([]);
-                              setParsedTotal(null);
-                              setParseReceiptPhotos([]);
-                              setParseError('');
-                              setSelectedRecording(lr);
-                              setItemStep('add-items');
-                              setAddItemModal(true);
-                            }}
-                          >
-                            <Text style={s.itemEditBtnText}>edit</Text>
+            <View style={s.dottedCard}>
+              {filledPeople.length === 0 ? (
+                <View style={s.emptyRow}><Text style={s.emptyText}>add people and items first</Text></View>
+              ) : (() => {
+                const totals = computeTotals();
+                return filledPeople.map((p, idx) => {
+                  const owed = totals[p] ?? 0;
+                  const amtColor = owed < 0 ? '#e53935' : DC.pageText;
+                  return (
+                    <View key={p}>
+                      <View style={s.payPersonRow}>
+                        <View style={s.payAvatar}>
+                          <Text style={s.payAvatarText}>{p.charAt(0).toUpperCase()}</Text>
+                        </View>
+                        <Text style={s.payPersonName}>{p}</Text>
+                        <Text style={[s.payPersonAmount, { color: amtColor }]}>
+                          {owed < 0 ? '- ' : ''}{fmt(Math.abs(owed))}
+                        </Text>
+                      </View>
+                      {idx < filledPeople.length - 1 && <View style={s.divider} />}
+                    </View>
+                  );
+                });
+              })()}
+            </View>
+
+            {/* Payment History */}
+            <View style={s.sectionRow}>
+              <Text style={s.sectionHeader}>Payment History</Text>
+            </View>
+            <View style={s.dottedCard}>
+              {filledPeople.length === 0 ? (
+                <View style={s.emptyRow}><Text style={s.emptyText}>no payment history yet</Text></View>
+              ) : (() => {
+                const totals = computeTotals();
+                return filledPeople.map((p, idx) => {
+                  const owed = Math.abs(totals[p] ?? 0);
+                  const amtColor = (totals[p] ?? 0) < 0 ? '#e53935' : DC.pageText;
+                  const personPayments = activePayments.filter((pay: any) => pay.person_name === p);
+                  const paid = personPayments.reduce((s: number, pay: any) => s + Number(pay.amount), 0);
+                  const fullyPaid = owed > 0 && paid >= owed - 0.01;
+                  return (
+                    <View key={p}>
+                      <View style={s.payPersonRow}>
+                        <View style={s.payAvatar}>
+                          <Text style={s.payAvatarText}>{p.charAt(0).toUpperCase()}</Text>
+                        </View>
+                        <Text style={s.payPersonName}>{p}</Text>
+                        <Text style={[s.payPersonAmount, { color: amtColor }]}>
+                          {(totals[p] ?? 0) < 0 ? '- ' : ''}{fmt(Math.abs(totals[p] ?? 0))}
+                        </Text>
+                        {!fullyPaid && billStatus === 'ongoing' && (
+                          <TouchableOpacity style={s.addPayBtn} onPress={() => openPaymentModal(p)} activeOpacity={0.7}>
+                            <Text style={s.addPayBtnText}>+</Text>
                           </TouchableOpacity>
                         )}
-                        <TouchableOpacity onPress={() => deleteItem(item.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                        </TouchableOpacity>
                       </View>
+                      {personPayments.map((pay: any, pi: number) => (
+                        <View key={pay.id} style={s.paySubRow}>
+                          <Text style={s.paySubLabel}>Payment {pi + 1}</Text>
+                          <Text style={s.paySubAmount}>{fmt(Number(pay.amount))}</Text>
+                        </View>
+                      ))}
+                      {idx < filledPeople.length - 1 && <View style={s.divider} />}
+                    </View>
+                  );
+                });
+              })()}
+            </View>
+
+            {/* Wallet — payment accounts for the share link */}
+            <View style={s.sectionRow}>
+              <Text style={s.sectionHeader}>Wallet</Text>
+              <TouchableOpacity style={s.addCircleBtn} onPress={async () => {
+                const { data: accs } = await supabase.from('accounts').select('id, account_name, bank, account_number, qr_code').eq('user_id', userId).order('account_name');
+                setShareAccounts(accs ?? []);
+                if (shareRow) {
+                  setShareSelectedIds(shareRow.data?.account_ids ?? []);
+                }
+                openShareModal();
+              }} activeOpacity={0.7}>
+                <Text style={s.addCircleBtnText}>+</Text>
+              </TouchableOpacity>
+            </View>
+            {shareAccounts.filter((a: any) => shareSelectedIds.includes(a.id)).length === 0 ? (
+              <View style={s.dottedCard}>
+                <View style={s.emptyRow}><Text style={s.emptyText}>no accounts added — tap + to add</Text></View>
+              </View>
+            ) : (
+              <View style={s.dottedCard}>
+                {shareAccounts.filter((a: any) => shareSelectedIds.includes(a.id)).map((acc: any, idx: number) => (
+                  <View key={acc.id}>
+                    <View style={s.walletRow}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={s.walletBank}>{acc.bank}</Text>
+                        <Text style={s.walletHolder}>{acc.account_name}</Text>
+                        <Text style={s.walletNumber}>{acc.account_number}</Text>
+                      </View>
+                      {acc.qr_code ? (
+                        <Image source={{ uri: acc.qr_code }} style={s.walletQr} resizeMode="contain" />
+                      ) : null}
+                    </View>
+                    {idx < shareAccounts.filter((a: any) => shareSelectedIds.includes(a.id)).length - 1 && <View style={s.divider} />}
+                  </View>
+                ))}
+              </View>
+            )}
+
+            <View style={{ height: 40 }} />
+          </ScrollView>
+        )}
+
+        {/* ── Step 3: Share ── */}
+        {wizardStep === 3 && (
+          <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+            <View style={s.sectionRow}>
+              <Text style={s.sectionHeader}>Share as</Text>
+            </View>
+            <View style={{ flexDirection: 'row', gap: 32, paddingHorizontal: DC.pagePadding, paddingTop: 8 }}>
+              {/* Link */}
+              <TouchableOpacity
+                style={{ alignItems: 'center', gap: 8 }}
+                onPress={async () => {
+                  if (!shareRow) { await generateLink(); }
+                  await copyShareLink();
+                }}
+                activeOpacity={0.8}
+              >
+                <SvgXml xml={SVG_LINK} width={32} height={32} color={DC.pageText} />
+                <Text style={s.shareLabel}>Link</Text>
+              </TouchableOpacity>
+              {/* Image */}
+              <TouchableOpacity style={{ alignItems: 'center', gap: 8 }} onPress={saveAsImage} activeOpacity={0.8}>
+                <SvgXml xml={SVG_IMAGE} width={32} height={32} color={DC.pageText} />
+                <Text style={s.shareLabel}>Image</Text>
+              </TouchableOpacity>
+            </View>
+            {shareCopied && (
+              <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 11, color: DC.accent1, paddingHorizontal: DC.pagePadding, marginTop: 8 }}>link copied!</Text>
+            )}
+            <View style={{ height: 40 }} />
+          </ScrollView>
+        )}
+
+      </SafeAreaView>
+
+      {/* ── Actions bottom sheet (ellipsis) ── */}
+      <BottomSheet visible={actionsModal} onClose={() => setActionsModal(false)} title="actions">
+        <TouchableOpacity style={s.actionSheetRow} onPress={() => { setActionsModal(false); handleToggleStatus(); }} activeOpacity={0.8}>
+          <Text style={s.actionSheetText}>{billStatus === 'closed' ? 'reopen bill' : 'close bill'}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={s.actionSheetRow} onPress={() => { setActionsModal(false); openEditName(); }} activeOpacity={0.8}>
+          <Text style={s.actionSheetText}>rename</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={s.actionSheetRow} onPress={() => { setActionsModal(false); setDeleteSplitModal(true); }} activeOpacity={0.8}>
+          <Text style={[s.actionSheetText, { color: '#e53935' }]}>delete split bill</Text>
+        </TouchableOpacity>
+      </BottomSheet>
+
+      {/* ── New unified Add Item modal ── */}
+      <Modal visible={newItemModal} animationType="fade" transparent statusBarTranslucent onRequestClose={() => setNewItemModal(false)}>
+        <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' }} activeOpacity={1} onPress={() => setNewItemModal(false)}>
+          <TouchableOpacity activeOpacity={1} onPress={() => {}} style={{ flex: 1, backgroundColor: '#ffffff' }}>
+            <SafeAreaView style={{ flex: 1 }}>
+
+              {/* Header */}
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', paddingHorizontal: DC.pagePadding, paddingTop: 28, paddingBottom: 16 }}>
+                <Text style={{ ...DC.typography.pageTitle }}>Add Item</Text>
+                <TouchableOpacity onPress={() => setNewItemModal(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <SvgXml xml={SVG_CLOSE} width={28} height={28} color={DC.pageText} />
+                </TouchableOpacity>
+              </View>
+
+              {/* ── Choice step ── */}
+              {newItemStep === 'choice' && (
+                <View style={{ paddingHorizontal: DC.pagePadding, gap: 12 }}>
+                  <TouchableOpacity
+                    style={{ borderWidth: DC.cardBorderWidth, borderColor: DC.cardBorder, borderRadius: DC.cardRadius, padding: 20 }}
+                    onPress={() => openNewItemForm(null)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 14, color: DC.pageText }}>Add an item</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={{ borderWidth: DC.cardBorderWidth, borderColor: DC.cardBorder, borderRadius: DC.cardRadius, padding: 20 }}
+                    onPress={async () => {
+                      const { data } = await supabase
+                        .from('recordings')
+                        .select('id, name, amount, type, transaction_date, status, is_due')
+                        .eq('user_id', userId)
+                        .in('type', ['expense', 'income'])
+                        .order('transaction_date', { ascending: false })
+                        .limit(200);
+                      setAllRecordings((data ?? []).filter((r: any) => !r.is_due));
+                      setNewItemRecSearch('');
+                      setNewItemRecShowMore(false);
+                      setNewItemStep('pick-recording');
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 14, color: DC.pageText }}>Add an existing record</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {/* ── Pick recording step ── */}
+              {newItemStep === 'pick-recording' && (
+                <SafeAreaView style={{ flex: 1 }}>
+                  <View style={{ ...DC.textbox.wrap, marginHorizontal: DC.pagePadding, marginBottom: 12 }}>
+                    <TextInput
+                      style={{ ...DC.textbox.input }}
+                      placeholder="Search record..."
+                      placeholderTextColor={DC.inputPlaceholder}
+                      value={newItemRecSearch}
+                      onChangeText={v => { setNewItemRecSearch(v); setNewItemRecShowMore(false); }}
+                      autoFocus
+                    />
+                  </View>
+                  <View style={{ height: 1, backgroundColor: DC.cardDividerColor }} />
+                  <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+                    {(() => {
+                      const q = newItemRecSearch.trim().toLowerCase();
+                      const alreadyLinkedIds = new Set(linkedRecordings.map((lr: any) => lr.recording?.id));
+                      const filtered = allRecordings.filter((r: any) =>
+                        !q || r.name.toLowerCase().includes(q) || (r.transaction_date ?? '').includes(q)
+                      );
+                      const visible = filtered.slice(0, newItemRecShowMore ? filtered.length : 10);
+                      if (filtered.length === 0) return (
+                        <View style={{ padding: DC.pagePadding }}>
+                          <Text style={{ ...DC.typography.muted }}>no recordings found</Text>
+                        </View>
+                      );
+                      return (
+                        <>
+                          {visible.map((rec: any) => {
+                            const alreadyAdded = alreadyLinkedIds.has(rec.id);
+                            const typeLabel = rec.type === 'expense' ? 'Expense' : rec.type === 'income' ? 'Income' : rec.type;
+                            const dateStr = rec.transaction_date ? new Date(rec.transaction_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+                            return (
+                              <TouchableOpacity
+                                key={rec.id}
+                                style={[rm.row, alreadyAdded && { opacity: 0.5 }]}
+                                onPress={() => { if (!alreadyAdded) openNewItemForm(rec); }}
+                                disabled={alreadyAdded}
+                                activeOpacity={0.7}
+                              >
+                                <View style={{ flex: 1 }}>
+                                  <Text style={rm.name} numberOfLines={1}>{rec.name}</Text>
+                                  <Text style={rm.sub}>{typeLabel} · {dateStr}</Text>
+                                  {alreadyAdded && <Text style={[rm.sub, { fontStyle: 'italic' }]}>(already linked)</Text>}
+                                </View>
+                                <Text style={rm.amount}>{fmt(Number(rec.amount))}</Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                          {!newItemRecShowMore && filtered.length > 10 && (
+                            <TouchableOpacity style={{ paddingVertical: 16, paddingHorizontal: DC.pagePadding }} onPress={() => setNewItemRecShowMore(true)}>
+                              <Text style={{ ...DC.typography.sectionBody, color: DC.pageTextMuted }}>Show {filtered.length - 10} more...</Text>
+                            </TouchableOpacity>
+                          )}
+                        </>
+                      );
+                    })()}
+                  </ScrollView>
+                </SafeAreaView>
+              )}
+
+              {/* ── Form step ── */}
+              {newItemStep === 'form' && (
+                <SafeAreaView style={{ flex: 1 }}>
+                  {/* Recording context */}
+                  {newItemFromRecording && (
+                    <View style={{ paddingHorizontal: DC.pagePadding, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: DC.cardDividerColor }}>
+                      <Text style={{ ...DC.typography.sectionHeader }}>Record:</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontFamily: 'Poppins-SemiBold', fontSize: 13, color: DC.pageText }} numberOfLines={1}>{newItemFromRecording.name}</Text>
+                          <Text style={{ ...DC.typography.subContent }}>
+                            {newItemFromRecording.type} · {newItemFromRecording.transaction_date ? new Date(newItemFromRecording.transaction_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}
+                          </Text>
+                        </View>
+                        <Text style={{ fontFamily: 'Poppins-Bold', fontSize: 14, color: DC.pageText }}>{fmt(Number(newItemFromRecording.amount))}</Text>
+                      </View>
+                      {/* Budget bar */}
+                      {(() => {
+                        const total = Number(newItemFromRecording.amount);
+                        const used = newItemRecordingBudgetUsed + newItemSubitemsTotal;
+                        const pct = total > 0 ? Math.min(used / total, 1) : 0;
+                        const over = used > total + 0.01;
+                        return (
+                          <View style={{ marginTop: 8 }}>
+                            <View style={{ height: 4, backgroundColor: DC.cardBorder, borderRadius: 2, overflow: 'hidden' }}>
+                              <View style={{ height: 4, borderRadius: 2, width: `${pct * 100}%` as any, backgroundColor: over ? Colors.expense : ACCENT_DARK }} />
+                            </View>
+                            <Text style={{ ...DC.typography.subContent, color: over ? Colors.expense : DC.pageTextMuted, marginTop: 2 }}>
+                              {fmt(used)} used · {over ? `${fmt(used - total)} over` : `${fmt(total - used)} left`}
+                            </Text>
+                          </View>
+                        );
+                      })()}
+                    </View>
+                  )}
+
+                  {/* Name + Amount row */}
+                  <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: DC.pagePadding, paddingTop: 16, paddingBottom: 12 }}>
+                    <View style={{ flex: 1, gap: 4 }}>
+                      <Text style={{ ...DC.typography.sectionHeader }}>Name</Text>
+                      <View style={DC.textbox.wrap}>
+                        <TextInput
+                          style={DC.textbox.input}
+                          placeholder="Type a name"
+                          placeholderTextColor={DC.inputPlaceholder}
+                          value={newItemName}
+                          onChangeText={setNewItemName}
+                          autoFocus={!newItemFromRecording}
+                        />
+                      </View>
+                    </View>
+                    <View style={{ width: 110, gap: 4 }}>
+                      <Text style={{ ...DC.typography.sectionHeader }}>Amount {newItemTab === 'subitems' && <Text style={{ fontFamily: 'Poppins-Regular', color: DC.pageTextMuted }}>(optional)</Text>}</Text>
+                      <View style={[DC.textbox.wrap, newItemTab === 'subitems' && { opacity: 0.4 }]}>
+                        <TextInput
+                          style={DC.textbox.input}
+                          placeholder="0.00"
+                          placeholderTextColor={DC.inputPlaceholder}
+                          value={newItemAmount}
+                          onChangeText={setNewItemAmount}
+                          keyboardType="decimal-pad"
+                          editable={newItemTab !== 'subitems'}
+                        />
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* Tab row */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: DC.pagePadding, paddingBottom: 12 }}>
+                    <TouchableOpacity style={newItemTab === 'assign' ? DC.button.active : DC.button.base} onPress={() => setNewItemTab('assign')} activeOpacity={0.8}>
+                      <Text style={newItemTab === 'assign' ? DC.button.textActive : DC.button.textInactive}>Assign People</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={newItemTab === 'subitems' ? DC.button.active : DC.button.base} onPress={() => setNewItemTab('subitems')} activeOpacity={0.8}>
+                      <Text style={newItemTab === 'subitems' ? DC.button.textActive : DC.button.textInactive}>Add Subitems</Text>
+                    </TouchableOpacity>
+                    {newItemTab === 'subitems' && (
+                      <TouchableOpacity
+                        style={DC.circleBtn.addSm}
+                        onPress={() => setNewItemSubitems(prev => [...prev, { name: '', amount: '', people: [] }])}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={s.addCircleBtnText}>+</Text>
+                      </TouchableOpacity>
                     )}
                   </View>
-                );
-              })}
-              <View style={s.itemsTotalRow}>
-                <Text style={s.itemsTotalLabel}>total allocated</Text>
-                <View style={s.itemsTotalDots} />
-                <Text style={s.itemsTotalValue}>{fmt(totalItemsCost)}</Text>
-              </View>
-            </View>
-          )}
-          {/* Receipt */}
-          <View style={s.divider} />
-          <View style={s.sectionRow}>
-            <Text style={s.sectionHeader}>receipt</Text>
-            {billStatus === 'ongoing' && (
-              <TouchableOpacity onPress={() => setAddReceiptModal(true)} style={s.sectionAddBtn}>
-                <Text style={{ fontFamily: AppFont.bold, fontSize: 13, color: '#111111' }}>add</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-          {/* Direct receipts uploaded to this split bill */}
-          {linkedReceipt && receiptPhotos.length > 0 ? (
-            <>
-              <Text style={{ fontFamily: AppFont.semiBold, fontSize: 10, color: ACCENT_DARK, letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 6 }}>uploaded here</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ paddingBottom: 12 }} contentContainerStyle={{ gap: 8 }}>
-                {receiptPhotos.map((p, idx) => (
-                  <TouchableOpacity key={p.id} onPress={() => { setPhotoModalPool('direct'); setPhotoModalIndex(idx); setPhotoModal(true); }} activeOpacity={0.85}>
-                    <Image source={{ uri: p.url }} style={{ width: 90, height: 90, borderRadius: Radius.md, backgroundColor: Colors.surface }} resizeMode="cover" />
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </>
-          ) : (
-            receiptPhotos.length === 0 && recordingReceiptPhotos.length === 0 && (
-              <View style={s.emptyWrap}>
-                <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.muted }}>no receipt photos yet</Text>
-              </View>
-            )
-          )}
-          {/* Receipts from linked recordings */}
-          {recordingReceiptPhotos.length > 0 && (
-            <>
-              <Text style={{ fontFamily: AppFont.semiBold, fontSize: 10, color: ACCENT_DARK, letterSpacing: 0.6, textTransform: 'uppercase', marginTop: linkedReceipt && receiptPhotos.length > 0 ? 8 : 0, marginBottom: 6 }}>from recordings</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ paddingBottom: 12 }} contentContainerStyle={{ gap: 8 }}>
-                {recordingReceiptPhotos.map((p, idx) => (
-                  <View key={p.id}>
-                    <TouchableOpacity onPress={() => { setPhotoModalPool('recording'); setPhotoModalIndex(idx); setPhotoModal(true); }} activeOpacity={0.85}>
-                      <Image source={{ uri: p.url }} style={{ width: 90, height: 90, borderRadius: Radius.md, backgroundColor: Colors.surface }} resizeMode="cover" />
+                  <View style={{ height: 1, backgroundColor: DC.cardDividerColor }} />
+
+                  <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 100 }}>
+
+                    {/* Assign People tab */}
+                    {newItemTab === 'assign' && (
+                      <View style={{ paddingTop: 8 }}>
+                        <View style={[DC.textbox.wrap, { marginHorizontal: DC.pagePadding, marginBottom: 12 }]}>
+                          <TextInput
+                            style={DC.textbox.input}
+                            placeholder="Search a name.."
+                            placeholderTextColor={DC.inputPlaceholder}
+                            value={newItemPeopleSearch}
+                            onChangeText={setNewItemPeopleSearch}
+                          />
+                        </View>
+                        <Text style={{ ...DC.typography.sectionHeader, paddingHorizontal: DC.pagePadding, marginBottom: 8 }}>People</Text>
+                        {allPeopleForAssign
+                          .filter(p => !newItemPeopleSearch.trim() || p.toLowerCase().includes(newItemPeopleSearch.toLowerCase()))
+                          .map((p, idx, arr) => {
+                            const sel = newItemPeople.includes(p);
+                            return (
+                              <TouchableOpacity
+                                key={p}
+                                style={[{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: DC.pagePadding, paddingVertical: DC.rowPaddingV }, idx < arr.length - 1 && { borderBottomWidth: DC.rowDivider.height, borderBottomColor: DC.rowDivider.backgroundColor }]}
+                                onPress={() => setNewItemPeople(prev => sel ? prev.filter(x => x !== p) : [...prev, p])}
+                                activeOpacity={0.7}
+                              >
+                                <View style={{ width: 28, height: 28, alignItems: 'center', justifyContent: 'center' }}>
+                                  {sel ? <SvgXml xml={SVG_CHECK_ONE} width={28} height={28} color="#2ab671" /> : <View style={{ width: 28, height: 28, borderRadius: 14, borderWidth: 1.5, borderColor: DC.controlBorder }} />}
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                  <Text style={{ fontFamily: 'Poppins-Bold', fontSize: 13, color: DC.pageText }}>{p}</Text>
+                                  {sel && <Text style={{ ...DC.typography.subContent, color: DC.pageTextMuted }}>Added</Text>}
+                                </View>
+                              </TouchableOpacity>
+                            );
+                          })}
+                      </View>
+                    )}
+
+                    {/* Add Subitems tab */}
+                    {newItemTab === 'subitems' && (
+                      <View style={{ paddingTop: 8 }}>
+                        {newItemSubitems.length === 0 ? (
+                          <View style={{ paddingHorizontal: DC.pagePadding, paddingTop: 16 }}>
+                            <Text style={{ ...DC.typography.muted }}>no subitems yet — tap + to add</Text>
+                          </View>
+                        ) : (
+                          newItemSubitems.map((sub, idx) => (
+                            <View key={idx} style={{ paddingHorizontal: DC.pagePadding, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: DC.controlBorder, gap: 8 }}>
+                              {/* Subitem name + amount + delete */}
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                <Text style={{ fontFamily: 'Poppins-Bold', fontSize: 13, color: DC.pageText, minWidth: 16 }}>{idx + 1}</Text>
+                                <View style={[DC.textbox.wrap, { flex: 1 }]}>
+                                  <TextInput
+                                    style={DC.textbox.input}
+                                    placeholder="Subitem name"
+                                    placeholderTextColor={DC.inputPlaceholder}
+                                    value={sub.name}
+                                    onChangeText={v => setNewItemSubitems(prev => prev.map((s, i) => i === idx ? { ...s, name: v } : s))}
+                                  />
+                                </View>
+                                <View style={[DC.textbox.wrap, { width: 90 }]}>
+                                  <TextInput
+                                    style={DC.textbox.input}
+                                    placeholder="0.00"
+                                    placeholderTextColor={DC.inputPlaceholder}
+                                    value={sub.amount}
+                                    onChangeText={v => setNewItemSubitems(prev => prev.map((s, i) => i === idx ? { ...s, amount: v } : s))}
+                                    keyboardType="decimal-pad"
+                                  />
+                                </View>
+                                <TouchableOpacity onPress={() => setNewItemSubitems(prev => prev.filter((_, i) => i !== idx))} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                                  <SvgXml xml={SVG_CLOSE} width={18} height={18} color={DC.pageTextMuted} />
+                                </TouchableOpacity>
+                              </View>
+                              {/* People chips */}
+                              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginLeft: 24 }}>
+                                {allPeopleForAssign.map(p => {
+                                  const sel = sub.people.includes(p);
+                                  return (
+                                    <TouchableOpacity
+                                      key={p}
+                                      style={[DC.button.base, sel && DC.button.active, { height: 32, paddingHorizontal: 12 }]}
+                                      onPress={() => setNewItemSubitems(prev => prev.map((s, i) => i === idx ? { ...s, people: sel ? s.people.filter(x => x !== p) : [...s.people, p] } : s))}
+                                      activeOpacity={0.7}
+                                    >
+                                      <Text style={[sel ? DC.button.textActive : DC.button.textInactive, { fontSize: 11 }]}>{p}</Text>
+                                    </TouchableOpacity>
+                                  );
+                                })}
+                              </View>
+                            </View>
+                          ))
+                        )}
+                      </View>
+                    )}
+                  </ScrollView>
+
+                  {/* Submit button — fixed at bottom */}
+                  <View style={{ paddingHorizontal: DC.pagePadding, paddingBottom: 24, paddingTop: 12, borderTopWidth: 1, borderTopColor: DC.cardDividerColor }}>
+                    {newItemFromRecording && newItemRecordingOver && (
+                      <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 11, color: Colors.expense, marginBottom: 8, textAlign: 'center' }}>total exceeds recording amount</Text>
+                    )}
+                    <TouchableOpacity
+                      style={[{
+                        backgroundColor: '#8c52ff',
+                        borderRadius: 999,
+                        paddingVertical: 14,
+                        alignItems: 'center',
+                        opacity: newItemSaving || !newItemName.trim() || (newItemTab === 'assign' && !newItemAmount) || (newItemTab === 'subitems' && newItemSubitems.length === 0) || newItemRecordingOver ? 0.4 : 1,
+                      }]}
+                      onPress={saveNewItem}
+                      disabled={newItemSaving || !newItemName.trim() || (newItemTab === 'assign' && !newItemAmount) || (newItemTab === 'subitems' && newItemSubitems.length === 0) || newItemRecordingOver}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={{ fontFamily: 'Poppins-SemiBold', fontSize: 14, color: '#ffffff' }}>{newItemSaving ? 'saving...' : 'Submit'}</Text>
                     </TouchableOpacity>
-                    <Text style={{ fontFamily: AppFont.regular, fontSize: 9, color: Colors.muted, maxWidth: 90, marginTop: 3 }} numberOfLines={1}>{p.recordingName}</Text>
                   </View>
-                ))}
-              </ScrollView>
-            </>
-          )}
-          {/* Charged expenses */}
-          {chargedExpenses.length > 0 && (
-            <>
-              <View style={s.divider} />
-              <View style={s.sectionRow}>
-                <Text style={s.sectionHeader}>charged to spaces</Text>
-              </View>
-              <View style={s.list}>
-                {chargedExpenses.map((exp: any) => (
-                  <TouchableOpacity
-                    key={exp.id}
-                    style={s.recRow}
-                    activeOpacity={0.85}
-                    onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: exp.id } } as any)}
-                  >
-                    <View style={[s.recIconWrap, { backgroundColor: PEACH + '33' }]}>
+                </SafeAreaView>
+              )}
+
+            </SafeAreaView>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+      {/* Edit Item Modal */}
+      <Modal visible={editItemModal} animationType="fade" transparent statusBarTranslucent onRequestClose={() => setEditItemModal(false)}>
+        <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' }} activeOpacity={1} onPress={() => setEditItemModal(false)}>
+          <TouchableOpacity activeOpacity={1} onPress={() => {}} style={{ flex: 1, backgroundColor: '#ffffff' }}>
+            <SafeAreaView style={{ flex: 1 }}>
+              {/* Frozen header */}
+              <View>
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', paddingHorizontal: DC.pagePadding, paddingTop: 28, paddingBottom: 4 }}>
+                  <View style={{ flex: 1, paddingRight: 12 }}>
+                    <Text style={{ ...DC.typography.pageTitle, marginBottom: 4 }}>Editing Item</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <Text style={{ ...DC.typography.sectionBody, fontFamily: 'Poppins-SemiBold', flex: 1 }} numberOfLines={1}>{editItemTarget?.recName ?? ''}</Text>
+                      {editItemTarget?.recAmount > 0 && (
+                        <Text style={{ ...DC.typography.pageTitle, fontSize: 14 }}>{fmt(editItemTarget.recAmount)}</Text>
+                      )}
                     </View>
-                    <View style={s.recMid}>
-                      <Text style={s.recName} numberOfLines={1}>{exp.name}</Text>
-                      <Text style={s.recDate}>
-                        {exp.space?.name ?? '—'}{exp.account?.account_name ? ` · ${exp.account.account_name}` : ''}
-                      </Text>
-                    </View>
-                    <Text style={[s.recAmount, { color: PEACH }]}>{fmt(Number(exp.amount))}</Text>
+                    <Text style={{ ...DC.typography.subContent, color: DC.pageTextMuted }}>
+                      {editItemTarget?.isExisting ? 'Existing Record' : 'Manually added'}
+                    </Text>
+                  </View>
+                  <TouchableOpacity onPress={() => setEditItemModal(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <SvgXml xml={SVG_CLOSE} width={28} height={28} color={DC.pageText} />
                   </TouchableOpacity>
-                ))}
+                </View>
+                {/* Tab row */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: DC.pagePadding, paddingVertical: 12 }}>
+                  <TouchableOpacity style={editItemTab === 'assign' ? DC.button.active : DC.button.base} onPress={() => handleEditItemTabChange('assign')} activeOpacity={0.8}>
+                    <Text style={editItemTab === 'assign' ? DC.button.textActive : DC.button.textInactive}>Assign People</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={editItemTab === 'subitems' ? DC.button.active : DC.button.base} onPress={() => handleEditItemTabChange('subitems')} activeOpacity={0.8}>
+                    <Text style={editItemTab === 'subitems' ? DC.button.textActive : DC.button.textInactive}>Add Subitems</Text>
+                  </TouchableOpacity>
+                  {editItemTab === 'subitems' && (
+                    <TouchableOpacity style={DC.circleBtn.addSm} onPress={openAddSubitem} activeOpacity={0.7}>
+                      <Text style={s.addCircleBtnText}>+</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+                <View style={{ height: 1, backgroundColor: DC.cardDividerColor }} />
               </View>
-            </>
-          )}
-          {/* Payment history */}
-          <View style={s.divider} />
-          <View style={s.sectionRow}>
-            <Text style={s.sectionHeader}>payment history</Text>
-          </View>
-          {filledPeople.length === 0 || items.length === 0 ? (
-            <View style={s.emptyWrap}>
-              <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.muted }}>add people and items to see payment history</Text>
-            </View>
-          ) : (() => {
-            const totals = computeTotals();
-            return (
-            <View style={s.list}>
-                {filledPeople.map(p => {
-                  const owed = totals[p] ?? 0;
-                  const isNegative = owed < 0; // you owe them
-                  const absOwed = Math.abs(owed);
-                  const personPayments = payments.filter((pay: any) => pay.person_name === p);
-                  const activePersonPayments = personPayments.filter((pay: any) => pay.status !== 'cancelled');
-                  const paid = activePersonPayments.reduce((s: number, pay: any) => s + Number(pay.amount), 0);
-                  const remaining = Math.max(0, absOwed - paid);
-                  const fullyPaid = absOwed > 0 && paid >= absOwed - 0.01;
-                  const pct = absOwed > 0 ? Math.min(paid / absOwed, 1) : 0;
-                  const lastPayment = activePersonPayments.length > 0
-                    ? activePersonPayments.reduce((latest: any, pay: any) =>
-                        new Date(pay.created_at) > new Date(latest.created_at) ? pay : latest
-                      )
-                    : null;
-                  // Build relationship summary for this person
-                  const personRecRows = getPersonRecordingRows(p);
-                  const personManualOwed = getPersonManualOwed(p);
-                  return (
-                    <View key={p} style={[s.itemCard, { flexDirection: 'column', alignItems: 'stretch', gap: 0, paddingHorizontal: 0, paddingVertical: 0, overflow: 'hidden' }]}>
-                      {/* Person row â€” no number */}
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, paddingHorizontal: 14 }}>
-                        <View style={{ flex: 1, gap: 2 }}>
-                          <Text style={[s.itemName, { fontSize: 18 }]}>{p}</Text>
-                          <Text style={s.itemSplit}>this bill: {fmt(absOwed)}</Text>
-                          {personBalances[p] !== undefined && (
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                              <Text style={{ fontFamily: AppFont.regular, fontSize: 10, color: Colors.muted }}>
-                                {personBalances[p] < 0 ? 'you owe' : 'owed'} all time:
-                              </Text>
-                              <Text style={{ fontFamily: AppFont.semiBold, fontSize: 10, color: personBalances[p] < 0 ? Colors.expense : ACCENT_DARK }}>
-                                {fmt(Math.abs(personBalances[p]))}
-                              </Text>
+
+              {/* Assign People tab */}
+              {editItemTab === 'assign' && (
+                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+                  {/* Search */}
+                  <View style={[DC.textbox.wrap, { marginHorizontal: DC.pagePadding, marginBottom: 16 }]}>
+                    <TextInput
+                      style={DC.textbox.input}
+                      placeholder="Search a name.."
+                      placeholderTextColor={DC.inputPlaceholder}
+                      value={editItemPeopleSearch}
+                      onChangeText={setEditItemPeopleSearch}
+                    />
+                  </View>
+                  <Text style={{ ...DC.typography.sectionHeader, paddingHorizontal: DC.pagePadding, marginBottom: 8 }}>People</Text>
+                  {allPeopleForAssign
+                    .filter(p => !editItemPeopleSearch.trim() || p.toLowerCase().includes(editItemPeopleSearch.toLowerCase()))
+                    .map((p, idx, arr) => {
+                      const sel = assignPeople.includes(p);
+                      return (
+                        <TouchableOpacity
+                          key={p}
+                          style={[
+                            { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: DC.pagePadding, paddingVertical: DC.rowPaddingV },
+                            idx < arr.length - 1 && { borderBottomWidth: DC.rowDivider.height, borderBottomColor: DC.rowDivider.backgroundColor },
+                          ]}
+                          onPress={async () => {
+                            const next = sel ? assignPeople.filter(x => x !== p) : [...assignPeople, p];
+                            setAssignPeople(next);
+                            await supabase.from('split_items').update({ people: next.length ? next : null }).eq('id', assignItem.id);
+                            refetchItems();
+                          }}
+                          activeOpacity={0.7}
+                        >
+                          {/* Circle toggle */}
+                          <View style={{ width: 28, height: 28, alignItems: 'center', justifyContent: 'center' }}>
+                            {sel ? (
+                              <SvgXml xml={SVG_CHECK_ONE} width={28} height={28} color="#2ab671" />
+                            ) : (
+                              <View style={{ width: 28, height: 28, borderRadius: 14, borderWidth: 1.5, borderColor: DC.controlBorder }} />
+                            )}
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ fontFamily: 'Poppins-Bold', fontSize: 13, color: DC.pageText }}>{p}</Text>
+                            {sel && <Text style={{ ...DC.typography.subContent, color: DC.pageTextMuted }}>Added</Text>}
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })}
+                </ScrollView>
+              )}
+
+              {/* Add Subitems tab */}
+              {editItemTab === 'subitems' && (
+                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+                  {(editItemTarget?.groupItems ?? []).filter((i: any) => i.id !== editItemTarget?.item?.id).length === 0 ? (
+                    <View style={{ paddingHorizontal: DC.pagePadding, paddingTop: 24 }}>
+                      <Text style={{ ...DC.typography.muted }}>no subitems yet — tap + to add</Text>
+                    </View>
+                  ) : (
+                    (editItemTarget?.groupItems ?? []).filter((i: any) => i.id !== editItemTarget?.item?.id).map((item: any, idx: number) => (
+                      <TouchableOpacity
+                        key={item.id}
+                        style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingVertical: 12, paddingHorizontal: DC.pagePadding, borderBottomWidth: 1, borderBottomColor: DC.controlBorder }}
+                        onPress={() => openAddSubitem({ id: item.id, name: item.name, cost: String(item.cost), people: item.people ?? [] })}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={{ fontFamily: 'Poppins-Bold', fontSize: 13, color: DC.pageText, minWidth: 16 }}>{idx + 1}</Text>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ ...DC.typography.sectionBody, fontFamily: 'Poppins-SemiBold' }} numberOfLines={1}>{item.name}</Text>
+                          {(item.people ?? []).length > 0 && (
+                            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
+                              {(item.people ?? []).map((p: string) => (
+                                <View key={p} style={{ backgroundColor: DC.pageActionBg, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3 }}>
+                                  <Text style={{ ...DC.typography.subContent }}>{p}</Text>
+                                </View>
+                              ))}
                             </View>
                           )}
                         </View>
-                        {!fullyPaid && absOwed > 0 && billStatus === 'ongoing' && (
-                          <TouchableOpacity style={s.itemEditBtn} onPress={() => { setItemPayPerson(p); setItemPayModal(true); }}>
-                            <Text style={s.itemEditBtnText}>mark paid</Text>
-                          </TouchableOpacity>
-                        )}
-                        {fullyPaid && (
-                          <View style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: '#F3FAD3' }}>
-                            <Text style={{ fontFamily: AppFont.bold, fontSize: 13, color: '#111111' }}>settled</Text>
-                          </View>
-                        )}
-                      </View>
-                      {/* Payment rows with numbering */}
-                      {personPayments.length > 0 && (
-                        <>
-                          <View style={{ height: 2, backgroundColor: Colors.border, marginHorizontal: 0 }} />
-                          <View style={{ paddingHorizontal: 14, paddingTop: 4, paddingBottom: 8 }}>
-                            {personPayments.slice().sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-                              .slice(0, showMorePayments[p] ? undefined : 3)
-                              .map((pay: any, payIdx: number) => (
-                              <View key={pay.id} style={[
-                                { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, borderBottomWidth: payIdx < (showMorePayments[p] ? personPayments.length : Math.min(3, personPayments.length)) - 1 ? 1 : 0, borderBottomColor: Colors.border },
-                                pay.status === 'cancelled' && { opacity: 0.45 },
-                              ]}>
-                                <Text style={s.itemNum}>{payIdx + 1}</Text>
-                                <View style={{ flex: 1, gap: 1 }}>
-                                  {pay.charged_recording_id ? (
-                                    <TouchableOpacity onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: pay.charged_recording_id } } as any)}>
-                                      <Text style={[s.itemName, pay.status === 'cancelled' && { textDecorationLine: 'line-through', color: Colors.muted }]}>{fmt(Number(pay.amount))}</Text>
-                                    </TouchableOpacity>
-                                  ) : (
-                                    <Text style={[s.itemName, pay.status === 'cancelled' && { textDecorationLine: 'line-through', color: Colors.muted }]}>{fmt(Number(pay.amount))}</Text>
-                                  )}
-                                  <Text style={[s.itemSplit, { fontStyle: 'italic' }]}>
-                                    {new Date(pay.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                                    {pay.status === 'cancelled' && pay.cancelled_reason ? ` Â· ${pay.cancelled_reason}` : pay.status === 'cancelled' ? ' Â· cancelled' : ''}
-                                  </Text>
-                                </View>
-                                {pay.status !== 'cancelled' && billStatus === 'ongoing' && (
-                                  <TouchableOpacity onPress={() => openCancelPayment(pay)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                                  </TouchableOpacity>
-                                )}
-                              </View>
-                            ))}
-                            {personPayments.length > 3 && (
-                              <TouchableOpacity onPress={() => setShowMorePayments(prev => ({ ...prev, [p]: !prev[p] }))} style={{ paddingTop: 8 }}>
-                                <Text style={{ fontFamily: AppFont.semiBold, fontSize: 10, color: ACCENT_DARK }}>
-                                  {showMorePayments[p] ? 'show less' : `show ${personPayments.length - 3} more`}
-                                </Text>
-                              </TouchableOpacity>
-                            )}
-                          </View>
-                        </>
-                      )}
-                    </View>
-                  );
-                })}
-              </View>
-            );
-          })()}
-          {/* Payment logs */}
-          {chargedExpenses.length > 0 && (
-            <>
-              <View style={s.divider} />
-              <View style={s.sectionRow}>
-                <Text style={s.sectionHeader}>payment logs</Text>
-              </View>
-              <View style={s.list}>
-                {chargedExpenses.map((exp: any) => (
-                  <TouchableOpacity
-                    key={exp.id}
-                    style={s.recRow}
-                    activeOpacity={0.85}
-                    onPress={() => router.push({ pathname: '/(app)/recording-detail', params: { recordingId: exp.id } } as any)}
-                  >
-                    <View style={[s.recIconWrap, { backgroundColor: ACCENT + '44' }]}>
-                    </View>
-                    <View style={s.recMid}>
-                      <Text style={s.recName} numberOfLines={1}>{exp.name}</Text>
-                      <Text style={s.recDate}>{exp.space?.name ?? '—'}{exp.account?.account_name ? ' · ' + exp.account.account_name : ''}</Text>
-                      <Text style={s.recDate}>{exp.transaction_date ? new Date(exp.transaction_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}</Text>
-                    </View>
-                    <Text style={[s.recAmount, { color: ACCENT_DARK }]}>{fmt(Number(exp.amount))}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </>
-          )}
-          {/* moved to actions row above recordings */}
-          <View style={{ height: 20 }} />
-        </ScrollView>
-      </SafeAreaView>
-      {/* Add item modal */}
-      <BottomSheet visible={addItemModal} onClose={() => { setAddItemModal(false); setEditingParsedItem(null); }} title="add items" maxHeight="65%">
-        {/* Edit field overlay — inside BottomSheet so it renders above it */}
-        {(editingParsedItem || editingExistingItem) && (
-          <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24, zIndex: 999 }}>
-            <TouchableOpacity style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} activeOpacity={1} onPress={() => { setEditingParsedItem(null); setEditingExistingItem(null); }} />
-            <View style={{ width: '100%', backgroundColor: Colors.white, borderRadius: 20, padding: 24, gap: 12 }}>
-              <Text style={{ fontFamily: AppFont.semiBold, fontSize: 11, color: Colors.muted, textTransform: 'uppercase', letterSpacing: 0.8 }}>
-                {(editingParsedItem?.field ?? editingExistingItem?.field) === 'name' ? 'item name' : 'item cost'}
-              </Text>
-              <TextInput
-                style={[s.itemFormInput, { fontSize: 16 }]}
-                value={editingParsedItem?.value ?? editingExistingItem?.value ?? ''}
-                onChangeText={v => {
-                  if (editingParsedItem) setEditingParsedItem(prev => prev ? { ...prev, value: v } : null);
-                  else setEditingExistingItem(prev => prev ? { ...prev, value: v } : null);
-                }}
-                keyboardType={(editingParsedItem?.field ?? editingExistingItem?.field) === 'cost' ? 'decimal-pad' : 'default'}
-                autoFocus
-                selectTextOnFocus
-              />
-              <TouchableOpacity
-                style={[s.doneBtn, { marginTop: 0 }]}
-                onPress={async () => {
-                  if (editingParsedItem) {
-                    const { idx, field, value } = editingParsedItem;
-                    if (itemStep === 'parse-review') {
-                      setParsedItems(prev => prev.map((r, i) => i === idx ? { ...r, [field]: value } : r));
-                    } else {
-                      setItemRows(prev => prev.map((r, i) => i === idx ? { ...r, [field]: value } : r));
-                    }
-                    setEditingParsedItem(null);
-                  } else if (editingExistingItem) {
-                    const { item, field, value } = editingExistingItem;
-                    const update = field === 'cost'
-                      ? { cost: parseFloat(value) || 0 }
-                      : { name: value.trim() };
-                    if (field === 'cost') { const recTotal = Number(selectedRecording?.amount_contributed ?? 0); if (recTotal > 0) { const otherCost = items.filter((i: any) => i.recording_id === selectedRecording?.recording?.id && i.id !== item.id).reduce((s: number, i: any) => s + Number(i.cost), 0); const newRowsCost = itemRows.reduce((s, r) => s + (parseFloat(r.cost || '0') || 0), 0); if (otherCost + (parseFloat(value) || 0) + newRowsCost > recTotal + 0.01) { setParseOverBudgetModal(true); return; } } } await supabase.from('split_items').update(update).eq('id', item.id); refetchItems(); setEditingExistingItem(null);
-                  }
-                }}
-              >
-                <Text style={s.doneBtnText}>done</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
-        {itemStep === 'pick-type' ? (
-          <View style={{ gap: 12 }}>
-            <Text style={{ fontFamily: AppFont.regular, fontSize: 12, color: Colors.muted, marginBottom: 4 }}>how do you want to add items?</Text>
-            <TouchableOpacity
-              style={[s.recPickRow, { borderBottomWidth: 0, backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: 16 }]}
-              onPress={() => setItemStep(linkedRecordings.length > 0 ? 'pick-recording' : 'manual')}
-            >
-              <View style={[s.recIconWrap, { backgroundColor: ACCENT + '22' }]}>
-              </View>
-              <View style={s.recMid}>
-                <Text style={s.recName}>from a recording</Text>
-                <Text style={s.recDate}>link to an existing recording</Text>
-              </View>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[s.recPickRow, { borderBottomWidth: 0, backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: 16 }]}
-              onPress={() => { setItemRows([{ name: '', cost: '' }]); setItemStep('manual'); }}
-            >
-              <View style={[s.recIconWrap, { backgroundColor: '#FFAB9122' }]}>
-              </View>
-              <View style={s.recMid}>
-                <Text style={s.recName}>manual item</Text>
-                <Text style={s.recDate}>receivable or loan · no recording created</Text>
-              </View>
-            </TouchableOpacity>
-          </View>
-        ) : itemStep === 'manual' ? (
-          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-            {/* Type toggle */}
-            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
-              {(['receivable', 'payable'] as const).map(t => (
-                <TouchableOpacity
-                  key={t}
-                  style={[s.modeBtn, manualItemType === t && s.modeBtnActive]}
-                  onPress={() => setManualItemType(t)}
-                >
-                  <Text style={[s.modeBtnText, manualItemType === t && s.modeBtnTextActive]}>
-                    {t === 'receivable' ? 'receivable (+)' : 'loan (-)'}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            {itemRows.map((row, i) => (
-              <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border }}>
-                <Text style={{ fontFamily: AppFont.semiBold, fontSize: 10, color: ACCENT_DARK, backgroundColor: ACCENT + '44', width: 20, height: 20, borderRadius: 10, textAlign: 'center', lineHeight: 20 }}>{i + 1}</Text>
-                <TouchableOpacity style={{ flex: 1 }} onPress={() => setEditingParsedItem({ idx: i, field: 'name', value: row.name })}>
-                  <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: row.name ? Colors.text : Colors.faint }} numberOfLines={1}>{row.name || 'add name'}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => setEditingParsedItem({ idx: i, field: 'cost', value: row.cost })}>
-                  <Text style={{ fontFamily: AppFont.semiBold, fontSize: 13, color: row.cost ? Colors.text : Colors.faint }}>{row.cost || '0.00'}</Text>
-                </TouchableOpacity>
-                {itemRows.length > 1 && (
-                  <TouchableOpacity onPress={() => setItemRows(prev => prev.filter((_, idx) => idx !== i))} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                  </TouchableOpacity>
-                )}
-              </View>
-            ))}
-            <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 8 }} onPress={() => setItemRows(prev => [...prev, { name: '', cost: '' }])}>
-              <Text style={{ fontFamily: AppFont.regular, fontSize: 12, color: ACCENT_DARK }}>add another</Text>
-            </TouchableOpacity>
-            <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-              <TouchableOpacity style={[s.doneBtn, { flex: 1, backgroundColor: Colors.surface, marginTop: 0 }]} onPress={() => setItemStep('pick-type')}>
-                <Text style={[s.doneBtnText, { color: Colors.muted }]}>back</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[s.doneBtn, { flex: 2, marginTop: 0, opacity: savingItem || !itemRows.some(r => r.name.trim() && r.cost) ? 0.4 : 1 }]}
-                onPress={saveManualItems}
-                disabled={savingItem || !itemRows.some(r => r.name.trim() && r.cost)}
-              >
-                <Text style={s.doneBtnText}>save items</Text>
-              </TouchableOpacity>
-            </View>
-          </ScrollView>
-        ) : itemStep === 'pick-recording' ? (
-          <ScrollView showsVerticalScrollIndicator={false}>
-            {linkedRecordings.map((lr: any) => {
-              const recType = lr.recording?.type ?? '';
-              const deduct = isDeductType(recType);
-              return (
-                <TouchableOpacity key={lr.id} style={s.recPickRow} onPress={() => handlePickRecording(lr)}>
-                  <View style={[s.recIconWrap, { backgroundColor: ACCENT + '44' }]}>
-                  </View>
-                  <View style={s.recMid}>
-                    <Text style={s.recName} numberOfLines={1}>{lr.recording?.name ?? '—'}</Text>
-                    <Text style={s.recDate}>{recType} · {fmt(Number(lr.amount_contributed))}</Text>
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        ) : itemStep === 'add-items' ? (
-          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-            <Text style={[s.recDate, { marginBottom: 8 }]}>
-              {selectedRecording?.recording?.name} · {selectedRecording?.recording?.type} · {fmt(Number(selectedRecording?.amount_contributed))}
-            </Text>
-            {/* Existing items for this recording */}
-            {(() => {
-              const existing = items.filter((i: any) => i.recording_id === selectedRecording?.recording?.id);
-              if (existing.length === 0) return null;
-              return (
-                <View style={{ marginBottom: 12 }}>
-                  <Text style={{ fontFamily: AppFont.semiBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 6 }}>already added</Text>
-                  {existing.map((item: any, i: number) => (
-                    <View key={item.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: Colors.border }}>
-                      <Text style={{ fontFamily: AppFont.semiBold, fontSize: 10, color: ACCENT_DARK, backgroundColor: ACCENT + '44', width: 20, height: 20, borderRadius: 10, textAlign: 'center', lineHeight: 20 }}>{i + 1}</Text>
-                      <TouchableOpacity style={{ flex: 1 }} onPress={() => setEditingExistingItem({ item, field: 'name', value: item.name })}>
-                        <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.text }} numberOfLines={1}>{item.name}</Text>
+                        <Text style={{ ...DC.typography.amount }}>{fmt(Number(item.cost))}</Text>
+                        <TouchableOpacity onPress={() => deleteItem(item.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                          <SvgXml xml={SVG_CLOSE} width={18} height={18} color={DC.pageTextMuted} />
+                        </TouchableOpacity>
                       </TouchableOpacity>
-                      <TouchableOpacity onPress={() => setEditingExistingItem({ item, field: 'cost', value: String(item.cost) })}>
-                        <Text style={{ fontFamily: AppFont.semiBold, fontSize: 13, color: Colors.text }}>{fmt(Number(item.cost))}</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity onPress={() => deleteItem(item.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                      </TouchableOpacity>
-                    </View>
-                  ))}
-                </View>
-              );
-            })()}
-            {/* Budget bar */}
-            {(() => {
-              const recTotal = Number(selectedRecording?.amount_contributed ?? 0);
-              const alreadyUsed = items
-                .filter((i: any) => i.recording_id === selectedRecording?.recording?.id)
-                .reduce((s: number, i: any) => s + Number(i.cost), 0);
-              const newTotal = itemRows.reduce((s, r) => s + parseFloat(r.cost || '0'), 0);
-              const used = alreadyUsed + newTotal;
-              const pct = recTotal > 0 ? Math.min(used / recTotal, 1) : 0;
-              const over = recTotal > 0 && used > recTotal + 0.01;
-              return (
-                <View style={{ marginBottom: 12 }}>
-                  <View style={{ height: 4, backgroundColor: Colors.border, borderRadius: 2, overflow: 'hidden' }}>
-                    <View style={{ height: 4, borderRadius: 2, width: `${pct * 100}%` as any, backgroundColor: over ? Colors.expense : ACCENT }} />
-                  </View>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
-                    <Text style={{ fontFamily: AppFont.regular, fontSize: 10, color: over ? Colors.expense : ACCENT_DARK }}>{fmt(used)} used</Text>
-                    <Text style={{ fontFamily: AppFont.regular, fontSize: 10, color: over ? Colors.expense : Colors.muted }}>
-                      {over ? `${fmt(used - recTotal)} over` : `${fmt(recTotal - used)} left`}
-                    </Text>
-                  </View>
-                </View>
-              );
-            })()}
-            {itemRows.map((row, i) => {
-              const recTotal = Number(selectedRecording?.amount_contributed ?? 0);
-              const alreadyUsed = items
-                .filter((i2: any) => i2.recording_id === selectedRecording?.recording?.id)
-                .reduce((s: number, i2: any) => s + Number(i2.cost), 0);
-              const runningTotal = itemRows.slice(0, i + 1).reduce((s, r) => s + parseFloat(r.cost || '0'), 0);
-              const rowOver = recTotal > 0 && alreadyUsed + runningTotal > recTotal + 0.01;
-              return (
-                <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border }}>
-                  <Text style={{ fontFamily: AppFont.semiBold, fontSize: 10, color: ACCENT_DARK, backgroundColor: ACCENT + '44', width: 20, height: 20, borderRadius: 10, textAlign: 'center', lineHeight: 20 }}>{i + 1}</Text>
-                  <TouchableOpacity style={{ flex: 1 }} onPress={() => setEditingParsedItem({ idx: i, field: 'name', value: row.name })}>
-                    <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: row.name ? Colors.text : Colors.faint }} numberOfLines={1}>{row.name || 'add name'}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => setEditingParsedItem({ idx: i, field: 'cost', value: row.cost })}>
-                    <Text style={{ fontFamily: AppFont.semiBold, fontSize: 13, color: rowOver ? Colors.expense : row.cost ? Colors.text : Colors.faint }}>{row.cost || '0.00'}</Text>
-                  </TouchableOpacity>
-                  {itemRows.length > 1 && (
-                    <TouchableOpacity onPress={() => setItemRows(prev => prev.filter((_, idx) => idx !== i))} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    </TouchableOpacity>
+                    ))
                   )}
-                </View>
-              );
-            })}
-            <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 8 }} onPress={() => setItemRows(prev => [...prev, { name: '', cost: '' }])}>
-              <Text style={{ fontFamily: AppFont.regular, fontSize: 12, color: ACCENT_DARK }}>add another</Text>
-            </TouchableOpacity>
-            {(() => {
-              const recTotal = Number(selectedRecording?.amount_contributed ?? 0);
-              const alreadyUsed = items
-                .filter((i: any) => i.recording_id === selectedRecording?.recording?.id)
-                .reduce((s: number, i: any) => s + Number(i.cost), 0);
-              const newTotal = itemRows.reduce((s, r) => s + parseFloat(r.cost || '0'), 0);
-              const over = recTotal > 0 && alreadyUsed + newTotal > recTotal + 0.01;
-              const hasValid = itemRows.some(r => r.name.trim() && r.cost);
-              return (
-                <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-                  <TouchableOpacity style={[s.doneBtn, { flex: 1, backgroundColor: Colors.surface, marginTop: 0 }]} onPress={() => setItemStep('pick-recording')}>
-                    <Text style={[s.doneBtnText, { color: Colors.muted }]}>back</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[s.doneBtn, { flex: 2, marginTop: 0, opacity: savingItem || !hasValid || over ? 0.4 : 1 }]}
-                    onPress={saveItems}
-                    disabled={savingItem || !hasValid || over}
-                  >
-                    <Text style={s.doneBtnText}>save items</Text>
-                  </TouchableOpacity>
-                </View>
-              );
-            })()}
-          </ScrollView>
-        ) : itemStep === 'parse-choice' ? (
-          <ScrollView showsVerticalScrollIndicator={false}>
-            <Text style={[s.recDate, { marginBottom: 12 }]}>
-              {selectedRecording?.recording?.name} · {fmt(Number(selectedRecording?.amount_contributed))}
-            </Text>
-            {parseError ? (
-              <Text style={{ fontFamily: AppFont.regular, fontSize: 11, color: Colors.expense, marginBottom: 12 }}>{parseError}</Text>
-            ) : null}
-            {parseReceiptPhotos.length > 0 ? (
-              <TouchableOpacity
-                style={[s.recPickRow, { borderBottomWidth: 0, backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: 16, marginBottom: 10 }]}
-                onPress={() => handleParseReceipt(parseReceiptPhotos)}
-              >
-                <View style={[s.recIconWrap, { backgroundColor: ACCENT + '22' }]}>
-                </View>
-                <View style={s.recMid}>
-                  <Text style={s.recName}>parse existing receipt</Text>
-                  <Text style={s.recDate}>{parseReceiptPhotos.length} photo{parseReceiptPhotos.length !== 1 ? 's' : ''} found</Text>
-                </View>
-              </TouchableOpacity>
-            ) : null}
-            <TouchableOpacity
-              style={[s.recPickRow, { borderBottomWidth: 0, backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: 16, marginBottom: 10 }]}
-              onPress={handleUploadReceiptForParse}
-            >
-              <View style={[s.recIconWrap, { backgroundColor: ACCENT + '22' }]}>
-              </View>
-              <View style={s.recMid}>
-                <Text style={s.recName}>upload & parse receipt</Text>
-                <Text style={s.recDate}>upload a photo and scan for items</Text>
-              </View>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[s.recPickRow, { borderBottomWidth: 0, backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: 16 }]}
-              onPress={() => { setItemRows([{ name: '', cost: '' }]); setItemStep('add-items'); }}
-            >
-              <View style={[s.recIconWrap, { backgroundColor: '#FFAB9122' }]}>
-              </View>
-              <View style={s.recMid}>
-                <Text style={s.recName}>add manually</Text>
-                <Text style={s.recDate}>type items yourself</Text>
-              </View>
-            </TouchableOpacity>
-            <TouchableOpacity style={[s.doneBtn, { backgroundColor: Colors.surface, marginTop: 16 }]} onPress={() => setItemStep('pick-recording')}>
-              <Text style={[s.doneBtnText, { color: Colors.muted }]}>back</Text>
-            </TouchableOpacity>
-          </ScrollView>
-        ) : itemStep === 'parsing' ? (
-          <View style={{ alignItems: 'center', paddingVertical: 40, gap: 16 }}>
-            <ActivityIndicator color={ACCENT_DARK} size="large" />
-            <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.muted }}>reading receipt...</Text>
-          </View>
-        ) : itemStep === 'parse-review' ? (
-          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-            {/* Receipt photos */}
-            {parseReceiptPhotos.length > 0 && (
-              <>
-                <Text style={{ fontFamily: AppFont.semiBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8 }}>receipt</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }} style={{ marginBottom: 16 }}>
-                  {parseReceiptPhotos.map((p, idx) => (
-                    <TouchableOpacity key={p.id} onPress={() => setParsePhotoIndex(idx === parsePhotoIndex && parseEnlargeModal ? -1 : idx) || setParseEnlargeModal(true)} activeOpacity={0.85}>
-                      <Image source={{ uri: p.url }} style={{ width: 100, height: 100, borderRadius: Radius.md, backgroundColor: Colors.surface }} resizeMode="cover" />
-                      <View style={{ position: 'absolute', bottom: 4, right: 4, backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 4, padding: 2 }}>
-                      </View>
-                    </TouchableOpacity>
-                  ))}
                 </ScrollView>
-                {/* Inline enlarge — renders inside BottomSheet so it stacks correctly */}
-                {parseEnlargeModal && parseReceiptPhotos[parsePhotoIndex] && (
-                  <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center', alignItems: 'center', zIndex: 999 }}>
-                    <TouchableOpacity
-                      style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-                      activeOpacity={1}
-                      onPress={() => setParseEnlargeModal(false)}
-                    />
-                    <Image
-                      source={{ uri: parseReceiptPhotos[parsePhotoIndex].url }}
-                      style={{ width: '100%', height: '90%', borderRadius: 8 }}
-                      resizeMode="contain"
-                    />
-                    <TouchableOpacity
-                      style={{ position: 'absolute', top: 12, right: 12, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 20, padding: 6, zIndex: 1000 }}
-                      onPress={() => setParseEnlargeModal(false)}
-                      hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                    >
-                    </TouchableOpacity>
-                  </View>
-                )}
-              </>
-            )}
-            {/* Totals checker */}
-            {(() => {
-              const parsedSum = parsedItems.reduce((s, r) => s + (parseFloat(r.cost || '0') || 0), 0);
-              const recTotal = Number(selectedRecording?.amount_contributed ?? 0);
-              const alreadyUsed = items
-                .filter((i: any) => i.recording_id === selectedRecording?.recording?.id)
-                .reduce((s: number, i: any) => s + Number(i.cost), 0);
-              const totalWithExisting = alreadyUsed + parsedSum;
-              const diff = parsedTotal ? Math.abs(parsedSum - parsedTotal) : null;
-              const overRec = recTotal > 0 && totalWithExisting > recTotal + 0.01;
-              return (
-                <View style={{ backgroundColor: Colors.surface, borderRadius: Radius.md, padding: 12, marginBottom: 16, gap: 6 }}>
-                  <Text style={{ fontFamily: AppFont.semiBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 4 }}>totals check</Text>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                    <Text style={{ fontFamily: AppFont.regular, fontSize: 11, color: Colors.muted }}>new items sum</Text>
-                    <Text style={{ fontFamily: AppFont.semiBold, fontSize: 11, color: Colors.text }}>{fmt(parsedSum)}</Text>
-                  </View>
-                  {alreadyUsed > 0 && (
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                      <Text style={{ fontFamily: AppFont.regular, fontSize: 11, color: Colors.muted }}>already allocated</Text>
-                      <Text style={{ fontFamily: AppFont.semiBold, fontSize: 11, color: Colors.muted }}>{fmt(alreadyUsed)}</Text>
-                    </View>
-                  )}
-                  {alreadyUsed > 0 && (
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                      <Text style={{ fontFamily: AppFont.regular, fontSize: 11, color: Colors.muted }}>total after save</Text>
-                      <Text style={{ fontFamily: AppFont.semiBold, fontSize: 11, color: overRec ? Colors.expense : Colors.text }}>{fmt(totalWithExisting)}</Text>
-                    </View>
-                  )}
-                  {parsedTotal ? (
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                      <Text style={{ fontFamily: AppFont.regular, fontSize: 11, color: Colors.muted }}>receipt total</Text>
-                      <Text style={{ fontFamily: AppFont.semiBold, fontSize: 11, color: diff && diff > 0.5 ? Colors.expense : ACCENT_DARK }}>{fmt(parsedTotal)}</Text>
-                    </View>
-                  ) : null}
-                  {recTotal > 0 && (
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                      <Text style={{ fontFamily: AppFont.regular, fontSize: 11, color: Colors.muted }}>recording amount</Text>
-                      <Text style={{ fontFamily: AppFont.semiBold, fontSize: 11, color: overRec ? Colors.expense : Colors.text }}>{fmt(recTotal)}</Text>
-                    </View>
-                  )}
-                  {diff && diff > 0.5 ? (
-                    <Text style={{ fontFamily: AppFont.regular, fontSize: 10, color: Colors.expense, marginTop: 2 }}>⚠ items sum differs from receipt total by {fmt(diff)} — check for missing items</Text>
-                  ) : parsedTotal ? (
-                    <Text style={{ fontFamily: AppFont.regular, fontSize: 10, color: ACCENT_DARK, marginTop: 2 }}>✓ items match receipt total</Text>
-                  ) : null}
-                  {overRec && (
-                    <Text style={{ fontFamily: AppFont.regular, fontSize: 10, color: Colors.expense, marginTop: 2 }}>⚠ total exceeds recording amount</Text>
-                  )}
-                </View>
-              );
-            })()}
-            {/* Editable parsed items — tap to edit */}
-            <Text style={{ fontFamily: AppFont.semiBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8 }}>parsed items</Text>
-            {parsedItems.map((row, i) => (
-              <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border }}>
-                <Text style={{ fontFamily: AppFont.semiBold, fontSize: 10, color: ACCENT_DARK, backgroundColor: ACCENT + '44', width: 20, height: 20, borderRadius: 10, textAlign: 'center', lineHeight: 20 }}>{i + 1}</Text>
-                <TouchableOpacity style={{ flex: 1 }} onPress={() => setEditingParsedItem({ idx: i, field: 'name', value: row.name })}>
-                  <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: row.name ? Colors.text : Colors.faint }} numberOfLines={1}>
-                    {row.name || 'add name'}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => setEditingParsedItem({ idx: i, field: 'cost', value: row.cost })}>
-                  <Text style={{ fontFamily: AppFont.semiBold, fontSize: 13, color: row.cost ? Colors.text : Colors.faint }}>
-                    {row.cost || '0.00'}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => setParsedItems(prev => prev.filter((_, idx) => idx !== i))} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                </TouchableOpacity>
-              </View>
-            ))}
-            <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 8 }} onPress={() => setParsedItems(prev => [...prev, { name: '', cost: '' }])}>
-              <Text style={{ fontFamily: AppFont.regular, fontSize: 12, color: ACCENT_DARK }}>add item</Text>
-            </TouchableOpacity>
-            <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-              <TouchableOpacity style={[s.doneBtn, { flex: 1, backgroundColor: Colors.surface, marginTop: 0 }]} onPress={() => setItemStep('parse-choice')}>
-                <Text style={[s.doneBtnText, { color: Colors.muted }]}>back</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[s.doneBtn, { flex: 2, marginTop: 0, opacity: savingItem || !parsedItems.some(r => r.name.trim() && r.cost) || (() => { const recTotal = Number(selectedRecording?.amount_contributed ?? 0); const alreadyUsed = items.filter((i: any) => i.recording_id === selectedRecording?.recording?.id).reduce((s: number, i: any) => s + Number(i.cost), 0); const newTotal = parsedItems.reduce((s, r) => s + parseFloat(r.cost || '0'), 0); return recTotal > 0 && alreadyUsed + newTotal > recTotal + 0.01; })() ? 0.4 : 1 }]}
-                onPress={saveParsedItems}
-                disabled={savingItem || !parsedItems.some(r => r.name.trim() && r.cost)}
-              >
-                <Text style={s.doneBtnText}>{savingItem ? 'saving...' : 'save items'}</Text>
-              </TouchableOpacity>
-            </View>
-          </ScrollView>
-        ) : null}
-      </BottomSheet>
-      <BottomSheet visible={!!assignItem} onClose={() => setAssignItem(null)} title="assign people">
-        {assignItem && (() => {
-          const deduct = isDeductType(assignItem.recording_type);
-          const cost = Number(assignItem.cost);
-          const perPerson = assignPeople.length > 0 ? cost / assignPeople.length : 0;
-          return (
-            <>
-              <Text style={[s.recDate, { marginBottom: 12 }]}>
-                {assignItem.name} · {deduct ? '-' : '+'}{fmt(cost)}
-              </Text>
-              <View style={[itemStyles.personSelectRow, { marginBottom: 12 }]}>
-                {filledPeople.map((p, pi) => {
-                  const sel = assignPeople.includes(p);
-                  return (
-                    <TouchableOpacity
-                      key={pi}
-                      style={[itemStyles.personSelectChip, sel && itemStyles.personSelectChipActive]}
-                      onPress={() => setAssignPeople(prev => sel ? prev.filter(x => x !== p) : [...prev, p])}
-                    >
-                      <Text style={[itemStyles.personSelectText, sel && itemStyles.personSelectTextActive]}>{p}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-              {assignPeople.length > 0 && (
-                <Text style={{ fontFamily: AppFont.semiBold, fontSize: 11, color: deduct ? ACCENT_DARK : '#FFAB91', marginBottom: 12 }}>
-                  {deduct ? '-' : '+'}{fmt(perPerson)} each
-                </Text>
               )}
-              <TouchableOpacity style={s.doneBtn} onPress={saveAssign}>
-                <Text style={s.doneBtnText}>done</Text>
-              </TouchableOpacity>
-            </>
-          );
-        })()}
-      </BottomSheet>
-      {/* Add person modal */}
-      <BottomSheet visible={addPersonModal} onClose={() => setAddPersonModal(false)} title="add people">
-        <View style={s.tagInputWrap}>
-          {people.map((p: any) => (
-            <View key={p.id} style={s.tagChip}>
-              <Text style={s.tagChipText}>{p.person_name}</Text>
-              <TouchableOpacity onPress={() => removePerson(p.id)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-              </TouchableOpacity>
-            </View>
-          ))}
-          <TextInput
-            style={s.tagInput}
-            placeholder={filledPeople.length === 0 ? 'type a name and press enter...' : ''}
-            placeholderTextColor={Colors.faint}
-            value={tagInputVal}
-            onChangeText={setTagInputVal}
-            returnKeyType="done"
-            onSubmitEditing={handleAddPersonSubmit}
-            blurOnSubmit={false}
-            autoFocus
-          />
-        </View>
-        <ScrollView style={{ maxHeight: 260 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-          {/* Friends section */}
-          {friends.length > 0 && (() => {
-            const filteredFriends = friends.filter(f =>
-              (!tagInputVal.trim() || f.name.toLowerCase().includes(tagInputVal.toLowerCase())) &&
-              !filledPeople.some(p => p.toLowerCase() === f.name.toLowerCase())
-            );
-            if (filteredFriends.length === 0) return null;
-            return (
-              <>
-                <Text style={[s.contactsLabel, { marginBottom: 6 }]}>friends</Text>
-                {filteredFriends.map(f => (
-                  <TouchableOpacity key={f.id} style={s.contactRow} onPress={() => { suppressSubmitRef.current = true; savePerson(f.name); setTagInputVal(''); }}>
-                    <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: ACCENT + '44', justifyContent: 'center', alignItems: 'center' }}>
-                      <Text style={{ fontFamily: AppFont.semiBold, fontSize: 11, color: ACCENT_DARK }}>{f.name.charAt(0).toUpperCase()}</Text>
-                    </View>
-                    <Text style={[s.contactName, { flex: 1 }]}>{f.name}</Text>
-                  </TouchableOpacity>
-                ))}
-                <View style={{ height: 1, backgroundColor: Colors.border, marginVertical: 8 }} />
-              </>
-            );
-          })()}
-          {/* Contacts section */}
-          <Text style={[s.contactsLabel, { marginBottom: 6 }]}>contacts</Text>
-          {contacts.length === 0 && <Text style={{ fontFamily: AppFont.regular, fontSize: 11, color: Colors.faint }}>no contacts saved yet</Text>}
-          {(() => {
-            const filtered = contacts.filter(c =>
-              !tagInputVal.trim() || c.toLowerCase().includes(tagInputVal.toLowerCase())
-            );
-            const visible = filtered.slice(0, contactsVisible);
-            return (
-              <>
-                {visible.map((c, i) => {
-                  const added = filledPeople.some(p => p.toLowerCase() === c.toLowerCase());
-                  return (
-                    <TouchableOpacity
-                      key={i}
-                      style={[s.contactRow, added && { opacity: 0.35 }]}
-                      onPress={() => { if (!added) { suppressSubmitRef.current = true; savePerson(c); setTagInputVal(''); } }}
-                      disabled={added}
-                    >
-                      <Text style={s.contactName}>{c}</Text>
-                      {added ? null : null}
-                    </TouchableOpacity>
-                  );
-                })}
-                {contactsVisible < filtered.length && (
-                  <TouchableOpacity
-                    style={{ paddingVertical: 10, alignItems: 'center' }}
-                    onPress={() => setContactsVisible(prev => prev + 5)}
-                  >
-                    <Text style={{ fontFamily: AppFont.regular, fontSize: 11, color: ACCENT_DARK }}>
-                      show {Math.min(5, filtered.length - contactsVisible)} more
-                    </Text>
-                  </TouchableOpacity>
-                )}
-              </>
-            );
-          })()}
-        </ScrollView>
-        <TouchableOpacity style={s.doneBtn} onPress={() => setAddPersonModal(false)} activeOpacity={0.8}>
-          <Text style={s.doneBtnText}>done</Text>
+            </SafeAreaView>
+          </TouchableOpacity>
         </TouchableOpacity>
-      </BottomSheet>
-      {/* Friend invite prompt */}
-      <BottomSheet visible={!!pendingInvitePerson} onClose={() => setPendingInvitePerson(null)} title="link to friend?">
-        {pendingInvitePerson && (() => {
-          const totals = computeTotals();
-          const amount = Math.abs(totals[pendingInvitePerson.name] ?? 0);
-          return (
-            <>
-              <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.text, marginBottom: 4 }}>
-                {pendingInvitePerson.name} is one of your friends.
-              </Text>
-              <Text style={{ fontFamily: AppFont.regular, fontSize: 11, color: Colors.muted, marginBottom: 16 }}>
-                send them an invite? they'll see this split bill and their share ({amount > 0 ? amount.toLocaleString('en-US', { minimumFractionDigits: 2 }) : 'tbd'}) as a debt on their end.
-              </Text>
-              <TouchableOpacity
-                style={[s.doneBtn, { opacity: sendingInvite ? 0.5 : 1 }]}
-                onPress={() => sendInvite(pendingInvitePerson.name, pendingInvitePerson.friendId, amount)}
-                disabled={sendingInvite}
-              >
-                <Text style={s.doneBtnText}>{sendingInvite ? 'sending...' : 'send invite'}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[s.doneBtn, { backgroundColor: Colors.surface, marginTop: 8 }]}
-                onPress={() => setPendingInvitePerson(null)}
-              >
-                <Text style={[s.doneBtnText, { color: Colors.muted }]}>skip</Text>
-              </TouchableOpacity>
-            </>
-          );
-        })()}
-      </BottomSheet>
-      {/* Add recording modal */}
-      <BottomSheet visible={addRecModal} onClose={() => setAddRecModal(false)} title="link a recording" maxHeight="70%">
-        {/* Tabs */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }} contentContainerStyle={{ gap: 6 }}>
-          {REC_TABS.map(t => (
-            <TouchableOpacity key={t.key} style={[s.modeBtn, recTab === t.key && s.modeBtnActive]} onPress={() => { setRecTab(t.key); setRecSearch(''); setRecShowMore(false); }}>
-              <Text style={[s.modeBtnText, recTab === t.key && s.modeBtnTextActive]}>{t.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-        {/* Date range */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }} contentContainerStyle={{ gap: 6 }}>
-          {REC_RANGES.map(r => (
-            <TouchableOpacity key={String(r.value)} style={[s.modeBtn, { paddingHorizontal: 10, paddingVertical: 5 }, recDays === r.value && s.modeBtnActive]} onPress={() => { setRecDays(r.value); setRecShowMore(false); }}>
-              <Text style={[s.modeBtnText, { fontSize: 11 }, recDays === r.value && s.modeBtnTextActive]}>{r.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-        {/* Search */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: Colors.borderMid, borderRadius: Radius.md, paddingHorizontal: 10, marginBottom: 10, gap: 6 }}>
-          <TextInput
-            style={{ flex: 1, fontFamily: AppFont.regular, fontSize: 13, color: Colors.text, paddingVertical: 8 }}
-            placeholder="search..."
-            placeholderTextColor={Colors.faint}
-            value={recSearch}
-            onChangeText={v => { setRecSearch(v); setRecShowMore(false); }}
-          />
-          {recSearch.length > 0 && (
-            <TouchableOpacity onPress={() => setRecSearch('')}>
-            </TouchableOpacity>
-          )}
-        </View>
-        {/* List */}
-        <ScrollView showsVerticalScrollIndicator={false}>
-          {(() => {
-            const cutoff = recDays ? new Date(Date.now() - recDays * 86400000).toISOString().split('T')[0] : null;
-            const filtered = allRecordings.filter(r =>
-              r.type === recTab &&
-              r.name.toLowerCase().includes(recSearch.toLowerCase()) &&
-              (!cutoff || (r.transaction_date ?? '') >= cutoff)
-            );
-            if (filtered.length === 0)
-              return <Text style={{ fontFamily: AppFont.regular, fontSize: 12, color: Colors.faint }}>no recordings found</Text>;
-            const visible = filtered.slice(0, recShowMore ? filtered.length : 10);
-            return (
-              <>
-                {visible.map((rec: any) => {
-                  const deduct = isDeductType(rec.type);
-                  return (
-                    <TouchableOpacity key={rec.id} style={s.recPickRow} onPress={() => linkRecording(rec)}>
-                      <View style={[s.recIconWrap, { backgroundColor: deduct ? ACCENT + '44' : '#FFAB9122' }]}>
-                      </View>
-                      <View style={s.recMid}>
-                        <Text style={s.recName} numberOfLines={1}>{rec.name}</Text>
-                        <Text style={s.recDate}>{rec.transaction_date ? new Date(rec.transaction_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</Text>
-                      {(rec.type === 'payable' || rec.type === 'receivable') && rec.status && (
-                        <View style={{ backgroundColor: rec.status === 'paid' || rec.status === 'received' ? ACCENT + '44' : rec.status === 'partial' ? '#FFAB9122' : Colors.border, borderRadius: Radius.pill, paddingHorizontal: 6, paddingVertical: 1, marginTop: 3, alignSelf: 'flex-start' }}>
-                          <Text style={{ fontFamily: AppFont.semiBold, fontSize: 9, color: rec.status === 'paid' || rec.status === 'received' ? ACCENT_DARK : rec.status === 'partial' ? '#FFAB91' : Colors.muted }}>{rec.status}</Text>
-                        </View>
-                      )}
-                      </View>
-                      <Text style={[s.recAmount, { color: deduct ? ACCENT_DARK : '#FFAB91' }]}>{fmt(Number(rec.amount))}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-                {!recShowMore && filtered.length > 10 && (
-                  <TouchableOpacity style={{ paddingVertical: 12, alignItems: 'center' }} onPress={() => setRecShowMore(true)}>
-                    <Text style={{ fontFamily: AppFont.regular, fontSize: 12, color: ACCENT_DARK }}>
-                      show {filtered.length - 10} more
-                    </Text>
-                  </TouchableOpacity>
-                )}
-              </>
-            );
-          })()}
-        </ScrollView>
-      </BottomSheet>
+      </Modal>
+      {/* Add Subitem modal — full screen */}
+      <Modal visible={addSubitemModal} animationType="fade" transparent statusBarTranslucent onRequestClose={() => setAddSubitemModal(false)}>
+        <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' }} activeOpacity={1} onPress={() => setAddSubitemModal(false)}>
+          <TouchableOpacity activeOpacity={1} onPress={() => {}} style={{ flex: 1, backgroundColor: '#ffffff' }}>
+            <SafeAreaView style={{ flex: 1 }}>
+              {/* Header */}
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', paddingHorizontal: DC.pagePadding, paddingTop: 28, paddingBottom: 16 }}>
+                <Text style={{ ...DC.typography.pageTitle }}>{editingSubitemId ? 'Edit Subitem' : 'Add Subitem'}</Text>
+                <TouchableOpacity onPress={() => setAddSubitemModal(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <SvgXml xml={SVG_CLOSE} width={28} height={28} color={DC.pageText} />
+                </TouchableOpacity>
+              </View>
+              <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: DC.pagePadding, paddingBottom: 40, gap: 16 }}>
+                {/* Name */}
+                <View style={{ gap: 6 }}>
+                  <Text style={{ ...DC.typography.sectionHeader }}>Name</Text>
+                  <View style={DC.textbox.wrap}>
+                    <TextInput
+                      style={DC.textbox.input}
+                      placeholder="type a name"
+                      placeholderTextColor={DC.inputPlaceholder}
+                      value={subitemName}
+                      onChangeText={setSubitemName}
+                      autoFocus
+                    />
+                  </View>
+                </View>
+                {/* Amount */}
+                <View style={{ gap: 6 }}>
+                  <Text style={{ ...DC.typography.sectionHeader }}>Amount</Text>
+                  <View style={DC.textbox.wrap}>
+                    <TextInput
+                      style={DC.textbox.input}
+                      placeholder="Amount"
+                      placeholderTextColor={DC.inputPlaceholder}
+                      value={subitemCost}
+                      onChangeText={setSubitemCost}
+                      keyboardType="decimal-pad"
+                    />
+                  </View>
+                </View>
+                {/* Assign People */}
+                <View style={{ gap: 6 }}>
+                  <Text style={{ ...DC.typography.sectionHeader }}>Assign People</Text>
+                  <View style={DC.textbox.wrap}>
+                    <TextInput
+                      style={DC.textbox.input}
+                      placeholder="Search a name"
+                      placeholderTextColor={DC.inputPlaceholder}
+                      value={subitemPeopleSearch}
+                      onChangeText={setSubitemPeopleSearch}
+                    />
+                  </View>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
+                    {allPeopleForAssign
+                      .filter(p => !subitemPeopleSearch.trim() || p.toLowerCase().includes(subitemPeopleSearch.toLowerCase()))
+                      .map(p => {
+                        const sel = subitemPeople.includes(p);
+                        return (
+                          <TouchableOpacity
+                            key={p}
+                            style={[DC.button.base, sel && DC.button.active]}
+                            onPress={() => setSubitemPeople(prev => sel ? prev.filter(x => x !== p) : [...prev, p])}
+                            activeOpacity={0.7}
+                          >
+                            <Text style={sel ? DC.button.textActive : DC.button.textInactive}>{p}</Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                  </View>
+                </View>
+                {/* Save */}
+                <TouchableOpacity
+                  style={[s.doneBtn, { opacity: savingSubitem || !subitemName.trim() || !subitemCost ? 0.4 : 1, marginTop: 8 }]}
+                  onPress={saveSubitem}
+                  disabled={savingSubitem || !subitemName.trim() || !subitemCost}
+                >
+                  <Text style={s.doneBtnText}>{savingSubitem ? 'saving...' : 'save subitem'}</Text>
+                </TouchableOpacity>
+              </ScrollView>
+            </SafeAreaView>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
+
       {/* Share modal */}
       <BottomSheet visible={shareModal} onClose={() => setShareModal(false)} title="share split bill" maxHeight="72%">
         {/* Accounts */}
@@ -3518,68 +3308,23 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
           <Text style={s.doneBtnText}>ok</Text>
         </TouchableOpacity>
       </BottomSheet>
-      {/* Accept invite modal */}
-      <BottomSheet visible={acceptModal} onClose={() => setAcceptModal(false)} title="accept split bill invite" maxHeight="60%">
-        {myInvite && (
-          <>
-            <Text style={{ fontFamily: AppFont.regular, fontSize: 12, color: Colors.muted, marginBottom: 16 }}>
-              a debt of {fmt(Number(myInvite.amount))} will be created. pick where to store it.
-            </Text>
-            <Text style={{ fontFamily: AppFont.semiBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8 }}>space</Text>
-            <ScrollView style={{ maxHeight: 160 }} showsVerticalScrollIndicator={false}>
-              {acceptSpaces.map((sp: any) => (
-                <TouchableOpacity
-                  key={sp.id}
-                  style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 10 }}
-                  onPress={() => setAcceptSpaceId(sp.id)}
-                >
-                  <Text style={{ fontFamily: AppFont.medium, fontSize: 13, color: Colors.text }}>{sp.name}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-            <Text style={{ fontFamily: AppFont.semiBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginTop: 16, marginBottom: 8 }}>category <Text style={{ fontFamily: AppFont.regular, textTransform: 'none' }}>(optional)</Text></Text>
-            <ScrollView style={{ maxHeight: 120 }} showsVerticalScrollIndicator={false}>
-              <TouchableOpacity
-                style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 10 }}
-                onPress={() => setAcceptCategoryId('')}
-              >
-                <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.muted }}>none</Text>
-              </TouchableOpacity>
-              {acceptCategories.map((cat: any) => (
-                <TouchableOpacity
-                  key={cat.id}
-                  style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 10 }}
-                  onPress={() => setAcceptCategoryId(cat.id)}
-                >
-                  <Text style={{ fontFamily: AppFont.medium, fontSize: 13, color: Colors.text }}>{cat.name}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-            <TouchableOpacity
-              style={[s.doneBtn, { opacity: acceptSaving || !acceptSpaceId ? 0.5 : 1 }]}
-              onPress={confirmAccept}
-              disabled={acceptSaving || !acceptSpaceId}
-            >
-              <Text style={s.doneBtnText}>{acceptSaving ? 'saving...' : 'confirm & create debt'}</Text>
-            </TouchableOpacity>
-          </>
-        )}
+
+
+      {/* Edit item tab switch warning */}
+      <BottomSheet visible={editItemTabWarnModal} onClose={() => { setEditItemTabWarnModal(false); setEditItemTabPending(null); }} title="switch tab?">
+        <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.text, marginBottom: 16 }}>
+          {editItemTab === 'assign'
+            ? 'switching to subitems will clear the people assigned to this item.'
+            : 'switching to assign people will delete all subitems on this item.'}
+        </Text>
+        <TouchableOpacity style={[s.doneBtn, { backgroundColor: Colors.expense + '22' }]} onPress={confirmEditItemTabChange}>
+          <Text style={[s.doneBtnText, { color: Colors.expense }]}>clear and switch</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[s.doneBtn, { backgroundColor: Colors.surface, marginTop: 8 }]} onPress={() => { setEditItemTabWarnModal(false); setEditItemTabPending(null); }}>
+          <Text style={[s.doneBtnText, { color: Colors.muted }]}>cancel</Text>
+        </TouchableOpacity>
       </BottomSheet>
-      {/* Over-budget overlay — inside Animated.View, shown above BottomSheet via zIndex */}
-      {parseOverBudgetModal && (
-        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32, zIndex: 9999 }}>
-          <TouchableOpacity style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} activeOpacity={1} onPress={() => setParseOverBudgetModal(false)} />
-          <View style={{ width: '100%', backgroundColor: Colors.white, borderRadius: 20, padding: 24, gap: 12 }}>
-            <Text style={{ fontFamily: AppFont.bold, fontSize: 20, color: Colors.text }}>items over budget</Text>
-            <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.muted }}>
-              the sum of items exceeds the recording amount. please reduce item costs before saving.
-            </Text>
-            <TouchableOpacity style={[s.doneBtn, { marginTop: 0 }]} onPress={() => setParseOverBudgetModal(false)}>
-              <Text style={s.doneBtnText}>ok, i'll fix it</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
+
       <PaymentModal
         visible={itemPayModal}
         person={itemPayPerson}
@@ -3591,77 +3336,171 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
   );
 }
 const s = StyleSheet.create({
-  header:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: PAGE, paddingTop: 16, paddingBottom: 16, gap: 10, backgroundColor: Colors.headerBg, borderBottomWidth: 1, borderBottomColor: Colors.borderMid },
-  backBtn:    { width: 36, height: 36, borderRadius: 18, backgroundColor: Brand.color.accent + '22', alignItems: 'center', justifyContent: 'center' },
-  headerBtn:  { width: 36, height: 36, borderRadius: 18, backgroundColor: Brand.color.accent + '22', alignItems: 'center', justifyContent: 'center' },
-  title:      { flex: 1, fontFamily: AppFont.bold, fontSize: 20, color: Brand.color.accent, letterSpacing: -0.3 },
-  totalBadge: { backgroundColor: ACCENT + '44', borderRadius: Radius.pill, paddingHorizontal: 12, paddingVertical: 5 },
-  totalBadgeText: { fontFamily: AppFont.semiBold, fontSize: 12, color: ACCENT_DARK },
-  scroll: { paddingBottom: 80, paddingHorizontal: PAGE },
-  divider: { height: 2, backgroundColor: Colors.border, marginTop: 16, marginBottom: 8, marginHorizontal: -PAGE },
-  emptyWrap: { alignItems: 'center', gap: 8, paddingVertical: 16 },
-  // ── Section blocks
-  sectionBlock: { marginBottom: 4 },
-  sectionRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 24, paddingBottom: 10 },
-  sectionHeader: { fontFamily: AppFont.bold, fontSize: DC.sectionLabelSize, color: DC.sectionLabelColor, letterSpacing: 0.6, textTransform: 'uppercase' as const },
-  sectionAddBtn: { width: 28, height: 28, borderRadius: 14, backgroundColor: DC.btnBg, borderWidth: DC.btnBorderWidth, borderColor: DC.btnBorder, alignItems: 'center', justifyContent: 'center' },
-  sectionAddText:{ fontFamily: AppFont.medium, fontSize: 11, color: ACCENT_DARK },
-  actionBtn:        { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: Radius.pill, backgroundColor: DC.btnBg, borderWidth: DC.btnBorderWidth, borderColor: DC.btnBorder, shadowColor: DC.btnShadowColor, shadowOffset: DC.btnShadowOffset, shadowOpacity: DC.btnShadowOpacity, shadowRadius: DC.btnShadowRadius, elevation: DC.btnElevation },
-  actionBtnText:    { fontFamily: AppFont.bold, fontSize: 13, color: DC.btnText },
-  actionBtnDanger:  { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: Radius.pill, backgroundColor: DC.btnDangerBg },
-  actionBtnDangerText: { fontFamily: AppFont.bold, fontSize: 13, color: DC.btnDangerText },
-  // ── List rows
-  list:       { gap: 8 },
-  recRow:     { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 14, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.white },
-  recNum:     { width: 56, fontFamily: AppFont.bold, fontSize: 32, color: '#95D4CF', textAlign: 'center' },
-  recRight:   { alignItems: 'flex-end', gap: 2 },
-  recStatus:  { fontFamily: AppFont.regular, fontSize: 9, color: '#111111' },
-  recMid:     { flex: 1, gap: 2 },
-  recName:    { fontFamily: AppFont.bold, fontSize: 14, color: '#111111' },
-  recDate:    { fontFamily: AppFont.regular, fontSize: 11, color: '#111111' },
-  recAmount:  { fontFamily: AppFont.bold, fontSize: 14, letterSpacing: -0.3, color: '#111111' },
-  // ── People chips
-  chipWrap:      { flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingBottom: 12, paddingTop: 4 },
-  personChip:    { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#F8F8F8', borderRadius: Radius.pill, paddingVertical: 6, paddingHorizontal: 14, borderWidth: 1, borderColor: '#EFEFEF' },
-  personChipText:{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.text },
-  tagInputWrap:  { flexDirection: 'row', flexWrap: 'wrap', gap: 6, borderWidth: 1, borderColor: Colors.borderMid, borderRadius: Radius.md, padding: 8, minHeight: 44, marginBottom: 12 },
-  tagChip:       { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: ACCENT + '44', borderRadius: Radius.pill, paddingVertical: 4, paddingLeft: 10, paddingRight: 6 },
-  tagChipText:   { fontFamily: AppFont.semiBold, fontSize: 11, color: ACCENT_DARK },
-  tagInput:      { fontFamily: AppFont.regular, fontSize: 16, color: Colors.text, minWidth: 120, flex: 1, padding: 2 },
-  contactsLabel: { fontFamily: AppFont.semiBold, fontSize: 11, letterSpacing: 0.4, textTransform: 'uppercase' as const, color: Colors.muted, marginBottom: 6 },
-  contactRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  contactName:   { fontFamily: AppFont.medium, fontSize: 14, color: Colors.text },
-  itemCard:      { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, paddingHorizontal: 14, borderRadius: 14, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.white },
-  itemEditBtn:    { paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: DC.btnBg, borderWidth: DC.btnBorderWidth, borderColor: DC.btnBorder, shadowColor: DC.btnShadowColor, shadowOffset: DC.btnShadowOffset, shadowOpacity: DC.btnShadowOpacity, shadowRadius: DC.btnShadowRadius, elevation: DC.btnElevation },
-  itemEditBtnText:{ fontFamily: AppFont.bold, fontSize: 13, color: DC.btnText },
-  itemNum:        { width: 56, fontFamily: AppFont.bold, fontSize: 32, color: '#95D4CF', textAlign: 'center' },
-  itemName:       { fontFamily: AppFont.bold, fontSize: 14, color: '#111111' },
-  itemSplit:      { fontFamily: AppFont.regular, fontSize: 11, color: '#111111' },
-  itemCost:       { fontFamily: AppFont.bold, fontSize: 14, letterSpacing: -0.2, color: '#111111' },
-  itemsTotalRow:  { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 14, backgroundColor: Colors.surface, borderRadius: 10, marginTop: 4 },
-  itemsTotalLabel:{ fontFamily: AppFont.regular, fontSize: 10, color: Colors.muted },
-  itemsTotalDots: { flex: 1, borderBottomWidth: 1, borderStyle: 'dotted', borderColor: Colors.faint, marginHorizontal: 8 },
-  itemsTotalValue:{ fontFamily: AppFont.semiBold, fontSize: 11, color: Colors.text },
-  itemFormRow:    { flexDirection: 'row', gap: 8, marginBottom: 10 },
-  itemFormInput:  { fontFamily: AppFont.regular, fontSize: 16, color: Colors.text, backgroundColor: Colors.white, borderRadius: Radius.md, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: Colors.borderMid },
-  manualRow:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 12, padding: 12, borderRadius: Radius.md, backgroundColor: Colors.surface },
-  manualLeft:     { flex: 1, gap: 4 },
-  manualName:     { fontFamily: AppFont.medium, fontSize: 13, color: Colors.text },
-  manualHint:     { fontFamily: AppFont.regular, fontSize: 11, color: Colors.muted },
-  manualInput:    { flex: 0, minWidth: 96, width: 96, textAlign: 'right' },
-  manualTotalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10, paddingHorizontal: 12, borderRadius: Radius.md, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.borderMid },
-  manualTotalLabel:{ fontFamily: AppFont.regular, fontSize: 10, color: Colors.muted },
-  manualTotalValue:{ fontFamily: AppFont.semiBold, fontSize: 14, color: Colors.text },
-  summaryRow:    { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surface, borderRadius: Radius.pill, paddingVertical: 12, paddingHorizontal: PAGE, borderWidth: 1, borderColor: Colors.border },
-  summaryName:   { fontFamily: AppFont.regular, fontSize: 10, color: Colors.text, flexShrink: 0 },
-  summaryDots:   { flex: 1, borderBottomWidth: 1, borderStyle: 'dotted', borderColor: Colors.faint, marginHorizontal: 10 },
-  summaryAmount: { fontFamily: AppFont.semiBold, fontSize: 13, color: Colors.text, flexShrink: 0 },
-  recPickRow:    { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 12 },
-  modeBtn:           { paddingHorizontal: 14, paddingVertical: 7, borderRadius: Radius.pill, borderWidth: 1, borderColor: Colors.borderMid, backgroundColor: Colors.surface },
-  modeBtnActive:     { backgroundColor: ACCENT + '44', borderColor: ACCENT },
-  modeBtnText:       { fontFamily: AppFont.regular,     fontSize: 12, color: Colors.muted },
-  modeBtnTextActive: { color: ACCENT_DARK, fontFamily: AppFont.semiBold },
-  doneBtn:           { backgroundColor: DC.btnBg, borderRadius: Radius.pill, paddingVertical: 14, alignItems: 'center', marginTop: 16, borderWidth: DC.btnBorderWidth, borderColor: DC.btnBorder, shadowColor: DC.btnShadowColor, shadowOffset: DC.btnShadowOffset, shadowOpacity: DC.btnShadowOpacity, shadowRadius: DC.btnShadowRadius, elevation: DC.btnElevation },
-  doneBtnText:       { fontFamily: AppFont.bold, fontSize: 14, color: DC.btnText },
+  // Page
+  header:      { paddingHorizontal: DC.pagePadding, paddingTop: 28, paddingBottom: 8, backgroundColor: '#ffffff' },
+  titleRow:    { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16 },
+  goBack:      { ...DC.typography.goBack, marginBottom: 12 },
+  title:       { ...DC.typography.pageTitle },
+  subtitle:    { ...DC.typography.sectionBody, color: DC.pageTextMuted, marginTop: 2 },
+
+  // Step indicator
+  stepRow:     { flexDirection: 'row', alignItems: 'flex-start', gap: 0, paddingBottom: 12 },
+  stepDivider: { height: 1, backgroundColor: DC.cardDividerColor, marginHorizontal: -DC.pagePadding, marginTop: 4 },
+  stepCircle:  { width: 28, height: 28, borderRadius: 14, backgroundColor: DC.cardBg, borderWidth: 1, borderColor: DC.controlBorder, alignItems: 'center', justifyContent: 'center' },
+  stepCircleActive: { backgroundColor: DC.circleBtn.active.backgroundColor, borderColor: DC.circleBtn.active.borderColor },
+  stepCircleDone:   { backgroundColor: DC.cardBg, borderColor: DC.controlBorder },
+  stepNum:     { fontFamily: 'Poppins-Regular', fontSize: 11, color: DC.pageTextMuted },
+  stepNumActive: { fontFamily: 'Poppins-Bold', fontSize: 11, color: '#ffffff' },
+  stepNumDone:   { fontFamily: 'Poppins-Regular', fontSize: 11, color: DC.pageTextMuted },
+  stepLabel:   { fontFamily: 'Poppins-Regular', fontSize: 9, color: DC.pageTextMuted, textAlign: 'center' as const },
+  stepLabelActive: { fontFamily: 'Poppins-SemiBold', fontSize: 9, color: DC.pageText },
+  stepDash:    { width: 32, height: 1, backgroundColor: DC.controlBorder, marginTop: 14, marginHorizontal: 4 },
+  stepDashDone: { backgroundColor: DC.circleBtn.active.borderColor },
+
+  // Next button
+  nextBtn:     { ...DC.button.active, paddingHorizontal: 20 },
+  nextBtnText: { ...DC.button.textActive },
+
+  // Scroll
+  scroll:      { paddingTop: 8, paddingBottom: 80 },
+
+  // Section rows
+  sectionRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: DC.pagePadding, paddingTop: 20, paddingBottom: 8 },
+  sectionHeader: { ...DC.typography.sectionHeader },
+
+  // Add circle button — small for section headers
+  addCircleBtn:     { ...DC.circleBtn.ghostSm },
+  addCircleBtnText: { fontFamily: 'Poppins-Bold', fontSize: 14, color: DC.pageText, lineHeight: 18 },
+
+  // Dotted card
+  dottedCard:  { borderWidth: 1.5, borderColor: '#aaaaaa', borderStyle: 'dashed' as const, borderRadius: 10, marginBottom: 8, marginHorizontal: DC.pagePadding, paddingHorizontal: 14 },
+  divider:     { height: 1, backgroundColor: DC.cardDividerColor, marginHorizontal: -14 },
+  emptyRow:    { paddingVertical: 16, alignItems: 'center' as const },
+  emptyText:   { ...DC.typography.muted },
+
+  // People avatars
+  personAvatar:     { width: 52, height: 52, borderRadius: 26, backgroundColor: '#efe9ff', alignItems: 'center', justifyContent: 'center' },
+  personAvatarText: { fontFamily: 'Poppins-Bold', fontSize: 18, color: DC.circleBtn.active.borderColor },
+  personName:       { ...DC.typography.subContent, textAlign: 'center' as const, maxWidth: 60 },
+
+  // Recording rows
+  recRow:      { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14 },
+  recNumWrap:  { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  recNum:      { fontFamily: 'Poppins-Bold', fontSize: 16, color: DC.pageText },
+  recName:     { ...DC.typography.sectionBody, flex: 1 },
+  recAmount:   { ...DC.typography.amount },
+
+  // Sub-item rows (items under a recording)
+  itemFlatRow:    { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, paddingLeft: 16 },
+  itemParentRow:  { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
+  itemParentNum:  { fontFamily: 'Poppins-Bold', fontSize: 16, color: DC.pageText, minWidth: 16 },
+  subItemRow:  { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, paddingLeft: 16, marginLeft: 6 },
+  subItemBar:  { position: 'absolute' as const, left: 0, top: 6, bottom: 6, width: 3, borderRadius: 2, backgroundColor: DC.circleBtn.active.borderColor },
+  subItemName: { ...DC.typography.sectionBody, flex: 1 },
+  subItemPeople: { ...DC.typography.subContent },
+  subItemAmount: { ...DC.typography.amount },
+
+  // Payment rows
+  payPersonRow:   { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14 },
+  payAvatar:      { width: 36, height: 36, borderRadius: 18, backgroundColor: '#efe9ff', alignItems: 'center', justifyContent: 'center' },
+  payAvatarText:  { fontFamily: 'Poppins-Bold', fontSize: 14, color: DC.circleBtn.active.borderColor },
+  payPersonName:  { ...DC.typography.sectionBody, flex: 1 },
+  payPersonAmount: { fontFamily: 'Poppins-Bold', fontSize: 13, color: DC.pageText },
+  addPayBtn:      { width: 28, height: 28, borderRadius: 14, backgroundColor: DC.circleBtn.active.backgroundColor, alignItems: 'center', justifyContent: 'center' },
+  addPayBtnText:  { fontFamily: 'Poppins-Bold', fontSize: 16, color: '#ffffff', lineHeight: 20 },
+  paySubRow:      { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, paddingLeft: 48 },
+  paySubLabel:    { ...DC.typography.subContent },
+  paySubAmount:   { fontFamily: 'Poppins-Bold', fontSize: 11, color: DC.pageText },
+
+  // Ellipsis button
+  ellipsisBtn:  { ...DC.circleBtn.base },
+
+  // Action sheet rows
+  actionSheetRow: { paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: DC.controlBorder },
+  actionSheetText: { ...DC.typography.sectionBody },
+
+  // Wallet row inside dottedCard
+  walletRow:    { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14 },
+  walletBank:   { fontFamily: 'Poppins-Bold', fontSize: 14, color: DC.pageText },
+  walletHolder: { fontFamily: 'Poppins-Regular', fontSize: 11, color: DC.pageTextMuted, marginTop: 2 },
+  walletNumber: { fontFamily: 'Poppins-Bold', fontSize: 13, color: DC.pageText, marginTop: 2 },
+  walletQr:     { width: 80, height: 80, borderRadius: 8 },
+
+  // Share icons
+  shareIconWrap: { width: 56, height: 56, borderRadius: 12, backgroundColor: DC.cardBg, borderWidth: 1, borderColor: DC.controlBorder, alignItems: 'center', justifyContent: 'center' },
+  shareIconText: { fontSize: 24 },
+  shareLabel:    { ...DC.typography.sectionBody },
+
+  // Generate link button
+  generateLinkBtn: { marginHorizontal: DC.pagePadding, marginTop: 16, paddingVertical: 12, borderRadius: 999, borderWidth: 1, borderColor: DC.controlBorder, alignItems: 'center' as const },
+  generateLinkText: { ...DC.typography.sectionBody, color: DC.pageTextMuted },
+
+  // Action buttons (step 3)
+  actionBtn:     { paddingVertical: 14, borderRadius: 999, borderWidth: 1, borderColor: DC.controlBorder, alignItems: 'center' as const },
+  actionBtnText: { ...DC.typography.sectionBody },
+
+  // Existing modal styles (kept for bottom sheets)
+  doneBtn:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: DC.btnBg, borderRadius: 999, paddingVertical: 14, marginTop: 8 },
+  doneBtnText:   { fontFamily: 'Poppins-SemiBold', fontSize: 13, color: DC.btnText },
+  modeBtn:       { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, borderWidth: 1, borderColor: DC.controlBorder, backgroundColor: DC.cardBg },
+  modeBtnActive: { borderColor: DC.circleBtn.active.borderColor, backgroundColor: DC.pageActionBg },
+  modeBtnText:   { fontFamily: 'Poppins-Regular', fontSize: 12, color: DC.pageText },
+  modeBtnTextActive: { fontFamily: 'Poppins-SemiBold', fontSize: 12, color: DC.circleBtn.active.borderColor },
+  itemFormInput: { fontFamily: 'Poppins-Regular', fontSize: 15, color: DC.pageText, borderWidth: 1, borderColor: DC.controlBorder, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 11 },
+  recPickRow:    { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: DC.controlBorder },
+  recIconWrap:   { width: 34, height: 34, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+  recMid:        { flex: 1, gap: 2 },
+  recDate:       { fontFamily: 'Poppins-Regular', fontSize: 10, color: DC.pageTextMuted },
+  recStatus:     { fontFamily: 'Poppins-Regular', fontSize: 10, color: DC.pageTextMuted },
+  recRight:      { alignItems: 'flex-end', gap: 2 },
+  itemCard:      { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: DC.controlBorder },
+  itemNum:       { fontFamily: 'Poppins-Bold', fontSize: 10, color: DC.circleBtn.active.borderColor, backgroundColor: DC.pageActionBg, width: 20, height: 20, borderRadius: 10, textAlign: 'center', lineHeight: 20 },
+  itemName:      { fontFamily: 'Poppins-SemiBold', fontSize: 13, color: DC.pageText },
+  itemCost:      { fontFamily: 'Poppins-Bold', fontSize: 13, color: DC.pageText },
+  itemSplit:     { fontFamily: 'Poppins-Regular', fontSize: 10, color: DC.pageTextMuted },
+  itemEditBtn:   { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, borderWidth: 1, borderColor: DC.controlBorder },
+  itemEditBtnText: { fontFamily: 'Poppins-Regular', fontSize: 11, color: DC.pageText },
+  itemsTotalRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 14 },
+  itemsTotalLabel: { fontFamily: 'Poppins-Regular', fontSize: 11, color: DC.pageTextMuted },
+  itemsTotalDots: { flex: 1, height: 1, borderBottomWidth: 1, borderBottomColor: DC.controlBorder, borderStyle: 'dashed', marginHorizontal: 8 },
+  itemsTotalValue: { fontFamily: 'Poppins-Bold', fontSize: 13, color: DC.pageText },
+  tagInputWrap:  { flexDirection: 'row', flexWrap: 'wrap', gap: 6, borderWidth: 1, borderColor: DC.controlBorder, borderRadius: 10, padding: 8, minHeight: 44, marginBottom: 12 },
+  tagChip:       { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: DC.pageActionBg, borderRadius: 999, paddingVertical: 4, paddingLeft: 10, paddingRight: 6 },
+  tagChipText:   { fontFamily: 'Poppins-SemiBold', fontSize: 11, color: DC.pageText },
+  tagInput:      { fontFamily: 'Poppins-Regular', fontSize: 15, color: DC.pageText, minWidth: 120, flex: 1, padding: 2 },
+  contactsLabel: { fontFamily: 'Poppins-SemiBold', fontSize: 10, color: DC.pageTextMuted, textTransform: 'uppercase', letterSpacing: 0.8 },
+  contactRow:    { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: DC.controlBorder },
+  contactName:   { fontFamily: 'Poppins-Regular', fontSize: 13, color: DC.pageText },
+  personChip:    { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, backgroundColor: DC.pageActionBg },
+  personChipText: { fontFamily: 'Poppins-Regular', fontSize: 12, color: DC.pageText },
+  chipWrap:      { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: DC.pagePadding, paddingBottom: 12 },
+  manualRow:     { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: DC.controlBorder },
+  manualLeft:    { flex: 1, gap: 2 },
+  manualName:    { fontFamily: 'Poppins-SemiBold', fontSize: 13, color: DC.pageText },
+  manualHint:    { fontFamily: 'Poppins-Regular', fontSize: 10, color: DC.pageTextMuted },
+  manualInput:   { width: 90, textAlign: 'right' as const },
+  manualTotalRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, marginTop: 4 },
+  manualTotalLabel: { fontFamily: 'Poppins-SemiBold', fontSize: 12, color: DC.pageText },
+  manualTotalValue: { fontFamily: 'Poppins-Bold', fontSize: 13, color: DC.pageText },
+  sectionAddBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: DC.controlBorder },
+  emptyWrap:     { alignItems: 'center', paddingVertical: 16 },
+  list:          { marginHorizontal: DC.pagePadding, borderWidth: 1, borderColor: DC.controlBorder, borderRadius: 12, overflow: 'hidden' },
+  actionBtnDanger:     { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, borderWidth: 1, borderColor: '#e53935' },
+  actionBtnDangerText: { fontFamily: 'Poppins-Regular', fontSize: 12, color: '#e53935' },
 });
 
+const pm = StyleSheet.create({
+  row:      { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: DC.rowPaddingV, paddingHorizontal: DC.pagePadding, borderBottomWidth: 1, borderBottomColor: DC.controlBorder },
+  avatar:   { width: 36, height: 36, borderRadius: 18, backgroundColor: '#e8f5f4', alignItems: 'center', justifyContent: 'center' },
+  avatarText: { fontFamily: 'Poppins-Bold', fontSize: 14, color: '#2A7A6F' },
+  name:     { ...DC.typography.sectionBody, fontFamily: 'Poppins-SemiBold' },
+  sub:      { ...DC.typography.subContent, fontStyle: 'italic' as const },
+});
+
+
+const rm = StyleSheet.create({
+  row:    { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 16, paddingHorizontal: DC.pagePadding, borderBottomWidth: 1, borderBottomColor: DC.controlBorder },
+  name:   { ...DC.typography.sectionBody, fontFamily: 'Poppins-SemiBold' as string },
+  sub:    { ...DC.typography.subContent },
+  amount: { ...DC.typography.amount, flexShrink: 0 },
+});
