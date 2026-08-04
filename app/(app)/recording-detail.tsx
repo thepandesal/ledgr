@@ -1,4 +1,4 @@
-import { SvgXml } from 'react-native-svg';
+﻿import { SvgXml } from 'react-native-svg';
 import GooeyLoader from '@/components/ui/GooeyLoader';
 import { BlurView } from 'expo-blur';
 import AddItemModal from './AddItemModal';
@@ -2155,11 +2155,9 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
         <ScrollView contentContainerStyle={rd.scroll} showsVerticalScrollIndicator={false} style={{ backgroundColor: Colors.white }}>
 
           {/* General Information */}
+          {/* General Information */}
           <View style={rd.sectionRow}>
             <Text style={rd.sectionLabel}>General Information</Text>
-            {isOwner && (
- <TouchableOpacity style={rd.editCircleBtn} onPress={openEditModal} activeOpacity={0.7}><SvgXml xml={SVG_EDIT} width={16} height={16} color={DC.circleBtn.active.borderColor} /></TouchableOpacity>
-            )}
           </View>
           <View style={rd.dottedCard}>
             <View style={rd.infoRow}>
@@ -2167,10 +2165,10 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
               <Text style={rd.infoValue}>{displayAmount()}</Text>
             </View>
             <View style={rd.rowDivider} />
-            <View style={rd.infoRow}>
+            <TouchableOpacity style={rd.infoRow} activeOpacity={isOwner ? 0.7 : 1} onPress={() => { if (isOwner) { setEditDate(recording?.transaction_date ?? ''); setEditModal(true); } }}>
               <Text style={rd.infoLabel}>Date</Text>
               <Text style={rd.infoValue}>{recording ? formatDate(recording.transaction_date) : ''}</Text>
-            </View>
+            </TouchableOpacity>
             <View style={rd.rowDivider} />
             <View style={rd.infoRow}>
               <Text style={rd.infoLabel}>Status</Text>
@@ -2181,10 +2179,50 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
               <Text style={rd.infoLabel}>Created By</Text>
               <Text style={rd.infoValue}>{creatorName || ''}</Text>
             </View>
-            <View style={[rd.infoRow, rd.infoRowLast]}>
-              <Text style={rd.infoLabel}>Borrower</Text>
-              <Text style={rd.infoValue}>{recording?.person_name || 'record is not a loan'}</Text>
+            <View style={rd.rowDivider} />
+            <View style={[rd.infoRow, !(recording?.is_due || recording?.type === 'due') && rd.infoRowLast]}>
+              <Text style={rd.infoLabel}>Loan</Text>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                  {(['Yes', 'No'] as const).map(opt => {
+                    const isLoan = !!recording?.is_due;
+                    const isActive = opt === 'Yes' ? isLoan : !isLoan;
+                    const hasPaid = Number(recording?.paid_amount ?? 0) > 0;
+                    const locked = !isOwner;
+                    return (
+                      <TouchableOpacity
+                        key={opt}
+                        activeOpacity={locked ? 1 : 0.7}
+                        onPress={async () => {
+                          if (locked) return;
+                          const newIsLoan = opt === 'Yes';
+                          await supabase.from('recordings').update({
+                            is_due: newIsLoan,
+                            status: newIsLoan ? 'unpaid' : 'paid',
+                            paid_amount: newIsLoan ? 0 : recording?.amount,
+                          }).eq('id', recordingId);
+                          setRecording((prev: any) => ({ ...prev, is_due: newIsLoan, status: newIsLoan ? 'unpaid' : 'paid' }));
+                        }}
+                        style={[
+                          { paddingHorizontal: 14, paddingVertical: 5, borderRadius: 999, borderWidth: 1 },
+                          isActive ? { backgroundColor: '#111111', borderColor: '#111111' } : { backgroundColor: 'transparent', borderColor: '#d2d2d2' },
+                          locked && { opacity: 0.5 },
+                        ]}
+                      >
+                        <Text style={{ fontFamily: 'Poppins-SemiBold', fontSize: 11, color: isActive ? '#fff' : '#999' }}>{opt}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
             </View>
+            {(recording?.is_due || recording?.type === 'due') && (
+              <>
+                <View style={rd.rowDivider} />
+                <TouchableOpacity style={[rd.infoRow, rd.infoRowLast, !!linkedSplitBill && { opacity: 0.4 }]} activeOpacity={isOwner && !linkedSplitBill ? 0.7 : 1} onPress={() => isOwner && !linkedSplitBill && openOwesYouEdit()}>
+                  <Text style={rd.infoLabel}>Borrower</Text>
+                  <Text style={[rd.infoValue, !recording?.person_name && !linkedSplitBill && { fontStyle: 'italic' }]}>{linkedSplitBill ? 'has split bill' : (recording?.person_name || 'tap to assign')}</Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
           <View style={rd.sectionRow}>
             <Text style={rd.sectionLabel}>Receipts</Text>
@@ -2216,7 +2254,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
           </View>
 
           {/* Split Bill */}
-          {/* Split Bill */}
+          {(() => { const isLoanWithBorrower = !!(recording?.is_due && recording?.person_name); return (
             <>
               <View style={rd.sectionRow}>
                 <Text style={rd.sectionLabel}>Split Bill</Text>
@@ -2226,7 +2264,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                       <SvgXml xml={SVG_VIEW} width={16} height={16} color={DC.circleBtn.active.borderColor} />
                     </TouchableOpacity>
                   ) : (
-                    <TouchableOpacity style={rd.editCircleBtn} onPress={openSplitBillModal} activeOpacity={0.7}>
+                    <TouchableOpacity style={[rd.editCircleBtn, isLoanWithBorrower && { opacity: 0.3 }]} onPress={() => !isLoanWithBorrower && openSplitBillModal()} activeOpacity={isLoanWithBorrower ? 1 : 0.7}>
                       <Text style={{ fontFamily: 'Poppins-Bold', fontSize: 16, color: DC.circleBtn.active.borderColor, lineHeight: 20 }}>+</Text>
                     </TouchableOpacity>
                   )
@@ -2238,9 +2276,10 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                     <Text style={{ ...DC.typography.muted }}>no split bill linked</Text>
                   </View>
                 ) : splitBillPerPerson.length === 0 ? (
-                  <View style={rd.infoRow}>
-                    <Text style={{ ...DC.typography.muted }}>no items assigned yet</Text>
-                  </View>
+                  <TouchableOpacity style={rd.infoRow} activeOpacity={0.7} onPress={() => openSplitBill(linkedSplitBill!.id, linkedSplitBill!.name)}>
+                    <Text style={{ ...DC.typography.muted }}>{linkedSplitBill?.name ?? 'split bill'}</Text>
+                    <Text style={rd.infoValue}>tap to open</Text>
+                  </TouchableOpacity>
                 ) : (
                   splitBillPerPerson.map((p, i) => (
                     <View key={p.name}>
@@ -2259,7 +2298,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                 )}
               </View>
             </>
-
+          ); })()}
                     {/* Payments */}
           <View style={rd.sectionRow}>
             <Text style={rd.sectionLabel}>Payments</Text>

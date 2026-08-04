@@ -430,9 +430,14 @@ export default function TabsLayout() {
   winWidthRef.current = W;
   const { user, userName } = useUser();
   const insets = useSafeAreaInsets();
-  const [activeTab, setActiveTab] = useState('home');
+  const [activeTab, setActiveTab] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.sessionStorage.getItem('activeTab') ?? 'home';
+    }
+    return 'home';
+  });
   const [othersOpen, setOthersOpen] = useState(false);
-  const activeTabRef = useRef('home');
+  const activeTabRef = useRef(typeof window !== 'undefined' ? (window.sessionStorage.getItem('activeTab') ?? 'home') : 'home');
   const titleAnim = useRef(new Animated.Value(1)).current;
   const blurAnim   = useRef(new Animated.Value(0)).current;
   const [blurActive, setBlurActive] = useState(false);
@@ -531,6 +536,19 @@ export default function TabsLayout() {
     });
   }, []);
 
+  const savePanelState = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    const state = {
+      spacesPanelOpen: spacesPanelOpenRef.current,
+      recordingsPanelOpen: recordingsPanelOpenRef.current,
+      remindersPanelOpen: remindersPanelOpenRef.current,
+      receivablesPanelOpen: receivablesPanelOpenRef.current,
+      loansPanelOpen: loansPanelOpenRef.current,
+      topSpendingOpen: topSpendingOpenRef.current,
+    };
+    window.sessionStorage.setItem('panelState', JSON.stringify(state));
+  }, []);
+
   const [topSpendingOpen, setTopSpendingOpen] = useState(false);
   const topSpendingOpenRef = useRef(false);
   const topSpendingAnim = useRef(new Animated.Value(winWidthRef.current)).current;
@@ -540,14 +558,16 @@ export default function TabsLayout() {
     setTopSpendingOpen(true);
     topSpendingAnim.setValue(winWidthRef.current);
     Animated.timing(topSpendingAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start();
-  }, []);
+    savePanelState();
+  }, [savePanelState]);
 
   const closeTopSpending = useCallback(() => {
     topSpendingOpenRef.current = false;
     Animated.timing(topSpendingAnim, { toValue: winWidthRef.current, duration: 260, useNativeDriver: true }).start(() => {
       setTopSpendingOpen(false);
     });
-  }, []);
+    savePanelState();
+  }, [savePanelState]);
 
   const dismissTopSpending = useCallback(() => {
     topSpendingAnim.setValue(winWidthRef.current);
@@ -567,14 +587,16 @@ export default function TabsLayout() {
     requestAnimationFrame(() => {
       Animated.timing(recordingsPanelAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start();
     });
-  }, []);
+    savePanelState();
+  }, [savePanelState]);
 
   const closeRecordingsPanel = useCallback(() => {
     recordingsPanelOpenRef.current = false;
     Animated.timing(recordingsPanelAnim, { toValue: winWidthRef.current, duration: 260, useNativeDriver: true }).start(() => {
       setRecordingsPanelOpen(false);
     });
-  }, []);
+    savePanelState();
+  }, [savePanelState]);
 
   const [spacesPanelOpen, setSpacesPanelOpen] = useState(false);
   const spacesPanelOpenRef = useRef(false);
@@ -587,33 +609,35 @@ export default function TabsLayout() {
     requestAnimationFrame(() => {
       Animated.timing(spacesPanelAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start();
     });
-  }, []);
+    savePanelState();
+  }, [savePanelState]);
 
   const closeSpacesPanel = useCallback(() => {
     spacesPanelOpenRef.current = false;
     Animated.timing(spacesPanelAnim, { toValue: winWidthRef.current, duration: 260, useNativeDriver: true }).start(() => {
       setSpacesPanelOpen(false);
     });
-  }, []);
+    savePanelState();
+  }, [savePanelState]);
 
   const [loansPanelOpen, setLoansPanelOpen] = useState(false);
   const loansPanelOpenRef = useRef(false);
   const loansPanelAnim = useRef(new Animated.Value(winWidthRef.current)).current;
-  const openLoansPanel = useCallback(() => { loansPanelOpenRef.current = true; setLoansPanelOpen(true); loansPanelAnim.setValue(winWidthRef.current); requestAnimationFrame(() => { Animated.timing(loansPanelAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start(); }); }, []);
-  const closeLoansPanel = useCallback(() => { loansPanelOpenRef.current = false; Animated.timing(loansPanelAnim, { toValue: winWidthRef.current, duration: 260, useNativeDriver: true }).start(() => { setLoansPanelOpen(false); }); }, []);
+  const openLoansPanel = useCallback(() => { loansPanelOpenRef.current = true; setLoansPanelOpen(true); loansPanelAnim.setValue(winWidthRef.current); requestAnimationFrame(() => { Animated.timing(loansPanelAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start(); }); savePanelState(); }, [savePanelState]);
+  const closeLoansPanel = useCallback(() => { loansPanelOpenRef.current = false; Animated.timing(loansPanelAnim, { toValue: winWidthRef.current, duration: 260, useNativeDriver: true }).start(() => { setLoansPanelOpen(false); }); savePanelState(); }, [savePanelState]);
 
   const [receivablesPanelOpen, setReceivablesPanelOpen] = useState(false);
   const receivablesPanelOpenRef = useRef(false);
   const receivablesPanelAnim = useRef(new Animated.Value(winWidthRef.current)).current;
   const [receivablesInitialPerson, setReceivablesInitialPerson] = useState<string | null>(null);
-  const openReceivablesPanel = useCallback((person?: string) => { setReceivablesInitialPerson(person ?? null); receivablesPanelOpenRef.current = true; setReceivablesPanelOpen(true); receivablesPanelAnim.setValue(winWidthRef.current); requestAnimationFrame(() => { Animated.timing(receivablesPanelAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start(); }); }, []);
-  const closeReceivablesPanel = useCallback(() => { receivablesPanelOpenRef.current = false; setReceivablesInitialPerson(null); Animated.timing(receivablesPanelAnim, { toValue: winWidthRef.current, duration: 260, useNativeDriver: true }).start(() => { setReceivablesPanelOpen(false); }); }, []);
+  const openReceivablesPanel = useCallback((person?: string) => { setReceivablesInitialPerson(person ?? null); receivablesPanelOpenRef.current = true; setReceivablesPanelOpen(true); receivablesPanelAnim.setValue(winWidthRef.current); requestAnimationFrame(() => { Animated.timing(receivablesPanelAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start(); }); savePanelState(); }, [savePanelState]);
+  const closeReceivablesPanel = useCallback(() => { receivablesPanelOpenRef.current = false; setReceivablesInitialPerson(null); Animated.timing(receivablesPanelAnim, { toValue: winWidthRef.current, duration: 260, useNativeDriver: true }).start(() => { setReceivablesPanelOpen(false); }); savePanelState(); }, [savePanelState]);
 
   const [remindersPanelOpen, setRemindersPanelOpen] = useState(false);
   const remindersPanelOpenRef = useRef(false);
   const remindersPanelAnim = useRef(new Animated.Value(winWidthRef.current)).current;
-  const openRemindersPanel = useCallback(() => { remindersPanelOpenRef.current = true; setRemindersPanelOpen(true); remindersPanelAnim.setValue(winWidthRef.current); requestAnimationFrame(() => { Animated.timing(remindersPanelAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start(); }); }, []);
-  const closeRemindersPanel = useCallback(() => { remindersPanelOpenRef.current = false; Animated.timing(remindersPanelAnim, { toValue: winWidthRef.current, duration: 260, useNativeDriver: true }).start(() => { setRemindersPanelOpen(false); }); }, []);
+  const openRemindersPanel = useCallback(() => { remindersPanelOpenRef.current = true; setRemindersPanelOpen(true); remindersPanelAnim.setValue(winWidthRef.current); requestAnimationFrame(() => { Animated.timing(remindersPanelAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start(); }); savePanelState(); }, [savePanelState]);
+  const closeRemindersPanel = useCallback(() => { remindersPanelOpenRef.current = false; Animated.timing(remindersPanelAnim, { toValue: winWidthRef.current, duration: 260, useNativeDriver: true }).start(() => { setRemindersPanelOpen(false); }); savePanelState(); }, [savePanelState]);
 
   const [contactsPanelOpen, setContactsPanelOpen] = useState(false);
   const contactsPanelAnim = useRef(new Animated.Value(winWidthRef.current)).current;
@@ -627,6 +651,26 @@ export default function TabsLayout() {
 
   const [homeDateLabel, setHomeDateLabel] = useState('');
   const visited = useVisited(activeTab);
+
+  // ── Persist & restore panel state across browser tab switches ──
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== 'visible') return;
+      const raw = window.sessionStorage.getItem('panelState');
+      if (!raw) return;
+      try {
+        const state = JSON.parse(raw);
+        if (state.spacesPanelOpen) { spacesPanelOpenRef.current = true; setSpacesPanelOpen(true); spacesPanelAnim.setValue(0); }
+        if (state.recordingsPanelOpen) { recordingsPanelOpenRef.current = true; setRecordingsPanelOpen(true); recordingsPanelAnim.setValue(0); }
+        if (state.remindersPanelOpen) { remindersPanelOpenRef.current = true; setRemindersPanelOpen(true); remindersPanelAnim.setValue(0); }
+        if (state.receivablesPanelOpen) { receivablesPanelOpenRef.current = true; setReceivablesPanelOpen(true); receivablesPanelAnim.setValue(0); }
+        if (state.loansPanelOpen) { loansPanelOpenRef.current = true; setLoansPanelOpen(true); loansPanelAnim.setValue(0); }
+        if (state.topSpendingOpen) { topSpendingOpenRef.current = true; setTopSpendingOpen(true); topSpendingAnim.setValue(0); }
+      } catch {}
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange);
+  }, []);
 
   const fetchUnread = useCallback(async () => {
     if (!userId) return;
@@ -657,30 +701,33 @@ export default function TabsLayout() {
   }, [userId, fetchUnread]);
 
   const slideAnims = useRef<Record<string, Animated.Value>>(
-    Object.fromEntries(SLIDE_KEYS.map((k) => [k, new Animated.Value(k === 'home' ? 0 : winWidthRef.current)]))
+    Object.fromEntries(SLIDE_KEYS.map((k) => {
+      const restoredTab = typeof window !== 'undefined' ? (window.sessionStorage.getItem('activeTab') ?? 'home') : 'home';
+      return [k, new Animated.Value(k === restoredTab ? 0 : winWidthRef.current)];
+    }))
   ).current;
 
   // Notification slide anim — no longer needed (notifications-page is in SLIDE_KEYS)
 
   // ── Reposition off-screen panels when window resizes ──
   useEffect(() => {
-    const updateHidden = (anim: Animated.Value | undefined) => {
-      if (anim && (anim as any).__getValue() !== 0) {
+    const updateHidden = (anim: Animated.Value | undefined, isOpen = false) => {
+      if (anim && (anim as any).__getValue() !== 0 && !isOpen) {
         anim.setValue(W);
       }
     };
-    SLIDE_KEYS.forEach(key => { if (key !== 'home') updateHidden(slideAnims[key]); });
-    updateHidden(spaceSlideAnim);
-    updateHidden(recordingSlideAnim);
-    updateHidden(splitBillSlideAnim);
-    updateHidden(topSpendingAnim);
-    updateHidden(recordingsPanelAnim);
-    updateHidden(spacesPanelAnim);
-    updateHidden(loansPanelAnim);
-    updateHidden(receivablesPanelAnim);
-    updateHidden(remindersPanelAnim);
-    updateHidden(contactsPanelAnim);
-    updateHidden(friendsPanelAnim);
+    SLIDE_KEYS.forEach(key => { if (key !== activeTabRef.current) updateHidden(slideAnims[key]); });
+    updateHidden(spaceSlideAnim, !!activeSpaceId);
+    updateHidden(recordingSlideAnim, !!activeRecordingId);
+    updateHidden(splitBillSlideAnim, !!activeSplitBillId);
+    updateHidden(topSpendingAnim, topSpendingOpenRef.current);
+    updateHidden(recordingsPanelAnim, recordingsPanelOpenRef.current);
+    updateHidden(spacesPanelAnim, spacesPanelOpenRef.current);
+    updateHidden(loansPanelAnim, loansPanelOpenRef.current);
+    updateHidden(receivablesPanelAnim, receivablesPanelOpenRef.current);
+    updateHidden(remindersPanelAnim, remindersPanelOpenRef.current);
+    updateHidden(contactsPanelAnim, contactsPanelOpen);
+    updateHidden(friendsPanelAnim, friendsPanelOpen);
   }, [W]);
 
   // Per-tab navigation stack cache (Instagram-style)
@@ -795,6 +842,7 @@ export default function TabsLayout() {
 
     setActiveTab(key);
     titleAnim.setValue(1);
+    if (typeof window !== 'undefined') window.sessionStorage.setItem('activeTab', key);
   }, [activeSpaceId, activeSpaceName, activeRecordingId]);
 
   const openOthers = useCallback(() => {

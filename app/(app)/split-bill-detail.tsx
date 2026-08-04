@@ -795,7 +795,7 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
       counter++;
     }
     const { data } = await supabase.from('split_shares')
-      .insert({ split_bill_id: splitBillId, recording_id: firstRecordingId, data: { account_ids: shareSelectedIds }, user_id: userId, slug })
+      .upsert({ split_bill_id: splitBillId, recording_id: firstRecordingId, data: { account_ids: shareSelectedIds }, user_id: userId, slug }, { onConflict: 'split_bill_id' })
       .select('id').single();
     setShareGenerating(false);
     if (!data) return;
@@ -946,22 +946,13 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
         if (await Sharing.isAvailableAsync()) {
           await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: 'Save split bill' });
         }
-      } else if (typeof document !== 'undefined') {
-        const isMobile = typeof navigator !== 'undefined' && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-        const Print = require('expo-print');
-        if (isMobile) {
-          await Print.printAsync({ html });
-        } else {
-          const { uri } = await Print.printToFileAsync({ html, width: 520 });
-          const res = await fetch(uri);
-          const blob = await res.blob();
-          const blobUrl = URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
-          const a = document.createElement('a');
-          a.href = blobUrl;
-          a.download = `${String(name).replace(/\s+/g, '-')}-split.pdf`;
-          document.body.appendChild(a); a.click();
-          document.body.removeChild(a);
-          setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+      } else if (typeof window !== 'undefined') {
+        const win = window.open('', '_blank');
+        if (win) {
+          win.document.write(html);
+          win.document.close();
+          win.focus();
+          setTimeout(() => win.print(), 500);
         }
       }
     } catch (e) { console.error('saveAsImage error:', e); }

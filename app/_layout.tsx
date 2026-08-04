@@ -1,7 +1,7 @@
 import { Stack, useRouter } from 'expo-router';
 import { useFonts } from 'expo-font';
 import { View, ActivityIndicator, Text } from 'react-native';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { supabase } from '../src/lib/supabase';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import * as Linking from 'expo-linking';
@@ -20,8 +20,6 @@ const queryClient = new QueryClient({
 });
 
 export default function RootLayout() {
-  console.log('[boot] RootLayout mounted');
-  console.time('[boot] fonts');
   const [fontsLoaded, fontError] = useFonts({
     'Poppins-Regular':  require('../assets/Poppins-Regular.ttf'),
     'Poppins-Medium':   require('../assets/Poppins-Medium.ttf'),
@@ -35,6 +33,8 @@ export default function RootLayout() {
   const router = useRouter();
   const [ready, setReady] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const readyRef = useRef(false);
+  const navigatedRef = useRef(false);
 
   useEffect(() => {
     if (typeof document === 'undefined') return;
@@ -66,19 +66,15 @@ export default function RootLayout() {
   }, []);
 
   useEffect(() => {
-    console.time('[boot] auth');
     let initialEventReceived = false;
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.timeEnd('[boot] auth');
-      console.log('[boot] auth event:', event);
-      const path = typeof window !== 'undefined' && typeof window.location !== 'undefined' ? window.location.pathname : '';
-      if (path.startsWith('/split/')) { setReady(true); return; }
+      const path = typeof window !== 'undefined' ? window.location.pathname : '';
+      if (path.startsWith('/split/')) { if (!readyRef.current) { readyRef.current = true; setReady(true); } return; }
 
       if (event === 'SIGNED_OUT') {
-        // Only redirect if we already had a session (explicit sign out), not on initial load
         if (initialEventReceived) {
           setIsAuthenticated(false);
-          setReady(true);
+          if (!readyRef.current) { readyRef.current = true; setReady(true); }
           if (typeof window !== 'undefined') {
             window.location.href = '/';
           } else {
@@ -92,23 +88,21 @@ export default function RootLayout() {
 
       if (!session) {
         setIsAuthenticated(false);
-        setReady(true);
+        if (!readyRef.current) { readyRef.current = true; setReady(true); }
       } else if (session?.user?.user_metadata?.onboarding_completed !== true) {
         setIsAuthenticated(true);
-        setReady(true);
+        if (!readyRef.current) { readyRef.current = true; setReady(true); }
         router.replace('/onboarding');
       } else if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') {
         setIsAuthenticated(true);
-        setReady(true);
-        const isAuthPage = !path || path === '/' || path === '/index';
-        if (event === 'SIGNED_IN' && isAuthPage) {
-          router.replace('/(app)/(tabs)');
-        } else if (event === 'INITIAL_SESSION' && isAuthPage) {
+        if (!readyRef.current) { readyRef.current = true; setReady(true); }
+        if (!navigatedRef.current && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')) {
+          navigatedRef.current = true;
           router.replace('/(app)/(tabs)');
         }
       } else {
         setIsAuthenticated(true);
-        setReady(true);
+        if (!readyRef.current) { readyRef.current = true; setReady(true); }
       }
     });
     return () => subscription.unsubscribe();
@@ -121,9 +115,6 @@ export default function RootLayout() {
       </View>
     );
   }
-
-  console.timeEnd('[boot] fonts');
-  console.log('[boot] rendering app');
 
   return (
     <QueryClientProvider client={queryClient}>

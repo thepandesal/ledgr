@@ -143,8 +143,11 @@ export default function SpacesPanel({ onClose }: Props) {
 
   const [spaceChoice, setSpaceChoice] = useState<{ id: string; name: string } | null>(null);
 
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
   const doDeleteSpace = async (sp: { id: string; name: string }) => {
     setSpaceChoice(null);
+    setConfirmDelete(false);
     try {
       const recordingIds = await supabase.from('recordings').select('id').eq('space_id', sp.id);
       const ids = (recordingIds.data ?? []).map((r: any) => r.id);
@@ -153,12 +156,6 @@ export default function SpacesPanel({ onClose }: Props) {
       await supabase.from('spaces').delete().eq('id', sp.id);
       await invalidate();
     } catch (e: any) { Alert.alert('Error', e?.message ?? 'Failed to delete space'); }
-  };
-
-  const handleDeleteSpace = (sp: { id: string; name: string }) => {
-    Alert.alert(`Delete "${sp.name}"?`, 'This will permanently delete the space and all recordings under it.',
-      [{ text: 'Cancel', style: 'cancel' }, { text: 'Delete', style: 'destructive', onPress: () => doDeleteSpace(sp) }]
-    );
   };
 
   return (
@@ -176,69 +173,115 @@ export default function SpacesPanel({ onClose }: Props) {
           </TouchableOpacity>
 
           {/* Uncategorized */}
-          <TouchableOpacity
-            style={st.card}
-            activeOpacity={0.7}
-            onPress={() => openRecordingsPanel({ categoryName: 'Uncategorized' })}
-          >
-            <Text style={st.cardName}>Uncategorized</Text>
-            <Text style={st.cardCount}>{uncategorizedCount} transaction{uncategorizedCount !== 1 ? 's' : ''}</Text>
-          </TouchableOpacity>
+          <Text style={st.sectionHeader}>Uncategorized</Text>
+          <View style={st.timelineWrap}>
+            <View style={st.timelineCol}>
+              <View style={st.tlDotWrap}>
+                <View style={st.tlLineHidden} />
+                <View style={st.tlDot} />
+                <View style={st.tlLineHidden} />
+              </View>
+            </View>
+            <View style={st.cardsCol}>
+              <TouchableOpacity style={st.card} activeOpacity={0.7} onPress={() => openRecordingsPanel({ categoryName: 'Uncategorized' })}>
+                <View style={st.cardLeft}>
+                  <Text style={st.cardName} numberOfLines={2} ellipsizeMode="tail">Uncategorized</Text>
+                </View>
+                <View style={st.cardDivider} />
+                <View style={st.cardRight}>
+                  <Text style={st.cardLabel}>Transactions</Text>
+                  <Text style={st.cardValue}>{uncategorizedCount} transaction{uncategorizedCount !== 1 ? 's' : ''}</Text>
+                </View>
+              </TouchableOpacity>
+            </View>
+          </View>
 
-          {/* Expense Tracker */}
-          {expenseSpaces.length > 0 && (
+          {/* Savings */}
+          {savingsSpaces.length > 0 && (
             <>
-              <Text style={st.sectionHeader}>Expense Tracker</Text>
-              {expenseSpaces.map((sp: any, i: number) => {
-                const budget = sp.budget ? convert(sp.budget, sp.budget_currency ?? 'PHP', defaultCurrency) : 0;
-                const over = budget > 0 && sp.spent > budget;
-                return (
-                  <TouchableOpacity key={sp.id} style={st.card} activeOpacity={0.7} onPress={() => setSpaceChoice({ id: sp.id, name: sp.name })}>
-                    <Text style={st.cardName} numberOfLines={1}>{sp.name}</Text>
-                    <View style={{ alignItems: 'flex-end' }}>
-                      {budget > 0 ? (
-                        <Text style={st.cardValue}>
-                          <Text style={over ? st.cardValueOver : st.cardValueBold}>{fmt(sp.spent)}</Text>
-                          <Text style={st.cardValueMuted}> / {fmt(budget)}</Text>
-                        </Text>
-                      ) : (
-                        <Text style={st.cardValueBold}>{fmt(sp.spent)}</Text>
-                      )}
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
+              <Text style={[st.sectionHeader, { marginTop: 28 }]}>Savings</Text>
+              <View style={st.timelineWrap}>
+                <View style={st.timelineCol}>
+                  {savingsSpaces.map((sp: any, i: number) => {
+                    const count = savingsSpaces.length;
+                    const isFirst = i === 0; const isLast = i === count - 1;
+                    const showDot = count > 1 && (isFirst || isLast);
+                    const showLine = count > 1 && !isFirst && !isLast;
+                    return (
+                      <View key={sp.id} style={st.tlDotWrap}>
+                        {showDot && (<><View style={isFirst ? st.tlLineHidden : st.tlLine} /><View style={st.tlDot} /><View style={isLast ? st.tlLineHidden : st.tlLine} /></>)}
+                        {showLine && <View style={[st.tlLine, { flex: 1 }]} />}
+                        {count === 1 && (<><View style={st.tlLineHidden} /><View style={st.tlDot} /><View style={st.tlLineHidden} /></>)}
+                      </View>
+                    );
+                  })}
+                </View>
+                <View style={st.cardsCol}>
+                  {savingsSpaces.map((sp: any) => {
+                    const goal = sp.budget ? convert(sp.budget, sp.budget_currency ?? 'PHP', defaultCurrency) : 0;
+                    return (
+                      <TouchableOpacity key={sp.id} style={st.card} activeOpacity={0.7} onPress={() => setSpaceChoice({ id: sp.id, name: sp.name })}>
+                        <View style={st.cardLeft}>
+                          <Text style={st.cardName} numberOfLines={2} ellipsizeMode="tail">{sp.name}</Text>
+                        </View>
+                        <View style={st.cardDivider} />
+                        <View style={st.cardRight}>
+                          <Text style={st.cardLabel}>Your all time savings</Text>
+                          <Text style={st.cardValue}>
+                            <Text style={{ color: '#e6a817' }}>{fmt(sp.savedAllTime)}</Text>
+                            {goal > 0 ? <Text style={st.cardValueMuted}> / {fmt(goal)}</Text> : null}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
             </>
           )}
 
-          {/* Savings Tracker */}
-          {savingsSpaces.length > 0 && (
+          {/* Expenses */}
+          {expenseSpaces.length > 0 && (
             <>
-              <Text style={st.sectionHeader}>Savings Tracker</Text>
-              {savingsSpaces.map((sp: any) => {
-                const goal = sp.budget ? convert(sp.budget, sp.budget_currency ?? 'PHP', defaultCurrency) : 0;
-                return (
-                  <TouchableOpacity key={sp.id} style={[st.card, { flexDirection: 'column', alignItems: 'flex-start' }]} activeOpacity={0.7} onPress={() => setSpaceChoice({ id: sp.id, name: sp.name })}>
-                    <Text style={st.cardName} numberOfLines={1}>{sp.name}</Text>
-                    <View style={st.savingsRows}>
-                      <View style={st.savingsRow}>
-                        <Text style={st.savingsLabel}>This month's savings:</Text>
-                        <Text style={st.savingsValue}>{fmt(sp.savedMonth)}</Text>
+              <Text style={[st.sectionHeader, { marginTop: 28 }]}>Expenses</Text>
+              <View style={st.timelineWrap}>
+                <View style={st.timelineCol}>
+                  {expenseSpaces.map((sp: any, i: number) => {
+                    const count = expenseSpaces.length;
+                    const isFirst = i === 0; const isLast = i === count - 1;
+                    const showDot = count > 1 && (isFirst || isLast);
+                    const showLine = count > 1 && !isFirst && !isLast;
+                    return (
+                      <View key={sp.id} style={st.tlDotWrap}>
+                        {showDot && (<><View style={isFirst ? st.tlLineHidden : st.tlLine} /><View style={st.tlDot} /><View style={isLast ? st.tlLineHidden : st.tlLine} /></>)}
+                        {showLine && <View style={[st.tlLine, { flex: 1 }]} />}
+                        {count === 1 && (<><View style={st.tlLineHidden} /><View style={st.tlDot} /><View style={st.tlLineHidden} /></>)}
                       </View>
-                      <View style={st.savingsRow}>
-                        <Text style={st.savingsLabel}>Savings up to date:</Text>
-                        <Text style={st.savingsValue}>{fmt(sp.savedAllTime)}</Text>
-                      </View>
-                      {goal > 0 && (
-                        <View style={st.savingsRow}>
-                          <Text style={st.savingsLabel}>Goal:</Text>
-                          <Text style={st.savingsValue}>{fmt(goal)}</Text>
+                    );
+                  })}
+                </View>
+                <View style={st.cardsCol}>
+                  {expenseSpaces.map((sp: any) => {
+                    const budget = sp.budget ? convert(sp.budget, sp.budget_currency ?? 'PHP', defaultCurrency) : 0;
+                    const over = budget > 0 && sp.spent > budget;
+                    return (
+                      <TouchableOpacity key={sp.id} style={st.card} activeOpacity={0.7} onPress={() => setSpaceChoice({ id: sp.id, name: sp.name })}>
+                        <View style={st.cardLeft}>
+                          <Text style={st.cardName} numberOfLines={2} ellipsizeMode="tail">{sp.name}</Text>
                         </View>
-                      )}
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
+                        <View style={st.cardDivider} />
+                        <View style={st.cardRight}>
+                          <Text style={st.cardLabel}>This month's spending</Text>
+                          <Text style={st.cardValue}>
+                            <Text style={over ? { color: '#FF5757' } : {}}>{fmt(sp.spent)}</Text>
+                            {budget > 0 ? <Text style={st.cardValueMuted}> / {fmt(budget)}</Text> : null}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
             </>
           )}
 
@@ -249,7 +292,7 @@ export default function SpacesPanel({ onClose }: Props) {
       )}
 
       {/* Space action sheet */}
-      <BottomSheet visible={!!spaceChoice} onClose={() => setSpaceChoice(null)} title={spaceChoice?.name ?? ''}>
+      <BottomSheet visible={!!spaceChoice} onClose={() => { setSpaceChoice(null); setConfirmDelete(false); }} title={spaceChoice?.name ?? ''}>
         <TouchableOpacity style={st.choiceRow} activeOpacity={0.8} onPress={() => { const sp = spaceChoice; setSpaceChoice(null); openRecordingsPanel({ spaceId: sp!.id, spaceName: sp!.name }); }}>
           <View style={{ flex: 1 }}>
             <Text style={st.choiceTitle}>View Recordings</Text>
@@ -262,10 +305,26 @@ export default function SpacesPanel({ onClose }: Props) {
             <Text style={st.choiceSub}>rename or archive</Text>
           </View>
         </TouchableOpacity>
-        <TouchableOpacity style={[st.choiceRow, { borderBottomWidth: 0 }]} activeOpacity={0.8} onPress={() => { const sp = spaceChoice!; handleDeleteSpace(sp); }}>
+        <TouchableOpacity style={[st.choiceRow, { borderBottomWidth: 0 }]} activeOpacity={0.8} onPress={() => setConfirmDelete(true)}>
           <View style={{ flex: 1 }}>
-            <Text style={[st.choiceTitle, { color: '#FF5757' }]}>Delete Space</Text>
-            <Text style={st.choiceSub}>permanently deletes space and all recordings</Text>
+            {confirmDelete ? (
+              <>
+                <Text style={[st.choiceTitle, { color: '#FF5757' }]}>Are you sure?</Text>
+                <View style={{ flexDirection: 'row', gap: 10, marginTop: 8 }}>
+                  <TouchableOpacity onPress={() => setConfirmDelete(false)} style={{ flex: 1, paddingVertical: 10, borderRadius: 999, borderWidth: 1, borderColor: '#d2d2d2', alignItems: 'center' }}>
+                    <Text style={{ fontFamily: AppFont.semiBold, fontSize: 12, color: '#111' }}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => doDeleteSpace(spaceChoice!)} style={{ flex: 1, paddingVertical: 10, borderRadius: 999, backgroundColor: '#FF5757', alignItems: 'center' }}>
+                    <Text style={{ fontFamily: AppFont.semiBold, fontSize: 12, color: '#fff' }}>Delete</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            ) : (
+              <>
+                <Text style={[st.choiceTitle, { color: '#FF5757' }]}>Delete Space</Text>
+                <Text style={st.choiceSub}>permanently deletes space and all recordings</Text>
+              </>
+            )}
           </View>
         </TouchableOpacity>
       </BottomSheet>
@@ -311,25 +370,26 @@ const st = StyleSheet.create({
   addBtn:     { alignSelf: 'flex-end', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999, backgroundColor: '#111111', marginBottom: 20 },
   addBtnText: { fontFamily: AppFont.semiBold, fontSize: 12, color: '#ffffff' },
 
-  sectionHeader: { ...DC.typography.sectionHeader, marginTop: 24, marginBottom: 10 },
+  sectionHeader: { fontFamily: 'Poppins-Bold', fontSize: 17, color: '#111111', marginBottom: 16 },
 
-  card: {
-    ...DC.dottedCard,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  cardName:      { ...DC.typography.sectionBody, fontStyle: 'italic', flex: 1 },
-  cardCount:     { ...DC.typography.sectionHeader },
-  cardValue:     { ...DC.typography.sectionBody },
-  cardValueBold: { ...DC.typography.sectionHeader },
-  cardValueOver: { ...DC.typography.sectionHeader, color: '#FF5757' },
-  cardValueMuted:{ ...DC.typography.sectionBody },
+  // Timeline
+  timelineWrap: { flexDirection: 'row', gap: 10 },
+  timelineCol:  { width: 12, alignItems: 'flex-start' },
+  tlDotWrap:    { flex: 1, alignItems: 'flex-start', justifyContent: 'center', minHeight: 100 },
+  tlDot:        { width: 10, height: 10, borderRadius: 5, backgroundColor: '#d2d2d2', zIndex: 1, marginLeft: -4.25 },
+  tlLine:       { flex: 1, width: 1.5, backgroundColor: '#d2d2d2', minHeight: 10 },
+  tlLineHidden: { flex: 1, width: 1.5, backgroundColor: 'transparent' },
+  cardsCol:     { flex: 1, gap: 10 },
 
-  savingsRows: { marginTop: 6, gap: 2 },
-  savingsRow:  { flexDirection: 'row', gap: 6, alignItems: 'center' },
-  savingsLabel:{ ...DC.typography.subContent, fontStyle: 'italic' },
-  savingsValue:{ ...DC.typography.subContent, fontFamily: 'Poppins-Bold' as string },
+  // Card
+  card:         { flexDirection: 'row', alignItems: 'stretch', borderWidth: 1.5, borderColor: '#d2d2d2', borderRadius: 12, backgroundColor: '#fff', overflow: 'hidden' },
+  cardLeft:     { width: 90, height: 90, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 8 },
+  cardName:     { fontFamily: 'Poppins-Bold', fontSize: 11, color: '#111111', textAlign: 'center' },
+  cardDivider:  { width: 0.5, backgroundColor: '#d2d2d2' },
+  cardRight:    { flex: 1, paddingVertical: 14, paddingHorizontal: 14, justifyContent: 'center' },
+  cardLabel:    { fontFamily: 'Poppins-Regular', fontSize: 10, color: DC.pageTextMuted, marginBottom: 2 },
+  cardValue:    { fontFamily: 'Poppins-Bold', fontSize: 11, color: '#111111' },
+  cardValueMuted:{ fontFamily: 'Poppins-Regular', fontSize: 11, color: DC.pageTextMuted },
 
   empty:     { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 60 },
   emptyText: { ...DC.typography.muted },

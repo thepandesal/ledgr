@@ -23,5 +23,48 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      (function() {
+        var blocked = false;
+        document.addEventListener('visibilitychange', function() {
+          if (document.visibilityState === 'hidden') {
+            blocked = true;
+            setTimeout(function() { blocked = false; }, 5000);
+          }
+        });
+        // Intercept all possible reload mechanisms
+        var _reload = location.reload.bind(location);
+        location.reload = function() {
+          console.log('[reload intercepted] location.reload, blocked:', blocked);
+          if (blocked) return;
+          _reload();
+        };
+        // Intercept WebSocket to log messages from dev server
+        var _WS = window.WebSocket;
+        window.WebSocket = function(url, protocols) {
+          var ws = protocols ? new _WS(url, protocols) : new _WS(url);
+          var origAddEventListener = ws.addEventListener.bind(ws);
+          ws.addEventListener = function(type, handler, opts) {
+            if (type === 'message') {
+              origAddEventListener(type, function(e) {
+                try {
+                  var data = JSON.parse(e.data);
+                  console.log('[ws message]', data.type || data);
+                  if (blocked && (data.type === 'reload' || data.type === 'reloadApp')) {
+                    console.log('[ws reload blocked]');
+                    return;
+                  }
+                } catch(err) {}
+                handler(e);
+              }, opts);
+            } else {
+              origAddEventListener(type, handler, opts);
+            }
+          };
+          return ws;
+        };
+        window.WebSocket.prototype = _WS.prototype;
+      })();
+    </script>
   </body>
 </html>

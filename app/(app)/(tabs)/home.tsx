@@ -596,30 +596,100 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
         {/* Recent Transactions */}
         <SectionHeader title="Recent Transactions" onArrowRight={() => openRecordingsPanel()} />
         {recent.length === 0 ? <EmptyRow label="no recordings" /> : (
-          <View style={s.sectionContent}>
-            {recent.slice(0, 3).map((r: any, i: number) => (
-              <TouchableOpacity key={r.id} style={[s.recRow, i === Math.min(recent.length, 3) - 1 && s.recRowLast]} activeOpacity={0.7} onPress={() => openRecording(r.id)}>
-                <View style={{ flex: 1 }}>
-                  <Text style={s.recRowName} numberOfLines={1}>{r.name.split(' ').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')}</Text>
-                  <Text style={s.recRowSub}>{r.space?.name ?? 'No Folder'}</Text>
-                  <Text style={s.recRowSub}>{formatDateLabel(r.transaction_date)}</Text>
-                </View>
-                <Text style={s.recRowAmount}>{['expense','debt','payment'].includes(r.type) ? '- ' : ''}{fmt(Number(r.amount))}</Text>
-              </TouchableOpacity>
-            ))}
+          <View style={s.sectionContentLeft}>
+            <View style={s.recList}>
+              {/* Timeline column */}
+              <View style={s.recTimelineCol}>
+                {recent.slice(0, 3).map((r: any, i: number) => {
+                  const count = Math.min(recent.length, 3);
+                  const isFirst = i === 0;
+                  const isLast = i === count - 1;
+                  const showDot = count > 1 && (isFirst || isLast);
+                  const showLine = count > 1 && !isFirst && !isLast;
+                  return (
+                    <View key={r.id} style={s.recDotWrap}>
+                      {showDot && (
+                        <>
+                          <View style={isFirst ? s.recLineHidden : s.recLineSegment} />
+                          <View style={s.recDot} />
+                          <View style={isLast ? s.recLineHidden : s.recLineSegment} />
+                        </>
+                      )}
+                      {showLine && <View style={[s.recLineSegment, { flex: 1 }]} />}
+                    </View>
+                  );
+                })}
+              </View>
+              {/* Cards column */}
+              <View style={s.recCardsCol}>
+                {recent.slice(0, 3).map((r: any) => {
+                  const isOut = ['expense','debt','payment'].includes(r.type);
+                  const dateObj = new Date(r.transaction_date + 'T00:00:00');
+                  const today = new Date(); today.setHours(0,0,0,0);
+                  const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
+                  const dateLabel = dateObj.getTime() === today.getTime() ? 'Today'
+                    : dateObj.getTime() === yesterday.getTime() ? 'Yesterday'
+                    : dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                  const nameStr = r.name.split(' ').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+                  return (
+                    <TouchableOpacity key={r.id} style={s.recCard} activeOpacity={0.7} onPress={() => openRecording(r.id)}>
+                      <View style={s.recDateCol}>
+                        <Text style={s.recDateText}>{dateLabel}</Text>
+                      </View>
+                      <View style={s.recCardDivider} />
+                      <View style={s.recContentCol}>
+                        <Text style={s.recAmount}>{isOut ? '- ' : ''}{fmt(Number(r.amount))}</Text>
+                        <Text style={s.recName} numberOfLines={1}>{nameStr}</Text>
+                        <Text style={s.recFolder} numberOfLines={1}>{r.space?.name ?? 'No Folder'}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
           </View>
         )}
         <View style={s.divider} />
         {/* Reminders */}
         <SectionHeader title="Reminders" onArrowRight={() => openRemindersPanel()} />
         {reminders.length === 0 ? <EmptyRow label="no reminders" /> : (
-          <View style={s.sectionContent}>
-            {reminders.map((r: any, i: number) => (
-              <View key={r.id} style={[s.reminderRow, i === reminders.length - 1 && s.reminderRowLast]}>
-                <Text style={s.recRowName}>{r.name}</Text>
-                <Text style={s.recRowSub}>{r.recording_type === 'expense' ? 'Expense' : 'Income'}</Text>
+          <View style={s.sectionContentLeft}>
+            <View style={s.recList}>
+              <View style={s.recTimelineCol}>
+                {reminders.map((r: any, i: number) => {
+                  const count = reminders.length;
+                  const isFirst = i === 0;
+                  const isLast = i === count - 1;
+                  const showDot = count > 1 && (isFirst || isLast);
+                  const showLine = count > 1 && !isFirst && !isLast;
+                  return (
+                    <View key={r.id} style={s.recDotWrap}>
+                      {showDot && (
+                        <>
+                          <View style={isFirst ? s.recLineHidden : s.recLineSegment} />
+                          <View style={s.recDot} />
+                          <View style={isLast ? s.recLineHidden : s.recLineSegment} />
+                        </>
+                      )}
+                      {showLine && <View style={[s.recLineSegment, { flex: 1 }]} />}
+                    </View>
+                  );
+                })}
               </View>
-            ))}
+              <View style={s.recCardsCol}>
+                {reminders.map((r: any) => (
+                  <View key={r.id} style={s.recCard}>
+                    <View style={s.recDateCol}>
+                      <Text style={s.recDateText}>{r.recording_type === 'expense' ? 'Expense' : 'Income'}</Text>
+                    </View>
+                    <View style={s.recCardDivider} />
+                    <View style={s.recContentCol}>
+                      <Text style={s.recName}>{r.name}</Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </View>
           </View>
         )}
         <View style={s.divider} />
@@ -628,39 +698,75 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
         {spaces.length === 0 ? <EmptyRow label="no folders" /> : (() => {
           const savingsSpaces = spaces.filter((sp: any) => sp.space_type === 'savings');
           const expenseSpaces = spaces.filter((sp: any) => sp.space_type !== 'savings');
+          const allSpaces = [...savingsSpaces, ...expenseSpaces];
+          const count = allSpaces.length;
           return (
-            <View style={s.sectionContent}>
-              {savingsSpaces.length > 0 && (
-                <>
-                  <Text style={s.folderSubtitle}>Savings</Text>
-                  {savingsSpaces.map((sp: any, i: number) => (
-                    <TouchableOpacity key={sp.id} style={[s.folderRow, i === savingsSpaces.length - 1 && s.folderRowLast]} activeOpacity={0.7} onPress={() => setSpaceChoice({ id: sp.id, name: sp.name })}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={s.recRowName}>{sp.name}</Text>
-                        <Text style={s.recRowSub}>Goal: {fmt(sp.budget ?? 0)}</Text>
-                        <Text style={s.recRowSub}>Up to date: {fmt(sp.monthNet ?? 0)}</Text>
+            <View style={s.sectionContentLeft}>
+              <View style={s.recList}>
+                <View style={s.recTimelineCol}>
+                  {allSpaces.map((sp: any, i: number) => {
+                    const isFirst = i === 0;
+                    const isLast = i === count - 1;
+                    const showDot = count > 1 && (isFirst || isLast);
+                    const showLine = count > 1 && !isFirst && !isLast;
+                    return (
+                      <View key={sp.id} style={s.recDotWrap}>
+                        {showDot && (
+                          <>
+                            <View style={isFirst ? s.recLineHidden : s.recLineSegment} />
+                            <View style={s.recDot} />
+                            <View style={isLast ? s.recLineHidden : s.recLineSegment} />
+                          </>
+                        )}
+                        {showLine && <View style={[s.recLineSegment, { flex: 1 }]} />}
                       </View>
-                      <Text style={s.recRowAmount}>{fmt(sp.spent ?? 0)}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </>
-              )}
-              {expenseSpaces.length > 0 && (
-                <>
-                  <Text style={[s.folderSubtitle, savingsSpaces.length > 0 && { marginTop: 16 }]}>Expense</Text>
-                  {expenseSpaces.map((sp: any, i: number) => (
-                    <TouchableOpacity key={sp.id} style={[s.folderRow, i === expenseSpaces.length - 1 && s.folderRowLast]} activeOpacity={0.7} onPress={() => setSpaceChoice({ id: sp.id, name: sp.name })}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={s.recRowName}>{sp.name}</Text>
-                        <Text style={s.recRowSub}>Budget: {fmt(sp.budget ?? 0)}</Text>
-                      </View>
-                      <Text style={[s.recRowAmount, (sp.spent ?? 0) > 0 && { color: DC.btnDangerBg }]}>
-                        {(sp.spent ?? 0) > 0 ? ('- ' + fmt(sp.spent)) : fmt(sp.spent ?? 0)}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </>
-              )}
+                    );
+                  })}
+                </View>
+                <View style={s.recCardsCol}>
+                  {savingsSpaces.length > 0 && (
+                    <>
+                      <Text style={s.folderSubtitle}>Savings</Text>
+                      {savingsSpaces.map((sp: any) => (
+                        <TouchableOpacity key={sp.id} style={s.recCard} activeOpacity={0.7} onPress={() => setSpaceChoice({ id: sp.id, name: sp.name })}>
+                          <View style={s.recDateCol}>
+                            <Text style={s.recDateText}>{sp.name}</Text>
+                          </View>
+                          <View style={s.recCardDivider} />
+                          <View style={s.recContentCol}>
+                            <Text style={s.recName}>Goal: {fmt(sp.budget ?? 0)}</Text>
+                            <Text style={s.recFolder}>Up to date: {fmt(sp.monthNet ?? 0)}</Text>
+                          </View>
+                          <View style={{ justifyContent: 'center', paddingRight: 14 }}>
+                            <Text style={s.recAmount}>{fmt(sp.spent ?? 0)}</Text>
+                          </View>
+                        </TouchableOpacity>
+                      ))}
+                    </>
+                  )}
+                  {expenseSpaces.length > 0 && (
+                    <>
+                      <Text style={[s.folderSubtitle, savingsSpaces.length > 0 && { marginTop: 16 }]}>Expense</Text>
+                      {expenseSpaces.map((sp: any) => (
+                        <TouchableOpacity key={sp.id} style={s.recCard} activeOpacity={0.7} onPress={() => setSpaceChoice({ id: sp.id, name: sp.name })}>
+                          <View style={s.recDateCol}>
+                            <Text style={s.recDateText}>{sp.name}</Text>
+                          </View>
+                          <View style={s.recCardDivider} />
+                          <View style={s.recContentCol}>
+                            <Text style={s.recName}>Budget: {fmt(sp.budget ?? 0)}</Text>
+                          </View>
+                          <View style={{ justifyContent: 'center', paddingRight: 14 }}>
+                            <Text style={[s.recAmount, (sp.spent ?? 0) > 0 && { color: DC.btnDangerBg }]}>
+                              {(sp.spent ?? 0) > 0 ? ('- ' + fmt(sp.spent)) : fmt(sp.spent ?? 0)}
+                            </Text>
+                          </View>
+                        </TouchableOpacity>
+                      ))}
+                    </>
+                  )}
+                </View>
+              </View>
             </View>
           );
         })()}
@@ -902,16 +1008,35 @@ const s = StyleSheet.create({
   // Section header
   sectionRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, paddingHorizontal: DC.pagePadding },
   sectionContent: { paddingHorizontal: DC.pagePadding },
+  sectionContentLeft: { paddingLeft: DC.pagePadding, paddingRight: DC.pagePadding },
   sectionTitle: { fontFamily: 'Poppins-Bold', fontSize: 14, color: DC.pageText },
   viewBtn:      { backgroundColor: '#8c52ff', borderRadius: 999, paddingHorizontal: 16, paddingVertical: 7 },
   viewBtnText:  { fontFamily: 'Poppins-SemiBold', fontSize: 11, color: '#ffffff' },
 
   // Rows shared across sections
-  recRow:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: DC.rowDivider.height, borderBottomColor: DC.rowDivider.backgroundColor },
-  recRowLast:  { borderBottomWidth: 0 },
-  recRowName:  { fontFamily: 'Poppins-Bold', fontSize: 13, color: DC.pageText },
-  recRowSub:   { fontFamily: 'Poppins-Regular', fontSize: 11, color: DC.pageTextMuted, marginTop: 2 },
-  recRowAmount: { fontFamily: 'Poppins-Bold', fontSize: 13, color: DC.pageText },
+  recList:       { flexDirection: 'row', gap: 10 },
+  recTimelineCol: { width: 12, alignItems: 'flex-start' },
+  recDotWrap:     { flex: 1, alignItems: 'flex-start', justifyContent: 'center', minHeight: 74 },
+  recDot:         { width: 10, height: 10, borderRadius: 5, backgroundColor: '#d2d2d2', zIndex: 1, marginLeft: -4.25 },
+  recLineSegment: { flex: 1, width: 1.5, backgroundColor: '#d2d2d2', minHeight: 10 },
+  recLineHidden:  { flex: 1, width: 1.5, backgroundColor: 'transparent' },
+  recCardsCol:    { flex: 1, gap: 10 },
+  recCard:       { flexDirection: 'row', alignItems: 'flex-start', borderWidth: 1.5, borderColor: '#d2d2d2', borderRadius: 12, backgroundColor: '#fff', overflow: 'hidden' },
+  recDateCol:    { width: 80, height: 80, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 10 },
+  recDateText:   { fontFamily: 'Poppins-Bold', fontSize: 11, color: DC.pageTextMuted, textAlign: 'center' },
+  recCardDivider:{ width: 0.5, backgroundColor: '#d2d2d2' },
+  recContentCol: { flex: 1, paddingVertical: 14, paddingHorizontal: 14 },
+  recAmount:     { fontFamily: 'Poppins-Bold', fontSize: 11, color: DC.pageText, marginBottom: 2 },
+  recName:       { fontFamily: 'Poppins-Regular', fontSize: 10, color: DC.pageText },
+  recFolder:     { fontFamily: 'Poppins-Regular', fontSize: 10, color: DC.pageTextMuted },
+  recRowWrap:    { flexDirection: 'row', alignItems: 'stretch', marginBottom: 10 },
+  recTimeline:   { width: 20, alignItems: 'center', paddingTop: 16 },
+  recLine:       { flex: 1, width: 1, backgroundColor: '#e0e0e0', marginTop: 4 },
+  recRow:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: DC.rowDivider.height, borderBottomColor: DC.rowDivider.backgroundColor },
+  recRowLast:    { borderBottomWidth: 0 },
+  recRowName:    { fontFamily: 'Poppins-Bold', fontSize: 13, color: DC.pageText },
+  recRowSub:     { fontFamily: 'Poppins-Regular', fontSize: 11, color: DC.pageTextMuted, marginTop: 2 },
+  recRowAmount:  { fontFamily: 'Poppins-Bold', fontSize: 13, color: DC.pageText },
 
   // Reminders
   reminderRow: { paddingVertical: 10, borderBottomWidth: DC.rowDivider.height, borderBottomColor: DC.rowDivider.backgroundColor },
