@@ -5,6 +5,7 @@ import { useEffect, useState, useRef } from 'react';
 import { supabase } from '../src/lib/supabase';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import * as Linking from 'expo-linking';
+import SyncModal from '../components/SyncModal';
 
 // Global letter spacing for all Text components
 Text.defaultProps = { ...Text.defaultProps, style: [{ letterSpacing: 0.3 }, Text.defaultProps?.style] };
@@ -118,6 +119,7 @@ export default function RootLayout() {
 
   return (
     <QueryClientProvider client={queryClient}>
+    <SyncModal />
     <Stack
       screenOptions={{
         headerShown: false,

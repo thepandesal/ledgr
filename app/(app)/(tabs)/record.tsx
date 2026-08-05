@@ -118,19 +118,28 @@ export default function RecordScreen({ isActive }: { isActive?: boolean }) {
 
   const handleSave = async () => {
     if (saving || saved) return;
+    if (!userId) { setError('not logged in'); return; }
     const amountVal = parseFloat(entry !== '' ? entry : String(prev ?? 0));
     if (isNaN(amountVal) || amountVal <= 0) { setError('enter an amount'); return; }
     setSaving(true); setError(''); setSaved(false);
     const minDelay = new Promise(res => setTimeout(res, 800));
     try {
-      const type = isLoan ? 'debt' : (direction === 'in' ? 'income' : 'expense');
-      const status = type === 'income' ? 'received' : type === 'expense' ? 'paid' : 'unpaid';
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (!currentUser) { setError('session expired, please log in again'); setSaving(false); return; }
+      const type = isLoan
+        ? (direction === 'out' ? 'expense' : 'debt')
+        : (direction === 'in' ? 'income' : 'expense');
+      const is_due = isLoan && direction === 'out';
+      const status = (isLoan && direction === 'out') ? 'unpaid'
+        : (isLoan && direction === 'in') ? 'unpaid'
+        : (type === 'income' ? 'received' : 'paid');
       const cat = CATEGORIES.find(c => c.key === category);
       const matched = userCategories.find(c => c.name.toLowerCase() === (cat?.label ?? '').toLowerCase());
       const { error: err } = await supabase.from('recordings').insert({
-        user_id: userId,
-        name: cat?.label ?? (direction === 'in' ? 'Money In' : 'Expense'),
+        user_id: currentUser.id,
+        name: cat?.label ?? (isLoan ? 'Loan' : (direction === 'in' ? 'Money In' : 'Expense')),
         type,
+        is_due: is_due,
         amount: amountVal,
         transaction_date: new Date().toISOString().split('T')[0],
         space_id: spaceId ?? null,
@@ -193,7 +202,7 @@ export default function RecordScreen({ isActive }: { isActive?: boolean }) {
         {/* ── Currency + amount ── */}
         <View style={s.amountBox}>
           <Text style={s.currencyLabel}>{defaultCurrency}</Text>
-          <Text style={s.amountInput} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+          <Text style={[s.amountInput, direction === 'in' ? { color: '#2ab671' } : { color: '#ed6a6a' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
             {displayAmount}
           </Text>
           <TouchableOpacity style={s.amountDel} onPress={pressDel} activeOpacity={0.7} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>

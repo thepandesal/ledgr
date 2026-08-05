@@ -737,9 +737,6 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
                             <Text style={s.recName}>Goal: {fmt(sp.budget ?? 0)}</Text>
                             <Text style={s.recFolder}>Up to date: {fmt(sp.monthNet ?? 0)}</Text>
                           </View>
-                          <View style={{ justifyContent: 'center', paddingRight: 14 }}>
-                            <Text style={s.recAmount}>{fmt(sp.spent ?? 0)}</Text>
-                          </View>
                         </TouchableOpacity>
                       ))}
                     </>
@@ -755,11 +752,6 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
                           <View style={s.recCardDivider} />
                           <View style={s.recContentCol}>
                             <Text style={s.recName}>Budget: {fmt(sp.budget ?? 0)}</Text>
-                          </View>
-                          <View style={{ justifyContent: 'center', paddingRight: 14 }}>
-                            <Text style={[s.recAmount, (sp.spent ?? 0) > 0 && { color: DC.btnDangerBg }]}>
-                              {(sp.spent ?? 0) > 0 ? ('- ' + fmt(sp.spent)) : fmt(sp.spent ?? 0)}
-                            </Text>
                           </View>
                         </TouchableOpacity>
                       ))}
@@ -1025,7 +1017,7 @@ const s = StyleSheet.create({
   recDateCol:    { width: 80, height: 80, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 10 },
   recDateText:   { fontFamily: 'Poppins-Bold', fontSize: 11, color: DC.pageTextMuted, textAlign: 'center' },
   recCardDivider:{ width: 0.5, backgroundColor: '#d2d2d2' },
-  recContentCol: { flex: 1, paddingVertical: 14, paddingHorizontal: 14 },
+  recContentCol: { flex: 1, paddingVertical: 14, paddingHorizontal: 14, justifyContent: 'center' },
   recAmount:     { fontFamily: 'Poppins-Bold', fontSize: 11, color: DC.pageText, marginBottom: 2 },
   recName:       { fontFamily: 'Poppins-Regular', fontSize: 10, color: DC.pageText },
   recFolder:     { fontFamily: 'Poppins-Regular', fontSize: 10, color: DC.pageTextMuted },
