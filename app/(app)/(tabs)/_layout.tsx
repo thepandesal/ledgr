@@ -88,7 +88,7 @@ const OTHERS_ITEMS = [
   { key: 'receivables', label: 'Receivables', icon: 'arrow-undo-outline',    route: '/(app)/receivables' },
 ];
 
-const SLIDE_KEYS = ['home', 'accounts', 'record', 'dashboard', 'categories', 'receipts', 'bill-split', 'contacts', 'notifications-page', 'reminders', 'profile'];
+const SLIDE_KEYS = ['home', 'accounts', 'record', 'dashboard', 'categories', 'receipts', 'bill-split', 'contacts', 'notifications-page', 'reminders', 'profile', 'spaces'];
 
 const PROFILE_DANGER   = '#FFAB91';
 const PROFILE_DANGEBG  = '#FFF5F2';
@@ -113,6 +113,7 @@ const SCREENS: Record<string, (isActive: boolean) => React.ReactNode> = {
   receipts:             (isActive) => <MemoReceipts isActive={isActive} />,
   contacts:             (isActive) => <MemoContacts isActive={isActive} />,
   reminders:            (isActive) => <MemoReminders isActive={isActive} />,
+  spaces:               () => <SpacesPanel onClose={() => {}} />,
 };
 
 // Tracks which tabs have been visited at least once — for lazy mounting
@@ -980,7 +981,7 @@ export default function TabsLayout() {
     <View style={s.container}>
 
       {/* ── Shared flat header ── */}
-      {activeTab !== 'profile' && activeTab !== 'accounts' && <View style={[s.waveBg, { paddingTop: insets.top + 28 }]}>
+      {activeTab !== 'profile' && activeTab !== 'accounts' && activeTab !== 'spaces' && <View style={[s.waveBg, { paddingTop: insets.top + 28 }]}>
         {activeTab === 'home' ? (
           <View style={s.homeHeaderRow}>
             <View style={s.homeHeaderTextCol}>
@@ -1058,7 +1059,7 @@ export default function TabsLayout() {
           </Animated.View>
         )}
       </View>}
-      {(activeTab === 'profile' || activeTab === 'accounts') && <View style={{ height: 0 }} />}
+      {(activeTab === 'profile' || activeTab === 'accounts' || activeTab === 'spaces') && <View style={{ height: 0 }} />}
 
       <View style={s.content}>
         {/* Slideable screens */}

@@ -153,6 +153,9 @@ export default function ReceiptsScreen({ isActive }: { isActive?: boolean }) {
         <View style={s.center}><ActivityIndicator color={Brand.color.accent} /></View>
       ) : entries.length === 0 ? (
         <View style={s.center}>
+          <TouchableOpacity onPress={() => setAddModal(true)} activeOpacity={0.7} style={s.addBtn}>
+            <Text style={s.addBtnText}>+ New Receipt</Text>
+          </TouchableOpacity>
           <Text style={Brand.type.emptyText}>no receipts yet</Text>
         </View>
       ) : (
@@ -163,6 +166,9 @@ export default function ReceiptsScreen({ isActive }: { isActive?: boolean }) {
           scrollEventThrottle={400}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         >
+          <TouchableOpacity onPress={() => setAddModal(true)} activeOpacity={0.7} style={s.addBtn}>
+            <Text style={s.addBtnText}>+ New Receipt</Text>
+          </TouchableOpacity>
           {paginatedEntries.map(entry => (
             <TouchableOpacity key={entry.id} style={s.card} activeOpacity={0.85}
               onPress={() => router.push({ pathname: '/(app)/receipt-detail', params: { receiptId: entry.id } } as any)}>
@@ -254,6 +260,9 @@ const s = StyleSheet.create({
   linkedDot:    { width: 6, height: 6, borderRadius: 3 },
   linkedText:   { ...Brand.type.cardMeta, color: Colors.text, maxWidth: 140 },
   unlinkedText: { ...Brand.type.cardMeta, marginTop: 2 },
+
+  addBtn:     { alignSelf: 'flex-end', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999, backgroundColor: '#111111', marginBottom: 20 },
+  addBtnText: { fontFamily: Brand.font.monoBold, fontSize: 12, color: '#ffffff' },
 
   fab: {
     position: 'absolute', bottom: 24, right: 24,

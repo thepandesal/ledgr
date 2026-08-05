@@ -1,16 +1,17 @@
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { AppFont } from '@/src/lib/fonts';
 import { useNav } from '@/src/lib/NavContext';
 import NavIcon from './NavIcons';
+import { useState } from 'react';
 
 const TABS = [
-  { key: 'home',              label: 'Home',          icon: 'home-outline' },
-  { key: 'accounts',           label: 'Accounts',      icon: 'wallet-outline' },
-  { key: 'record',            label: 'Record',        icon: 'add' },
-  { key: 'notifications-tab', label: 'Notifications', icon: 'notifications-outline' },
-  { key: 'others',            label: 'Others',        icon: 'apps-outline' },
+  { key: 'home',       label: 'Dashboard', icon: 'home-outline' },
+  { key: 'spaces',     label: 'Folders',   icon: 'folder-outline' },
+  { key: 'record',     label: 'Record',    icon: 'add' },
+  { key: 'accounts',   label: 'Accounts',  icon: 'wallet-outline' },
+  { key: 'categories', label: 'Categories', icon: 'pricetag-outline' },
 ];
 
 const NAV_BG       = '#fffffd';
@@ -22,15 +23,29 @@ const ADD_SIZE = 56;
 export default function BottomNav() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { activeTab, handleNavPress, unreadCount } = useNav();
+  const { activeTab, handleNavPress } = useNav();
+
+  const [showChoice, setShowChoice] = useState(false);
 
   const handlePress = (key: string) => {
+    if (key === 'record') { setShowChoice(true); return; }
     if (router.canDismiss()) {
       handleNavPress(key);
       router.dismissAll();
     } else {
       handleNavPress(key);
     }
+  };
+
+  const goRecord = () => {
+    setShowChoice(false);
+    if (router.canDismiss()) { handleNavPress('record'); router.dismissAll(); }
+    else handleNavPress('record');
+  };
+
+  const goCapture = () => {
+    setShowChoice(false);
+    router.push('/(app)/capture-receipt' as any);
   };
 
   return (
@@ -41,8 +56,8 @@ export default function BottomNav() {
           if (tab.key === 'record') return <View key={tab.key} style={s.spacer} />;
 
           const isActive = activeTab === tab.key;
-          const iconName = tab.key === 'notifications-tab' ? 'notifications' : tab.key;
-          const badge = tab.key === 'notifications-tab' ? unreadCount : 0;
+          const iconName = tab.icon;
+          const badge = 0;
           return (
             <TouchableOpacity
               key={tab.key}
@@ -65,7 +80,7 @@ export default function BottomNav() {
           );
         })}
 
-        {/* Floating add button — opens Record quick-add tab */}
+        {/* Floating add button */}
         <TouchableOpacity
           style={[s.addBtn, activeTab === 'record' && s.addBtnActive]}
           onPress={() => handlePress('record')}
@@ -74,6 +89,29 @@ export default function BottomNav() {
           <NavIcon name="add" size={28} color="#fff" />
         </TouchableOpacity>
       </View>
+
+      {/* Choice modal */}
+      <Modal visible={showChoice} transparent animationType="fade" onRequestClose={() => setShowChoice(false)}>
+        <TouchableOpacity style={s.overlay} activeOpacity={1} onPress={() => setShowChoice(false)}>
+          <View style={s.sheet}>
+            <TouchableOpacity style={s.choiceBtn} onPress={goRecord} activeOpacity={0.8}>
+              <NavIcon name="create-outline" size={22} color="#000" />
+              <View>
+                <Text style={s.choiceTitle}>Add Record</Text>
+                <Text style={s.choiceSub}>quick-add a transaction</Text>
+              </View>
+            </TouchableOpacity>
+            <View style={s.choiceDivider} />
+            <TouchableOpacity style={s.choiceBtn} onPress={goCapture} activeOpacity={0.8}>
+              <NavIcon name="camera-outline" size={22} color="#000" />
+              <View>
+                <Text style={s.choiceTitle}>Capture Receipt</Text>
+                <Text style={s.choiceSub}>photo one or more receipts</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
@@ -179,4 +217,26 @@ const s = StyleSheet.create({
     color: '#fff',
     lineHeight: 13,
   },
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    paddingBottom: 48,
+  },
+  choiceBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    paddingVertical: 16,
+  },
+  choiceDivider: { height: 1, backgroundColor: '#f0f0f0' },
+  choiceTitle: { fontFamily: AppFont.semiBold, fontSize: 15, color: '#111' },
+  choiceSub:   { fontFamily: AppFont.regular,  fontSize: 12, color: '#999', marginTop: 2 },
 });

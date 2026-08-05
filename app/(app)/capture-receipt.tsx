@@ -120,7 +120,9 @@ export default function CaptureReceiptScreen() {
     <Animated.View style={[pageStyles.container, { transform: [{ translateX: slideAnim }] }]}>
       <SafeAreaView style={pageStyles.inner}>
         <View style={s.header}>
-
+          <TouchableOpacity onPress={handleBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Text style={s.backBtn}>✕ cancel</Text>
+          </TouchableOpacity>
           <View>
             <Text style={pageStyles.pageLabel}>receipts</Text>
             <Text style={[pageStyles.pageName, { fontSize: 22, lineHeight: 26 }]}>add photos</Text>
@@ -173,7 +175,8 @@ export default function CaptureReceiptScreen() {
 const CELL = (width - 48) / 3;
 
 const s = StyleSheet.create({
-  header: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 28, paddingTop: 14, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 14, paddingHorizontal: 28, paddingTop: 14, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  backBtn: { fontFamily: Fonts.mono, fontSize: 12, color: Colors.muted },
   grid: { padding: 16, gap: 8 },
   photoCell: { width: CELL, height: CELL, marginRight: 8, marginBottom: 8, borderRadius: Radius.lg, overflow: 'hidden' },
   photoThumb: { width: '100%', height: '100%' },

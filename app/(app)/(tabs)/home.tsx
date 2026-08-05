@@ -1,37 +1,18 @@
-﻿import { View, Text, Image, StyleSheet, TouchableOpacity, ScrollView,
-  SafeAreaView, ActivityIndicator, RefreshControl,
-  TextInput, KeyboardAvoidingView, Platform } from 'react-native';
+﻿import { View, Text, StyleSheet, TouchableOpacity, ScrollView,
+  SafeAreaView, ActivityIndicator, RefreshControl } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useUser } from '../../../src/hooks/useUser';
 import { supabase } from '../../../src/lib/supabase';
 import { Colors, Radius } from '@/components/ui/theme';
 import { DC } from '../../../src/lib/design';
-import { AppFont } from '../../../src/lib/fonts';
 import { useNav, setHomeDateEditHandler } from '../../../src/lib/NavContext';
 import { useRouter } from 'expo-router';
+import NavIcon from '@/components/ui/NavIcons';
 import { BlurView } from 'expo-blur';
 import GooeyLoader from '@/components/ui/GooeyLoader';
 import BottomSheet from '@/components/ui/BottomSheet';
-import { isReminderDueToday, reminderFrequencyLabel } from '../../../src/lib/reminderUtils';
-import { useState, useMemo, useEffect, useRef } from 'react';
-import TourTarget from '@/components/TourTarget';
+import { useState, useMemo, useEffect } from 'react';
 
-const TEAL = '#5dc4bb';
-
-import { FACE_IMAGES } from '../../../src/lib/faceImages';
-const abbrNum = (n: number) => {
-  if (n === 0) return '0';
-  const abs = Math.abs(n);
-  const sign = n < 0 ? '-' : '';
-  const units = [{ v: 1e9, s: 'B' }, { v: 1e6, s: 'M' }, { v: 1e3, s: 'k' }];
-  for (const u of units) {
-    if (abs >= u.v) {
-      const val = n / u.v;
-      return sign + (val < 100 ? parseFloat(val.toFixed(val < 10 ? 2 : 1)) : Math.round(val)) + u.s;
-    }
-  }
-  return Math.round(n).toLocaleString('en-US');
-};
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const YEARS = Array.from({ length: 21 }, (_, i) => 2020 + i);
@@ -39,8 +20,8 @@ const YEARS = Array.from({ length: 21 }, (_, i) => 2020 + i);
 type DateMode = 'monthly' | '3months';
 
 export default function HomeScreen({ isActive }: { isActive?: boolean }) {
-  const { userId, defaultCurrency, userName, user } = useUser();
-  const { switchTab, openSpace, openRecording, openRecordingsPanel, openSpacesPanel, openReceivablesPanel, openRemindersPanel, openContactsPanel, openFriendsPanel } = useNav();
+  const { userId } = useUser();
+  const { switchTab, openRecording, openRecordingsPanel, openReceivablesPanel, openSplitBill } = useNav();
   const router = useRouter();
   const queryClient = useQueryClient();
   const [dateMode, setDateMode] = useState<DateMode>('monthly');
@@ -57,8 +38,6 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
   const [draftFromYear, setDraftFromYear] = useState(new Date().getFullYear());
 
   const [refreshing, setRefreshing] = useState(false);
-  const peopleScrollRef = useRef<any>(null);
-  const actionsScrollRef = useRef<any>(null);
 
   const { from: monthFrom, to: monthTo, label: monthLabel } = useMemo(() => {
     if (dateMode === 'monthly') {
@@ -81,12 +60,10 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
   useEffect(() => {
     if (!userId) return;
     const invalidateAll = () => {
-      queryClient.invalidateQueries({ queryKey: ['home-summary-v2', userId] });
       queryClient.invalidateQueries({ queryKey: ['home-recent', userId] });
       queryClient.invalidateQueries({ queryKey: ['home-people', userId] });
-      queryClient.invalidateQueries({ queryKey: ['home-spaces', userId] });
-      queryClient.invalidateQueries({ queryKey: ['home-totals', userId] });
-      queryClient.invalidateQueries({ queryKey: ['home-shared', userId] });
+      queryClient.invalidateQueries({ queryKey: ['home-split-bills', userId] });
+      queryClient.invalidateQueries({ queryKey: ['home-receipts', userId] });
     };
     const id = `${userId}-${Date.now()}`;
     const channel = supabase
@@ -94,24 +71,9 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'recordings', filter: `user_id=eq.${userId}` }, () => invalidateAll())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'spaces', filter: `user_id=eq.${userId}` }, () => invalidateAll())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'split_bills', filter: `user_id=eq.${userId}` }, () => invalidateAll())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'recording_reminders', filter: `user_id=eq.${userId}` }, () =>
-        queryClient.invalidateQueries({ queryKey: ['home-reminders', userId] })
-      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'receipt_entries', filter: `user_id=eq.${userId}` }, () => invalidateAll())
       .subscribe();
-    const sharedChannel = supabase
-      .channel(`home-shared-live-${id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'recordings' }, (payload: any) => {
-        const checkShared = (data: any) => {
-          if (!data?.shared_with) return false;
-          const arr = typeof data.shared_with === 'string' ? JSON.parse(data.shared_with) : data.shared_with;
-          return Array.isArray(arr) && (arr.includes(userId) || data.user_id === userId);
-        };
-        if (checkShared(payload.new) || checkShared(payload.old)) {
-          queryClient.invalidateQueries({ queryKey: ['home-shared', userId] });
-        }
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); supabase.removeChannel(sharedChannel); };
+    return () => { supabase.removeChannel(channel); };
   }, [userId, queryClient]);
 
   const onRefresh = async () => {
@@ -119,8 +81,8 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['home-recent', userId] }),
       queryClient.invalidateQueries({ queryKey: ['home-people', userId] }),
-      queryClient.invalidateQueries({ queryKey: ['home-spaces', userId, monthFrom] }),
-      queryClient.invalidateQueries({ queryKey: ['home-reminders', userId] }),
+      queryClient.invalidateQueries({ queryKey: ['home-split-bills', userId] }),
+      queryClient.invalidateQueries({ queryKey: ['home-receipts', userId] }),
     ]);
     setRefreshing(false);
   };
@@ -143,119 +105,45 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
     enabled: !!userId,
   });
 
-  // ── Shared recordings ───────────────────────────────────────────────
-  const { data: shared = [] } = useQuery({
-    queryKey: ['home-shared', userId],
+  // ── Recent Receipts ───────────────────────────────────────────────────────
+  const { data: recentReceipts = [], isLoading: loadingReceipts } = useQuery({
+    queryKey: ['home-receipts', userId],
     queryFn: async () => {
-      try {
-        // Recordings shared with me by others
-        const { data: sharedWithMe } = await supabase
-          .from('recordings')
-          .select('id, name, type, amount, paid_amount, status, user_id, transaction_date, shared_with')
-          .neq('status', 'voided')
-          .filter('shared_with', 'cs', `["${userId}"]`)
-          .order('created_at', { ascending: false });
-
-        // My recordings that I shared with others
-        const { data: myShared } = await supabase
-          .from('recordings')
-          .select('id, name, type, amount, paid_amount, status, user_id, transaction_date, shared_with')
-          .eq('user_id', userId)
-          .neq('shared_with', '[]')
-          .not('shared_with', 'is', null)
-          .neq('status', 'voided')
-          .order('created_at', { ascending: false });
-
-        const allIds = [...new Set([
-          ...(sharedWithMe ?? []).map((r: any) => r.user_id),
-          ...(myShared ?? []).flatMap((r: any) => {
-            const sw = typeof r.shared_with === 'string' ? JSON.parse(r.shared_with) : (r.shared_with ?? []);
-            return Array.isArray(sw) ? sw : [];
-          }),
-        ].filter(Boolean))] as string[];
-
-        const displayNames: Record<string, string> = {};
-        await Promise.all(allIds.map(async (id: string) => {
-          const { data: n } = await supabase.rpc('get_user_display_name', { user_id: id });
-          if (n) displayNames[id] = n as string;
-        }));
-
-        // Look up my debt recordings for items shared with me
-        const sharedByIds = [...new Set((sharedWithMe ?? []).map((r: any) => r.id).filter(Boolean))] as string[];
-        const { data: myDebts } = sharedByIds.length > 0
-          ? await supabase.from('recordings').select('id, amount, paid_amount, status, source_recording_id').eq('user_id', userId).eq('is_tagged', true).in('source_recording_id', sharedByIds)
-          : { data: [] };
-        const debtMap: Record<string, any> = {};
-        (myDebts ?? []).forEach((d: any) => { debtMap[d.source_recording_id] = d; });
-
-        const items: any[] = [];
-
-        // Items shared with me → I owe the owner
-        (sharedWithMe ?? []).forEach((r: any) => {
-          const isOwner = r.user_id === userId;
-          const debt = debtMap[r.id];
-          const myPaid = debt ? Number(debt.paid_amount ?? 0) : Number(r.paid_amount ?? 0);
-          const myAmount = debt ? Number(debt.amount) : Number(r.amount);
-          const myStatus = debt ? debt.status : r.status;
-          const isPaid = myStatus === 'paid' || (myAmount > 0 && myPaid >= myAmount - 0.01);
-          items.push({
-            id: r.id,
-            recordingId: r.id,
-            name: r.name,
-            amount: myAmount,
-            paidAmount: myPaid,
-            status: myStatus,
-            isPaid,
-            isOwner,
-            counterpartyId: r.user_id,
-            counterpartyName: displayNames[r.user_id] ?? 'Someone',
-            perspective: isOwner ? 'shared_to' : 'shared_with',
-          });
-        });
-
-        // My recordings that I shared with others
-        (myShared ?? []).forEach((r: any) => {
-          if ((sharedWithMe ?? []).some((s: any) => s.id === r.id)) return;
-          const sw = typeof r.shared_with === 'string' ? JSON.parse(r.shared_with) : (r.shared_with ?? []);
-          const ids = Array.isArray(sw) ? sw : [];
-          ids.forEach((friendId: string) => {
-            const friendName = displayNames[friendId] ?? 'Someone';
-            const paid = Number(r.paid_amount ?? 0);
-            const isPaid = r.status === 'paid' || (Number(r.amount) > 0 && paid >= Number(r.amount) - 0.01);
-            items.push({
-              id: r.id + '_' + friendId,
-              recordingId: r.id,
-              name: r.name,
-              amount: Number(r.amount),
-              paidAmount: paid,
-              status: r.status,
-              isPaid,
-              isOwner: true,
-              counterpartyId: friendId,
-              counterpartyName: friendName,
-              perspective: 'shared_to',
-            });
-          });
-        });
-
-        return items;
-      } catch { return []; }
+      const { data } = await supabase
+        .from('receipt_entries')
+        .select('id, note, created_at, recording_id, recordings(name)')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(3);
+      return (data ?? []).map((e: any) => ({
+        ...e,
+        recording: Array.isArray(e.recordings) ? e.recordings[0] : e.recordings,
+      }));
     },
     enabled: !!userId,
   });
 
-  // ── Reminders ─────────────────────────────────────────────────────────
-  const { data: reminders = [], isLoading: loadingReminders } = useQuery({
-    queryKey: ['home-reminders', userId],
+  // ── Split Bills ───────────────────────────────────────────────────────
+  const { data: splitBills = [], isLoading: loadingSplitBills } = useQuery({
+    queryKey: ['home-split-bills', userId],
     queryFn: async () => {
       const { data } = await supabase
-        .from('recording_reminders')
-        .select('id, name, frequency, day_of_week, day_of_month, start_date, status, recording_type')
+        .from('split_bills')
+        .select('id, name, created_at, status')
         .eq('user_id', userId)
-        .eq('status', 'active')
-        .order('name', { ascending: true })
+        .order('created_at', { ascending: false })
         .limit(3);
-      return data ?? [];
+      if (!data || data.length === 0) return [];
+      const billIds = data.map((b: any) => b.id);
+      const [{ data: allRecordings }, { data: allPeople }] = await Promise.all([
+        supabase.from('split_bill_recordings').select('split_bill_id, amount_contributed').in('split_bill_id', billIds),
+        supabase.from('bill_splits').select('split_bill_id, person_name').in('split_bill_id', billIds),
+      ]);
+      return data.map((bill: any) => ({
+        ...bill,
+        people_count: new Set((allPeople ?? []).filter((p: any) => p.split_bill_id === bill.id).map((p: any) => p.person_name)).size,
+        total_amount: (allRecordings ?? []).filter((r: any) => r.split_bill_id === bill.id).reduce((s: number, r: any) => s + Number(r.amount_contributed), 0),
+      }));
     },
     enabled: !!userId,
   });
@@ -441,139 +329,10 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
     enabled: !!userId,
   });
 
-  const peopleSummary = peopleData ?? [];
-  const { data: spaces = [], isLoading: loadingSpaces } = useQuery({
-    queryKey: ['home-spaces', userId, monthFrom],
-    queryFn: async () => {
-      const { data: spaceRows } = await supabase
-        .from('spaces')
-        .select('id, name, budget, budget_currency, space_type')
-        .eq('user_id', userId)
-        .neq('is_active', false)
-        .order('sort_order', { ascending: true, nullsFirst: false })
-        .limit(10);
-
-      const { data: memberRows } = await supabase
-        .from('space_members')
-        .select('space_id, role')
-        .eq('user_id', userId)
-        .eq('status', 'accepted');
-
-      const memberSpaceIds = (memberRows ?? []).map((m: any) => m.space_id);
-      let sharedSpaces: any[] = [];
-      if (memberSpaceIds.length > 0) {
-        const { data: sharedRows } = await supabase
-          .from('spaces')
-          .select('id, name, budget, budget_currency, space_type')
-          .in('id', memberSpaceIds)
-          .neq('is_active', false);
-        sharedSpaces = (sharedRows ?? []).map((s: any) => ({
-          ...s,
-          space_type: 'shared',
-        }));
-      }
-
-      const allSpaces = [
-        ...(spaceRows ?? []),
-        ...sharedSpaces,
-      ].slice(0, 10);
-
-      if (allSpaces.length === 0) return [];
-
-      const from = monthFrom;
-      const to   = monthTo;
-      const ids = allSpaces.map((s: any) => s.id);
-
-      const { data: recs } = await supabase
-        .from('recordings')
-        .select('space_id, amount, type')
-        .in('space_id', ids)
-        .neq('status', 'voided')
-        .gte('transaction_date', from)
-        .lte('transaction_date', to);
-
-      const spentMap: Record<string, number> = {};
-      const monthNetMap: Record<string, number> = {};
-      const savedMap: Record<string, number> = {};
-      (recs ?? []).forEach((r: any) => {
-        if (r.type === 'expense' || r.type === 'debt') {
-          spentMap[r.space_id] = (spentMap[r.space_id] ?? 0) + Number(r.amount);
-        }
-        if (r.type === 'income' || r.type === 'due') {
-          monthNetMap[r.space_id] = (monthNetMap[r.space_id] ?? 0) + Number(r.amount);
-        }
-        if (r.type === 'expense' || r.type === 'debt') {
-          monthNetMap[r.space_id] = (monthNetMap[r.space_id] ?? 0) - Number(r.amount);
-        }
-      });
-
-      const { data: allTimeRecs } = await supabase
-        .from('recordings')
-        .select('space_id, amount, type')
-        .in('space_id', ids)
-        .neq('status', 'voided')
-        .lte('transaction_date', to);
-
-      (allTimeRecs ?? []).forEach((r: any) => {
-        if (r.type === 'income' || r.type === 'due') {
-          savedMap[r.space_id] = (savedMap[r.space_id] ?? 0) + Number(r.amount);
-        }
-        if (r.type === 'expense' || r.type === 'debt') {
-          savedMap[r.space_id] = (savedMap[r.space_id] ?? 0) - Number(r.amount);
-        }
-      });
-
-      return allSpaces.map((s: any) => ({
-        ...s,
-        spent: s.space_type === 'savings' ? (savedMap[s.id] ?? 0) : (spentMap[s.id] ?? 0),
-        monthNet: s.space_type === 'savings' ? (monthNetMap[s.id] ?? 0) : undefined,
-      }));
-    },
-    enabled: !!userId,
-  });
-
-  // ── Total counts for see more ──────────────────────────────────────────
-  const { data: totalCounts = { recordings: 0, spaces: 0, reminders: 0, people: 0 } } = useQuery({
-    queryKey: ['home-totals', userId],
-    queryFn: async () => {
-      const [rec, sp, rem, sharedSp] = await Promise.all([
-        supabase.from('recordings').select('*', { count: 'exact', head: true }).eq('user_id', userId).neq('status', 'voided'),
-        supabase.from('spaces').select('*', { count: 'exact', head: true }).eq('user_id', userId).neq('is_active', false),
-        supabase.from('space_members').select('*', { count: 'exact', head: true }).eq('user_id', userId).eq('status', 'accepted'),
-        supabase.from('recording_reminders').select('*', { count: 'exact', head: true }).eq('user_id', userId).eq('status', 'active'),
-      ]);
-      const { data: personCount } = await supabase
-        .from('recordings')
-        .select('person_name')
-        .eq('user_id', userId)
-        .in('type', ['debt', 'due'])
-        .neq('status', 'voided')
-        .neq('status', 'paid')
-        .neq('person_name', '')
-        .not('person_name', 'is', null);
-      const distinctPeople = new Set((personCount ?? []).map((r: any) => r.person_name));
-      return { recordings: rec.count ?? 0, spaces: (sp.count ?? 0) + (sharedSp.count ?? 0), reminders: rem.count ?? 0, people: distinctPeople.size };
-    },
-    enabled: !!userId,
-  });
-
-  const [spaceChoice, setSpaceChoice] = useState<{ id: string; name: string } | null>(null);
-
-  const [addContactSheet, setAddContactSheet] = useState(false);
-  const [addAccountSheet, setAddAccountSheet] = useState(false);
-  const [accBank, setAccBank] = useState('');
-  const [accName, setAccName] = useState('');
-  const [accNumber, setAccNumber] = useState('');
-  const [accHolder, setAccHolder] = useState('');
-  const [accError, setAccError] = useState('');
-  const [accLoading, setAccLoading] = useState(false);
+  const peopleSummary = (peopleData ?? []).slice(0, 3);
 
   const fmt = (n: number | undefined | null) => (n ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const formatDateLabel = (d: string) => {
-    const date = new Date(d + 'T00:00:00');
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  };
-  const isLoading = loadingRecent || loadingPeople || loadingSpaces || loadingReminders;
+  const isLoading = loadingRecent || loadingPeople || loadingSplitBills || loadingReceipts;
 
   const { setHomeDateLabel } = useNav();
 
@@ -594,11 +353,10 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
         {/* Recent Transactions */}
-        <SectionHeader title="Recent Transactions" onArrowRight={() => openRecordingsPanel()} />
+        <SectionHeader title="Transactions" onArrowRight={() => openRecordingsPanel()} />
         {recent.length === 0 ? <EmptyRow label="no recordings" /> : (
           <View style={s.sectionContentLeft}>
             <View style={s.recList}>
-              {/* Timeline column */}
               <View style={s.recTimelineCol}>
                 {recent.slice(0, 3).map((r: any, i: number) => {
                   const count = Math.min(recent.length, 3);
@@ -608,19 +366,12 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
                   const showLine = count > 1 && !isFirst && !isLast;
                   return (
                     <View key={r.id} style={s.recDotWrap}>
-                      {showDot && (
-                        <>
-                          <View style={isFirst ? s.recLineHidden : s.recLineSegment} />
-                          <View style={s.recDot} />
-                          <View style={isLast ? s.recLineHidden : s.recLineSegment} />
-                        </>
-                      )}
+                      {showDot && (<><View style={isFirst ? s.recLineHidden : s.recLineSegment} /><View style={s.recDot} /><View style={isLast ? s.recLineHidden : s.recLineSegment} /></>)}
                       {showLine && <View style={[s.recLineSegment, { flex: 1 }]} />}
                     </View>
                   );
                 })}
               </View>
-              {/* Cards column */}
               <View style={s.recCardsCol}>
                 {recent.slice(0, 3).map((r: any) => {
                   const isOut = ['expense','debt','payment'].includes(r.type);
@@ -633,9 +384,7 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
                   const nameStr = r.name.split(' ').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
                   return (
                     <TouchableOpacity key={r.id} style={s.recCard} activeOpacity={0.7} onPress={() => openRecording(r.id)}>
-                      <View style={s.recDateCol}>
-                        <Text style={s.recDateText}>{dateLabel}</Text>
-                      </View>
+                      <View style={s.recDateCol}><Text style={s.recDateText}>{dateLabel}</Text></View>
                       <View style={s.recCardDivider} />
                       <View style={s.recContentCol}>
                         <Text style={s.recAmount}>{isOut ? '- ' : ''}{fmt(Number(r.amount))}</Text>
@@ -650,145 +399,75 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
           </View>
         )}
         <View style={s.divider} />
-        {/* Reminders */}
-        <SectionHeader title="Reminders" onArrowRight={() => openRemindersPanel()} />
-        {reminders.length === 0 ? <EmptyRow label="no reminders" /> : (
-          <View style={s.sectionContentLeft}>
-            <View style={s.recList}>
-              <View style={s.recTimelineCol}>
-                {reminders.map((r: any, i: number) => {
-                  const count = reminders.length;
-                  const isFirst = i === 0;
-                  const isLast = i === count - 1;
-                  const showDot = count > 1 && (isFirst || isLast);
-                  const showLine = count > 1 && !isFirst && !isLast;
-                  return (
-                    <View key={r.id} style={s.recDotWrap}>
-                      {showDot && (
-                        <>
-                          <View style={isFirst ? s.recLineHidden : s.recLineSegment} />
-                          <View style={s.recDot} />
-                          <View style={isLast ? s.recLineHidden : s.recLineSegment} />
-                        </>
-                      )}
-                      {showLine && <View style={[s.recLineSegment, { flex: 1 }]} />}
-                    </View>
-                  );
-                })}
-              </View>
-              <View style={s.recCardsCol}>
-                {reminders.map((r: any) => (
-                  <View key={r.id} style={s.recCard}>
-                    <View style={s.recDateCol}>
-                      <Text style={s.recDateText}>{r.recording_type === 'expense' ? 'Expense' : 'Income'}</Text>
-                    </View>
-                    <View style={s.recCardDivider} />
-                    <View style={s.recContentCol}>
-                      <Text style={s.recName}>{r.name}</Text>
-                    </View>
-                  </View>
-                ))}
-              </View>
-            </View>
-          </View>
-        )}
-        <View style={s.divider} />
-        {/* Folders */}
-        <SectionHeader title="Folders" onArrowRight={openSpacesPanel} />
-        {spaces.length === 0 ? <EmptyRow label="no folders" /> : (() => {
-          const savingsSpaces = spaces.filter((sp: any) => sp.space_type === 'savings');
-          const expenseSpaces = spaces.filter((sp: any) => sp.space_type !== 'savings');
-          const allSpaces = [...savingsSpaces, ...expenseSpaces];
-          const count = allSpaces.length;
-          return (
-            <View style={s.sectionContentLeft}>
-              <View style={s.recList}>
-                <View style={s.recTimelineCol}>
-                  {allSpaces.map((sp: any, i: number) => {
-                    const isFirst = i === 0;
-                    const isLast = i === count - 1;
-                    const showDot = count > 1 && (isFirst || isLast);
-                    const showLine = count > 1 && !isFirst && !isLast;
-                    return (
-                      <View key={sp.id} style={s.recDotWrap}>
-                        {showDot && (
-                          <>
-                            <View style={isFirst ? s.recLineHidden : s.recLineSegment} />
-                            <View style={s.recDot} />
-                            <View style={isLast ? s.recLineHidden : s.recLineSegment} />
-                          </>
-                        )}
-                        {showLine && <View style={[s.recLineSegment, { flex: 1 }]} />}
-                      </View>
-                    );
-                  })}
-                </View>
-                <View style={s.recCardsCol}>
-                  {savingsSpaces.length > 0 && (
-                    <>
-                      <Text style={s.folderSubtitle}>Savings</Text>
-                      {savingsSpaces.map((sp: any) => (
-                        <TouchableOpacity key={sp.id} style={s.recCard} activeOpacity={0.7} onPress={() => setSpaceChoice({ id: sp.id, name: sp.name })}>
-                          <View style={s.recDateCol}>
-                            <Text style={s.recDateText}>{sp.name}</Text>
-                          </View>
-                          <View style={s.recCardDivider} />
-                          <View style={s.recContentCol}>
-                            <Text style={s.recName}>Goal: {fmt(sp.budget ?? 0)}</Text>
-                            <Text style={s.recFolder}>Up to date: {fmt(sp.monthNet ?? 0)}</Text>
-                          </View>
-                        </TouchableOpacity>
-                      ))}
-                    </>
-                  )}
-                  {expenseSpaces.length > 0 && (
-                    <>
-                      <Text style={[s.folderSubtitle, savingsSpaces.length > 0 && { marginTop: 16 }]}>Expense</Text>
-                      {expenseSpaces.map((sp: any) => (
-                        <TouchableOpacity key={sp.id} style={s.recCard} activeOpacity={0.7} onPress={() => setSpaceChoice({ id: sp.id, name: sp.name })}>
-                          <View style={s.recDateCol}>
-                            <Text style={s.recDateText}>{sp.name}</Text>
-                          </View>
-                          <View style={s.recCardDivider} />
-                          <View style={s.recContentCol}>
-                            <Text style={s.recName}>Budget: {fmt(sp.budget ?? 0)}</Text>
-                          </View>
-                        </TouchableOpacity>
-                      ))}
-                    </>
-                  )}
-                </View>
-              </View>
-            </View>
-          );
-        })()}
-        <View style={s.divider} />
+
         {/* Loans */}
         <SectionHeader title="Loans" onArrowRight={() => openReceivablesPanel()} />
         {peopleSummary.length === 0 ? <EmptyRow label="no active loans" /> : (
-          <View
-            ref={peopleScrollRef}
-            style={{ overflow: 'hidden', flexDirection: 'row', cursor: 'grab' } as any}
-            onMouseDown={makeScrollDragHandler(peopleScrollRef)}
-            onTouchStart={makeScrollDragHandler(peopleScrollRef)}
-          >
-            <View style={{ flexDirection: 'row', gap: 16, paddingBottom: 4, paddingHorizontal: DC.pagePadding }}>
-              {peopleSummary.map((p: any) => {
-                const isNegative = p.net < 0;
-                const absNet = Math.abs(p.net);
-                const initials = p.person.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase();
-                return (
-                  <TouchableOpacity key={p.person} style={s.loanCard} activeOpacity={0.7} onPress={() => openReceivablesPanel(p.person)}>
-                    <View style={s.loanAvatar}>
-                      <Text style={s.loanAvatarText}>{initials}</Text>
-                    </View>
-                    <Text style={s.loanName} numberOfLines={1}>{p.person}</Text>
-                    <Text style={s.loanLabel}>{isNegative ? 'You Owe:' : 'Owes You:'}</Text>
+          <View style={s.sectionContentLeft}>
+            {peopleSummary.map((p: any, i: number) => {
+              const isNegative = p.net < 0;
+              const absNet = Math.abs(p.net);
+              const initials = p.person.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase();
+              return (
+                <TouchableOpacity key={p.person} style={[s.loanRow, i < peopleSummary.length - 1 && s.loanRowBorder]} activeOpacity={0.7} onPress={() => openReceivablesPanel(p.person)}>
+                  <View style={s.loanAvatar}><Text style={s.loanAvatarText}>{initials}</Text></View>
+                  <Text style={s.loanName} numberOfLines={1}>{p.person}</Text>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={s.loanLabel}>{isNegative ? 'You Owe' : 'Owes You'}</Text>
                     <Text style={[s.loanAmount, { color: isNegative ? DC.btnDangerBg : DC.incomeColor }]}>{fmt(absNet)}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
+        <View style={s.divider} />
+
+        {/* Receipts */}
+        <SectionHeader title="Receipts" onArrowRight={() => switchTab('receipts')} />
+        {recentReceipts.length === 0 ? <EmptyRow label="no receipts yet" /> : (
+          <View style={s.sectionContentLeft}>
+            {recentReceipts.map((entry: any, i: number) => {
+              const d = new Date(entry.created_at);
+              const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+              const name = entry.note ?? dateStr;
+              return (
+                <TouchableOpacity key={entry.id} style={[s.loanRow, i < recentReceipts.length - 1 && s.loanRowBorder]} activeOpacity={0.7} onPress={() => router.push({ pathname: '/(app)/receipt-detail', params: { receiptId: entry.id } } as any)}>
+                  <View style={[s.loanAvatar, { backgroundColor: '#f0f0f0' }]}>
+                    <NavIcon name="receipt-outline" size={18} color="#888" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.loanName} numberOfLines={1}>{name}</Text>
+                    <Text style={s.loanLabel}>{dateStr}</Text>
+                  </View>
+                  <View style={[s.linkedBadge, { backgroundColor: entry.recording ? '#e8f4f3' : '#f5f5f5' }]}>
+                    <Text style={[s.linkedText, { color: entry.recording ? '#4f9289' : '#aaa' }]}>
+                      {entry.recording ? 'linked' : 'unlinked'}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
+        <View style={s.divider} />
+
+        {/* Split Bills */}
+        <SectionHeader title="Split Bills" onArrowRight={() => switchTab('bill-split')} />
+        {splitBills.length === 0 ? <EmptyRow label="no split bills" /> : (
+          <View style={s.sectionContentLeft}>
+            {splitBills.map((bill: any, i: number) => (
+              <TouchableOpacity key={bill.id} style={[s.loanRow, i < splitBills.length - 1 && s.loanRowBorder]} activeOpacity={0.7} onPress={() => openSplitBill(bill.id, bill.name)}>
+                <View style={[s.loanAvatar, { backgroundColor: '#e8f4f3' }]}>
+                  <Text style={[s.loanAvatarText, { color: '#4f9289' }]}>{bill.people_count}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.loanName} numberOfLines={1}>{bill.name}</Text>
+                  <Text style={s.loanLabel}>{bill.people_count} {bill.people_count !== 1 ? 'people' : 'person'}</Text>
+                </View>
+                <Text style={[s.loanAmount, { color: DC.pageText }]}>{fmt(bill.total_amount)}</Text>
+              </TouchableOpacity>
+            ))}
           </View>
         )}
       </ScrollView>
@@ -886,59 +565,6 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
           <Text style={s.applyBtnText}>Apply</Text>
         </TouchableOpacity>
       </BottomSheet>
-
-      <BottomSheet visible={!!spaceChoice} onClose={() => setSpaceChoice(null)} title={spaceChoice?.name ?? ''}>
-        <TouchableOpacity style={s.choiceRow} activeOpacity={0.8} onPress={() => { const sp = spaceChoice; setSpaceChoice(null); openRecordingsPanel({ spaceId: sp!.id, spaceName: sp!.name }); }}>
-          <View style={{ flex: 1 }}>
-            <Text style={s.choiceTitle}>View Recordings</Text>
-            <Text style={s.choiceSub}>browse this space's recordings</Text>
-          </View>
-        </TouchableOpacity>
-        <TouchableOpacity style={[s.choiceRow, { borderBottomWidth: 0 }]} activeOpacity={0.8} onPress={() => { const sp = spaceChoice; setSpaceChoice(null); openSpace(sp!.id, sp!.name, true); }}>
-          <View style={{ flex: 1 }}>
-            <Text style={s.choiceTitle}>Edit Space</Text>
-            <Text style={s.choiceSub}>rename, archive, or delete</Text>
-          </View>
-        </TouchableOpacity>
-      </BottomSheet>
-
-      <BottomSheet visible={addAccountSheet} onClose={() => { setAddAccountSheet(false); setAccBank(''); setAccName(''); setAccNumber(''); setAccHolder(''); setAccError(''); }} title="add account">
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <View style={{ gap: 10, paddingBottom: 16 }}>
-            <TextInput style={{ borderWidth: 1, borderColor: '#e0e0e0', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 10, fontFamily: 'Poppins-Regular', fontSize: 13, color: '#111' }} placeholder="bank" placeholderTextColor={Colors.faint} value={accBank} onChangeText={setAccBank} />
-            <TextInput style={{ borderWidth: 1, borderColor: '#e0e0e0', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 10, fontFamily: 'Poppins-Regular', fontSize: 13, color: '#111' }} placeholder="account name" placeholderTextColor={Colors.faint} value={accName} onChangeText={setAccName} />
-            <TextInput style={{ borderWidth: 1, borderColor: '#e0e0e0', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 10, fontFamily: 'Poppins-Regular', fontSize: 13, color: '#111' }} placeholder="account number" placeholderTextColor={Colors.faint} value={accNumber} onChangeText={setAccNumber} keyboardType="numeric" />
-            <TextInput style={{ borderWidth: 1, borderColor: '#e0e0e0', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 10, fontFamily: 'Poppins-Regular', fontSize: 13, color: '#111' }} placeholder="account holder" placeholderTextColor={Colors.faint} value={accHolder} onChangeText={setAccHolder} />
-            {accError ? <Text style={{ color: '#e74c3c', fontSize: 12 }}>{accError}</Text> : null}
-            <TouchableOpacity style={{ backgroundColor: TEAL, borderRadius: 8, paddingVertical: 12, alignItems: 'center', opacity: accLoading ? 0.6 : 1 }} disabled={accLoading} onPress={async () => {
-              if (!accBank.trim() || !accName.trim() || !accNumber.trim()) { setAccError('bank, account name and number are required.'); return; }
-              setAccLoading(true); setAccError('');
-              const { error: err } = await supabase.from('accounts').insert({ user_id: userId, bank: accBank.trim(), account_name: accName.trim(), account_number: accNumber.trim(), holder_name: accHolder.trim() || accName.trim(), account_type: 'Savings', account_details: '', color: Colors.border });
-              setAccLoading(false);
-              if (err) { setAccError(err.message); return; }
-              setAddAccountSheet(false); setAccBank(''); setAccName(''); setAccNumber(''); setAccHolder(''); setAccError('');
-              queryClient.invalidateQueries({ queryKey: ['accounts'] });
-            }}>
-              <Text style={{ color: '#fff', fontWeight: '600', textAlign: 'center' }}>{accLoading ? 'saving...' : 'save account'}</Text>
-            </TouchableOpacity>
-          </View>
-        </KeyboardAvoidingView>
-      </BottomSheet>
-
-      <BottomSheet visible={addContactSheet} onClose={() => setAddContactSheet(false)} title="add a contact">
-        <TouchableOpacity style={s.choiceRow} activeOpacity={0.8} onPress={() => { setAddContactSheet(false); openFriendsPanel(); }}>
-          <View style={{ flex: 1 }}>
-            <Text style={s.choiceTitle}>Add a Friend</Text>
-            <Text style={s.choiceSub}>connect with other Ledgr users</Text>
-          </View>
-        </TouchableOpacity>
-        <TouchableOpacity style={[s.choiceRow, { borderBottomWidth: 0 }]} activeOpacity={0.8} onPress={() => { setAddContactSheet(false); openContactsPanel(); }}>
-          <View style={{ flex: 1 }}>
-            <Text style={s.choiceTitle}>Add a Manual Contact</Text>
-            <Text style={s.choiceSub}>add someone without an account</Text>
-          </View>
-        </TouchableOpacity>
-      </BottomSheet>
     </SafeAreaView>
   );
 }
@@ -955,32 +581,6 @@ function SectionHeader({ title, onArrowRight }: { title: string; onArrowRight?: 
       )}
     </View>
   );
-}
-
-function makeScrollDragHandler(ref: React.RefObject<any>) {
-  return (e: any) => {
-    const el = ref.current as unknown as HTMLElement;
-    if (!el) return;
-    const startX = e.nativeEvent?.pageX ?? e.pageX ?? e.changedTouches?.[0]?.pageX;
-    if (startX == null) return;
-    const scrollLeft = el.scrollLeft;
-    const onMove = (ev: MouseEvent | TouchEvent) => {
-      const pageX = 'changedTouches' in ev ? ev.changedTouches[0].pageX : (ev as MouseEvent).pageX;
-      el.scrollLeft = scrollLeft - (pageX - startX);
-    };
-    const onUp = () => {
-      document.removeEventListener('mousemove', onMove as any);
-      document.removeEventListener('mouseup', onUp);
-      document.removeEventListener('touchmove', onMove as any);
-      document.removeEventListener('touchend', onUp);
-      el.style.cursor = 'grab';
-    };
-    el.style.cursor = 'grabbing';
-    document.addEventListener('mousemove', onMove as any);
-    document.addEventListener('mouseup', onUp);
-    document.addEventListener('touchmove', onMove as any, { passive: true } as any);
-    document.addEventListener('touchend', onUp);
-  };
 }
 
 function EmptyRow({ label, onPress }: { label: string; onPress?: () => void }) {
@@ -1040,12 +640,17 @@ const s = StyleSheet.create({
   folderRowLast:  { borderBottomWidth: 0 },
 
   // Part 19: loans
+  loanRow:        { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
+  loanRowBorder:  { borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
   loanCard:       { width: 80, alignItems: 'center', gap: 3 },
   loanAvatar:     { width: 44, height: 44, borderRadius: 22, backgroundColor: '#ede9ff', alignItems: 'center', justifyContent: 'center' },
   loanAvatarText: { fontFamily: 'Poppins-Bold', fontSize: 13, color: '#8c52ff' },
-  loanName:       { fontFamily: 'Poppins-Regular', fontSize: 10, color: DC.pageText, textAlign: 'center' },
-  loanLabel:      { fontFamily: 'Poppins-Regular', fontSize: 9, color: DC.pageTextMuted, textAlign: 'center' },
-  loanAmount:     { fontFamily: 'Poppins-Bold', fontSize: 11, textAlign: 'center' },
+  loanName:       { fontFamily: 'Poppins-Regular', fontSize: 13, color: DC.pageText, flex: 1 },
+  loanLabel:      { fontFamily: 'Poppins-Regular', fontSize: 10, color: DC.pageTextMuted, textAlign: 'right' },
+  loanAmount:     { fontFamily: 'Poppins-Bold', fontSize: 13, textAlign: 'right' },
+
+  linkedBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
+  linkedText:  { fontFamily: 'Poppins-SemiBold', fontSize: 10 },
 
   // Part 20: empty + bottom sheet styles
   emptyRow:  { paddingVertical: 12, paddingHorizontal: DC.pagePadding },

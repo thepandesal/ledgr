@@ -1,6 +1,6 @@
 import { View, Text, StyleSheet, Modal, ActivityIndicator } from 'react-native';
 import { useState, useEffect, useRef } from 'react';
-import NetInfo from '@react-native-community/netinfo';
+import * as Network from 'expo-network';
 import { flushQueue, getPendingCount } from '../src/lib/offlineQueue';
 import { Colors, Fonts, Radius } from './ui/theme';
 
@@ -12,15 +12,17 @@ export default function SyncModal() {
   const wasOfflineRef = useRef(false);
 
   useEffect(() => {
-    const unsub = NetInfo.addEventListener(async (netState) => {
-      const isOnline = !!netState.isConnected;
+    let interval: ReturnType<typeof setInterval>;
+
+    const check = async () => {
+      const net = await Network.getNetworkStateAsync();
+      const isOnline = !!net.isConnected && !!net.isInternetReachable;
 
       if (!isOnline) {
         wasOfflineRef.current = true;
         return;
       }
 
-      // Only show sync modal if we were previously offline
       if (!wasOfflineRef.current) return;
       wasOfflineRef.current = false;
 
@@ -31,11 +33,11 @@ export default function SyncModal() {
       const { flushed } = await flushQueue();
       setFlushedCount(flushed);
       setState('done');
-
       setTimeout(() => setState('hidden'), 2500);
-    });
+    };
 
-    return unsub;
+    interval = setInterval(check, 3000);
+    return () => clearInterval(interval);
   }, []);
 
   if (state === 'hidden') return null;

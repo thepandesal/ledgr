@@ -125,7 +125,7 @@ export default function SpacesPanel({ onClose }: Props) {
       queryClient.invalidateQueries({ queryKey: ['spaces', userId] });
     };
     const channel = supabase
-      .channel(`spaces-panel-live-${userId}`)
+      .channel(`spaces-panel-live-${userId}-${Date.now()}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'recordings', filter: `user_id=eq.${userId}` }, () => invalidateAll())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'spaces', filter: `user_id=eq.${userId}` }, () => invalidateAll())
       .subscribe();
@@ -160,7 +160,7 @@ export default function SpacesPanel({ onClose }: Props) {
 
   return (
     <SafeAreaView style={st.root}>
-      <TopHeader title="Folders" onBack={onClose} centered />
+      <TopHeader title="Folders" centered />
 
       {isLoading ? (
         <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}><GooeyLoader /></BlurView>
