@@ -362,7 +362,9 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
     setNewItemScanError('');
     setNewItemStep('scanning');
     try {
-      // Upload compressed version to receipt section
+      // OCR with jimp xerox preprocessing
+      const parsed = await ocrReceiptImage(uri);
+      // Upload processed (xerox) image to R2 if available, else compressed original
       const compressed = await compressImage(uri);
       let entryId = linkedReceipt?.id;
       if (!entryId) {
@@ -370,11 +372,9 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
         entryId = entry?.id;
       }
       if (entryId) {
-        await uploadReceiptPhoto(compressed, entryId);
+        await uploadReceiptPhoto(parsed.processedBase64 ?? compressed, entryId);
         loadLinkedReceipt();
       }
-      // OCR on original URI — do NOT compress before OCR
-      const parsed = await ocrReceiptImage(uri);
       if (parsed.items.length === 0) {
         setNewItemScanError('no items detected — try a clearer photo');
         setNewItemStep('choice');
@@ -384,8 +384,8 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
       }
       setNewItemScanLoading(false);
     } catch (e: any) {
-      console.error('[SCAN] error:', e);
-      setNewItemScanError('failed to read receipt — try again or add manually');
+      console.error('[SCAN] error:', e?.message ?? e, e?.stack);
+      setNewItemScanError(`failed to read receipt — ${e?.message ?? 'unknown error'}`);
       setNewItemStep('choice');
       setNewItemScanLoading(false);
     }
