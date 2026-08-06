@@ -81,7 +81,8 @@ function extractPrice(line: string): number | null {
   const cleaned = line
     .replace(/^[^a-zA-Z\d]+/, '')
     .replace(/[\(\)\[\]{}|'`"]+\s*$/, '')
-    .replace(/\s+[a-zA-Z]{1,2}\s*$/, '')
+    .replace(/\s+[a-zA-Z]{1,4}\s*$/, '')  // strip trailing OCR garbage like "(s)" or "whulf"
+    .replace(/\([a-zA-Z]{1,3}\)\s*$/, '') // strip trailing (s) (x) etc
     .trim();
   // Match price with comma thousands separator: "1,245.00" or "1,245 00" or "1,245"
   const withComma = cleaned.match(/(\d{1,3}(?:,\d{3})+)(?:[.\s](\d{2}))?\s*$/);
@@ -145,8 +146,8 @@ function isValidItemLine(line: string): boolean {
   // Skip keyword lines (whole-word match)
   if (hasSkipKeyword(lower)) return false;
 
-  // Skip date lines: contain patterns like 07/12/2026 or 10:33
-  if (/\d{2}[\/\-]\d{2}[\/\-]\d{4}/.test(trimmed)) return false;
+  // Skip date lines: contain patterns like 07/12/2026 or 10:33 or garbled variants
+  if (/\d{2}[\/\-]\d{2}[\/\-]/.test(trimmed)) return false;
   if (/\d{2}:\d{2}/.test(trimmed) && !/[a-zA-Z]{3,}/.test(trimmed)) return false;
 
   // Skip serial/reference codes: long alphanumeric strings
@@ -202,277 +203,27 @@ export function parseReceiptText(rawText: string): ParsedReceipt {
   return { items, detectedTotal, rawText: escapeHtml(rawText) };
 }
 
-// ── jimp xerox preprocessing (native + web fallback) ─────────────────────────
-async function preprocessWithJimp(imageUri: string): Promise<{ uri: string; base64: string }> {
-  // jimp ESM doesn't work with Metro dynamic import — use require
-  let Jimp: any, JimpMime: any;
-  try {
-    const jimpModule = require('jimp');
-    Jimp = jimpModule.Jimp;
-    JimpMime = jimpModule.JimpMime;
-    if (!Jimp?.fromBuffer) throw new Error('Jimp.fromBuffer not found');
-  } catch (e) {
-    throw new Error(`jimp load failed: ${e}`);
-  }
-
-  let buffer: ArrayBuffer;
-  if (imageUri.startsWith('data:')) {
-    const b64 = imageUri.split(',')[1];
-    if (!b64) throw new Error('invalid data URI');
-    const binary = atob(b64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    buffer = bytes.buffer;
-  } else {
-    const res = await fetch(imageUri);
-    if (!res.ok) throw new Error(`fetch failed: ${res.status}`);
-    buffer = await res.arrayBuffer();
-  }
-  console.log('[JIMP] buffer size:', buffer.byteLength);
-
-  const img = await Jimp.fromBuffer(buffer);
-  console.log('[JIMP] loaded:', img.width, 'x', img.height);
-
-  // Upscale 2x + grayscale into new buffer
-  const w = img.width, h = img.height;
-  const nw = w * 2, nh = h * 2;
-  const newData = new Uint8Array(nw * nh * 4);
-
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const srcIdx = (y * w + x) * 4;
-      const r = img.bitmap.data[srcIdx];
-      const g = img.bitmap.data[srcIdx + 1];
-      const b = img.bitmap.data[srcIdx + 2];
-      const gray = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
-      for (let dy = 0; dy < 2; dy++) {
-        for (let dx = 0; dx < 2; dx++) {
-          const dstIdx = ((y * 2 + dy) * nw + (x * 2 + dx)) * 4;
-          newData[dstIdx] = newData[dstIdx+1] = newData[dstIdx+2] = gray;
-          newData[dstIdx+3] = 255;
-        }
-      }
-    }
-  }
-
-  // Adaptive threshold
-  const gray2 = new Uint8Array(nw * nh);
-  for (let i = 0; i < nw * nh; i++) gray2[i] = newData[i * 4];
-
-  const integral = new Float64Array((nw + 1) * (nh + 1));
-  for (let y = 0; y < nh; y++)
-    for (let x = 0; x < nw; x++)
-      integral[(y+1)*(nw+1)+(x+1)] = gray2[y*nw+x] + integral[y*(nw+1)+(x+1)] + integral[(y+1)*(nw+1)+x] - integral[y*(nw+1)+x];
-
-  const radius = Math.max(8, Math.round(nw / 16));
-  for (let y = 0; y < nh; y++) {
-    for (let x = 0; x < nw; x++) {
-      const x1 = Math.max(0, x-radius), y1 = Math.max(0, y-radius);
-      const x2 = Math.min(nw-1, x+radius), y2 = Math.min(nh-1, y+radius);
-      const count = (x2-x1+1) * (y2-y1+1);
-      const sum = integral[(y2+1)*(nw+1)+(x2+1)] - integral[y1*(nw+1)+(x2+1)] - integral[(y2+1)*(nw+1)+x1] + integral[y1*(nw+1)+x1];
-      const val = gray2[y*nw+x] < (sum / count) - 10 ? 0 : 255;
-      const idx = (y * nw + x) * 4;
-      newData[idx] = newData[idx+1] = newData[idx+2] = val;
-    }
-  }
-
-  // Write back to jimp and export
-  img.bitmap.data = Buffer.from(newData) as any;
-  img.bitmap.width = nw;
-  img.bitmap.height = nh;
-
-  const base64 = await img.getBase64(JimpMime.png);
-  console.log('[JIMP] done, output length:', base64.length);
-  return { uri: base64, base64 };
-}
-
-// ── Web canvas preprocessing (upscale 2x + adaptive threshold) ───────────────
-async function preprocessForOcr(imageUri: string): Promise<HTMLCanvasElement | string> {
-  if (typeof document === 'undefined') return imageUri;
-
-  // Fetch remote URLs as blob to avoid CORS canvas taint
-  let srcUri = imageUri;
-  if (imageUri.startsWith('http')) {
-    try {
-      const res = await fetch(imageUri);
-      const blob = await res.blob();
-      srcUri = await new Promise<string>((r) => {
-        const reader = new FileReader();
-        reader.onload = () => r(reader.result as string);
-        reader.readAsDataURL(blob);
-      });
-    } catch (_) {}
-  }
-
-  return new Promise((resolve) => {
-    const img = new window.Image();
-    img.onload = () => {
-      const orientation = srcUri.startsWith('data:image/jpeg') ? getExifOrientation(srcUri) : 1;
-      const swap = orientation >= 5;
-      // Upscale 2x for better OCR
-      const scale = Math.max(2, 2000 / (swap ? img.height : img.width));
-      const srcW = Math.round(img.width * scale);
-      const srcH = Math.round(img.height * scale);
-      const canvas = document.createElement('canvas');
-      canvas.width  = swap ? srcH : srcW;
-      canvas.height = swap ? srcW : srcH;
-      const ctx = canvas.getContext('2d')!;
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.save();
-      ctx.translate(canvas.width / 2, canvas.height / 2);
-      const rotMap: Record<number, number> = { 3: 180, 6: 90, 8: -90, 5: -90, 7: 90 };
-      const flipMap: Record<number, boolean> = { 2: true, 4: true, 5: true, 7: true };
-      if (flipMap[orientation]) ctx.scale(-1, 1);
-      ctx.rotate(((rotMap[orientation] ?? 0) * Math.PI) / 180);
-      ctx.drawImage(img, -srcW / 2, -srcH / 2, srcW, srcH);
-      ctx.restore();
-
-      const w = canvas.width, h = canvas.height;
-      const imageData = ctx.getImageData(0, 0, w, h);
-      const data = imageData.data;
-
-      // Step 1: grayscale
-      const gray = new Uint8Array(w * h);
-      for (let i = 0; i < data.length; i += 4) {
-        gray[i >> 2] = Math.round(0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2]);
-      }
-
-      // Step 2: adaptive threshold (local mean - 10)
-      const integral = new Float64Array((w + 1) * (h + 1));
-      for (let y = 0; y < h; y++)
-        for (let x = 0; x < w; x++)
-          integral[(y+1)*(w+1)+(x+1)] = gray[y*w+x] + integral[y*(w+1)+(x+1)] + integral[(y+1)*(w+1)+x] - integral[y*(w+1)+x];
-
-      const radius = Math.max(8, Math.round(w / 16));
-      for (let y = 0; y < h; y++) {
-        for (let x = 0; x < w; x++) {
-          const x1 = Math.max(0, x-radius), y1 = Math.max(0, y-radius);
-          const x2 = Math.min(w-1, x+radius), y2 = Math.min(h-1, y+radius);
-          const count = (x2-x1+1) * (y2-y1+1);
-          const sum = integral[(y2+1)*(w+1)+(x2+1)] - integral[y1*(w+1)+(x2+1)] - integral[(y2+1)*(w+1)+x1] + integral[y1*(w+1)+x1];
-          const val = gray[y*w+x] < (sum / count) - 15 ? 0 : 255;
-          const idx = (y*w+x) * 4;
-          data[idx] = data[idx+1] = data[idx+2] = val;
-          data[idx+3] = 255;
-        }
-      }
-      ctx.putImageData(imageData, 0, 0);
-      resolve(canvas);
-    };
-    img.onerror = () => resolve(imageUri);
-    img.src = srcUri;
-  });
-}
-
-
-/** Read EXIF orientation from a data URI (JPEG only) */
-function getExifOrientation(dataUri: string): number {
-  try {
-    const base64 = dataUri.split(',')[1];
-    if (!base64) return 1;
-    const binary = atob(base64.slice(0, 1024)); // only need the header
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    // Check JPEG SOI marker
-    if (bytes[0] !== 0xFF || bytes[1] !== 0xD8) return 1;
-    let offset = 2;
-    while (offset < bytes.length - 4) {
-      if (bytes[offset] !== 0xFF) break;
-      const marker = bytes[offset + 1];
-      const segLen = (bytes[offset + 2] << 8) | bytes[offset + 3];
-      if (marker === 0xE1) { // APP1 = EXIF
-        // Check Exif header
-        const exifHeader = String.fromCharCode(...bytes.slice(offset + 4, offset + 10));
-        if (exifHeader.startsWith('Exif')) {
-          const tiffOffset = offset + 10;
-          const littleEndian = bytes[tiffOffset] === 0x49;
-          const read16 = (o: number) => littleEndian
-            ? (bytes[tiffOffset + o] | (bytes[tiffOffset + o + 1] << 8))
-            : ((bytes[tiffOffset + o] << 8) | bytes[tiffOffset + o + 1]);
-          const read32 = (o: number) => littleEndian
-            ? (bytes[tiffOffset + o] | (bytes[tiffOffset + o + 1] << 8) | (bytes[tiffOffset + o + 2] << 16) | (bytes[tiffOffset + o + 3] << 24))
-            : ((bytes[tiffOffset + o] << 24) | (bytes[tiffOffset + o + 1] << 16) | (bytes[tiffOffset + o + 2] << 8) | bytes[tiffOffset + o + 3]);
-          const ifdOffset = read32(4);
-          const numEntries = read16(ifdOffset);
-          for (let i = 0; i < numEntries; i++) {
-            const entryOffset = ifdOffset + 2 + i * 12;
-            const tag = read16(entryOffset);
-            if (tag === 0x0112) { // Orientation tag
-              return read16(entryOffset + 8);
-            }
-          }
-        }
-      }
-      offset += 2 + segLen;
-    }
-  } catch (_) {}
-  return 1;
-}
-
-
-// ── Convert any image URI to ArrayBuffer ─────────────────────────────────────
-async function uriToArrayBuffer(imageUri: string): Promise<ArrayBuffer> {
-  if (imageUri.startsWith('data:')) {
-    const base64 = imageUri.split(',')[1];
-    const binary = atob(base64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    return bytes.buffer;
-  }
-  // blob: or http(s): URL
-  const res = await fetch(imageUri);
-  return res.arrayBuffer();
-}
-
 // ── OCR runner ────────────────────────────────────────────────────────────────
 export async function ocrReceiptImage(imageUri: string): Promise<ParsedReceipt> {
   const { Platform } = require('react-native');
   console.log('[OCR] platform:', Platform.OS, 'uri scheme:', imageUri.slice(0, 25));
 
   let rawText = '';
-  let processedBase64: string | undefined;
 
-  // ── Web: canvas preprocessing (upscale 2x + adaptive threshold) ──
-  if (Platform.OS === 'web') {
-    try {
-      const ocrInput = await preprocessForOcr(imageUri);
-      const Tesseract = await import('tesseract.js');
-      const result = await Tesseract.recognize(ocrInput as any, 'eng', {
-        logger: () => {},
-        tessedit_pageseg_mode: '6',
-      } as any);
-      rawText = result.data.text;
-    } catch (e: any) {
-      console.error('[OCR] web canvas failed:', e?.message ?? e);
-      throw e;
-    }
-  } else {
-    // ── Native: jimp preprocessing ──
-    try {
-      const processed = await preprocessWithJimp(imageUri);
-      processedBase64 = processed.base64;
-      const Tesseract = await import('tesseract.js');
-      const result = await Tesseract.recognize(processed.uri as any, 'eng', {
-        logger: () => {},
-        tessedit_pageseg_mode: '6',
-      } as any);
-      rawText = result.data.text;
-    } catch (e: any) {
-      console.error('[OCR] native jimp failed:', e?.message ?? e);
-      // Fallback to raw image
-      const Tesseract = await import('tesseract.js');
-      const result = await Tesseract.recognize(imageUri as any, 'eng', {
-        logger: () => {},
-        tessedit_pageseg_mode: '6',
-      } as any);
-      rawText = result.data.text;
-    }
+  try {
+    const Tesseract = await import('tesseract.js');
+    const result = await Tesseract.recognize(imageUri as any, 'eng', {
+      logger: () => {},
+      tessedit_pageseg_mode: '6',
+    } as any);
+    rawText = result.data.text;
+  } catch (e: any) {
+    console.error('[OCR] failed:', e?.message ?? e);
+    throw e;
   }
 
   console.log('[OCR] raw text:', JSON.stringify(rawText));
   const parsed = parseReceiptText(rawText);
   console.log('[OCR] parsed items:', parsed.items);
-  return { ...parsed, processedBase64 };
+  return { ...parsed };
 }
