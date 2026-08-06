@@ -10,8 +10,6 @@ import { supabase } from '../../../src/lib/supabase';
 import * as ImagePicker from 'expo-image-picker';
 import BottomSheet from '@/components/ui/BottomSheet';
 import TopHeader from '@/components/ui/TopHeader';
-import formStyles from '@/components/ui/formStyles';
-import accountStyles from '@/components/ui/accountStyles';
 import { Colors, Radius, Spacing } from '@/components/ui/theme';
 import { DC } from '../../../src/lib/design';
 import { compressImage, uploadReceiptPhoto } from '../../../src/lib/receiptUpload';
@@ -49,7 +47,7 @@ export default function ReceiptsScreen({ isActive, onClose }: { isActive?: boole
   }, [userId]));
 
   const [addModal, setAddModal] = useState(false);
-  const [addStep, setAddStep] = useState<'name' | 'photos'>('name');
+  const [addStep, setAddStep] = useState<'source' | 'name' | 'photos'>('source');
   const [folderName, setFolderName] = useState('');
   const [creating, setCreating] = useState(false);
   const [activeEntryId, setActiveEntryId] = useState<string | null>(null);
@@ -87,32 +85,45 @@ export default function ReceiptsScreen({ isActive, onClose }: { isActive?: boole
     enabled: !!userId,
   });
 
-  const createEntry = async () => {
+  const createEntry = async (name?: string) => {
     if (!userId) return;
     setCreating(true);
     const now = new Date();
     const timeStr = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-    const note = folderName.trim() || timeStr;
+    const note = (name ?? folderName).trim() || timeStr;
     const { data: entry, error } = await supabase.from('receipt_entries').insert({ user_id: userId, note }).select().single();
     setCreating(false);
     if (!error && entry) { setActiveEntryId(entry.id); setAddStep('photos'); }
   };
 
   const closeAddModal = () => {
-    setAddModal(false); setAddStep('name'); setFolderName(''); setActiveEntryId(null);
+    setAddModal(false); setAddStep('source'); setFolderName(''); setActiveEntryId(null);
     setDisplayCount(10);
     queryClient.invalidateQueries({ queryKey: ['receipts', userId] });
+  };
+
+  const ensureEntry = async () => {
+    if (activeEntryId) return activeEntryId;
+    if (!userId) return null;
+    const now = new Date();
+    const note = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+    const { data: entry } = await supabase.from('receipt_entries').insert({ user_id: userId, note }).select().single();
+    if (entry) { setActiveEntryId(entry.id); return entry.id; }
+    return null;
   };
 
   const addFromCamera = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') { Alert.alert('Permission needed', 'Camera access required.'); return; }
     const result = await ImagePicker.launchCameraAsync({ quality: 1 });
-    if (!result.canceled && result.assets[0] && activeEntryId) {
+    if (!result.canceled && result.assets[0]) {
+      const entryId = await ensureEntry();
+      if (!entryId) return;
       try {
         const compressed = await compressImage(result.assets[0].uri);
-        await uploadReceiptPhoto(compressed, activeEntryId);
+        await uploadReceiptPhoto(compressed, entryId);
         queryClient.invalidateQueries({ queryKey: ['receipts', userId] });
+        setAddStep('name');
       } catch (e: any) {
         if (e?.message === 'RECEIPT_LIMIT_REACHED') Alert.alert('monthly limit reached', 'you\'ve used all 10 free receipt photo uploads this month. resets on the 1st.');
       }
@@ -123,16 +134,19 @@ export default function ReceiptsScreen({ isActive, onClose }: { isActive?: boole
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') { Alert.alert('Permission needed', 'Photo library access required.'); return; }
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsMultipleSelection: true, quality: 1 });
-    if (!result.canceled && activeEntryId) {
+    if (!result.canceled) {
+      const entryId = await ensureEntry();
+      if (!entryId) return;
       try {
         const CONCURRENCY = 3;
         for (let i = 0; i < result.assets.length; i += CONCURRENCY) {
           await Promise.all(result.assets.slice(i, i + CONCURRENCY).map(async (asset) => {
             const compressed = await compressImage(asset.uri);
-            await uploadReceiptPhoto(compressed, activeEntryId!);
+            await uploadReceiptPhoto(compressed, entryId!);
           }));
         }
         queryClient.invalidateQueries({ queryKey: ['receipts', userId] });
+        setAddStep('name');
       } catch (e: any) {
         if (e?.message === 'RECEIPT_LIMIT_REACHED') Alert.alert('monthly limit reached', 'you\'ve used all 10 free receipt photo uploads this month. resets on the 1st.');
       }
@@ -252,36 +266,83 @@ export default function ReceiptsScreen({ isActive, onClose }: { isActive?: boole
         </ScrollView>
       )}
 
-      <BottomSheet visible={addModal} onClose={closeAddModal} title={addStep === 'name' ? 'new receipt' : 'add photos'}>
-        {addStep === 'name' ? (
+      <BottomSheet visible={addModal} onClose={closeAddModal} title={addStep === 'source' ? 'new receipt' : addStep === 'name' ? 'name your receipt' : 'add more photos'}>
+        {addStep === 'source' && (
+          <View style={{ gap: 10 }}>
+            <TouchableOpacity
+              style={{ backgroundColor: '#111111', borderRadius: 999, paddingVertical: 14, alignItems: 'center' }}
+              onPress={addFromCamera}
+              activeOpacity={0.85}
+            >
+              <Text style={{ fontFamily: 'Poppins-SemiBold', fontSize: 13, color: '#ffffff' }}>camera</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={{ borderRadius: 999, paddingVertical: 14, alignItems: 'center', borderWidth: 1, borderColor: DC.controlBorder }}
+              onPress={addFromGallery}
+              activeOpacity={0.85}
+            >
+              <Text style={{ fontFamily: 'Poppins-SemiBold', fontSize: 13, color: DC.pageText }}>gallery</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        {addStep === 'name' && (
           <>
-            <TextInput style={formStyles.input} placeholder="folder name (optional)" placeholderTextColor={Colors.faint} value={folderName} onChangeText={setFolderName} autoFocus returnKeyType="done" onSubmitEditing={createEntry} />
-            <Text style={formStyles.hintMuted}>leave empty to use current time</Text>
-            <View style={formStyles.actions}>
-              <TouchableOpacity style={formStyles.cancelBtn} onPress={closeAddModal}>
-                <Text style={formStyles.cancelBtnText}>cancel</Text>
+            <View style={DC.textbox.wrap}>
+              <TextInput
+                style={DC.textbox.input}
+                placeholder="receipt name (optional)"
+                placeholderTextColor={DC.inputPlaceholder}
+                value={folderName}
+                onChangeText={setFolderName}
+                autoFocus
+                returnKeyType="done"
+                onSubmitEditing={() => createEntry()}
+              />
+            </View>
+            <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 11, color: DC.pageTextMuted, marginTop: 6, marginBottom: 16 }}>leave empty to use current time</Text>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <TouchableOpacity
+                style={{ flex: 1, borderRadius: 999, paddingVertical: 14, alignItems: 'center', borderWidth: 1, borderColor: DC.controlBorder }}
+                onPress={() => createEntry('')}
+                activeOpacity={0.8}
+              >
+                <Text style={{ fontFamily: 'Poppins-SemiBold', fontSize: 13, color: DC.pageTextMuted }}>skip</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[formStyles.primaryBtn, creating && { opacity: 0.6 }]} onPress={createEntry} disabled={creating}>
-                <Text style={formStyles.primaryBtnText}>{creating ? 'creating...' : 'create'}</Text>
+              <TouchableOpacity
+                style={{ flex: 2, backgroundColor: '#111111', borderRadius: 999, paddingVertical: 14, alignItems: 'center', opacity: creating ? 0.6 : 1 }}
+                onPress={() => createEntry()}
+                disabled={creating}
+                activeOpacity={0.85}
+              >
+                <Text style={{ fontFamily: 'Poppins-SemiBold', fontSize: 13, color: '#ffffff' }}>{creating ? 'saving...' : 'save'}</Text>
               </TouchableOpacity>
             </View>
           </>
-        ) : (
-          <>
-            <View style={accountStyles.photoButtons}>
-              <TouchableOpacity style={accountStyles.photoBtn} onPress={addFromCamera}>
-                <Text style={accountStyles.photoBtnText}>camera</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={accountStyles.photoBtn} onPress={addFromGallery}>
-                <Text style={[accountStyles.photoBtnText, { color: Colors.text }]}>gallery</Text>
-              </TouchableOpacity>
-            </View>
-            <View style={formStyles.actions}>
-              <TouchableOpacity style={formStyles.primaryBtn} onPress={closeAddModal}>
-                <Text style={formStyles.primaryBtnText}>done</Text>
-              </TouchableOpacity>
-            </View>
-          </>
+        )}
+        {addStep === 'photos' && (
+          <View style={{ gap: 10 }}>
+            <TouchableOpacity
+              style={{ backgroundColor: '#111111', borderRadius: 999, paddingVertical: 14, alignItems: 'center' }}
+              onPress={addFromCamera}
+              activeOpacity={0.85}
+            >
+              <Text style={{ fontFamily: 'Poppins-SemiBold', fontSize: 13, color: '#ffffff' }}>add more from camera</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={{ borderRadius: 999, paddingVertical: 14, alignItems: 'center', borderWidth: 1, borderColor: DC.controlBorder }}
+              onPress={addFromGallery}
+              activeOpacity={0.85}
+            >
+              <Text style={{ fontFamily: 'Poppins-SemiBold', fontSize: 13, color: DC.pageText }}>add more from gallery</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={{ borderRadius: 999, paddingVertical: 14, alignItems: 'center' }}
+              onPress={closeAddModal}
+              activeOpacity={0.8}
+            >
+              <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 13, color: DC.pageTextMuted }}>done</Text>
+            </TouchableOpacity>
+          </View>
         )}
       </BottomSheet>
     </View>

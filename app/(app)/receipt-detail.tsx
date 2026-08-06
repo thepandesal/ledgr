@@ -3,30 +3,31 @@ import {
   Dimensions, ScrollView, Image, ActivityIndicator, Alert, Modal, TextInput
 } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../../src/lib/supabase';
-import { useSlideScreen } from '../../src/hooks/useSlideScreen';
-import { BlurView } from 'expo-blur';
+import { useScreenAnim } from '@/components/ui/ScreenWrapper';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import BottomSheet from '@/components/ui/BottomSheet';
 import ConfirmModal from '@/components/ui/ConfirmModal';
-import formStyles from '@/components/ui/formStyles';
-import pageStyles from '@/components/ui/pageStyles';
-import accountStyles from '@/components/ui/accountStyles';
-import { Colors, Fonts, Radius, Spacing } from '@/components/ui/theme';
+import TopHeader from '@/components/ui/TopHeader';
+import { Colors, Fonts, Radius } from '@/components/ui/theme';
+import { DC } from '../../src/lib/design';
+import { Brand } from '../../src/lib/brand';
 import { compressImage, uploadReceiptPhoto } from '../../src/lib/receiptUpload';
 
 const { width: SW, height: SH } = Dimensions.get('window');
-const COLS = 5;
-const GAP = 6;
-const CELL = (SW - 64 - GAP * (COLS - 1)) / COLS;
+const COLS = 3;
+const GAP = 8;
+const CELL = (SW - DC.pagePadding * 2 - GAP * (COLS - 1)) / COLS;
 
 interface Photo { id: string; url: string; path: string; }
 
 export default function ReceiptDetailScreen() {
   const { receiptId } = useLocalSearchParams<{ receiptId: string }>();
   const router = useRouter();
-  const { slideAnim, handleBack } = useSlideScreen();
+  const { slideAnim, handleBack } = useScreenAnim();
+  const insets = useSafeAreaInsets();
 
   const [entry, setEntry] = useState<any>(null);
   const [linkedRecordingName, setLinkedRecordingName] = useState('');
@@ -41,12 +42,10 @@ export default function ReceiptDetailScreen() {
   const [linkDate, setLinkDate] = useState(new Date().toISOString().split('T')[0]);
   const [linkRecordings, setLinkRecordings] = useState<any[]>([]);
   const [linkSearch, setLinkSearch] = useState('');
-
   const [uploading, setUploading] = useState(false);
+  const [actionsModal, setActionsModal] = useState(false);
 
-  useEffect(() => {
-    load();
-  }, []);
+  useEffect(() => { load(); }, []);
 
   useFocusEffect(useCallback(() => {
     if (!uploading) load();
@@ -62,17 +61,12 @@ export default function ReceiptDetailScreen() {
       }
     }
     const { data: rows } = await supabase.from('receipt_photos').select('id, storage_path, url').eq('entry_id', receiptId).order('created_at');
-    if (rows) {
-      setPhotos(rows.map((p: any) => ({ id: p.id, url: p.url ?? '', path: p.storage_path })));
-    }
+    if (rows) setPhotos(rows.map((p: any) => ({ id: p.id, url: p.url ?? '', path: p.storage_path })));
     setLoading(false);
   };
 
-  // handleBack provided by useSlideScreen hook
-
   const rename = async () => {
-    const timeStr = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-    const newName = renameVal.trim() || timeStr;
+    const newName = renameVal.trim() || new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
     await supabase.from('receipt_entries').update({ note: newName }).eq('id', receiptId);
     setEntry((prev: any) => ({ ...prev, note: newName }));
     setRenameModal(false);
@@ -97,7 +91,6 @@ export default function ReceiptDetailScreen() {
     setPhotos(remaining);
     setCarouselIdx(null);
     setDeletePhotoConfirm(null);
-    // If no photos left, delete the whole entry and go back to recording if linked
     if (remaining.length === 0) {
       const recordingId = entry?.recording_id;
       await supabase.from('receipt_entries').delete().eq('id', receiptId);
@@ -122,12 +115,8 @@ export default function ReceiptDetailScreen() {
           if (uploaded) setPhotos(prev => [...prev, uploaded]);
         }
       } catch (e: any) {
-        if (e?.message === 'RECEIPT_LIMIT_REACHED') {
-          Alert.alert('monthly limit reached', 'you\'ve used all 10 free receipt photo uploads this month. resets on the 1st.');
-        }
-      } finally {
-        setUploading(false);
-      }
+        if (e?.message === 'RECEIPT_LIMIT_REACHED') Alert.alert('monthly limit reached', 'you\'ve used all 10 free receipt photo uploads this month.');
+      } finally { setUploading(false); }
     }
   };
 
@@ -142,12 +131,8 @@ export default function ReceiptDetailScreen() {
         const uploaded = await uploadReceiptPhoto(compressed, receiptId);
         if (uploaded) setPhotos(prev => [...prev, uploaded]);
       } catch (e: any) {
-        if (e?.message === 'RECEIPT_LIMIT_REACHED') {
-          Alert.alert('monthly limit reached', 'you\'ve used all 10 free receipt photo uploads this month. resets on the 1st.');
-        }
-      } finally {
-        setUploading(false);
-      }
+        if (e?.message === 'RECEIPT_LIMIT_REACHED') Alert.alert('monthly limit reached', 'you\'ve used all 10 free receipt photo uploads this month.');
+      } finally { setUploading(false); }
     }
   };
 
@@ -164,14 +149,6 @@ export default function ReceiptDetailScreen() {
     setLinkSearch('');
     loadRecordingsForDate(today);
     setLinkModal(true);
-  };
-
-  const changeDate = (delta: number) => {
-    const d = new Date(linkDate);
-    d.setDate(d.getDate() + delta);
-    const newDate = d.toISOString().split('T')[0];
-    setLinkDate(newDate);
-    loadRecordingsForDate(newDate);
   };
 
   const linkToRecording = async (rec: any) => {
@@ -191,138 +168,267 @@ export default function ReceiptDetailScreen() {
     ? linkRecordings.filter(r => r.name.toLowerCase().includes(linkSearch.toLowerCase()))
     : linkRecordings;
 
-  const formatDate = (d: string) => { const [y, m, day] = d.split('-').map(Number); return new Date(y, m - 1, day).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); };
-  const typeColor = (type: string) => type === 'expense' ? Colors.expense : type === 'income' ? Colors.income : Colors.text;
+  const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2 });
+  const typeColor = (type: string) => type === 'expense' ? Colors.expense : type === 'income' ? Colors.income : DC.pageText;
+  const formatDate = (d: string) => {
+    if (!d) return '';
+    const dt = new Date(d);
+    return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
 
   if (loading) return (
-    <Animated.View style={[pageStyles.container, { transform: [{ translateX: slideAnim }] }]}>
+    <Animated.View style={[{ flex: 1, backgroundColor: '#ffffff' }, { transform: [{ translateX: slideAnim }] }]}>
       <SafeAreaView style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator color={Colors.cyan} />
+        <ActivityIndicator color={DC.headerBlueBg} />
       </SafeAreaView>
     </Animated.View>
   );
 
   return (
-    <Animated.View style={[pageStyles.container, { transform: [{ translateX: slideAnim }] }]}>
-      <SafeAreaView style={pageStyles.inner}>
+    <Animated.View style={[{ flex: 1, backgroundColor: '#ffffff' }, { transform: [{ translateX: slideAnim }] }]}>
+      <TopHeader
+        title="Receipt"
+        subtitle={(entry?.note ?? 'untitled').toLowerCase()}
+        centered
+        variant="blue"
+        topInset={insets.top}
+        onBack={handleBack}
+        right={
+          <TouchableOpacity
+            style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' }}
+            onPress={() => setActionsModal(true)}
+            activeOpacity={0.7}
+          >
+            <Text style={{ color: '#ffffff', fontSize: 16, letterSpacing: 2, lineHeight: 18 }}>···</Text>
+          </TouchableOpacity>
+        }
+      />
 
+      <ScrollView contentContainerStyle={{ paddingHorizontal: DC.pagePadding, paddingTop: 24, paddingBottom: 48 }} showsVerticalScrollIndicator={false}>
 
-
-        <View style={[pageStyles.titleBlock, { paddingHorizontal: Spacing.page }]}>
-          <Text style={pageStyles.pageLabel}>receipts</Text>
-          <View style={s.titleRow}>
-            <TouchableOpacity style={s.titleNameBtn} onPress={() => { setRenameVal(entry?.note ?? ''); setRenameModal(true); }}>
-              <Text style={pageStyles.pageName} numberOfLines={1}>{(entry?.note ?? 'untitled').toLowerCase()}</Text>
+        {/* Date + add buttons */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+          <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 11, color: DC.pageTextMuted }}>
+            {formatDate(entry?.created_at ?? '')}
+          </Text>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <TouchableOpacity
+              style={{ height: 32, paddingHorizontal: 14, borderRadius: 999, backgroundColor: DC.viewBtnBg, alignItems: 'center', justifyContent: 'center' }}
+              onPress={addFromCamera}
+              activeOpacity={0.8}
+            >
+              <Text style={{ fontFamily: 'Poppins-SemiBold', fontSize: 11, color: DC.viewBtnText }}>camera</Text>
             </TouchableOpacity>
-            <Text style={s.pageDate}>{formatDate(entry?.created_at ?? '')}</Text>
+            <TouchableOpacity
+              style={{ height: 32, paddingHorizontal: 14, borderRadius: 999, backgroundColor: DC.viewBtnBg, alignItems: 'center', justifyContent: 'center' }}
+              onPress={addFromGallery}
+              activeOpacity={0.8}
+            >
+              <Text style={{ fontFamily: 'Poppins-SemiBold', fontSize: 11, color: DC.viewBtnText }}>
+                {uploading ? 'uploading...' : 'gallery'}
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
 
-        <View style={[pageStyles.actionRow, { marginHorizontal: Spacing.page }]}>
-          <TouchableOpacity style={pageStyles.actionBtn} onPress={addFromCamera}>
-            <Text style={pageStyles.actionBtnText}>camera</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={pageStyles.actionBtn} onPress={addFromGallery}>
-            <Text style={pageStyles.actionBtnText}>photos</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[pageStyles.actionBtn, pageStyles.actionBtnDanger]} onPress={() => setDeleteEntryConfirm(true)}>
-            <Text style={[pageStyles.actionBtnText, { color: Colors.danger }]}>delete</Text>
-          </TouchableOpacity>
-        </View>
-
-        <ScrollView contentContainerStyle={pageStyles.scroll} showsVerticalScrollIndicator={false}>
-
-          <Text style={pageStyles.sectionHeader}>photos</Text>
-
-          {photos.length > 0 ? (
-            <View style={s.grid}>
-              {photos.map((p, i) => (
-                <View key={p.id} style={s.cell}>
-                  <TouchableOpacity onPress={() => setCarouselIdx(i)} activeOpacity={0.85} style={{ flex: 1 }}>
-                    <Image source={{ uri: p.url }} style={s.cellImg} resizeMode="cover" />
-                  </TouchableOpacity>
-
-                </View>
-              ))}
-            </View>
-          ) : (
-            <View style={[pageStyles.emptyBox, { borderWidth: 0, backgroundColor: 'transparent', marginBottom: 24 }]}>
-              <Text style={pageStyles.emptyText}>no photos yet</Text>
-            </View>
-          )}
-
-          <Text style={pageStyles.sectionHeader}>recording</Text>
-
-          {entry?.recording_id ? (
-            <View style={s.linkedCard}>
-              <View style={{ flex: 1 }}>
-                <Text style={s.linkedName} numberOfLines={1}>{linkedRecordingName.toLowerCase()}</Text>
-                <TouchableOpacity onPress={unlink}>
-                  <Text style={s.unlinkText}>unlink recording</Text>
-                </TouchableOpacity>
-              </View>
-
-            </View>
-          ) : (
-            <View style={s.recordingActions}>
-              <TouchableOpacity style={s.makeRecordingBtn} onPress={() => router.push({ pathname: '/(app)/add-recording', params: { from: 'receipt', receiptId, defaultDate: new Date().toISOString().split('T')[0] } } as any)} activeOpacity={0.85}>
-                <Text style={s.makeRecordingText}>make a recording</Text>
+        {/* Photos section */}
+        <Text style={s.sectionLabel}>photos</Text>
+        {photos.length === 0 ? (
+          <View style={s.emptyCard}>
+            <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 12, color: DC.pageTextMuted }}>no photos yet — tap camera or gallery above</Text>
+          </View>
+        ) : (
+          <View style={s.grid}>
+            {photos.map((p, i) => (
+              <TouchableOpacity key={p.id} onPress={() => setCarouselIdx(i)} activeOpacity={0.85} style={s.cell}>
+                <Image source={{ uri: p.url }} style={s.cellImg} resizeMode="cover" />
               </TouchableOpacity>
-              <TouchableOpacity style={s.linkBtn} onPress={openLinkModal} activeOpacity={0.85}>
-                <Text style={s.linkBtnText}>link existing recording</Text>
-              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
+        {/* Recording section */}
+        <Text style={[s.sectionLabel, { marginTop: 8 }]}>recording</Text>
+        {entry?.recording_id ? (
+          <View style={s.linkedCard}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontFamily: 'Poppins-SemiBold', fontSize: 13, color: DC.pageText }} numberOfLines={1}>{linkedRecordingName}</Text>
+              <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 10, color: DC.pageTextMuted, marginTop: 1 }}>linked recording</Text>
             </View>
-          )}
+            <TouchableOpacity
+              onPress={unlink}
+              style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: DC.controlBorder }}
+              activeOpacity={0.7}
+            >
+              <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 11, color: DC.pageTextMuted }}>unlink</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={{ gap: 10 }}>
+            <TouchableOpacity
+              style={s.primaryBtn}
+              onPress={() => router.push({ pathname: '/(app)/add-recording', params: { from: 'receipt', receiptId, defaultDate: new Date().toISOString().split('T')[0] } } as any)}
+              activeOpacity={0.85}
+            >
+              <Text style={s.primaryBtnText}>make a recording</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.secondaryBtn} onPress={openLinkModal} activeOpacity={0.85}>
+              <Text style={s.secondaryBtnText}>link existing recording</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
-        </ScrollView>
-      </SafeAreaView>
+      </ScrollView>
 
-      {/* Carousel */}
+      {/* Photo carousel */}
       <Modal visible={carouselIdx !== null} transparent animationType="fade" onRequestClose={() => setCarouselIdx(null)}>
-        <BlurView intensity={60} tint="light" style={StyleSheet.absoluteFill}>
-          <SafeAreaView style={{ flex: 1 }}>
-            <View style={s.carouselHeader}>
-              <Text style={s.carouselCount}>{(carouselIdx ?? 0) + 1} / {photos.length}</Text>
-            </View>
-            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-              <Image source={{ uri: photos[carouselIdx ?? 0]?.url ?? '' }} style={{ width: SW - 32, height: SH * 0.55, borderRadius: 16 }} resizeMode="contain" />
-
-            </View>
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#0f1a19' }}>
+          {/* Header */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12 }}>
+            <Text style={{ fontFamily: 'Poppins-Bold', fontSize: 15, color: '#ffffff' }}>receipt</Text>
             {photos.length > 1 && (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.thumbStrip}>
+              <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{(carouselIdx ?? 0) + 1} / {photos.length}</Text>
+            )}
+            <TouchableOpacity
+              onPress={() => setCarouselIdx(null)}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center' }}
+            >
+              <Text style={{ color: '#ffffff', fontSize: 16, lineHeight: 18 }}>×</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Photo */}
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', position: 'relative' }}>
+            <TouchableOpacity
+              onPress={() => setCarouselIdx(i => Math.max(0, (i ?? 0) - 1))}
+              disabled={(carouselIdx ?? 0) === 0}
+              style={{ position: 'absolute', left: 12, zIndex: 10, width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center', opacity: (carouselIdx ?? 0) === 0 ? 0.2 : 1 }}
+              activeOpacity={0.7}
+            >
+              <Text style={{ color: '#ffffff', fontSize: 20, lineHeight: 22 }}>‹</Text>
+            </TouchableOpacity>
+            <Image
+              source={{ uri: photos[carouselIdx ?? 0]?.url ?? '' }}
+              style={{ width: SW - 32, height: SH * 0.65, borderRadius: 16 }}
+              resizeMode="contain"
+            />
+            <TouchableOpacity
+              onPress={() => setCarouselIdx(i => Math.min(photos.length - 1, (i ?? 0) + 1))}
+              disabled={(carouselIdx ?? 0) === photos.length - 1}
+              style={{ position: 'absolute', right: 12, zIndex: 10, width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center', opacity: (carouselIdx ?? 0) === photos.length - 1 ? 0.2 : 1 }}
+              activeOpacity={0.7}
+            >
+              <Text style={{ color: '#ffffff', fontSize: 20, lineHeight: 22 }}>›</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Dots + thumbnails */}
+          <View style={{ paddingBottom: 16, paddingTop: 12, gap: 12 }}>
+            {photos.length > 1 && (
+              <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 6 }}>
+                {photos.map((_, i) => (
+                  <TouchableOpacity key={i} onPress={() => setCarouselIdx(i)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+                    <View style={{ width: i === carouselIdx ? 20 : 6, height: 6, borderRadius: 3, backgroundColor: i === carouselIdx ? Brand.color.accent : 'rgba(255,255,255,0.2)' }} />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+            {photos.length > 1 && (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, gap: 8 }}>
                 {photos.map((p, i) => (
-                  <TouchableOpacity key={p.id} onPress={() => setCarouselIdx(i)} style={[s.thumbItem, i === carouselIdx && s.thumbItemActive]}>
-                    <Image source={{ uri: p.url }} style={s.thumbImg} resizeMode="cover" />
+                  <TouchableOpacity key={p.id} onPress={() => setCarouselIdx(i)} activeOpacity={0.8}>
+                    <Image
+                      source={{ uri: p.url }}
+                      style={{ width: 56, height: 56, borderRadius: 10, borderWidth: i === carouselIdx ? 2 : 0, borderColor: Brand.color.accent, opacity: i === carouselIdx ? 1 : 0.45 }}
+                      resizeMode="cover"
+                    />
                   </TouchableOpacity>
                 ))}
               </ScrollView>
             )}
-          </SafeAreaView>
-        </BlurView>
+            {/* Delete button */}
+            <TouchableOpacity
+              onPress={() => setDeletePhotoConfirm(photos[carouselIdx ?? 0])}
+              style={{ alignSelf: 'center', paddingVertical: 8, paddingHorizontal: 20 }}
+              activeOpacity={0.7}
+            >
+              <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 12, color: Colors.expense }}>delete photo</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
       </Modal>
 
+      {/* Actions bottom sheet */}
+      <BottomSheet visible={actionsModal} onClose={() => setActionsModal(false)} title="actions">
+        <TouchableOpacity
+          style={s.actionRow}
+          onPress={() => { setActionsModal(false); setRenameVal(entry?.note ?? ''); setRenameModal(true); }}
+          activeOpacity={0.8}
+        >
+          <Text style={s.actionText}>rename</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={s.actionRow}
+          onPress={() => { setActionsModal(false); setDeleteEntryConfirm(true); }}
+          activeOpacity={0.8}
+        >
+          <Text style={[s.actionText, { color: Colors.expense }]}>delete receipt</Text>
+        </TouchableOpacity>
+      </BottomSheet>
+
       {/* Link modal */}
-      <BottomSheet visible={linkModal} onClose={() => setLinkModal(false)} sub="receipt" title="link to recording">
-        <TextInput style={formStyles.searchInput} placeholder="search by name..." placeholderTextColor={Colors.faint} value={linkSearch} onChangeText={setLinkSearch} />
-        <View style={s.linkDateRow}>
-          <Text style={s.linkDateText}>{new Date(linkDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</Text>
+      <BottomSheet visible={linkModal} onClose={() => setLinkModal(false)} title="link to recording">
+        <View style={DC.textbox.wrap}>
+          <TextInput
+            style={DC.textbox.input}
+            placeholder="search by name..."
+            placeholderTextColor={DC.inputPlaceholder}
+            value={linkSearch}
+            onChangeText={setLinkSearch}
+          />
         </View>
+        <View style={{ height: 1, backgroundColor: DC.cardDividerColor, marginVertical: 12 }} />
         {filteredRecordings.length === 0 ? (
-          <Text style={formStyles.listEmpty}>no recordings on this date</Text>
+          <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 12, color: DC.pageTextMuted, paddingVertical: 8 }}>no recordings found</Text>
         ) : (
-          filteredRecordings.map((rec: any) => (
-            <TouchableOpacity key={rec.id} style={formStyles.listItem} onPress={() => linkToRecording(rec)}>
-              <View style={[s.linkTypeDot, { backgroundColor: typeColor(rec.type) }]} />
+          filteredRecordings.map((rec: any, idx: number) => (
+            <TouchableOpacity
+              key={rec.id}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: idx < filteredRecordings.length - 1 ? DC.rowDivider.height : 0, borderBottomColor: DC.rowDivider.backgroundColor }}
+              onPress={() => linkToRecording(rec)}
+              activeOpacity={0.7}
+            >
+              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: typeColor(rec.type), flexShrink: 0 }} />
               <View style={{ flex: 1 }}>
-                <Text style={formStyles.listItemText} numberOfLines={1}>{rec.name.toLowerCase()}</Text>
-                <Text style={formStyles.listItemSub}>{rec.type} · {Number(rec.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+                <Text style={{ fontFamily: 'Poppins-SemiBold', fontSize: 13, color: DC.pageText }} numberOfLines={1}>{rec.name}</Text>
+                <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 10, color: DC.pageTextMuted }}>{rec.type} · {fmt(Number(rec.amount))}</Text>
               </View>
             </TouchableOpacity>
           ))
         )}
-        <View style={formStyles.actions}>
-          <TouchableOpacity style={formStyles.cancelBtn} onPress={() => setLinkModal(false)}>
-            <Text style={formStyles.cancelBtnText}>cancel</Text>
+      </BottomSheet>
+
+      {/* Rename modal */}
+      <BottomSheet visible={renameModal} onClose={() => setRenameModal(false)} title="rename receipt">
+        <View style={DC.textbox.wrap}>
+          <TextInput
+            style={DC.textbox.input}
+            placeholder="receipt name"
+            placeholderTextColor={DC.inputPlaceholder}
+            value={renameVal}
+            onChangeText={setRenameVal}
+            autoFocus
+            returnKeyType="done"
+            onSubmitEditing={rename}
+          />
+        </View>
+        <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+          <TouchableOpacity style={[s.primaryBtn, { flex: 1, backgroundColor: Colors.surface }]} onPress={() => setRenameModal(false)}>
+            <Text style={[s.primaryBtnText, { color: DC.pageTextMuted }]}>cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[s.primaryBtn, { flex: 2 }]} onPress={rename}>
+            <Text style={s.primaryBtnText}>save</Text>
           </TouchableOpacity>
         </View>
       </BottomSheet>
@@ -331,7 +437,7 @@ export default function ReceiptDetailScreen() {
       <ConfirmModal
         visible={deleteEntryConfirm}
         onClose={() => setDeleteEntryConfirm(false)}
-        title="delete folder"
+        title="delete receipt"
         message="this will delete all photos. cannot be undone."
         actions={[
           { label: 'cancel', onPress: () => setDeleteEntryConfirm(false), muted: true },
@@ -350,64 +456,85 @@ export default function ReceiptDetailScreen() {
           { label: 'delete', onPress: () => deletePhoto(deletePhotoConfirm!), destructive: true },
         ]}
       />
-
-      {/* Rename modal */}
-      <BottomSheet visible={renameModal} onClose={() => setRenameModal(false)} sub="receipt" title="rename folder">
-        <TextInput
-          style={formStyles.input}
-          placeholder="folder name"
-          placeholderTextColor="#c0c0c0"
-          value={renameVal}
-          onChangeText={setRenameVal}
-          autoFocus
-          returnKeyType="done"
-          onSubmitEditing={rename}
-        />
-        <View style={formStyles.actions}>
-          <TouchableOpacity style={formStyles.cancelBtn} onPress={() => setRenameModal(false)}>
-            <Text style={formStyles.cancelBtnText}>cancel</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={formStyles.primaryBtn} onPress={rename}>
-            <Text style={formStyles.primaryBtnText}>save</Text>
-          </TouchableOpacity>
-        </View>
-      </BottomSheet>
     </Animated.View>
   );
 }
 
 const s = StyleSheet.create({
-  // Title row
-  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  titleNameBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 },
-  pageDate: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.muted },
-  // Photo grid
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GAP, marginBottom: 24 },
-  cell: { width: CELL, height: CELL, borderRadius: Radius.sm, overflow: 'hidden', backgroundColor: Colors.input, position: 'relative' },
+  sectionLabel: {
+    fontFamily: 'Poppins-Bold',
+    fontSize: 11,
+    color: DC.pageTextMuted,
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    marginBottom: 12,
+  },
+  emptyCard: {
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: DC.controlBorder,
+    borderRadius: 12,
+    paddingVertical: 24,
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: GAP,
+    marginBottom: 28,
+  },
+  cell: {
+    width: CELL,
+    height: CELL,
+    borderRadius: 10,
+    overflow: 'hidden',
+    backgroundColor: DC.cardBg,
+  },
   cellImg: { width: '100%', height: '100%' },
-  cellDelete: { position: 'absolute', top: 3, right: 3 },
-  // Linked recording card
-  linkedCard: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: Colors.surface, borderRadius: Radius.md, padding: 14, borderWidth: 1, borderColor: Colors.border, marginBottom: 16 },
-  linkedName: { fontFamily: Fonts.display, fontSize: 16, color: Colors.text, letterSpacing: -0.5 },
-  unlinkText: { fontFamily: Fonts.mono, fontSize: 10, color: Colors.danger, marginTop: 3 },
-  recordingActions: { gap: 10, marginBottom: 16 },
-  makeRecordingBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: Colors.text, borderRadius: Radius.pill, paddingVertical: 13 },
-  makeRecordingText: { fontFamily: Fonts.monoBold, fontSize: 13, color: Colors.white },
-  linkBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: Colors.surface, borderRadius: Radius.pill, paddingVertical: 13, borderWidth: 1, borderColor: Colors.borderMid },
-  linkBtnText: { fontFamily: Fonts.monoBold, fontSize: 13, color: Colors.text },
-  // Carousel
-  carouselHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 12 },
-  carouselBtn: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
-  carouselCount: { fontFamily: Fonts.mono, fontSize: 12, color: Colors.text },
-  arrowLeft: { position: 'absolute', left: 8, backgroundColor: 'rgba(255,255,255,0.85)', borderRadius: Radius.pill, width: 44, height: 44, justifyContent: 'center', alignItems: 'center' },
-  arrowRight: { position: 'absolute', right: 8, backgroundColor: 'rgba(255,255,255,0.85)', borderRadius: Radius.pill, width: 44, height: 44, justifyContent: 'center', alignItems: 'center' },
-  thumbStrip: { paddingHorizontal: 16, paddingVertical: 12, gap: 8, alignItems: 'center' },
-  thumbItem: { width: 56, height: 56, borderRadius: Radius.sm, overflow: 'hidden', borderWidth: 2, borderColor: 'transparent' },
-  thumbItemActive: { borderColor: Colors.cyan },
-  thumbImg: { width: '100%', height: '100%' },
-  // Link modal
-  linkDateRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', paddingVertical: 4 },
-  linkDateText: { fontFamily: Fonts.display, fontSize: 15, color: Colors.text },
-  linkTypeDot: { width: 8, height: 8, borderRadius: 4, flexShrink: 0 },
+  linkedCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 1,
+    borderColor: DC.controlBorder,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 16,
+  },
+  primaryBtn: {
+    backgroundColor: '#111111',
+    borderRadius: 999,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  primaryBtnText: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 13,
+    color: '#ffffff',
+  },
+  secondaryBtn: {
+    borderRadius: 999,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: DC.controlBorder,
+  },
+  secondaryBtnText: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 13,
+    color: DC.pageText,
+  },
+  actionRow: {
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: DC.rowDivider.backgroundColor,
+  },
+  actionText: {
+    fontFamily: 'Poppins-Regular',
+    fontSize: 14,
+    color: DC.pageText,
+  },
 });
-
