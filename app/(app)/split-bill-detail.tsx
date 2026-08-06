@@ -262,6 +262,21 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
   };
   useEffect(() => { if (splitBillId) loadLinkedReceipt(); }, [splitBillId]);
 
+  const handleDeleteReceiptPhoto = async () => {
+    const pool = photoModalPool === 'direct' ? receiptPhotos : recordingReceiptPhotos;
+    const current = pool[photoModalIndex];
+    if (!current) return;
+    // Remove from storage + DB
+    const { data: row } = await supabase.from('receipt_photos').select('storage_path').eq('id', current.id).maybeSingle();
+    if (row?.storage_path) await supabase.storage.from('receipts').remove([row.storage_path]);
+    await supabase.from('receipt_photos').delete().eq('id', current.id);
+    // Adjust index if we deleted the last item
+    const newIndex = Math.max(0, photoModalIndex - 1);
+    setPhotoModalIndex(newIndex);
+    if (pool.length <= 1) setPhotoModal(false);
+    loadLinkedReceipt();
+  };
+
   // ── Friends list (for invite matching) ─────────────────────────────────────────────
   const { data: friends = [] } = useQuery<{ id: string; name: string }[]>({
     queryKey: ['friends', userId],
@@ -426,15 +441,14 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
         setNewItemScanError('no items detected — try a clearer photo');
         setNewItemStep('choice');
       } else {
-        setNewItemScanItems(parsed.items.map((i: any) => ({ name: i.name, cost: String(i.price), selected: true })));
+        setNewItemScanGroups([{ photoUri: url, items: parsed.items.map((i: any) => ({ name: i.name, cost: String(i.price), selected: true })) }]);
         setNewItemStep('scan-review');
       }
-      setNewItemScanLoading(false);
     } catch (e: any) {
       setNewItemScanError('failed to read receipt — try again or add manually');
       setNewItemStep('choice');
-      setNewItemScanLoading(false);
     }
+    setNewItemScanLoading(false);
   };
   const saveScanItems = async () => {
     const allValid = newItemScanGroups.flatMap(g => g.items.filter(r => r.selected !== false && r.name.trim() && parseFloat(r.cost) > 0));
@@ -2452,7 +2466,7 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
                           setNewItemScanError('no items found in text — try editing the text above');
                           setNewItemStep('ocr-text');
                         } else {
-                          setNewItemScanItems(parsed.items.map((i: any) => ({ name: i.name, cost: String(i.price), selected: true })));
+                          setNewItemScanGroups([{ photoUri: '', items: parsed.items.map((i: any) => ({ name: i.name, cost: String(i.price), selected: true })) }]);
                           setNewItemStep('scan-review');
                         }
                       }}
@@ -3265,57 +3279,97 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
           <Text style={[s.doneBtnText, { color: Colors.text }]}>gallery</Text>
         </TouchableOpacity>
       </BottomSheet>
-            {/* Photo carousel modal */}
+                        {/* Photo carousel modal */}
       <Modal visible={photoModal} transparent animationType="fade" onRequestClose={() => setPhotoModal(false)}>
-        <SafeAreaView style={{ flex: 1, backgroundColor: DC.photoViewerBg }}>
-          {/* Header */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: DC.pagePadding, paddingTop: 12, paddingBottom: 8 }}>
-            <View style={{ flex: 1, alignItems: 'center' }}>
-              <Text style={{ fontFamily: AppFont.bold, fontSize: 15, color: DC.pageText }}>receipt</Text>
-            </View>
-            <TouchableOpacity onPress={() => setPhotoModal(false)} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }} style={{ position: 'absolute', right: DC.pagePadding }}>
-            </TouchableOpacity>
-          </View>
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#0f1a19' }}>
           {(() => {
             const pool = photoModalPool === 'direct' ? receiptPhotos : recordingReceiptPhotos;
+            const current = pool[photoModalIndex];
+            const label = current && 'recordingName' in current ? (current as any).recordingName : null;
             return (
               <>
-                {/* Photo + arrows */}
-                <View style={{ height: 420, justifyContent: 'center', alignItems: 'center', position: 'relative' }}>
+                {/* Header */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontFamily: 'Poppins-Bold', fontSize: 15, color: '#ffffff', letterSpacing: 0.2 }}>receipt</Text>
+                    {label ? <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 11, color: Brand.color.accent, marginTop: 1 }} numberOfLines={1}>{label}</Text> : null}
+                  </View>
+                  {pool.length > 1 && (
+                    <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 11, color: 'rgba(255,255,255,0.4)', marginRight: 12 }}>{photoModalIndex + 1} / {pool.length}</Text>
+                  )}
+                  <TouchableOpacity
+                    onPress={() => setPhotoModal(false)}
+                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                    style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center' }}
+                  >
+                    <Text style={{ color: '#ffffff', fontSize: 16, lineHeight: 18 }}>×</Text>
+                  </TouchableOpacity>
+                </View>
+                {/* Photo */}
+                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', position: 'relative' }}>
                   <TouchableOpacity
                     onPress={() => setPhotoModalIndex(i => i - 1)}
                     disabled={photoModalIndex === 0}
-                    style={{ position: 'absolute', left: 12, zIndex: 10, width: 36, height: 36, borderRadius: 18, backgroundColor: DC.photoViewerNav, justifyContent: 'center', alignItems: 'center', opacity: photoModalIndex === 0 ? 0.3 : 1 }}
+                    style={{ position: 'absolute', left: 12, zIndex: 10, width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center', opacity: photoModalIndex === 0 ? 0.2 : 1 }}
+                    activeOpacity={0.7}
                   >
+                    <Text style={{ color: '#ffffff', fontSize: 20, lineHeight: 22 }}>‹</Text>
                   </TouchableOpacity>
-                  <Image source={{ uri: pool[photoModalIndex]?.url ?? '' }} style={{ width: width - 80, height: 400, borderRadius: 12 }} resizeMode="contain" />
+                  <Image
+                    source={{ uri: current?.url ?? '' }}
+                    style={{ width: width - 32, height: '85%' as any, borderRadius: 16 }}
+                    resizeMode="contain"
+                  />
                   <TouchableOpacity
                     onPress={() => setPhotoModalIndex(i => i + 1)}
                     disabled={photoModalIndex === pool.length - 1}
-                    style={{ position: 'absolute', right: 12, zIndex: 10, width: 36, height: 36, borderRadius: 18, backgroundColor: DC.photoViewerNav, justifyContent: 'center', alignItems: 'center', opacity: photoModalIndex === pool.length - 1 ? 0.3 : 1 }}
+                    style={{ position: 'absolute', right: 12, zIndex: 10, width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center', opacity: photoModalIndex === pool.length - 1 ? 0.2 : 1 }}
+                    activeOpacity={0.7}
                   >
+                    <Text style={{ color: '#ffffff', fontSize: 20, lineHeight: 22 }}>›</Text>
                   </TouchableOpacity>
                 </View>
-                {/* Recording name label */}
-                {pool[photoModalIndex] && 'recordingName' in pool[photoModalIndex] && (pool[photoModalIndex] as any).recordingName ? (
-                  <Text style={{ fontFamily: AppFont.regular, fontSize: 11, color: DC.pageTextMuted, textAlign: 'center', marginTop: 4 }} numberOfLines={1}>{(pool[photoModalIndex] as any).recordingName}</Text>
-                ) : null}
-                {/* Dot indicators */}
-                <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 6, paddingVertical: 12 }}>
-                  {pool.map((_, i) => (
-                    <TouchableOpacity key={i} onPress={() => setPhotoModalIndex(i)}>
-                      <View style={{ width: i === photoModalIndex ? 18 : 6, height: 6, borderRadius: 3, backgroundColor: i === photoModalIndex ? DC.accent1 : DC.cardBorder }} />
-                    </TouchableOpacity>
-                  ))}
+                {/* Dots + thumbnails */}
+                <View style={{ paddingBottom: 28, paddingTop: 12, gap: 12 }}>
+                  {pool.length > 1 && (
+                    <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 6 }}>
+                      {pool.map((_, i) => (
+                        <TouchableOpacity key={i} onPress={() => setPhotoModalIndex(i)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+                          <View style={{ width: i === photoModalIndex ? 20 : 6, height: 6, borderRadius: 3, backgroundColor: i === photoModalIndex ? Brand.color.accent : 'rgba(255,255,255,0.2)' }} />
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+                  {pool.length > 1 && (
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, gap: 8 }}>
+                      {pool.map((p, i) => (
+                        <TouchableOpacity key={p.id} onPress={() => setPhotoModalIndex(i)} activeOpacity={0.8}>
+                          <Image
+                            source={{ uri: p.url }}
+                            style={{ width: 56, height: 56, borderRadius: 10, borderWidth: i === photoModalIndex ? 2 : 0, borderColor: Brand.color.accent, opacity: i === photoModalIndex ? 1 : 0.45 }}
+                            resizeMode="cover"
+                          />
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  )}
                 </View>
-                {/* Thumbnail strip */}
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: DC.pagePadding, gap: 8, paddingBottom: 16 }}>
-                  {pool.map((p, i) => (
-                    <TouchableOpacity key={p.id} onPress={() => setPhotoModalIndex(i)} activeOpacity={0.8}>
-                      <Image source={{ uri: p.url }} style={{ width: 64, height: 64, borderRadius: 8, borderWidth: i === photoModalIndex ? 2 : 0, borderColor: DC.accent1 }} resizeMode="cover" />
+                {/* Delete / Remove button */}
+                {(() => {
+                  const pool = photoModalPool === 'direct' ? receiptPhotos : recordingReceiptPhotos;
+                  const isDirect = photoModalPool === 'direct';
+                  const label = isDirect ? 'delete photo' : 'remove from view';
+                  const color = isDirect ? Colors.expense : 'rgba(255,255,255,0.5)';
+                  return (
+                    <TouchableOpacity
+                      onPress={handleDeleteReceiptPhoto}
+                      style={{ alignSelf: 'center', paddingVertical: 10, paddingHorizontal: 20, marginBottom: 8 }}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 12, color }}>{label}</Text>
                     </TouchableOpacity>
-                  ))}
-                </ScrollView>
+                  );
+                })()}
               </>
             );
           })()}
