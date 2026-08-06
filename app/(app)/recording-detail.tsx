@@ -711,22 +711,13 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
     if (!recordingId) return;
     const channel = supabase
       .channel(`recording-live-${recordingId}-${Date.now()}`)
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'recordings',
-        filter: `id=eq.${recordingId}`,
-      }, () => {
-        loadRecording();
-      })
-      .on('postgres_changes', {
-        event: 'DELETE',
-        schema: 'public',
-        table: 'recordings',
-        filter: `id=eq.${recordingId}`,
-      }, () => {
-        handleBack();
-      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'recordings', filter: `id=eq.${recordingId}` }, () => { loadRecording(); })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'recordings', filter: `id=eq.${recordingId}` }, () => { handleBack(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'recordings', filter: `linked_recording_id=eq.${recordingId}` }, () => { loadPaymentData(); loadTrackingExpense(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'receipt_photos' }, () => { loadLinkedReceipt(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'receipt_entries' }, () => { loadLinkedReceipt(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'split_items', filter: `recording_id=eq.${recordingId}` }, () => { loadItems(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bill_splits', filter: `recording_id=eq.${recordingId}` }, () => { loadPeople(); })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [recordingId]);
@@ -1460,14 +1451,18 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
       const result = await ImagePicker.launchCameraAsync({ quality: 1 });
       if (!result.canceled && result.assets[0]) {
         let entryId = linkedReceipt?.id;
+        let newlyCreatedEntryId: string | null = null;
         if (!entryId) {
           const { data: { user } } = await supabase.auth.getUser();
           if (!user) return;
-          const note = recording?.transaction_date && recording?.name
-            ? `${new Date(recording.transaction_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}: ${recording.name}`
-            : recording?.name ?? '';
+          const note = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
           const { data: entry } = await supabase.from('receipt_entries').insert({ user_id: user.id, note, recording_id: recordingId }).select().maybeSingle();
           entryId = entry?.id;
+          newlyCreatedEntryId = entry?.id ?? null;
+          if (entry) {
+            setLinkedReceipt(entry);
+            await supabase.from('recordings').update({ receipt_entry_id: entryId }).eq('id', recordingId);
+          }
         }
         if (!entryId) return;
         setAddReceiptModal(false);
@@ -1491,14 +1486,18 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
       const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsMultipleSelection: true, quality: 1 });
       if (!result.canceled) {
         let entryId = linkedReceipt?.id;
+        let newlyCreatedEntryId: string | null = null;
         if (!entryId) {
           const { data: { user } } = await supabase.auth.getUser();
           if (!user) return;
-          const note = recording?.transaction_date && recording?.name
-            ? `${new Date(recording.transaction_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}: ${recording.name}`
-            : recording?.name ?? '';
+          const note = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
           const { data: entry } = await supabase.from('receipt_entries').insert({ user_id: user.id, note, recording_id: recordingId }).select().maybeSingle();
           entryId = entry?.id;
+          newlyCreatedEntryId = entry?.id ?? null;
+          if (entry) {
+            setLinkedReceipt(entry);
+            await supabase.from('recordings').update({ receipt_entry_id: entryId }).eq('id', recordingId);
+          }
         }
         if (!entryId) return;
         setAddReceiptModal(false);
@@ -1512,6 +1511,11 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
       }
     } catch (e: any) {
       setUploadingPhoto(false);
+      if (newlyCreatedEntryId) {
+        await supabase.from('recordings').update({ receipt_entry_id: null }).eq('id', recordingId);
+        await supabase.from('receipt_entries').delete().eq('id', newlyCreatedEntryId);
+        setLinkedReceipt(null);
+      }
       if (e?.message === 'RECEIPT_LIMIT_REACHED') {
         Alert.alert('monthly limit reached', 'you\'ve used all 10 free receipt photo uploads this month. resets on the 1st.');
       }
@@ -1526,10 +1530,10 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
       setLinkedReceipt(entry);
     } else if (recording?.source_recording_id) {
       const { data: srcEntry } = await supabase.from('receipt_entries').select('id, note, created_at').eq('recording_id', recording.source_recording_id).maybeSingle();
-      if (srcEntry) entryId = srcEntry.id;
+      if (srcEntry) { entryId = srcEntry.id; setLinkedReceipt(srcEntry); }
     }
     if (!entryId) return;
-    const { data: photos } = await supabase.from('receipt_photos').select('id, storage_path, url').eq('entry_id', entryId).order('created_at').limit(5);
+    const { data: photos } = await supabase.from('receipt_photos').select('id, storage_path, url').eq('entry_id', entryId).order('created_at');
     if (photos) {
       const resolved = await Promise.all(photos.map(async (p: any) => {
         if (p.url) return { id: p.id, url: p.url };
@@ -1575,7 +1579,7 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
         if (entry) entryId = entry.id;
       }
       if (entryId) {
-        const { data: photos } = await supabase.from('receipt_photos').select('id, storage_path, url').eq('entry_id', entryId).order('created_at').limit(5);
+        const { data: photos } = await supabase.from('receipt_photos').select('id, storage_path, url').eq('entry_id', entryId).order('created_at');
         if (photos) {
           const resolved = await Promise.all(photos.map(async (p: any) => {
             if (p.url) return { id: p.id, url: p.url };
@@ -1872,9 +1876,7 @@ export default function RecordingDetailScreen({ recordingId: propRecordingId, on
         } else {
           const { data: { user } } = await supabase.auth.getUser();
           if (user) {
-            const note = recording?.transaction_date && recording?.name
-              ? `${new Date(recording.transaction_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}: ${recording.name}`
-              : recording?.name ?? '';
+            const note = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
             const { data: entry, error: entryErr } = await supabase.from('receipt_entries').insert({ user_id: user.id, note, recording_id: receiptRecId }).select().maybeSingle();
             if (entryErr) { setEditPhotoError(entryErr.message); setEditPhotoUploadState('error'); return; }
             entryId = entry?.id;

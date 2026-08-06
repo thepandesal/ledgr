@@ -1,5 +1,7 @@
 ﻿import { View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  SafeAreaView, ActivityIndicator, RefreshControl } from 'react-native';
+  SafeAreaView, RefreshControl, Alert } from 'react-native';
+import { WebView } from 'react-native-webview';
+import { Platform } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useUser } from '../../../src/hooks/useUser';
 import { supabase } from '../../../src/lib/supabase';
@@ -7,11 +9,32 @@ import { Colors, Radius } from '@/components/ui/theme';
 import { DC } from '../../../src/lib/design';
 import { useNav, setHomeDateEditHandler } from '../../../src/lib/NavContext';
 import { useRouter } from 'expo-router';
-import NavIcon from '@/components/ui/NavIcons';
 import { BlurView } from 'expo-blur';
-import GooeyLoader from '@/components/ui/GooeyLoader';
+import { LOADING_SPINNER_SVG_DATA_URI } from '../../../src/lib/loadingSpinnerBase64';
 import BottomSheet from '@/components/ui/BottomSheet';
 import { useState, useMemo, useEffect } from 'react';
+
+async function receiptActions({
+  action, entry, userId, supabaseClient, onDone,
+}: {
+  action: 'delete' | 'unlink';
+  entry: any;
+  userId: string;
+  supabaseClient: typeof supabase;
+  onDone: () => void;
+}) {
+  if (action === 'delete') {
+    const { data: photos } = await supabaseClient.from('receipt_photos').select('storage_path').eq('entry_id', entry.id);
+    if (photos && photos.length > 0) {
+      await supabaseClient.storage.from('receipts').remove(photos.map((p: any) => p.storage_path));
+      await supabaseClient.from('receipt_photos').delete().eq('entry_id', entry.id);
+    }
+    await supabaseClient.from('receipt_entries').delete().eq('id', entry.id);
+  } else {
+    await supabaseClient.from('receipt_entries').update({ recording_id: null }).eq('id', entry.id);
+  }
+  onDone();
+}
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -111,17 +134,25 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
     queryFn: async () => {
       const { data } = await supabase
         .from('receipt_entries')
-        .select('id, note, created_at, recording_id, recordings(name)')
+        .select('id, note, created_at, recording_id, receipt_photos(id)')
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
         .limit(3);
       return (data ?? []).map((e: any) => ({
         ...e,
-        recording: Array.isArray(e.recordings) ? e.recordings[0] : e.recordings,
+        photo_count: Array.isArray(e.receipt_photos) ? e.receipt_photos.length : 0,
+        recording: e.recording_id ? { name: '' } : null,
       }));
     },
     enabled: !!userId,
+    staleTime: 0,
   });
+
+  useEffect(() => {
+    if (isActive && userId) {
+      queryClient.invalidateQueries({ queryKey: ['home-receipts', userId] });
+    }
+  }, [isActive, userId]);
 
   // ── Split Bills ───────────────────────────────────────────────────────
   const { data: splitBills = [], isLoading: loadingSplitBills } = useQuery({
@@ -135,15 +166,21 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
         .limit(3);
       if (!data || data.length === 0) return [];
       const billIds = data.map((b: any) => b.id);
-      const [{ data: allRecordings }, { data: allPeople }] = await Promise.all([
-        supabase.from('split_bill_recordings').select('split_bill_id, amount_contributed').in('split_bill_id', billIds),
-        supabase.from('bill_splits').select('split_bill_id, person_name').in('split_bill_id', billIds),
+      const [{ data: allItems }, { data: allPeople }] = await Promise.all([
+        supabase.from('split_items').select('split_bill_id, cost, people').in('split_bill_id', billIds),
+        supabase.from('split_items').select('split_bill_id, people').in('split_bill_id', billIds),
       ]);
-      return data.map((bill: any) => ({
-        ...bill,
-        people_count: new Set((allPeople ?? []).filter((p: any) => p.split_bill_id === bill.id).map((p: any) => p.person_name)).size,
-        total_amount: (allRecordings ?? []).filter((r: any) => r.split_bill_id === bill.id).reduce((s: number, r: any) => s + Number(r.amount_contributed), 0),
-      }));
+      return data.map((bill: any) => {
+        const billItems = (allItems ?? []).filter((i: any) => i.split_bill_id === bill.id);
+        const allPeopleInBill = [...new Set(
+          billItems.flatMap((i: any) => i.people ?? [])
+        )];
+        return {
+          ...bill,
+          people_count: allPeopleInBill.length,
+          total_amount: billItems.reduce((s: number, i: any) => s + Number(i.cost), 0),
+        };
+      });
     },
     enabled: !!userId,
   });
@@ -331,6 +368,11 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
 
   const peopleSummary = (peopleData ?? []).slice(0, 3);
 
+  const [receiptActionEntry, setReceiptActionEntry] = useState<any>(null);
+
+  const handleReceiptAction = (action: 'delete' | 'unlink', entry: any) =>
+    receiptActions({ action, entry, userId: userId!, supabaseClient: supabase, onDone: () => queryClient.invalidateQueries({ queryKey: ['home-receipts', userId] }) });
+
   const fmt = (n: number | undefined | null) => (n ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const isLoading = loadingRecent || loadingPeople || loadingSplitBills || loadingReceipts;
 
@@ -428,17 +470,14 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
         {recentReceipts.length === 0 ? <EmptyRow label="no receipts yet" /> : (
           <View style={s.sectionContentLeft}>
             {recentReceipts.map((entry: any, i: number) => {
-              const d = new Date(entry.created_at);
-              const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-              const name = entry.note ?? dateStr;
               return (
-                <TouchableOpacity key={entry.id} style={[s.loanRow, i < recentReceipts.length - 1 && s.loanRowBorder]} activeOpacity={0.7} onPress={() => router.push({ pathname: '/(app)/receipt-detail', params: { receiptId: entry.id } } as any)}>
-                  <View style={[s.loanAvatar, { backgroundColor: '#f0f0f0' }]}>
-                    <NavIcon name="receipt-outline" size={18} color="#888" />
-                  </View>
+                <TouchableOpacity key={entry.id} style={[s.loanRow, i < recentReceipts.length - 1 && s.loanRowBorder]} activeOpacity={0.7}
+                  onPress={() => router.push({ pathname: '/(app)/receipt-detail', params: { receiptId: entry.id } } as any)}
+                  onLongPress={() => setReceiptActionEntry(entry)}
+                >
                   <View style={{ flex: 1 }}>
-                    <Text style={s.loanName} numberOfLines={1}>{name}</Text>
-                    <Text style={s.loanLabel}>{dateStr}</Text>
+                    <Text style={s.receiptName} numberOfLines={1}>{entry.note ?? 'untitled'}</Text>
+                    <Text style={s.receiptSub}>{entry.photo_count} {entry.photo_count === 1 ? 'photo' : 'photos'}</Text>
                   </View>
                   <View style={[s.linkedBadge, { backgroundColor: entry.recording ? '#e8f4f3' : '#f5f5f5' }]}>
                     <Text style={[s.linkedText, { color: entry.recording ? '#4f9289' : '#aaa' }]}>
@@ -452,6 +491,36 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
         )}
         <View style={s.divider} />
 
+        {/* Receipt action sheet */}
+        <BottomSheet visible={!!receiptActionEntry} onClose={() => setReceiptActionEntry(null)} title="receipt">
+          <TouchableOpacity style={s.choiceRow} activeOpacity={0.8} onPress={() => {
+            const e = receiptActionEntry;
+            setReceiptActionEntry(null);
+            router.push({ pathname: '/(app)/capture-receipt', params: { receiptId: e?.id } } as any);
+          }}>
+            <View style={{ flex: 1 }}><Text style={s.choiceTitle}>Add Photos</Text><Text style={s.choiceSub}>Add more photos to this receipt</Text></View>
+          </TouchableOpacity>
+          {receiptActionEntry?.recording_id && (
+            <TouchableOpacity style={s.choiceRow} activeOpacity={0.8} onPress={() => {
+              const e = receiptActionEntry;
+              setReceiptActionEntry(null);
+              handleReceiptAction('unlink', e);
+            }}>
+              <View style={{ flex: 1 }}><Text style={s.choiceTitle}>Unlink Receipt</Text><Text style={s.choiceSub}>Remove the recording link</Text></View>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity style={s.choiceRow} activeOpacity={0.8} onPress={() => {
+            const e = receiptActionEntry;
+            setReceiptActionEntry(null);
+            Alert.alert('Delete Receipt', 'This will delete all photos. Cannot be undone.', [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Delete', style: 'destructive', onPress: () => handleReceiptAction('delete', e) },
+            ]);
+          }}>
+            <View style={{ flex: 1 }}><Text style={[s.choiceTitle, { color: '#e53935' }]}>Delete Receipt</Text><Text style={s.choiceSub}>Permanently remove this receipt</Text></View>
+          </TouchableOpacity>
+        </BottomSheet>
+
         {/* Split Bills */}
         <SectionHeader title="Split Bills" onArrowRight={() => switchTab('bill-split')} />
         {splitBills.length === 0 ? <EmptyRow label="no split bills" /> : (
@@ -461,11 +530,11 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
                 <View style={[s.loanAvatar, { backgroundColor: '#e8f4f3' }]}>
                   <Text style={[s.loanAvatarText, { color: '#4f9289' }]}>{bill.people_count}</Text>
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={s.loanName} numberOfLines={1}>{bill.name}</Text>
+                <Text style={s.loanName} numberOfLines={1}>{bill.name}</Text>
+                <View style={{ alignItems: 'flex-end' }}>
+                  <Text style={[s.loanAmount, { color: DC.pageText }]}>{fmt(bill.total_amount)}</Text>
                   <Text style={s.loanLabel}>{bill.people_count} {bill.people_count !== 1 ? 'people' : 'person'}</Text>
                 </View>
-                <Text style={[s.loanAmount, { color: DC.pageText }]}>{fmt(bill.total_amount)}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -475,7 +544,20 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
       {/* Loading overlay */}
       {isLoading && (
         <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}>
-          <GooeyLoader />
+          <View style={s.loaderCenter}>
+            {Platform.OS === 'web' ? (
+              <img src={LOADING_SPINNER_SVG_DATA_URI} alt="loading" style={{ width: 48, height: 48 }} />
+            ) : (
+              <WebView
+                originWhitelist={['*']}
+                source={{ html: `<!DOCTYPE html><html><body style="margin:0;background:transparent;display:flex;align-items:center;justify-content:center;width:100%;height:100%"><img src="${LOADING_SPINNER_SVG_DATA_URI}" style="width:48px;height:48px" /></body></html>` }}
+                style={{ width: 48, height: 48, backgroundColor: 'transparent' }}
+                pointerEvents="none"
+                setSupportMultipleWindows={false}
+                scrollEnabled={false}
+              />
+            )}
+          </View>
         </BlurView>
       )}
 
@@ -602,8 +684,8 @@ const s = StyleSheet.create({
   sectionContent: { paddingHorizontal: DC.pagePadding },
   sectionContentLeft: { paddingLeft: DC.pagePadding, paddingRight: DC.pagePadding },
   sectionTitle: { fontFamily: 'Poppins-Bold', fontSize: 14, color: DC.pageText },
-  viewBtn:      { backgroundColor: '#8c52ff', borderRadius: 999, paddingHorizontal: 16, paddingVertical: 7 },
-  viewBtnText:  { fontFamily: 'Poppins-SemiBold', fontSize: 11, color: '#ffffff' },
+  viewBtn:      { backgroundColor: DC.viewBtnBg, borderRadius: DC.viewBtnRadius, paddingHorizontal: DC.viewBtnPaddingH, paddingVertical: DC.viewBtnPaddingV },
+  viewBtnText:  { fontFamily: 'Poppins-Regular', fontSize: DC.viewBtnFontSize, color: DC.viewBtnText },
 
   // Rows shared across sections
   recList:       { flexDirection: 'row', gap: 10 },
@@ -643,14 +725,17 @@ const s = StyleSheet.create({
   loanRow:        { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
   loanRowBorder:  { borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
   loanCard:       { width: 80, alignItems: 'center', gap: 3 },
-  loanAvatar:     { width: 44, height: 44, borderRadius: 22, backgroundColor: '#ede9ff', alignItems: 'center', justifyContent: 'center' },
-  loanAvatarText: { fontFamily: 'Poppins-Bold', fontSize: 13, color: '#8c52ff' },
+  loanAvatar:     { width: 44, height: 44, borderRadius: 22, backgroundColor: DC.viewBtnBg, alignItems: 'center', justifyContent: 'center' },
+  loanAvatarText: { fontFamily: 'Poppins-Bold', fontSize: 13, color: DC.viewBtnText },
   loanName:       { fontFamily: 'Poppins-Regular', fontSize: 13, color: DC.pageText, flex: 1 },
   loanLabel:      { fontFamily: 'Poppins-Regular', fontSize: 10, color: DC.pageTextMuted, textAlign: 'right' },
   loanAmount:     { fontFamily: 'Poppins-Bold', fontSize: 13, textAlign: 'right' },
 
   linkedBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
   linkedText:  { fontFamily: 'Poppins-SemiBold', fontSize: 10 },
+
+  receiptName: { fontFamily: 'Poppins-Regular', fontSize: 13, color: DC.pageText },
+  receiptSub:  { fontFamily: 'Poppins-Regular', fontSize: 10, color: DC.pageTextMuted, marginTop: 1 },
 
   // Part 20: empty + bottom sheet styles
   emptyRow:  { paddingVertical: 12, paddingHorizontal: DC.pagePadding },
@@ -670,4 +755,5 @@ const s = StyleSheet.create({
   dropTextActive: { fontFamily: 'Poppins-SemiBold', fontSize: 13, color: '#4f9289' },
   applyBtn:    { backgroundColor: '#4f9289', borderRadius: Radius.pill, paddingVertical: 14, alignItems: 'center', marginTop: 20 },
   applyBtnText: { fontFamily: 'Poppins-SemiBold', fontSize: 15, color: '#ffffff' },
+  loaderCenter: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 });

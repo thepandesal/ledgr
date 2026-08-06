@@ -52,7 +52,7 @@ export function useScreenAnim(onBack?: () => void) {
       useNativeDriver: true,
     }).start(() => {
       onBack?.();
-      router.back();
+      if (router.canGoBack()) router.back();
     });
   };
 

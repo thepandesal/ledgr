@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Modal, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, ActivityIndicator, Modal, Platform } from 'react-native';
 import { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { WebView } from 'react-native-webview';
@@ -10,8 +10,8 @@ import { SAVINGS_COIN_LOOP_URI, SAVINGS_DONE_URI } from '../../../src/lib/saving
 import { SYSTEM_CATEGORIES as CATEGORIES, CatIcon } from '../../../src/lib/systemCategories';
 
 // ── Brand tokens ─────────────────────────────────────────────────────────────
-const ACCENT      = '#8c52ff';
-const ACCENT_DARK = '#3f1397';
+const ACCENT      = DC.headerBlueBg;  // #4394ff
+const ACCENT_DARK = DC.headerBlueBg;
 const TEXT        = '#373737';
 const BORDER      = '#d2d2d2';
 
@@ -36,7 +36,13 @@ export default function RecordScreen({ isActive }: { isActive?: boolean }) {
   const { userId, defaultCurrency } = useUser();
   const queryClient = useQueryClient();
 
+  const [recordName, setRecordName] = useState('');
+  const [useCustomName, setUseCustomName] = useState(false);
   const [isLoan, setIsLoan] = useState(false);
+  const [borrower, setBorrower] = useState('');
+  const [borrowerInput, setBorrowerInput] = useState('');
+  const [showBorrowerDropdown, setShowBorrowerDropdown] = useState(false);
+  const [contacts, setContacts] = useState<string[]>([]);
   const [direction, setDirection] = useState<'in' | 'out'>('out');
   const [entry, setEntry] = useState('');
   const [prev, setPrev] = useState<number | null>(null);
@@ -57,6 +63,8 @@ export default function RecordScreen({ isActive }: { isActive?: boolean }) {
     supabase.from('spaces').select('id,name').eq('user_id', userId).neq('is_active', false)
       .order('sort_order', { ascending: true, nullsFirst: false })
       .then(({ data }) => setSpaces(data ?? []));
+    supabase.from('contacts').select('name').eq('user_id', userId).order('name')
+      .then(({ data }) => setContacts((data ?? []).map((c: any) => c.name)));
   }, [userId]);
 
   const current = entry !== '' ? parseFloat(entry) : (prev ?? 0);
@@ -120,7 +128,8 @@ export default function RecordScreen({ isActive }: { isActive?: boolean }) {
     if (saving || saved) return;
     if (!userId) { setError('not logged in'); return; }
     const amountVal = parseFloat(entry !== '' ? entry : String(prev ?? 0));
-    if (isNaN(amountVal) || amountVal <= 0) { setError('enter an amount'); return; }
+    if (isNaN(amountVal) || amountVal <= 0) { setError('amount is required *'); return; }
+    if (!useCustomName && !category) { setError('category is required *'); return; }
     setSaving(true); setError(''); setSaved(false);
     const minDelay = new Promise(res => setTimeout(res, 800));
     try {
@@ -135,9 +144,12 @@ export default function RecordScreen({ isActive }: { isActive?: boolean }) {
         : (type === 'income' ? 'received' : 'paid');
       const cat = CATEGORIES.find(c => c.key === category);
       const matched = userCategories.find(c => c.name.toLowerCase() === (cat?.label ?? '').toLowerCase());
+      const recordingName = useCustomName && recordName.trim()
+        ? recordName.trim()
+        : cat?.label ?? (isLoan ? 'Loan' : (direction === 'in' ? 'Money In' : 'Expense'));
       const { error: err } = await supabase.from('recordings').insert({
         user_id: currentUser.id,
-        name: cat?.label ?? (isLoan ? 'Loan' : (direction === 'in' ? 'Money In' : 'Expense')),
+        name: recordingName,
         type,
         is_due: is_due,
         amount: amountVal,
@@ -146,6 +158,7 @@ export default function RecordScreen({ isActive }: { isActive?: boolean }) {
         category_id: matched?.id ?? null,
         status,
         currency: defaultCurrency,
+        person_name: isLoan && borrower.trim() ? borrower.trim() : null,
       });
       if (err) throw err;
       await minDelay;
@@ -154,7 +167,7 @@ export default function RecordScreen({ isActive }: { isActive?: boolean }) {
       queryClient.invalidateQueries({ queryKey: ['home-recent', userId] });
       queryClient.invalidateQueries({ queryKey: ['home-shared', userId] });
       queryClient.invalidateQueries({ queryKey: ['recordings-panel', userId] });
-      setEntry(''); setPrev(null); setOp(null); setIsLoan(false); setSpaceId(null);
+      setEntry(''); setPrev(null); setOp(null); setIsLoan(false); setSpaceId(null); setBorrower(''); setBorrowerInput(''); setShowBorrowerDropdown(false);
       setShowLoader(true);
       setSaved(true);
     } catch (e: any) {
@@ -173,13 +186,94 @@ export default function RecordScreen({ isActive }: { isActive?: boolean }) {
     <View style={s.container}>
       <ScrollView contentContainerStyle={[s.scroll, { paddingHorizontal: DC.pagePadding }]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
+        {/* ── Add a name ── */}
+        <View style={s.nameRow}>
+          <TouchableOpacity style={s.loanRow} onPress={() => setUseCustomName(v => !v)} activeOpacity={0.8}>
+            <View style={[s.check, useCustomName && s.checkOn]}>
+              {useCustomName && <Text style={s.checkMark}>✓</Text>}
+            </View>
+            <Text style={s.loanText}>Add a name</Text>
+          </TouchableOpacity>
+          <TextInput
+            style={[s.nameInput, !useCustomName && s.nameInputDisabled]}
+            placeholder="e.g. grocery run"
+            placeholderTextColor={useCustomName ? '#aaa' : '#d2d2d2'}
+            value={recordName}
+            onChangeText={setRecordName}
+            editable={useCustomName}
+          />
+        </View>
+
         {/* ── Tag as loan checkbox ── */}
-        <TouchableOpacity style={s.loanRow} onPress={() => setIsLoan(v => !v)} activeOpacity={0.8}>
-          <View style={[s.check, isLoan && s.checkOn]}>
-            {isLoan && <Text style={s.checkMark}>✓</Text>}
-          </View>
-          <Text style={s.loanText}>{direction === 'in' ? 'Tag as your loan' : 'Tag as loan'}</Text>
-        </TouchableOpacity>
+        <View style={s.loanRowWrap}>
+          <TouchableOpacity style={s.loanRow} onPress={() => { setIsLoan(v => !v); setShowBorrowerDropdown(false); }} activeOpacity={0.8}>
+            <View style={[s.check, isLoan && s.checkOn]}>
+              {isLoan && <Text style={s.checkMark}>✓</Text>}
+            </View>
+            <Text style={s.loanText}>{direction === 'in' ? 'Tag as your loan' : 'Tag as loan'}</Text>
+          </TouchableOpacity>
+          {isLoan && (
+            <View style={s.borrowerWrap}>
+              {borrower ? (
+                <View style={s.borrowerBadge}>
+                  <Text style={s.borrowerBadgeText}>{borrower}</Text>
+                  <TouchableOpacity onPress={() => setBorrower('')} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+                    <Text style={s.borrowerBadgeX}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <>
+                  <TextInput
+                    style={s.borrowerInput}
+                    placeholder={direction === 'in' ? 'Borrowed from...' : 'Borrower...'}
+                    placeholderTextColor="#aaa"
+                    value={borrowerInput}
+                    onChangeText={v => { setBorrowerInput(v); setShowBorrowerDropdown(true); }}
+                    onFocus={() => setShowBorrowerDropdown(true)}
+                  />
+                  {showBorrowerDropdown && (
+                    <View style={s.borrowerDropdown}>
+                      {contacts
+                        .filter(c => !borrowerInput.trim() || c.toLowerCase().includes(borrowerInput.toLowerCase()))
+                        .map(c => (
+                          <TouchableOpacity
+                            key={c}
+                            style={s.borrowerOption}
+                            onPress={() => { setBorrower(c); setBorrowerInput(''); setShowBorrowerDropdown(false); }}
+                            activeOpacity={0.7}
+                          >
+                            <Text style={s.borrowerOptionText}>{c}</Text>
+                          </TouchableOpacity>
+                        ))
+                      }
+                      {borrowerInput.trim() && !contacts.some(c => c.toLowerCase() === borrowerInput.toLowerCase()) && (
+                        <TouchableOpacity
+                          style={s.borrowerCreateOption}
+                          onPress={async () => {
+                            const name = borrowerInput.trim();
+                            const existing = contacts.find(c => c.toLowerCase() === name.toLowerCase());
+                            if (existing) {
+                              setBorrower(existing);
+                            } else {
+                              await supabase.from('contacts').insert({ user_id: userId, name });
+                              setContacts(prev => [...prev, name].sort());
+                              setBorrower(name);
+                            }
+                            setBorrowerInput('');
+                            setShowBorrowerDropdown(false);
+                          }}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={s.borrowerCreateText}>+ Add "{borrowerInput.trim()}" as contact</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  )}
+                </>
+              )}
+            </View>
+          )}
+        </View>
 
         {/* ── Money in / out ── */}
         <View style={s.dirRow}>
@@ -200,8 +294,8 @@ export default function RecordScreen({ isActive }: { isActive?: boolean }) {
         </View>
 
         {/* ── Currency + amount ── */}
-        <View style={s.amountBox}>
-          <Text style={s.currencyLabel}>{defaultCurrency}</Text>
+        <View style={[s.amountBox, (isNaN(parseFloat(entry)) || parseFloat(entry) <= 0) && false]}>
+          <Text style={s.currencyLabel}>{defaultCurrency} <Text style={s.asterisk}>*</Text></Text>
           <Text style={[s.amountInput, direction === 'in' ? { color: '#2ab671' } : { color: '#ed6a6a' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
             {displayAmount}
           </Text>
@@ -229,7 +323,9 @@ export default function RecordScreen({ isActive }: { isActive?: boolean }) {
         </View>
 
         {/* ── Categories ── */}
-        <Text style={[s.catLabel, { marginTop: 28 }]}>Categories</Text>
+        <Text style={[s.catLabel, { marginTop: 28 }]}>
+          Categories {!useCustomName && <Text style={s.asterisk}>*</Text>}
+        </Text>
         <View style={s.catGrid}>
           {CATEGORIES.map(c => {
             const selected = category === c.key;
@@ -313,8 +409,26 @@ const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#ffffff' },
   scroll: { paddingTop: 14, paddingBottom: 150 },
 
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
+  nameInput: { flex: 1, fontFamily: AppFont.regular, fontSize: 13, color: TEXT, backgroundColor: '#f6f6f6', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: BORDER },
+  nameInputDisabled: { opacity: 0.4 },
+
   // ── Loan tag checkbox ──
-  loanRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 10, marginBottom: 14 },
+  loanRowWrap: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14, zIndex: 10 },
+  loanRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', gap: 10 },
+  borrowerWrap:    { flex: 1, position: 'relative' },
+  borrowerInput:   { fontFamily: AppFont.regular, fontSize: 12, color: TEXT, backgroundColor: '#f6f6f6', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: BORDER },
+  borrowerBadge:   { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: DC.viewBtnBg, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6, alignSelf: 'flex-start' },
+  borrowerBadgeText: { fontFamily: AppFont.semiBold, fontSize: 12, color: DC.headerBlueBg },
+  borrowerBadgeX:  { fontFamily: AppFont.bold, fontSize: 11, color: DC.headerBlueBg },
+  borrowerDropdown:      { position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4, backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: BORDER, zIndex: 20, elevation: 6, maxHeight: 180 },
+  borrowerDropdownEmpty: { fontFamily: AppFont.regular, fontSize: 12, color: '#aaa', padding: 12, textAlign: 'center' },
+  borrowerOption:        { paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
+  borrowerOptionActive:  { backgroundColor: DC.viewBtnBg },
+  borrowerOptionText:    { fontFamily: AppFont.regular, fontSize: 13, color: TEXT },
+  borrowerOptionTextActive: { fontFamily: AppFont.semiBold, fontSize: 13, color: DC.headerBlueBg },
+  borrowerCreateOption:  { paddingHorizontal: 14, paddingVertical: 10 },
+  borrowerCreateText:    { fontFamily: AppFont.semiBold, fontSize: 12, color: DC.headerBlueBg },
   check: {
     width: 20, height: 20, borderRadius: 10,
     borderWidth: 1.5, borderColor: BORDER,
@@ -357,22 +471,22 @@ const s = StyleSheet.create({
     marginLeft: 10,
     paddingHorizontal: 10, paddingVertical: 4,
     borderRadius: 999,
-    backgroundColor: '#efe9ff',
+    backgroundColor: DC.viewBtnBg,
   },
-  amountDelText: { fontFamily: AppFont.bold, fontSize: 9, color: ACCENT, textTransform: 'uppercase' },
+  amountDelText: { fontFamily: AppFont.bold, fontSize: 9, color: DC.headerBlueBg, textTransform: 'uppercase' },
 
   // ── Calculator ──
   calc: { gap: 8, marginBottom: 22 },
   calcRow: { flexDirection: 'row', gap: 8 },
   calcBtn: {
     flex: 1, height: 48, borderRadius: 12,
-    backgroundColor: '#373737',
+    backgroundColor: DC.viewBtnBg,
     alignItems: 'center', justifyContent: 'center',
   },
   calcBtnWide: { flex: 2 },
-  calcBtnOp: { backgroundColor: '#efe9ff' },
-  calcText: { fontFamily: AppFont.bold, fontSize: 13, color: '#ffffff' },
-  calcTextOp: { fontFamily: AppFont.bold, fontSize: 15, color: ACCENT },
+  calcBtnOp: { backgroundColor: '#6085d3' },
+  calcText: { fontFamily: AppFont.bold, fontSize: 20, color: DC.headerBlueBg },
+  calcTextOp: { fontFamily: AppFont.bold, fontSize: 22, color: '#ffffff' },
 
   // ── Categories ──
   catLabel: {
@@ -393,6 +507,7 @@ const s = StyleSheet.create({
   catNameOn: { fontFamily: AppFont.semiBold, fontSize: 9, color: '#ffffff' },
 
   errorText: { fontFamily: AppFont.regular, fontSize: 10, color: '#ed6a6a', marginTop: 12, textAlign: 'center' },
+  asterisk:  { color: '#ed6a6a', fontFamily: AppFont.bold },
 
   // ── Save modal ──
   modalOverlay: {
@@ -413,7 +528,7 @@ const s = StyleSheet.create({
     marginTop: 18,
     alignSelf: 'center',
     minWidth: 160,
-    backgroundColor: '#3f1397', borderRadius: 999,
+    backgroundColor: DC.headerBlueBg, borderRadius: 999,
     paddingVertical: 14, paddingHorizontal: 32,
     alignItems: 'center', justifyContent: 'center',
   },

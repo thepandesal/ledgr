@@ -11,28 +11,49 @@ interface Props {
   right?: React.ReactNode;
   topInset?: number;
   centered?: boolean;
+  variant?: 'default' | 'branded' | 'panel' | 'blue';
 }
 
-export default function TopHeader({ title, subtitle, onBack, right, topInset = 0, centered = false }: Props) {
+export default function TopHeader({ title, subtitle, onBack, right, topInset = 0, centered = false, variant = 'default' }: Props) {
+  const branded = variant === 'branded';
+  const panel   = variant === 'panel';
+  const blue    = variant === 'blue';
+  const colored = branded || panel;
+
+  const wrapStyle: any = blue ? {
+    backgroundColor: DC.headerBlueBg,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
+  } : colored ? {
+    backgroundColor: '#deecff',
+    borderBottomLeftRadius: branded ? 40 : 32,
+    borderBottomRightRadius: branded ? 40 : 32,
+  } : {};
+
+  const textColor  = blue ? '#ffffff' : colored ? '#373737' : '#111111';
+  const arrowColor = blue ? '#ffffff' : colored ? '#373737' : DC.backBtn.color;
+  const fontFamily = (colored || blue) ? 'Poppins-Bold' : 'Poppins-SemiBold';
+  const fontSize   = (colored || blue) ? 16 : 15;
+
   return (
-    <View>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: DC.pagePadding, paddingTop: 28 + topInset, paddingBottom: subtitle ? 10 : 14, minHeight: 28 + topInset + 56 }}>
+    <View style={wrapStyle}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: DC.pagePadding, paddingTop: DC.headerPaddingTop + topInset, paddingBottom: blue ? DC.headerPaddingBottom : (subtitle ? 10 : 14), minHeight: DC.headerPaddingTop + topInset + (blue ? DC.headerContentHeight : 56) }}>
         <TouchableOpacity onPress={onBack} activeOpacity={0.7} disabled={!onBack} style={{ width: DC.backBtn.width }}>
-          {onBack && <SvgXml xml={SVG_BACK} width={DC.backBtn.width} height={DC.backBtn.height} color={DC.backBtn.color} />}
+          {onBack && <SvgXml xml={SVG_BACK} width={DC.backBtn.width} height={DC.backBtn.height} color={arrowColor} />}
         </TouchableOpacity>
         {centered ? (
           <View style={{ flex: 1, alignItems: 'center' }}>
-            <Text style={{ fontFamily: 'Poppins-SemiBold', fontSize: 15, color: '#111111', textAlign: 'center' }}>{title}</Text>
-            {subtitle ? <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 11, color: '#111111', fontStyle: 'italic', textAlign: 'center' }} numberOfLines={1}>{subtitle}</Text> : null}
+            <Text style={{ fontFamily, fontSize, color: textColor, textAlign: 'center' }}>{title}</Text>
+            {subtitle ? <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 11, color: textColor, fontStyle: 'italic', textAlign: 'center' }} numberOfLines={1}>{subtitle}</Text> : null}
           </View>
         ) : (
           <View style={{ flex: 1, paddingHorizontal: 8 }}>
-            <Text style={{ ...DC.typography.pageTitle }}>{title}</Text>
+            <Text style={(colored || blue) ? { fontFamily, fontSize, color: textColor } : { ...DC.typography.pageTitle }}>{title}</Text>
           </View>
         )}
         <View style={{ width: DC.backBtn.width, alignItems: 'flex-end' }}>{right}</View>
       </View>
-      <View style={{ height: 1, backgroundColor: DC.cardDividerColor }} />
+      {!(colored || blue) && <View style={{ height: 1, backgroundColor: DC.cardDividerColor }} />}
     </View>
   );
 }

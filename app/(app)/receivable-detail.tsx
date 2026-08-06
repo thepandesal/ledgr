@@ -1,16 +1,18 @@
 import {
-  View, Text, StyleSheet, ScrollView, SafeAreaView,
+  View, Text, StyleSheet, ScrollView,
   TouchableOpacity, TextInput, RefreshControl,
   Animated, Dimensions, Modal, ActivityIndicator,
 } from 'react-native';
 import { useState, useEffect, useRef, useMemo } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useUser } from '../../src/hooks/useUser';
 import { supabase } from '../../src/lib/supabase';
 import { Colors, Radius } from '@/components/ui/theme';
 import { AppFont } from '../../src/lib/fonts';
 import { DC } from '../../src/lib/design';
-import PageHeader from '@/components/ui/PageHeader';
+import TopHeader from '@/components/ui/TopHeader';
+import NavIcon from '@/components/ui/NavIcons';
 import { useNav } from '../../src/lib/NavContext';
 import GooeyLoader from '@/components/ui/GooeyLoader';
 import { BlurView } from 'expo-blur';
@@ -28,7 +30,8 @@ const { width } = Dimensions.get('window');
 
 export default function ReceivableDetail({ person, onClose, onBack }: Props) {
   const { userId } = useUser();
-  const { openSplitBill, openRecording } = useNav();
+  const insets = useSafeAreaInsets();
+  const { openSplitBill, openRecording, toggleNotifDropdown } = useNav();
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<'pending' | 'completed'>('pending');
   const tabLabel = tab === 'pending' ? 'Ongoing' : 'Completed';
@@ -559,11 +562,18 @@ export default function ReceivableDetail({ person, onClose, onBack }: Props) {
 
   return (
     <Animated.View style={[StyleSheet.absoluteFill, { transform: [{ translateX: slideAnim }] }]} pointerEvents="box-none">
-      <SafeAreaView style={st.root}>
-        <PageHeader
+      <View style={st.root}>
+        <TopHeader
           title="Loan Details"
+          centered
+          variant="blue"
+          topInset={insets.top}
           onBack={handleClose}
-          titleColor={TEAL}
+          right={
+            <TouchableOpacity onPress={toggleNotifDropdown} activeOpacity={0.7}>
+              <NavIcon name="notifications" size={22} color="#ffffff" />
+            </TouchableOpacity>
+          }
         />
 
         <View style={st.personNameRow}>
@@ -756,7 +766,7 @@ export default function ReceivableDetail({ person, onClose, onBack }: Props) {
             </View>
           </View>
         </Modal>
-      </SafeAreaView>
+      </View>
     </Animated.View>
   );
 }
@@ -765,10 +775,10 @@ const st = StyleSheet.create({
   root:        { flex: 1, backgroundColor: Colors.white },
   scroll:      { paddingHorizontal: DC.pagePadding, paddingBottom: 120, paddingTop: 8 },
   tabRow:      { flexDirection: 'row', gap: 8, paddingHorizontal: DC.pagePadding, paddingVertical: 8 },
-  tab:         { flex: 1, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: DC.pageActionBg, alignItems: 'center' },
-  tabActive:   { backgroundColor: '#111111' },
-  tabText:     { fontFamily: AppFont.regular, fontSize: 12, color: DC.pageActionText },
-  tabTextActive: { fontFamily: AppFont.semiBold, fontSize: 12, color: '#ffffff' },
+  tab:         { flex: 1, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: 'transparent', borderWidth: 1, borderColor: DC.controlBorder, alignItems: 'center' },
+  tabActive:   { backgroundColor: DC.viewBtnBg, borderColor: DC.viewBtnBg },
+  tabText:     { fontFamily: AppFont.regular, fontSize: 12, color: DC.pageText },
+  tabTextActive: { fontFamily: AppFont.semiBold, fontSize: 12, color: DC.viewBtnText },
   searchWrap:  { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: DC.cardBorder, borderRadius: Radius.pill, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: DC.cardBg, marginHorizontal: DC.pagePadding, marginBottom: 8 },
   searchInput: { flex: 1, fontFamily: AppFont.regular, fontSize: 13, color: DC.pageText, padding: 0 },
   row:         { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 10 },
@@ -779,10 +789,10 @@ const st = StyleSheet.create({
   empty:       { flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 120 },
   emptyText:   { fontFamily: AppFont.regular, fontSize: 13, color: Colors.muted },
   sectionLabel: { fontFamily: AppFont.bold, fontSize: 10, color: Colors.muted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4, marginTop: 8 },
-  settleBtn:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginHorizontal: DC.pagePadding, paddingVertical: 10, borderRadius: Radius.pill, backgroundColor: DC.pageActionBg, marginBottom: 8 },
-  settleBtnText: { fontFamily: AppFont.semiBold, fontSize: 13, color: DC.pageActionText },
-  personNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: DC.pagePadding, paddingTop: 4, paddingBottom: 4 },
-  avatarSmall: { width: 24, height: 24, borderRadius: 12, backgroundColor: TEAL + '66', justifyContent: 'center', alignItems: 'center' },
-  avatarSmallText: { fontFamily: AppFont.bold, fontSize: 10, color: '#2A7A6F' },
-  personNameText: { fontFamily: AppFont.semiBold, fontSize: 13, color: Colors.text, flex: 1 },
+  settleBtn:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginHorizontal: DC.pagePadding, paddingVertical: 10, borderRadius: Radius.pill, backgroundColor: DC.viewBtnBg, marginBottom: 8 },
+  settleBtnText: { fontFamily: AppFont.semiBold, fontSize: 13, color: DC.viewBtnText },
+  personNameRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: DC.pagePadding, paddingTop: 16, paddingBottom: 12 },
+  avatarSmall: { width: 36, height: 36, borderRadius: 18, backgroundColor: DC.viewBtnBg, justifyContent: 'center', alignItems: 'center' },
+  avatarSmallText: { fontFamily: AppFont.bold, fontSize: 14, color: DC.viewBtnText },
+  personNameText: { fontFamily: AppFont.bold, fontSize: 18, color: Colors.text, flex: 1 },
 });

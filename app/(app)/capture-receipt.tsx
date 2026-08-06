@@ -1,6 +1,7 @@
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Animated, Dimensions, FlatList, Image, Alert } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '../../src/lib/supabase';
 import { useSlideScreen } from '../../src/hooks/useSlideScreen';
@@ -13,6 +14,7 @@ const { width } = Dimensions.get('window');
 
 export default function CaptureReceiptScreen() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { receiptId, galleryOnly, recordingId, recordingName, recordingDate } = useLocalSearchParams<{ receiptId?: string; galleryOnly?: string; recordingId?: string; recordingName?: string; recordingDate?: string }>();
   const slideAnim = useRef(new Animated.Value(width)).current;
 
@@ -74,32 +76,51 @@ export default function CaptureReceiptScreen() {
   const save = async () => {
     if (photos.length === 0) return;
     setSaving(true);
+    console.log('[save] starting, photos:', photos.length);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { setSaving(false); return; }
+      if (!user) { console.log('[save] no user'); setSaving(false); return; }
+      console.log('[save] user:', user.id);
 
-      // Create or use existing receipt entry
       let rId = receiptId;
       if (!rId) {
-        const note = recordingDate && recordingName
-          ? `${new Date(recordingDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}: ${recordingName}`
-          : new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+        const now = new Date();
+        const note = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' }).replace(',', '') +
+          ' ' + now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
         const { data: rec, error } = await supabase.from('receipt_entries').insert({
           user_id: user.id,
           note,
           recording_id: recordingId ?? null,
         }).select().single();
+        console.log('[save] receipt_entries insert:', rec?.id, 'error:', error?.message);
         if (error || !rec) { Alert.alert('Error', error?.message ?? 'Failed to create receipt'); setSaving(false); return; }
         rId = rec.id;
       }
+      console.log('[save] using entry id:', rId);
 
+      let uploadedCount = 0;
       for (const uri of photos) {
+        console.log('[save] uploading uri:', uri.slice(0, 50));
         const uploaded = await uploadReceiptPhoto(uri, rId!);
+        console.log('[save] upload result:', uploaded?.id, uploaded?.url?.slice(0, 50));
         if (!uploaded) { Alert.alert('Upload Error', 'Failed to upload photo'); setSaving(false); return; }
+        uploadedCount++;
       }
 
-      router.replace({ pathname: '/(app)/(tabs)/receipts' } as any);
+      // Delete entry if no photos were uploaded
+      if (uploadedCount === 0 && !receiptId) {
+        await supabase.from('receipt_entries').delete().eq('id', rId!);
+        setSaving(false);
+        return;
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['receipts'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['home-receipts'], exact: false });
+      Animated.timing(slideAnim, { toValue: width, duration: 250, useNativeDriver: false }).start(() => {
+        router.back();
+      });
     } catch (e: any) {
+      console.log('[save] caught error:', e?.message);
       if (e?.message === 'RECEIPT_LIMIT_REACHED') {
         Alert.alert(
           'monthly limit reached',

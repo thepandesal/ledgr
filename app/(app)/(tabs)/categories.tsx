@@ -1,16 +1,22 @@
 import {
-  View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, TextInput, ActivityIndicator,
+  View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator,
 } from 'react-native';
 import { supabase } from '../../../src/lib/supabase';
 import { useState, useMemo } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useUser } from '../../../src/hooks/useUser';
 import type { Category } from '../../../src/types';
 import BottomSheet from '@/components/ui/BottomSheet';
 import ConfirmModal from '@/components/ui/ConfirmModal';
+import TopHeader from '@/components/ui/TopHeader';
+import NavIcon from '@/components/ui/NavIcons';
+import { SvgXml } from 'react-native-svg';
 import { Colors, Radius, Spacing } from '@/components/ui/theme';
+import { DC } from '../../../src/lib/design';
 import { Brand } from '../../../src/lib/brand';
 import { AppFont } from '../../../src/lib/fonts';
+import { useNav } from '../../../src/lib/NavContext';
 
 const PASTEL_COLORS = ['#FFB3B3', '#FFD9B3', '#FFFAB3', '#B3FFB3', '#B3FFE0', '#B3F0FF', '#B3C6FF', '#D9B3FF', '#FFB3F0', '#FFB3C6'];
 const SUGGESTED_ICONS = ['fast-food-outline', 'car-outline', 'flash-outline', 'home-outline', 'musical-notes-outline', 'heart-outline', 'cart-outline', 'save-outline', 'airplane-outline', 'briefcase-outline', 'cafe-outline', 'fitness-outline', 'gift-outline', 'school-outline', 'phone-portrait-outline', 'ellipsis-horizontal-outline'];
@@ -20,6 +26,9 @@ const PREVIEW_LIMIT = 3;
 export default function CategoriesScreen() {
   const queryClient = useQueryClient();
   const { userId, defaultCurrency } = useUser();
+  const insets = useSafeAreaInsets();
+  const { switchTab, toggleNotifDropdown } = useNav();
+  const SVG_ADD = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="currentColor" d="M12 4.75c.69 0 1.25.56 1.25 1.25v4.75H18a1.25 1.25 0 1 1 0 2.5h-4.75V18a1.25 1.25 0 1 1-2.5 0v-4.75H6a1.25 1.25 0 1 1 0-2.5h4.75V6c0-.69.56-1.25 1.25-1.25" /></svg>`;
   const [modal, setModal] = useState(false);
   const [menuModal, setMenuModal] = useState(false);
   const [selected, setSelected] = useState<Category | null>(null);
@@ -103,8 +112,25 @@ export default function CategoriesScreen() {
   };
 
   return (
-    <SafeAreaView style={s.container}>
+    <View style={s.container}>
+      <TopHeader
+        title="Categories"
+        centered
+        variant="blue"
+        topInset={insets.top}
+        right={
+          <TouchableOpacity onPress={toggleNotifDropdown} activeOpacity={0.7}>
+            <NavIcon name="notifications" size={22} color="#ffffff" />
+          </TouchableOpacity>
+        }
+      />
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+        <View style={s.actionRow}>
+          <TouchableOpacity onPress={openAdd} activeOpacity={0.7} style={s.addBtn}>
+            <SvgXml xml={SVG_ADD} width={16} height={16} color="#ffffff" />
+            <Text style={s.addBtnText}>New Category</Text>
+          </TouchableOpacity>
+        </View>
         <View style={s.list}>
           {categories.map(cat => {
             const catRecordings = grouped[cat.id] ?? [];
@@ -200,13 +226,16 @@ export default function CategoriesScreen() {
           { label: 'delete', onPress: handleDelete, destructive: true },
         ]}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.white },
-  scroll:    { paddingHorizontal: Spacing.page, paddingTop: 20, paddingBottom: 80 },
+  scroll:    { paddingHorizontal: Spacing.page, paddingTop: 16, paddingBottom: 80 },
+  actionRow: { flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 16 },
+  addBtn:    { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, backgroundColor: DC.headerBlueBg },
+  addBtnText:{ fontFamily: AppFont.semiBold, fontSize: 11, color: '#ffffff' },
 
   list:      { gap: 12 },
   emptyWrap: { alignItems: 'center', gap: 12, paddingVertical: 48 },

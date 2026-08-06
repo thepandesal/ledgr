@@ -1,10 +1,13 @@
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, Image, ScrollView } from 'react-native';
+import { WebView } from 'react-native-webview';
+import { Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useState, useEffect } from 'react';
 import { supabase } from '../src/lib/supabase';
 import { AppFont } from '../src/lib/fonts';
-
-import { FACE_IMAGES } from '../src/lib/faceImages';
+import TopHeader from '../components/ui/TopHeader';
+import { AVATAR_SVGS } from '../src/lib/avatarSvgs';
+import { DC } from '../src/lib/design';
 
 export default function OnboardingScreen() {
   const router = useRouter();
@@ -36,9 +39,9 @@ export default function OnboardingScreen() {
 
   return (
     <SafeAreaView style={s.container}>
+      <TopHeader title="Let's Start" variant="branded" />
       <ScrollView contentContainerStyle={s.scroll}>
-        <Text style={s.title}>LETS START</Text>
-        <Text style={s.sectionHeader}>NAME</Text>
+        <Text style={s.sectionHeader}>Name</Text>
         <TextInput
           style={s.input}
           placeholder="Enter your name"
@@ -49,16 +52,27 @@ export default function OnboardingScreen() {
           returnKeyType="done"
         />
 
-        <Text style={s.sectionHeader}>ICON</Text>
+        <Text style={s.sectionHeader}>Icon</Text>
         <View style={s.grid}>
-          {Array.from({ length: 49 }, (_, i) => i).map(i => (
+          {AVATAR_SVGS.map((uri, i) => (
             <TouchableOpacity
               key={i}
               style={[s.iconCell, selectedIcon === i && s.iconCellSelected]}
               onPress={() => { setSelectedIcon(i); setError(''); }}
               activeOpacity={0.7}
             >
-              <Image source={FACE_IMAGES[i]} style={{ width: 40, height: 40 }} />
+              {Platform.OS === 'web' ? (
+                <img src={uri} style={{ width: '100%', height: '100%' }} />
+              ) : (
+                <WebView
+                  originWhitelist={['*']}
+                  source={{ html: `<!DOCTYPE html><html><body style="margin:0;background:transparent;display:flex;align-items:center;justify-content:center;width:100%;height:100%"><img src="${uri}" style="width:100%;height:100%" /></body></html>` }}
+                  style={{ width: '100%', height: '100%', backgroundColor: 'transparent' }}
+                  pointerEvents="none"
+                  setSupportMultipleWindows={false}
+                  scrollEnabled={false}
+                />
+              )}
             </TouchableOpacity>
           ))}
         </View>
@@ -80,14 +94,14 @@ export default function OnboardingScreen() {
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#ffffff' },
-  scroll: { paddingHorizontal: 24, paddingTop: 60, paddingBottom: 40 },
+  scroll: { paddingHorizontal: DC.pagePadding, paddingTop: 16, paddingBottom: 40 },
   sectionHeader: {
     fontFamily: 'Poppins-Medium',
-    fontSize: 20,
-    color: '#000000',
+    fontSize: 14,
+    color: '#373737',
     letterSpacing: 0.4,
     marginBottom: 12,
-    marginTop: 24,
+    marginTop: 12,
   },
   title: {
     fontFamily: 'Poppins-Medium',
@@ -111,17 +125,18 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
   },
   iconCell: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
+    width: '16%',
+    aspectRatio: 1,
+    borderRadius: 999,
     borderWidth: 2,
     borderColor: '#d2d2d2',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#ffffff',
+    overflow: 'hidden',
   },
   iconCellSelected: {
     borderColor: '#2a2a26',
@@ -138,9 +153,9 @@ const s = StyleSheet.create({
     borderRadius: 999,
     paddingVertical: 16,
     alignItems: 'center',
-    backgroundColor: '#2a2a26',
+    backgroundColor: '#deecff',
     marginTop: 32,
   },
   buttonDisabled: { opacity: 0.4 },
-  buttonText: { fontFamily: 'Poppins-SemiBold', fontSize: 15, color: '#ffffff', letterSpacing: 1.5 },
+  buttonText: { fontFamily: 'Poppins-Regular', fontSize: 15, color: '#4394ff', letterSpacing: 1.5 },
 });

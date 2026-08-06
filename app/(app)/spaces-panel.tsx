@@ -1,8 +1,9 @@
 import {
-  View, Text, StyleSheet, ScrollView, SafeAreaView,
+  View, Text, StyleSheet, ScrollView,
   TouchableOpacity, RefreshControl, Alert, TextInput, ActivityIndicator,
 } from 'react-native';
 import { useState, useMemo, useEffect } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useUser } from '../../src/hooks/useUser';
 import { supabase } from '../../src/lib/supabase';
@@ -15,16 +16,21 @@ import GooeyLoader from '@/components/ui/GooeyLoader';
 import { BlurView } from 'expo-blur';
 import BottomSheet from '@/components/ui/BottomSheet';
 import TopHeader from '@/components/ui/TopHeader';
+import NavIcon from '@/components/ui/NavIcons';
+import { SvgXml } from 'react-native-svg';
 
 
 const TEAL = '#9cd7d2';
 const fmt = (n: number | undefined | null) => (n ?? 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
-interface Props { onClose: () => void; }
+interface Props { onClose: () => void; showBack?: boolean; }
 
-export default function SpacesPanel({ onClose }: Props) {
+export default function SpacesPanel({ onClose, showBack }: Props) {
   const { userId, defaultCurrency } = useUser();
-  const { openRecordingsPanel, openSpace } = useNav();
+  const insets = useSafeAreaInsets();
+  const { openRecordingsPanel, openSpace, toggleNotifDropdown } = useNav();
+
+  const SVG_ADD = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="currentColor" d="M12 4.75c.69 0 1.25.56 1.25 1.25v4.75H18a1.25 1.25 0 1 1 0 2.5h-4.75V18a1.25 1.25 0 1 1-2.5 0v-4.75H6a1.25 1.25 0 1 1 0-2.5h4.75V6c0-.69.56-1.25 1.25-1.25" /></svg>`;
   const { convert } = useExchangeRates();
   const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
@@ -159,8 +165,14 @@ export default function SpacesPanel({ onClose }: Props) {
   };
 
   return (
-    <SafeAreaView style={st.root}>
-      <TopHeader title="Folders" centered />
+    <View style={st.root}>
+      <TopHeader title="Folders" centered variant="blue" topInset={insets.top} onBack={showBack ? onClose : undefined}
+        right={
+          <TouchableOpacity onPress={toggleNotifDropdown} activeOpacity={0.7}>
+            <NavIcon name="notifications" size={22} color="#ffffff" />
+          </TouchableOpacity>
+        }
+      />
 
       {isLoading ? (
         <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}><GooeyLoader /></BlurView>
@@ -168,9 +180,13 @@ export default function SpacesPanel({ onClose }: Props) {
         <ScrollView contentContainerStyle={st.scroll} showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
 
-          <TouchableOpacity onPress={openCreate} activeOpacity={0.7} style={st.addBtn}>
-            <Text style={st.addBtnText}>+ New Folder</Text>
-          </TouchableOpacity>
+          {/* Top action row */}
+          <View style={st.actionRow}>
+            <TouchableOpacity onPress={openCreate} activeOpacity={0.7} style={st.addBtn}>
+              <SvgXml xml={SVG_ADD} width={16} height={16} color="#ffffff" />
+              <Text style={st.addBtnText}>New Folder</Text>
+            </TouchableOpacity>
+          </View>
 
           {/* Uncategorized */}
           <Text style={st.sectionHeader}>Uncategorized</Text>
@@ -359,16 +375,17 @@ export default function SpacesPanel({ onClose }: Props) {
           {creating ? <ActivityIndicator color={Colors.white} /> : <Text style={st.saveBtnText}>create space</Text>}
         </TouchableOpacity>
       </BottomSheet>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const st = StyleSheet.create({
   root:   { flex: 1, backgroundColor: '#fff' },
-  scroll: { paddingHorizontal: DC.pagePadding, paddingTop: 20, paddingBottom: 80 },
+  scroll: { paddingHorizontal: DC.pagePadding, paddingTop: 16, paddingBottom: 80 },
 
-  addBtn:     { alignSelf: 'flex-end', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999, backgroundColor: '#111111', marginBottom: 20 },
-  addBtnText: { fontFamily: AppFont.semiBold, fontSize: 12, color: '#ffffff' },
+  actionRow: { flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 16 },
+  addBtn:     { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, backgroundColor: DC.headerBlueBg },
+  addBtnText: { fontFamily: AppFont.semiBold, fontSize: 11, color: '#ffffff' },
 
   sectionHeader: { fontFamily: 'Poppins-Bold', fontSize: 17, color: '#111111', marginBottom: 16 },
 

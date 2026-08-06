@@ -18,10 +18,13 @@ export const DC = {
   pagePadding:      34,         // horizontal padding for all pages
   letterSpacing:    0.3,        // subtle letter spacing for all text
 
-  // Header
-  headerBrand:      '#111111',  // LEDGR wordmark color
+  // Header background color (blue — used by home, spaces, recordings panels)
+  headerBlueBg:     '#4394ff',
   headerTitle:      '#111111',  // tab title color
   headerBorder:     '#E6E6E6',
+  headerPaddingTop:    28,      // padding above content (below inset)
+  headerPaddingBottom: 24,      // padding below content
+  headerContentHeight: 52,      // fixed content height — matches home panel's two-line greeting
 
   // Cards
   cardBg:           '#F8F8F8',
@@ -93,6 +96,14 @@ export const DC = {
   btnElevation:     3,
   btnDangerBg:      '#FF5757',  // danger button background
   btnDangerText:    '#ffffff',  // danger button text
+
+  // View / section action button (home panel style — light blue pill)
+  viewBtnBg:        '#deecff',  // light blue background
+  viewBtnText:      '#4394ff',  // blue text
+  viewBtnRadius:    999,
+  viewBtnPaddingH:  16,
+  viewBtnPaddingV:  7,
+  viewBtnFontSize:  11,
 
   // Space cards
   spaceCardBg:          '#ebf7f6',
@@ -233,7 +244,7 @@ export const DC = {
       top: 2, bottom: 2,
       width: '50%' as any,
       borderRadius: 999,
-      backgroundColor: '#8c52ff' as string,
+      backgroundColor: '#4394ff' as string,
     },
     btn: {
       width: 80, height: 38,
@@ -273,9 +284,9 @@ export const DC = {
       height: 38,
       borderRadius: 999,
       borderWidth: 1,
-      borderColor: '#8c52ff' as string,
+      borderColor: '#4394ff' as string,
       paddingHorizontal: 16,
-      backgroundColor: '#8c52ff' as string,
+      backgroundColor: '#4394ff' as string,
       alignItems: 'center' as const,
       justifyContent: 'center' as const,
     },
@@ -327,22 +338,22 @@ export const DC = {
       width: 38, height: 38,
       borderRadius: 19,
       borderWidth: 1,
-      borderColor: '#8c52ff' as string,
-      backgroundColor: '#8c52ff' as string,
+      borderColor: '#4394ff' as string,
+      backgroundColor: '#4394ff' as string,
       alignItems: 'center' as const,
       justifyContent: 'center' as const,
     },
     ghost: {
       width: 38, height: 38,
       borderRadius: 19,
-      backgroundColor: '#f0ebff' as string,
+      backgroundColor: '#deecff' as string,
       alignItems: 'center' as const,
       justifyContent: 'center' as const,
     },
     ghostSm: {
       width: 28, height: 28,
       borderRadius: 14,
-      backgroundColor: '#f0ebff' as string,
+      backgroundColor: '#deecff' as string,
       alignItems: 'center' as const,
       justifyContent: 'center' as const,
     },

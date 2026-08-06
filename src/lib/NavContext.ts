@@ -66,6 +66,8 @@ interface NavContextType {
   homeDateLabel: string;
   setHomeDateLabel: (label: string) => void;
   onHomeDateEdit: () => void;
+  // Notification dropdown
+  toggleNotifDropdown: () => void;
 }
 
 export const NavContext = createContext<NavContextType>({
@@ -105,6 +107,7 @@ export const NavContext = createContext<NavContextType>({
   homeDateLabel: '',
   setHomeDateLabel: () => {},
   onHomeDateEdit: () => {},
+  toggleNotifDropdown: () => {},
 });
 
 export const useNav = () => useContext(NavContext);

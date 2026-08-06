@@ -1,8 +1,9 @@
 import {
-  View, Text, StyleSheet, ScrollView, SafeAreaView,
+  View, Text, StyleSheet, ScrollView,
   TouchableOpacity, RefreshControl, TextInput,
 } from 'react-native';
 import { useState, useEffect, useRef } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ReceivableDetail from './receivable-detail';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useUser } from '../../src/hooks/useUser';
@@ -10,7 +11,8 @@ import { supabase } from '../../src/lib/supabase';
 import { Colors, Radius } from '@/components/ui/theme';
 import { AppFont } from '../../src/lib/fonts';
 import { DC } from '../../src/lib/design';
-import PageHeader from '@/components/ui/PageHeader';
+import TopHeader from '@/components/ui/TopHeader';
+import NavIcon from '@/components/ui/NavIcons';
 import { useNav } from '../../src/lib/NavContext';
 import GooeyLoader from '@/components/ui/GooeyLoader';
 import { BlurView } from 'expo-blur';
@@ -22,7 +24,8 @@ interface Props { onClose: () => void; initialPerson?: string | null; }
 
 export default function PeoplePanel({ onClose, initialPerson }: Props) {
   const { userId } = useUser();
-  const { openRecording, openSplitBill } = useNav();
+  const insets = useSafeAreaInsets();
+  const { openRecording, openSplitBill, toggleNotifDropdown } = useNav();
   const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
   const [detailPerson, setDetailPerson] = useState<string | null>(null);
@@ -256,8 +259,14 @@ export default function PeoplePanel({ onClose, initialPerson }: Props) {
   );
 
   return (
-    <SafeAreaView style={s.container}>
-      <PageHeader title="people" onBack={onClose} />
+    <View style={s.container}>
+      <TopHeader title="Loans" onBack={onClose} centered variant="blue" topInset={insets.top}
+        right={
+          <TouchableOpacity onPress={toggleNotifDropdown} activeOpacity={0.7}>
+            <NavIcon name="notifications" size={22} color="#ffffff" />
+          </TouchableOpacity>
+        }
+      />
 
       {/* Search */}
       <View style={s.searchRow}>
@@ -268,7 +277,6 @@ export default function PeoplePanel({ onClose, initialPerson }: Props) {
           value={search}
           onChangeText={setSearch}
         />
-
       </View>
 
       {/* Section tabs */}
@@ -373,18 +381,18 @@ export default function PeoplePanel({ onClose, initialPerson }: Props) {
         )}
         <View style={{ height: 40 }} />
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.white },
-  scroll: { paddingHorizontal: 20, paddingTop: 4, paddingBottom: 40 },
+  scroll: { paddingHorizontal: DC.pagePadding, paddingTop: 4, paddingBottom: 40 },
   searchRow: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    marginHorizontal: 20, marginTop: 12, marginBottom: 8,
+    marginHorizontal: DC.pagePadding, marginTop: 12, marginBottom: 4,
     paddingHorizontal: 12, paddingVertical: 8,
-    borderRadius: Radius.md, backgroundColor: Colors.surface,
+    borderRadius: DC.controlRadius, backgroundColor: Colors.surface,
     borderWidth: 1, borderColor: Colors.borderMid,
   },
   searchInput: { flex: 1, fontFamily: AppFont.regular, fontSize: 13, color: Colors.text, padding: 0 },
@@ -401,24 +409,24 @@ const s = StyleSheet.create({
   rowLast: { borderBottomWidth: 0 },
   avatar: {
     width: 34, height: 34, borderRadius: 17,
-    backgroundColor: TEAL + '66', justifyContent: 'center', alignItems: 'center',
+    backgroundColor: DC.viewBtnBg, justifyContent: 'center', alignItems: 'center',
   },
-  avatarText: { fontFamily: AppFont.bold, fontSize: 13, color: '#2A7A6F' },
+  avatarText: { fontFamily: AppFont.bold, fontSize: 13, color: DC.viewBtnText },
   rowName: { fontFamily: AppFont.semiBold, fontSize: 14, color: Colors.text },
   rowSub: { fontFamily: AppFont.regular, fontSize: 10, color: Colors.muted, marginTop: 1 },
   rowAmount: { fontFamily: AppFont.bold, fontSize: 14, color: '#111111' },
-  tabRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 20, paddingVertical: 8 },
+  tabRow: { flexDirection: 'row', gap: 8, paddingHorizontal: DC.pagePadding, paddingVertical: 8 },
   tab: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-    paddingVertical: 10, borderRadius: Radius.pill, backgroundColor: Colors.surface,
-    borderWidth: 1, borderColor: Colors.borderMid,
+    paddingVertical: 10, borderRadius: Radius.pill,
+    backgroundColor: 'transparent', borderWidth: 1, borderColor: DC.controlBorder,
   },
-  tabActive: { backgroundColor: '#111111', borderColor: '#111111' },
-  tabText: { fontFamily: AppFont.regular, fontSize: 13, color: '#666666' },
-  tabTextActive: { fontFamily: AppFont.semiBold, fontSize: 13, color: '#ffffff' },
+  tabActive: { backgroundColor: DC.viewBtnBg, borderColor: DC.viewBtnBg },
+  tabText: { fontFamily: AppFont.regular, fontSize: 13, color: DC.pageText },
+  tabTextActive: { fontFamily: AppFont.semiBold, fontSize: 13, color: DC.viewBtnText },
   tabCount: {
-    fontFamily: AppFont.bold, fontSize: 10, color: '#ffffff',
-    backgroundColor: '#9cd7d2', borderRadius: 99,
+    fontFamily: AppFont.bold, fontSize: 10, color: DC.viewBtnText,
+    backgroundColor: DC.viewBtnBg, borderRadius: 99,
     paddingHorizontal: 6, paddingVertical: 1,
     overflow: 'hidden',
   },

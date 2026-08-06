@@ -1,10 +1,11 @@
 import {
-  View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView,
+  View, Text, StyleSheet, TouchableOpacity, ScrollView,
   TextInput, ActivityIndicator, Alert, Image, Dimensions, Modal, RefreshControl,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../../src/lib/supabase';
 import { useEffect, useRef, useState, useContext } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useUser } from '../../../src/hooks/useUser';
 import type { Account } from '../../../src/types';
@@ -12,11 +13,13 @@ import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import BottomSheet from '@/components/ui/BottomSheet';
 import ConfirmModal from '@/components/ui/ConfirmModal';
+import TopHeader from '@/components/ui/TopHeader';
+import NavIcon from '@/components/ui/NavIcons';
 import { Colors, Radius } from '@/components/ui/theme';
 import { BlurContext } from '../../../src/lib/BlurContext';
 import { DC } from '../../../src/lib/design';
 import { AppFont } from '../../../src/lib/fonts';
-
+import { useNav } from '../../../src/lib/NavContext';
 import { SvgXml } from 'react-native-svg';
 
 const { width: SW, height: SH } = Dimensions.get('window');
@@ -40,6 +43,8 @@ export default function AccountsScreen({ isActive }: { isActive?: boolean }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { userId } = useUser();
+  const insets = useSafeAreaInsets();
+  const { switchTab, toggleNotifDropdown } = useNav();
   const { setBlur, registerAdd, unregisterAdd } = useContext(BlurContext);
   const [addModal, setAddModal] = useState(false);
   const [editAccount, setEditAccount] = useState<Account | null>(null);
@@ -85,20 +90,29 @@ export default function AccountsScreen({ isActive }: { isActive?: boolean }) {
   })).filter(g => g.items.length > 0);
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
-      {/* ── Frozen header ── */}
-      <View style={s.frozen}>
-        <View style={s.header}>
-          <Text style={s.title}>Accounts</Text>
-          <TouchableOpacity onPress={openAdd} activeOpacity={0.7}>
-            <SvgXml xml={SVG_ADD} width={26} height={26} color="#373737" />
+    <View style={{ flex: 1, backgroundColor: '#fff' }}>
+      <TopHeader
+        title="Accounts"
+        centered
+        variant="blue"
+        topInset={insets.top}
+        right={
+          <TouchableOpacity onPress={toggleNotifDropdown} activeOpacity={0.7}>
+            <NavIcon name="notifications" size={22} color="#ffffff" />
           </TouchableOpacity>
-        </View>
-        <View style={s.divider} />
-      </View>
+        }
+      />
 
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
+
+        {/* Action row */}
+        <View style={s.actionRow}>
+          <TouchableOpacity onPress={openAdd} activeOpacity={0.7} style={s.addBtn}>
+            <SvgXml xml={SVG_ADD} width={16} height={16} color="#ffffff" />
+            <Text style={s.addBtnText}>New Account</Text>
+          </TouchableOpacity>
+        </View>
 
         {accounts.length === 0 ? (
           <View style={s.emptyBox}><Text style={s.emptyText}>no accounts saved yet</Text></View>
@@ -150,7 +164,7 @@ export default function AccountsScreen({ isActive }: { isActive?: boolean }) {
           { label: 'delete', onPress: handleDelete, destructive: true },
         ]}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -518,7 +532,10 @@ const s = StyleSheet.create({
   divider: { height: 1, backgroundColor: '#d2d2d2' },
   header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: DC.pagePadding, paddingTop: 28, paddingBottom: 16 },
   title:        { ...DC.typography.pageTitle },
-  scroll:       { paddingHorizontal: DC.pagePadding, paddingTop: 20, paddingBottom: 80 },
+  scroll:       { paddingHorizontal: DC.pagePadding, paddingTop: 16, paddingBottom: 80 },
+  actionRow:    { flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 16 },
+  addBtn:       { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, backgroundColor: DC.headerBlueBg },
+  addBtnText:   { fontFamily: AppFont.semiBold, fontSize: 11, color: '#ffffff' },
   sectionHeader:{ ...DC.typography.sectionHeader, marginTop: 20, marginBottom: 10 },
   card:         { ...DC.dottedCard, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
   cardLeft:     { flex: 1 },

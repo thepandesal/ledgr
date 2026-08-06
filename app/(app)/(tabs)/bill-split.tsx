@@ -1,15 +1,20 @@
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  SafeAreaView, TextInput, ActivityIndicator, RefreshControl,
+  TextInput, ActivityIndicator, RefreshControl,
 } from 'react-native';
+import { SvgXml } from 'react-native-svg';
 import { useState, useMemo } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useUser } from '../../../src/hooks/useUser';
 import { supabase } from '../../../src/lib/supabase';
 import { useRouter } from 'expo-router';
 import BottomSheet from '@/components/ui/BottomSheet';
 import ConfirmModal from '@/components/ui/ConfirmModal';
+import TopHeader from '@/components/ui/TopHeader';
+import NavIcon from '@/components/ui/NavIcons';
 import { Colors, Radius, Spacing } from '@/components/ui/theme';
+import { DC } from '../../../src/lib/design';
 import { Brand } from '../../../src/lib/brand';
 import { useNav } from '../../../src/lib/NavContext';
 
@@ -23,11 +28,14 @@ interface SplitBillRow {
   status: 'ongoing' | 'closed';
 }
 
-export default function BillSplitScreen() {
+export default function BillSplitScreen({ isActive, onClose }: { isActive?: boolean; onClose?: () => void }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { userId } = useUser();
-  const { openSplitBill } = useNav();
+  const { openSplitBill, switchTab, toggleNotifDropdown } = useNav();
+  const insets = useSafeAreaInsets();
+
+  const SVG_ADD = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="currentColor" d="M12 4.75c.69 0 1.25.56 1.25 1.25v4.75H18a1.25 1.25 0 1 1 0 2.5h-4.75V18a1.25 1.25 0 1 1-2.5 0v-4.75H6a1.25 1.25 0 1 1 0-2.5h4.75V6c0-.69.56-1.25 1.25-1.25" /></svg>`;
 
   const [createModal, setCreateModal] = useState(false);
   const [billName, setBillName] = useState('');
@@ -37,6 +45,7 @@ export default function BillSplitScreen() {
   const [selected, setSelected] = useState<SplitBillRow | null>(null);
   const [displayCount, setDisplayCount] = useState(10);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'all' | 'ongoing' | 'closed'>('all');
   const [viewMode, setViewMode] = useState<'date' | 'person'>('date');
 
@@ -232,7 +241,19 @@ export default function BillSplitScreen() {
   };
 
   return (
-    <SafeAreaView style={s.container}>
+    <View style={s.container}>
+      <TopHeader
+        title="Split Bills"
+        centered
+        variant="blue"
+        topInset={insets.top}
+        onBack={() => onClose ? onClose() : switchTab('home')}
+        right={
+          <TouchableOpacity onPress={toggleNotifDropdown} activeOpacity={0.7}>
+            <NavIcon name="notifications" size={22} color="#ffffff" />
+          </TouchableOpacity>
+        }
+      />
       <ScrollView
         contentContainerStyle={s.scroll}
         showsVerticalScrollIndicator={false}
@@ -241,25 +262,41 @@ export default function BillSplitScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
         {isLoading ? (
-          <ActivityIndicator color={Brand.color.accent} style={{ marginTop: 40 }} />
+          <ActivityIndicator color={DC.headerBlueBg} style={{ marginTop: 40 }} />
         ) : (
           <>
-            {/* Filter row */}
+            {/* Filter row with dropdown + add button */}
             <View style={s.filterRow}>
-              {/* Status chips */}
-              <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', flex: 1 }}>
-                {(['all', 'ongoing', 'closed'] as const).map(f => (
-                  <TouchableOpacity
-                    key={f}
-                    style={[s.filterChip, statusFilter === f && s.filterChipActive]}
-                    onPress={() => { setStatusFilter(f); setDisplayCount(10); }}
-                  >
-                    <Text style={[s.filterChipText, statusFilter === f && s.filterChipTextActive]}>{f}</Text>
-                  </TouchableOpacity>
-                ))}
+              <View style={s.filterDropdownWrap}>
+                <TouchableOpacity
+                  style={[s.filterBtn, statusFilter !== 'all' && s.filterBtnActive]}
+                  onPress={() => setShowFilterDropdown(v => !v)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[s.filterBtnText, statusFilter !== 'all' && s.filterBtnTextActive]}>
+                    {statusFilter === 'all' ? 'Filters' : statusFilter}
+                  </Text>
+                  {statusFilter !== 'all' && <View style={s.filterDot} />}
+                </TouchableOpacity>
+                {showFilterDropdown && (
+                  <View style={s.dropdownList}>
+                    {(['all', 'ongoing', 'closed'] as const).map(f => (
+                      <TouchableOpacity
+                        key={f}
+                        style={[s.dropdownItem, statusFilter === f && s.dropdownItemActive]}
+                        onPress={() => { setStatusFilter(f); setDisplayCount(10); setShowFilterDropdown(false); }}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={[s.dropdownItemText, statusFilter === f && s.dropdownItemTextActive]}>{f}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
               </View>
-              {/* View toggle */}
-
+              <TouchableOpacity onPress={() => setCreateModal(true)} activeOpacity={0.7} style={s.addBtn}>
+                <SvgXml xml={SVG_ADD} width={18} height={18} color="#ffffff" />
+                <Text style={s.addBtnText}>New Bill</Text>
+              </TouchableOpacity>
             </View>
 
             {/* Date nav — only in date mode */}
@@ -311,7 +348,7 @@ export default function BillSplitScreen() {
                   {hasMore && (
                     <View style={s.loadMoreWrap}>
                       {isLoadingMore
-                        ? <ActivityIndicator color={Brand.color.accent} size="small" />
+                        ? <ActivityIndicator color={DC.headerBlueBg} size="small" />
                         : <Text style={s.loadMoreText}>scroll for more</Text>}
                     </View>
                   )}
@@ -390,7 +427,7 @@ export default function BillSplitScreen() {
           { label: 'delete', onPress: handleDelete, destructive: true },
         ]}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -401,15 +438,20 @@ const s = StyleSheet.create({
   emptyWrap: { alignItems: 'center', gap: 12, paddingVertical: 48 },
   list: {},
 
-  filterRow:            { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
-  filterChip:           { paddingHorizontal: 14, paddingVertical: 7, borderRadius: Radius.pill, borderWidth: 1, borderColor: Colors.borderMid, backgroundColor: Colors.surface },
-  filterChipActive:     { backgroundColor: Brand.color.accent, borderColor: Brand.color.accent },
-  filterChipText:       { fontFamily: Brand.font.mono, fontSize: 12, color: Colors.muted },
-  filterChipTextActive: { fontFamily: Brand.font.monoBold, fontSize: 12, color: Brand.color.accentText },
-
-  viewToggle:      { flexDirection: 'row', borderRadius: Radius.pill, borderWidth: 1, borderColor: Colors.borderMid, overflow: 'hidden' },
-  toggleBtn:       { paddingHorizontal: 10, paddingVertical: 7, backgroundColor: Colors.surface },
-  toggleBtnActive: { backgroundColor: Brand.color.accent + '44' },
+  filterRow:            { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12, zIndex: 10 },
+  filterDropdownWrap:   { position: 'relative' },
+  filterBtn:            { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 8, borderRadius: DC.controlRadius, backgroundColor: DC.viewBtnBg, borderWidth: 1, borderColor: DC.viewBtnBg },
+  filterBtnActive:      { backgroundColor: DC.viewBtnBg, borderColor: DC.viewBtnBg },
+  filterBtnText:        { fontFamily: Brand.font.mono, fontSize: 11, color: DC.viewBtnText },
+  filterBtnTextActive:  { fontFamily: Brand.font.monoBold, fontSize: 11, color: DC.viewBtnText },
+  filterDot:            { width: 7, height: 7, borderRadius: 4, backgroundColor: DC.viewBtnText },
+  dropdownList:         { position: 'absolute', top: '100%', left: 0, minWidth: 140, marginTop: 4, borderRadius: 12, borderWidth: 1, borderColor: DC.controlBorder, backgroundColor: '#fff', zIndex: 20, elevation: 6 },
+  dropdownItem:         { paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: DC.controlBorder },
+  dropdownItemActive:   { backgroundColor: DC.viewBtnBg },
+  dropdownItemText:     { fontFamily: Brand.font.mono, fontSize: 13, color: DC.pageText },
+  dropdownItemTextActive: { fontFamily: Brand.font.monoBold, fontSize: 13, color: DC.viewBtnText },
+  addBtn:               { flexDirection: 'row', alignItems: 'center', gap: 5, marginLeft: 'auto', paddingHorizontal: 14, paddingVertical: 8, borderRadius: DC.controlRadius, backgroundColor: DC.headerBlueBg },
+  addBtnText:           { fontFamily: Brand.font.monoBold, fontSize: 11, color: '#ffffff' },
 
   dateNav:      { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 16 },
   dateNavArrow: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.surface },
@@ -420,15 +462,14 @@ const s = StyleSheet.create({
   dateHeaderText: { fontFamily: Brand.font.mono, fontSize: 10, color: Colors.muted, letterSpacing: 1.4, textTransform: 'uppercase' },
 
   card:         { backgroundColor: Colors.white, paddingVertical: Brand.spacing.card, flexDirection: 'row', alignItems: 'center', gap: 14, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  cardIconWrap: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', backgroundColor: Brand.color.headerBg },
   cardMid:      { flex: 1, gap: 2 },
   cardName:     { ...Brand.type.cardTitle },
   cardMeta:     { ...Brand.type.cardMeta },
-  cardAmount:   { ...Brand.type.cardAmount, color: Brand.color.headerText },
+  cardAmount:   { ...Brand.type.cardAmount, color: DC.pageText },
 
   statusBadge:           { paddingHorizontal: 8, paddingVertical: 3, borderRadius: Radius.pill, backgroundColor: Brand.color.accent + '44' },
   statusBadgeClosed:     { backgroundColor: Colors.surface },
-  statusBadgeText:       { fontFamily: Brand.font.monoBold, fontSize: 9, color: Brand.color.accentDark, textTransform: 'uppercase', letterSpacing: 0.5 },
+  statusBadgeText:       { fontFamily: Brand.font.monoBold, fontSize: 9, color: DC.viewBtnText, textTransform: 'uppercase', letterSpacing: 0.5 },
   statusBadgeTextClosed: { color: Colors.muted },
 
   loadMoreWrap: { alignItems: 'center', paddingVertical: 20 },

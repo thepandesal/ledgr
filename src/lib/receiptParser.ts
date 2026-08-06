@@ -48,16 +48,24 @@ const SKIP_KEYWORDS = [
 ];
 
 // ── Price pattern: number with optional decimal, possibly preceded by currency ─
-// Matches: 149.00  1,234.50  ₱149  P149  $12.50  12  etc.
-const PRICE_PATTERN = /(?:₱|P|PHP|USD|\$)?\s*(\d{1,6}(?:[,\.]\d{2,3})*(?:\.\d{2})?)\s*$/;
+// Matches: 149.00  1,234.50  19,00 (EU)  ₱149  P149  $12.50  $ 19,00  etc.
+const PRICE_PATTERN = /(?:₱|P|PHP|USD|\$)?\s*(\d{1,6}(?:[,\.]\d{2,3})*(?:[,\.]\d{2})?)\s*$/;
 const PRICE_ANYWHERE = /(?:₱|P|PHP|USD|\$)?\s*(\d{1,6}(?:[,\.]\d{2,3})*(?:\.\d{2})?)/g;
 
 // ── Total line detector ───────────────────────────────────────────────────────
 const TOTAL_KEYWORDS = ['total', 'amount due', 'grand total', 'balance due'];
 
 function cleanPrice(raw: string): number {
-  // Remove currency symbols and commas, parse float
-  return parseFloat(raw.replace(/[₱P,\s]/g, '').replace('PHP', ''));
+  // Remove currency symbols and leading/trailing spaces
+  let s = raw.replace(/[₱P$\s]/g, '').replace('PHP', '').replace('USD', '');
+  // Handle European comma-decimal format: if ends with ,XX (2 digits) treat comma as decimal
+  if (/,\d{2}$/.test(s)) {
+    s = s.replace(/\./g, '').replace(',', '.');
+  } else {
+    // Standard: remove commas as thousand separators
+    s = s.replace(/,/g, '');
+  }
+  return parseFloat(s);
 }
 
 function isSkipLine(line: string): boolean {
@@ -87,15 +95,13 @@ function extractPrice(line: string): number | null {
 }
 
 function extractItemName(line: string, price: number): string {
-  // Remove the price from the end of the line
-  const priceStr = price.toFixed(2);
-  // Try to remove trailing price pattern
+  // Remove trailing price pattern including currency symbol with optional space
   let name = line
-    .replace(/(?:₱|P|PHP|USD|\$)?\s*[\d,]+\.?\d*\s*$/, '')
+    .replace(/(?:₱|P|PHP|USD|\$)?\s*[\d,]+[,\.]?\d*\s*$/, '')
     .replace(/\s{2,}/g, ' ')
     .trim();
 
-  // Remove leading quantity patterns like "2x", "2 x", "x2"
+  // Remove leading quantity patterns like "1x", "2x", "2 x", "x2"
   name = name.replace(/^\d+\s*[xX]\s*/, '').replace(/^[xX]\s*\d+\s*/, '').trim();
 
   // Remove trailing dots/dashes used as price leaders
@@ -160,17 +166,40 @@ export function parseReceiptText(rawText: string): ParsedReceipt {
 // ── OCR runner (web only via Tesseract.js) ────────────────────────────────────
 export async function ocrReceiptImage(imageUri: string): Promise<ParsedReceipt> {
   if (typeof window === 'undefined') {
-    // Native — return empty, caller should handle
     return { items: [], detectedTotal: null, rawText: '' };
   }
 
-  // Dynamically import Tesseract to avoid SSR issues
+  console.log('[OCR] starting, uri scheme:', imageUri.slice(0, 30));
+
   const Tesseract = await import('tesseract.js');
 
-  const result = await Tesseract.recognize(imageUri, 'eng', {
-    logger: () => {}, // suppress logs
+  // If blob URI, convert to base64 first so Tesseract can read it
+  let processUri = imageUri;
+  if (imageUri.startsWith('blob:')) {
+    console.log('[OCR] converting blob to base64');
+    processUri = await new Promise<string>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('GET', imageUri);
+      xhr.responseType = 'blob';
+      xhr.onload = () => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(xhr.response);
+      };
+      xhr.onerror = reject;
+      xhr.send();
+    });
+    console.log('[OCR] converted, base64 length:', processUri.length);
+  }
+
+  const result = await Tesseract.recognize(processUri, 'eng', {
+    logger: () => {},
   });
 
   const rawText = result.data.text;
-  return parseReceiptText(rawText);
+  console.log('[OCR] raw text:', JSON.stringify(rawText));
+  const parsed = parseReceiptText(rawText);
+  console.log('[OCR] parsed items:', parsed.items);
+  return parsed;
 }

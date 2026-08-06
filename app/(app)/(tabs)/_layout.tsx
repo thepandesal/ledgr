@@ -1,4 +1,5 @@
 import { View, TouchableOpacity, Text, StyleSheet, Animated, Platform, SafeAreaView, ScrollView, useWindowDimensions, Clipboard, TextInput, ActivityIndicator, Modal, Switch, Image } from 'react-native';
+import { WebView } from 'react-native-webview';
 import { SvgXml } from 'react-native-svg';
 import TopHeader from '@/components/ui/TopHeader';
 import NavIcon from '@/components/ui/NavIcons';
@@ -22,7 +23,6 @@ import SplitBillDetailScreen from '../split-bill-detail';
 import CategoriesPanel from '../top-spending';
 import RecordingsPanel from '../recordings-panel';
 import SpacesPanel from '../spaces-panel';
-import LoansPanel from '../loans-panel';
 import PeoplePanel from '../people-panel';
 import RemindersPanel from '../reminders-panel';
 import ContactsPanel from '../contacts-panel';
@@ -40,6 +40,7 @@ import AppTourOverlay from '@/components/AppTourOverlay';
 import { TourContext, APP_TOUR_STEPS } from '../../../src/lib/TourContext';
 import { NavContext } from '../../../src/lib/NavContext';
 import { consumePendingTabGlobal, useNav, triggerHomeDateEdit } from '../../../src/lib/NavContext';
+import { LOADING_SPINNER_SVG_DATA_URI } from '../../../src/lib/loadingSpinnerBase64';
 import type { RefObject } from 'react';
 import type { View as RNView } from 'react-native';
 
@@ -88,7 +89,7 @@ const OTHERS_ITEMS = [
   { key: 'receivables', label: 'Receivables', icon: 'arrow-undo-outline',    route: '/(app)/receivables' },
 ];
 
-const SLIDE_KEYS = ['home', 'accounts', 'record', 'dashboard', 'categories', 'receipts', 'bill-split', 'contacts', 'notifications-page', 'reminders', 'profile', 'spaces'];
+const SLIDE_KEYS = ['home', 'accounts', 'record', 'dashboard', 'categories', 'contacts', 'notifications-page', 'reminders', 'profile', 'spaces'];
 
 const PROFILE_DANGER   = '#FFAB91';
 const PROFILE_DANGEBG  = '#FFF5F2';
@@ -109,8 +110,6 @@ const SCREENS: Record<string, (isActive: boolean) => React.ReactNode> = {
   accounts:             (isActive) => <MemoAccounts isActive={isActive} />,
   dashboard:            (isActive) => <MemoDashboard isActive={isActive} />,
   categories:           (isActive) => <MemoCategories isActive={isActive} />,
-  'bill-split':         (isActive) => <MemoBillSplit isActive={isActive} />,
-  receipts:             (isActive) => <MemoReceipts isActive={isActive} />,
   contacts:             (isActive) => <MemoContacts isActive={isActive} />,
   reminders:            (isActive) => <MemoReminders isActive={isActive} />,
   spaces:               () => <SpacesPanel onClose={() => {}} />,
@@ -554,6 +553,14 @@ export default function TabsLayout() {
   const topSpendingOpenRef = useRef(false);
   const topSpendingAnim = useRef(new Animated.Value(winWidthRef.current)).current;
 
+  const [panelLoading, setPanelLoading] = useState(false);
+  const panelLoadingTimer = useRef<any>(null);
+  const showPanelLoader = () => {
+    setPanelLoading(true);
+    if (panelLoadingTimer.current) clearTimeout(panelLoadingTimer.current);
+    panelLoadingTimer.current = setTimeout(() => setPanelLoading(false), 700);
+  };
+
   const openTopSpending = useCallback(() => {
     topSpendingOpenRef.current = true;
     setTopSpendingOpen(true);
@@ -581,6 +588,7 @@ export default function TabsLayout() {
   const [recordingsPanelOpts, setRecordingsPanelOpts] = useState<{ categoryId?: string; categoryName?: string; spaceId?: string; spaceName?: string }>({});
 
   const openRecordingsPanel = useCallback((opts?: { categoryId?: string; categoryName?: string; spaceId?: string; spaceName?: string }) => {
+    showPanelLoader();
     recordingsPanelOpenRef.current = true;
     setRecordingsPanelOpts(opts ?? {});
     recordingsPanelAnim.setValue(winWidthRef.current);
@@ -631,7 +639,7 @@ export default function TabsLayout() {
   const receivablesPanelOpenRef = useRef(false);
   const receivablesPanelAnim = useRef(new Animated.Value(winWidthRef.current)).current;
   const [receivablesInitialPerson, setReceivablesInitialPerson] = useState<string | null>(null);
-  const openReceivablesPanel = useCallback((person?: string) => { setReceivablesInitialPerson(person ?? null); receivablesPanelOpenRef.current = true; setReceivablesPanelOpen(true); receivablesPanelAnim.setValue(winWidthRef.current); requestAnimationFrame(() => { Animated.timing(receivablesPanelAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start(); }); savePanelState(); }, [savePanelState]);
+  const openReceivablesPanel = useCallback((person?: string) => { showPanelLoader(); setReceivablesInitialPerson(person ?? null); receivablesPanelOpenRef.current = true; setReceivablesPanelOpen(true); receivablesPanelAnim.setValue(winWidthRef.current); requestAnimationFrame(() => { Animated.timing(receivablesPanelAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start(); }); savePanelState(); }, [savePanelState]);
   const closeReceivablesPanel = useCallback(() => { receivablesPanelOpenRef.current = false; setReceivablesInitialPerson(null); Animated.timing(receivablesPanelAnim, { toValue: winWidthRef.current, duration: 260, useNativeDriver: true }).start(() => { setReceivablesPanelOpen(false); }); savePanelState(); }, [savePanelState]);
 
   const [remindersPanelOpen, setRemindersPanelOpen] = useState(false);
@@ -649,6 +657,16 @@ export default function TabsLayout() {
   const friendsPanelAnim = useRef(new Animated.Value(winWidthRef.current)).current;
   const openFriendsPanel = useCallback(() => { setFriendsPanelOpen(true); friendsPanelAnim.setValue(winWidthRef.current); requestAnimationFrame(() => { Animated.timing(friendsPanelAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start(); }); }, []);
   const closeFriendsPanel = useCallback(() => { Animated.timing(friendsPanelAnim, { toValue: winWidthRef.current, duration: 260, useNativeDriver: true }).start(() => { setFriendsPanelOpen(false); }); }, []);
+
+  const [receiptsPanelOpen, setReceiptsPanelOpen] = useState(false);
+  const receiptsPanelAnim = useRef(new Animated.Value(winWidthRef.current)).current;
+  const openReceiptsPanel = useCallback(() => { setReceiptsPanelOpen(true); receiptsPanelAnim.setValue(winWidthRef.current); requestAnimationFrame(() => { Animated.timing(receiptsPanelAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start(); }); }, []);
+  const closeReceiptsPanel = useCallback(() => { Animated.timing(receiptsPanelAnim, { toValue: winWidthRef.current, duration: 260, useNativeDriver: true }).start(() => { setReceiptsPanelOpen(false); }); }, []);
+
+  const [billSplitPanelOpen, setBillSplitPanelOpen] = useState(false);
+  const billSplitPanelAnim = useRef(new Animated.Value(winWidthRef.current)).current;
+  const openBillSplitPanel = useCallback(() => { setBillSplitPanelOpen(true); billSplitPanelAnim.setValue(winWidthRef.current); requestAnimationFrame(() => { Animated.timing(billSplitPanelAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start(); }); }, []);
+  const closeBillSplitPanel = useCallback(() => { Animated.timing(billSplitPanelAnim, { toValue: winWidthRef.current, duration: 260, useNativeDriver: true }).start(() => { setBillSplitPanelOpen(false); }); }, []);
 
   const [homeDateLabel, setHomeDateLabel] = useState('');
   const visited = useVisited(activeTab);
@@ -729,12 +747,17 @@ export default function TabsLayout() {
     updateHidden(remindersPanelAnim, remindersPanelOpenRef.current);
     updateHidden(contactsPanelAnim, contactsPanelOpen);
     updateHidden(friendsPanelAnim, friendsPanelOpen);
+    updateHidden(receiptsPanelAnim, receiptsPanelOpen);
+    updateHidden(billSplitPanelAnim, billSplitPanelOpen);
   }, [W]);
 
   // Per-tab navigation stack cache (Instagram-style)
   const tabStacks = useRef<Record<string, { spaceId: string | null; spaceName: string | null; recordingId: string | null; topSpendingOpen: boolean; recordingsPanelOpen: boolean; spacesPanelOpen: boolean; loansPanelOpen: boolean; receivablesPanelOpen: boolean; remindersPanelOpen: boolean }>>({});
 
   const switchTab = useCallback((key: string) => {
+    // receipts and bill-split are now overlay panels, not tabs
+    if (key === 'receipts') { openReceiptsPanel(); return; }
+    if (key === 'bill-split') { openBillSplitPanel(); return; }
     if (key === activeTabRef.current) return;
     const prev = activeTabRef.current;
 
@@ -777,15 +800,16 @@ export default function TabsLayout() {
     setRemindersPanelOpen(false);
     setContactsPanelOpen(false);
     setFriendsPanelOpen(false);
+    setReceiptsPanelOpen(false);
+    setBillSplitPanelOpen(false);
 
     activeTabRef.current = key;
 
     const incoming = slideAnims[key];
     const outgoing = slideAnims[prev];
 
-    // Slide animation for profile, instant swap for other tabs
+    // Slide animation for profile; instant swap for other tabs
     if (prev === 'profile') {
-      // Slide profile out before switching
       outgoing?.setValue(0);
       Animated.timing(outgoing!, { toValue: winWidthRef.current, duration: 260, useNativeDriver: true }).start();
       incoming?.setValue(0);
@@ -977,11 +1001,11 @@ export default function TabsLayout() {
   return (
     <TourContext.Provider value={{ register: registerTourTarget, unregister: unregisterTourTarget }}>
     <BlurContext.Provider value={{ setBlur, registerAdd, unregisterAdd, activeTab, __hasProvider: true }}>
-    <NavContext.Provider value={{ activeTab, switchTab, handleNavPress, unreadCount, pendingTab, setPendingTab, openSpace, closeSpace, activeSpaceId, activeSpaceName, openRecording, closeRecording, activeRecordingId, openSplitBill, closeSplitBill, activeSplitBillId, activeSplitBillName, openTopSpending, closeTopSpending, openRecordingsPanel, closeRecordingsPanel, openSpacesPanel, closeSpacesPanel, openLoansPanel, closeLoansPanel, openReceivablesPanel, closeReceivablesPanel, openRemindersPanel, closeRemindersPanel, openContactsPanel, closeContactsPanel, openFriendsPanel, closeFriendsPanel, homeDateLabel, setHomeDateLabel, onHomeDateEdit: triggerHomeDateEdit }}>
+    <NavContext.Provider value={{ activeTab, switchTab, handleNavPress, unreadCount, pendingTab, setPendingTab, openSpace, closeSpace, activeSpaceId, activeSpaceName, openRecording, closeRecording, activeRecordingId, openSplitBill, closeSplitBill, activeSplitBillId, activeSplitBillName, openTopSpending, closeTopSpending, openRecordingsPanel, closeRecordingsPanel, openSpacesPanel, closeSpacesPanel, openLoansPanel, closeLoansPanel, openReceivablesPanel, closeReceivablesPanel, openRemindersPanel, closeRemindersPanel, openContactsPanel, closeContactsPanel, openFriendsPanel, closeFriendsPanel, homeDateLabel, setHomeDateLabel, onHomeDateEdit: triggerHomeDateEdit, toggleNotifDropdown }}>
     <View style={s.container}>
 
       {/* ── Shared flat header ── */}
-      {activeTab !== 'profile' && activeTab !== 'accounts' && activeTab !== 'spaces' && <View style={[s.waveBg, { paddingTop: insets.top + 28 }]}>
+      {activeTab !== 'profile' && activeTab !== 'accounts' && activeTab !== 'spaces' && activeTab !== 'categories' && activeTab !== 'dashboard' && activeTab !== 'record' && <View style={[s.waveBg, { paddingTop: insets.top + DC.headerPaddingTop }]}>
         {activeTab === 'home' ? (
           <View style={s.homeHeaderRow}>
             <View style={s.homeHeaderTextCol}>
@@ -990,68 +1014,18 @@ export default function TabsLayout() {
               </TouchableOpacity>
               <TouchableOpacity onPress={triggerHomeDateEdit} activeOpacity={0.7} style={s.homeDateRow} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                 <Text style={s.homeDateValue}>{homeDateLabel}</Text>
-                <NavIcon name="create-outline" size={14} color="#373737" />
+                <NavIcon name="create-outline" size={14} color="#ffffff" />
               </TouchableOpacity>
             </View>
 
             <TouchableOpacity onPress={toggleNotifDropdown} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <NavIcon name="notifications" size={24} color="#000" />
+              <NavIcon name="notifications" size={24} color="#ffffff" />
               {unreadCount > 0 && (
                 <View style={s.notifBadge}>
                   <Text style={s.notifBadgeText}>{unreadCount > 9 ? '9+' : String(unreadCount)}</Text>
                 </View>
               )}
             </TouchableOpacity>
-            {showNotifDropdown && (
-              <>
-                <TouchableOpacity style={s.notifOverlay} onPress={() => setShowNotifDropdown(false)} activeOpacity={1} />
-                <View style={s.notifDropdown}>
-                  <View style={s.notifArrow} />
-                  <View style={s.notifCard}>
-                    <View style={s.notifContent}>
-                      {notifLoading ? (
-                        <ActivityIndicator color="#000" style={{ paddingVertical: 20 }} />
-                      ) : notifList.length === 0 ? (
-                        <Text style={s.notifEmptyText}>no notifications</Text>
-                      ) : (
-                        <>
-                          {(() => {
-                            const latestDate = notifList[0]?.created_at?.slice(0, 10);
-                            const latest: any[] = [];
-                            const rest: any[] = [];
-                            notifList.forEach(n => {
-                              if (n.created_at?.slice(0, 10) === latestDate) latest.push(n);
-                              else rest.push(n);
-                            });
-                            return (
-                              <>
-                                <Text style={s.notifSectionLabel}>{new Date(latestDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</Text>
-                                {latest.map(n => (
-                                  <TouchableOpacity key={n.id} style={s.notifItem} activeOpacity={0.7}>
-                                    <Text style={s.notifItemTitle} numberOfLines={1}>{n.title}</Text>
-                                    {n.body ? <Text style={s.notifItemBody} numberOfLines={1}>{n.body}</Text> : null}
-                                  </TouchableOpacity>
-                                ))}
-                                {rest.length > 0 && <Text style={s.notifSectionLabel}>others</Text>}
-                                {rest.map(n => (
-                                  <TouchableOpacity key={n.id} style={s.notifItem} activeOpacity={0.7}>
-                                    <Text style={s.notifItemTitle} numberOfLines={1}>{n.title}</Text>
-                                    {n.body ? <Text style={s.notifItemBody} numberOfLines={1}>{n.body}</Text> : null}
-                                  </TouchableOpacity>
-                                ))}
-                              </>
-                            );
-                          })()}
-                          <TouchableOpacity style={s.notifViewAll} onPress={() => { setShowNotifDropdown(false); switchTab('notifications-page'); }} activeOpacity={0.7}>
-                            <Text style={s.notifViewAllText}>view notifications</Text>
-                          </TouchableOpacity>
-                        </>
-                      )}
-                    </View>
-                  </View>
-                </View>
-              </>
-            )}
           </View>
         ) : (
           <Animated.View style={{ opacity: titleAnim }}>
@@ -1059,7 +1033,7 @@ export default function TabsLayout() {
           </Animated.View>
         )}
       </View>}
-      {(activeTab === 'profile' || activeTab === 'accounts' || activeTab === 'spaces') && <View style={{ height: 0 }} />}
+      {(activeTab === 'profile' || activeTab === 'accounts' || activeTab === 'spaces' || activeTab === 'categories' || activeTab === 'dashboard' || activeTab === 'record') && <View style={{ height: 0 }} />}
 
       <View style={s.content}>
         {/* Slideable screens */}
@@ -1137,15 +1111,15 @@ export default function TabsLayout() {
       {/* Spaces panel — conditionally rendered */}
       {spacesPanelOpen && (
         <Animated.View style={[s.screen, s.panel, { transform: [{ translateX: spacesPanelAnim }], zIndex: 55 }]}>
-          <SpacesPanel onClose={closeSpacesPanel} />
+          <SpacesPanel onClose={closeSpacesPanel} showBack />
         </Animated.View>
       )}
 
-      {/* Loans panel */}
+      {/* Loans panel — now uses PeoplePanel */}
       {loansPanelOpen && (
         <Animated.View style={[s.screen, s.panel, { transform: [{ translateX: loansPanelAnim }], zIndex: 55 }]}
           pointerEvents="auto">
-          <LoansPanel onClose={closeLoansPanel} />
+          <PeoplePanel onClose={closeLoansPanel} />
         </Animated.View>
       )}
 
@@ -1179,6 +1153,20 @@ export default function TabsLayout() {
         </Animated.View>
       )}
 
+      {/* Receipts panel */}
+      {receiptsPanelOpen && (
+        <Animated.View style={[s.screen, s.panel, { transform: [{ translateX: receiptsPanelAnim }], zIndex: 62 }]}>
+          <MemoReceipts isActive={receiptsPanelOpen} onClose={closeReceiptsPanel} />
+        </Animated.View>
+      )}
+
+      {/* Bill Split panel */}
+      {billSplitPanelOpen && (
+        <Animated.View style={[s.screen, s.panel, { transform: [{ translateX: billSplitPanelAnim }], zIndex: 62 }]}>
+          <MemoBillSplit isActive={billSplitPanelOpen} onClose={closeBillSplitPanel} />
+        </Animated.View>
+      )}
+
       {/* Others bubble */}
       {othersOpen && (
         <>
@@ -1204,8 +1192,59 @@ export default function TabsLayout() {
       )}
 
       {/* Bottom nav bar */}
-      {/* Bottom nav — position absolute so it overlays transparentModal screens */}
       <BottomNav />
+
+      {/* Global notification dropdown — shown from any screen */}
+      {showNotifDropdown && (
+        <>
+          <TouchableOpacity style={[StyleSheet.absoluteFill, { zIndex: 1998 }]} onPress={() => setShowNotifDropdown(false)} activeOpacity={1} />
+          <View style={[s.notifDropdown, { zIndex: 1999 }]}>
+            <View style={s.notifArrow} />
+            <View style={s.notifCard}>
+              <View style={s.notifContent}>
+                {notifLoading ? (
+                  <ActivityIndicator color="#000" style={{ paddingVertical: 20 }} />
+                ) : notifList.length === 0 ? (
+                  <Text style={s.notifEmptyText}>no notifications</Text>
+                ) : (
+                  <>
+                    {(() => {
+                      const latestDate = notifList[0]?.created_at?.slice(0, 10);
+                      const latest: any[] = [];
+                      const rest: any[] = [];
+                      notifList.forEach(n => {
+                        if (n.created_at?.slice(0, 10) === latestDate) latest.push(n);
+                        else rest.push(n);
+                      });
+                      return (
+                        <>
+                          <Text style={s.notifSectionLabel}>{new Date(latestDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</Text>
+                          {latest.map(n => (
+                            <TouchableOpacity key={n.id} style={s.notifItem} activeOpacity={0.7}>
+                              <Text style={s.notifItemTitle} numberOfLines={1}>{n.title}</Text>
+                              {n.body ? <Text style={s.notifItemBody} numberOfLines={1}>{n.body}</Text> : null}
+                            </TouchableOpacity>
+                          ))}
+                          {rest.length > 0 && <Text style={s.notifSectionLabel}>others</Text>}
+                          {rest.map(n => (
+                            <TouchableOpacity key={n.id} style={s.notifItem} activeOpacity={0.7}>
+                              <Text style={s.notifItemTitle} numberOfLines={1}>{n.title}</Text>
+                              {n.body ? <Text style={s.notifItemBody} numberOfLines={1}>{n.body}</Text> : null}
+                            </TouchableOpacity>
+                          ))}
+                          <TouchableOpacity style={s.notifViewAll} onPress={() => { setShowNotifDropdown(false); switchTab('notifications-page'); }} activeOpacity={0.7}>
+                            <Text style={s.notifViewAllText}>view notifications</Text>
+                          </TouchableOpacity>
+                        </>
+                      );
+                    })()}
+                  </>
+                )}
+              </View>
+            </View>
+          </View>
+        </>
+      )}
 
       <AppTourOverlay
         visible={tourVisible}
@@ -1216,6 +1255,24 @@ export default function TabsLayout() {
         onSkip={finishTour}
         loading={tourLoading}
       />
+
+      {/* ── Panel loading overlay ── */}
+      {panelLoading && (
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(255,255,255,0.92)', alignItems: 'center', justifyContent: 'center', zIndex: 200 }]} pointerEvents="none">
+          {Platform.OS === 'web' ? (
+            <img src={LOADING_SPINNER_SVG_DATA_URI} alt="loading" style={{ width: 80, height: 80 }} />
+          ) : (
+            <WebView
+              originWhitelist={['*']}
+              source={{ html: `<!DOCTYPE html><html><body style="margin:0;background:transparent;display:flex;align-items:center;justify-content:center;width:100%;height:100%"><img src="${LOADING_SPINNER_SVG_DATA_URI}" style="width:80px;height:80px" /></body></html>` }}
+              style={{ width: 80, height: 80, backgroundColor: 'transparent' }}
+              pointerEvents="none"
+              setSupportMultipleWindows={false}
+              scrollEnabled={false}
+            />
+          )}
+        </View>
+      )}
 
       {/* ── Global blur overlay (covers header + content) ── */}
       {blurActive && (
@@ -1270,15 +1327,15 @@ const s = StyleSheet.create({
   panel:     { bottom: 0 },
 
   // ── Shared header
-  waveBg:       { backgroundColor: Colors.white, paddingHorizontal: DC.pagePadding, paddingBottom: 14, zIndex: 10, alignItems: 'flex-start', borderBottomWidth: 1, borderBottomColor: '#e8e8e8' },
+  waveBg:       { backgroundColor: DC.headerBlueBg, paddingHorizontal: DC.pagePadding, paddingBottom: DC.headerPaddingBottom, zIndex: 10, alignItems: 'flex-start', borderBottomWidth: 0, borderBottomLeftRadius: 32, borderBottomRightRadius: 32 },
   appLabelText: { fontFamily: AppFont.brandLight, fontSize: 16, color: DC.pageText, letterSpacing: 0.5 },
   pageTitle:    { fontFamily: AppFont.bold, fontSize: 18, color: DC.pageText, letterSpacing: 0.3 },
   homeHeaderRow:       { flexDirection: 'row', alignItems: 'center', gap: 10, width: '100%' },
   homeHeaderTextCol:   { flex: 1, justifyContent: 'center' },
-  homeHeaderGreeting:  { fontFamily: 'Poppins-Regular', fontSize: 18, color: '#373737' },
-  homeHeaderName:      { fontFamily: 'Poppins-Bold', fontSize: 18, color: '#373737' },
+  homeHeaderGreeting:  { fontFamily: 'Poppins-Regular', fontSize: 18, color: '#ffffff' },
+  homeHeaderName:      { fontFamily: 'Poppins-Bold', fontSize: 18, color: '#ffffff' },
   homeDateRow:         { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 1 },
-  homeDateValue:       { fontFamily: 'Poppins-Regular', fontSize: 12, color: '#373737' },
+  homeDateValue:       { fontFamily: 'Poppins-Regular', fontSize: 12, color: '#ffffff' },
   pageSubtitle: { display: 'none' as any },
   waveTitleRow: { alignItems: 'center' },
   wave:         { display: 'none' as any },
@@ -1294,7 +1351,7 @@ const s = StyleSheet.create({
     position: 'absolute', top: -1000, left: -1000, right: -1000, bottom: -1000, zIndex: 998,
   },
   notifDropdown: {
-    position: 'absolute', top: 56, right: 14, left: 14, zIndex: 999,
+    position: 'absolute', top: 100, right: 14, left: 14, zIndex: 1999,
   },
   notifArrow: {
     alignSelf: 'flex-end', marginRight: 12,

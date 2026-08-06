@@ -529,7 +529,7 @@ export default function DashboardScreen({ isActive }: { isActive?: boolean }) {
   };
 
   return (
-    <SafeAreaView style={s.container}>
+    <View style={s.container}>
 
       {/* ── Sheet: menu floats on top, list scrolls underneath ── */}
       <View style={s.sheet}>
@@ -940,7 +940,7 @@ export default function DashboardScreen({ isActive }: { isActive?: boolean }) {
         </View>
       </BottomSheet>
 
-    </SafeAreaView>
+    </View>
   );
 }
 

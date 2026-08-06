@@ -1,9 +1,10 @@
 import {
-  View, Text, StyleSheet, ScrollView, SafeAreaView,
+  View, Text, StyleSheet, ScrollView,
   ActivityIndicator, TouchableOpacity, RefreshControl, TextInput, Modal, Animated,
 } from 'react-native';
 import TopHeader from '@/components/ui/TopHeader';
 import { useState, useMemo, useEffect } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useUser } from '../../src/hooks/useUser';
@@ -13,7 +14,9 @@ import { useNav } from '../../src/lib/NavContext';
 import AddExpenseScreen from './add-expense';
 import { SYSTEM_CATEGORIES, CatIcon, catIconKeyForName } from '../../src/lib/systemCategories';
 import { SvgXml } from 'react-native-svg';
+import NavIcon from '@/components/ui/NavIcons';
 
+const SVG_BACK   = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12"><path fill="currentColor" d="M10.5 6a.75.75 0 0 0-.75-.75H3.81l1.97-1.97a.75.75 0 0 0-1.06-1.06L1.47 5.47a.75.75 0 0 0 0 1.06l3.25 3.25a.75.75 0 0 0 1.06-1.06L3.81 6.75h5.94A.75.75 0 0 0 10.5 6" /></svg>`;
 const SVG_ADD    = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="currentColor" d="M12 4.75c.69 0 1.25.56 1.25 1.25v4.75H18a1.25 1.25 0 1 1 0 2.5h-4.75V18a1.25 1.25 0 1 1-2.5 0v-4.75H6a1.25 1.25 0 1 1 0-2.5h4.75V6c0-.69.56-1.25 1.25-1.25" /></svg>`;
 const SVG_EDIT   = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="currentColor" d="M12.85 6.91L2.71 17.045l-.7 4.075a.74.74 0 0 0 .21.655c.14.14.335.22.53.22c.04 0 .085 0 .125-.01l4.075-.7l10.14-10.14l-4.24-4.24zm8.27-4.03A3 3 0 0 0 19 2c-.8 0-1.555.31-2.12.88l-2.97 2.97l4.24 4.24l2.97-2.97C21.685 6.555 22 5.8 22 5s-.31-1.555-.88-2.12"/></svg>`;
 const SVG_FOLDER = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="currentColor" d="M4 20q-.825 0-1.412-.587T2 18V6q0-.825.588-1.412T4 4h6l2 2h8q.825 0 1.413.588T22 8H4v10l2.4-8h17.1l-2.575 8.575q-.2.65-.737 1.038T19 20z"/></svg>`;
@@ -41,7 +44,8 @@ interface Props {
 
 export default function RecordingsPanel({ onClose, categoryId, categoryName, spaceId: propSpaceId, spaceName }: Props) {
   const { userId, defaultCurrency } = useUser();
-  const { openRecording } = useNav();
+  const insets = useSafeAreaInsets();
+  const { openRecording, switchTab, toggleNotifDropdown } = useNav();
   const router = useRouter();
   const handleBack = () => {
     if (router.canGoBack()) router.back();
@@ -168,12 +172,23 @@ export default function RecordingsPanel({ onClose, categoryId, categoryName, spa
   };
 
   return (
-    <SafeAreaView style={s.root}>
-      <TopHeader title="Transactions" onBack={handleBack} centered />
+    <View style={s.root}>
+      <TopHeader
+        title="Transactions"
+        onBack={handleBack}
+        centered
+        variant="blue"
+        topInset={insets.top}
+        right={
+          <TouchableOpacity onPress={toggleNotifDropdown} activeOpacity={0.7}>
+            <NavIcon name="notifications" size={22} color="#ffffff" />
+          </TouchableOpacity>
+        }
+      />
 
       {/* ── Frozen controls ── */}
       <View style={s.frozen}>
-        {/* Row 1: segment toggle + action buttons */}
+        {/* segment toggle + action buttons */}
         <View style={s.pillRow}>
           <View style={s.segmentOuter}>
             <TouchableOpacity style={[s.segmentInner, viewMode === 'date' && s.segmentInnerActive]} onPress={() => setViewMode('date')} activeOpacity={0.8}>
@@ -184,7 +199,7 @@ export default function RecordingsPanel({ onClose, categoryId, categoryName, spa
             </TouchableOpacity>
           </View>
           <View style={{ flexDirection: 'row', gap: 8, marginLeft: 'auto', alignItems: 'center' }}>
-            <TouchableOpacity onPress={() => setShowTypeChoice(true)} activeOpacity={0.7} style={{ width: DC.circleBtn.active.width, height: DC.circleBtn.active.height, borderRadius: DC.circleBtn.active.borderRadius, backgroundColor: '#373737', alignItems: 'center', justifyContent: 'center' }}>
+            <TouchableOpacity onPress={() => setShowTypeChoice(true)} activeOpacity={0.7} style={{ width: DC.circleBtn.active.width, height: DC.circleBtn.active.height, borderRadius: DC.circleBtn.active.borderRadius, backgroundColor: DC.headerBlueBg, alignItems: 'center', justifyContent: 'center' }}>
               <SvgXml xml={SVG_ADD} width={22} height={22} color={DC.btnText} />
             </TouchableOpacity>
           </View>
@@ -192,20 +207,23 @@ export default function RecordingsPanel({ onClose, categoryId, categoryName, spa
 
         {/* Row 2: filter button + action buttons */}
         <View style={s.filterRow}>
-          <TouchableOpacity style={[DC.button.base, showFilterDropdown && DC.button.active]} onPress={() => setShowFilterDropdown(v => !v)} activeOpacity={0.8}>
-            <Text style={showFilterDropdown ? DC.button.textActive : DC.button.textInactive}>
-              {filterOption === 'all' ? 'Filters' : FILTER_LABELS[filterOption]}
-            </Text>
-          </TouchableOpacity>
-          {showFilterDropdown && (
-            <View style={s.dropdownList}>
-              {Object.keys(FILTER_TYPE_MAP).map(key => (
-                <TouchableOpacity key={key} style={[s.dropdownItem, filterOption === key && s.dropdownItemActive]} onPress={() => { setFilterOption(key); setShowFilterDropdown(false); }} activeOpacity={0.7}>
-                  <Text style={[s.dropdownItemText, filterOption === key && s.dropdownItemTextActive]}>{FILTER_LABELS[key]}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
+          <View>
+            <TouchableOpacity style={[s.filterBtn, filterOption !== 'all' && s.filterBtnActive]} onPress={() => setShowFilterDropdown(v => !v)} activeOpacity={0.8}>
+              <Text style={[s.filterBtnText, filterOption !== 'all' && s.filterBtnTextActive]}>
+                {filterOption === 'all' ? 'Filters' : FILTER_LABELS[filterOption]}
+              </Text>
+              {filterOption !== 'all' && <View style={s.filterDot} />}
+            </TouchableOpacity>
+            {showFilterDropdown && (
+              <View style={s.dropdownList}>
+                {Object.keys(FILTER_TYPE_MAP).map(key => (
+                  <TouchableOpacity key={key} style={[s.dropdownItem, filterOption === key && s.dropdownItemActive]} onPress={() => { setFilterOption(key); setShowFilterDropdown(false); }} activeOpacity={0.7}>
+                    <Text style={[s.dropdownItemText, filterOption === key && s.dropdownItemTextActive]}>{FILTER_LABELS[key]}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </View>
           {selected.size > 0 && (
             <View style={{ flexDirection: 'row', gap: 8, marginLeft: 'auto' }}>
               <TouchableOpacity style={DC.circleBtn.base} activeOpacity={0.7}>
@@ -318,13 +336,13 @@ export default function RecordingsPanel({ onClose, categoryId, categoryName, spa
           spaceName={spaceName}
         />
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 
 const s = StyleSheet.create({
-  root:   { flex: 1, backgroundColor: DC.pageBg },
-  frozen: { backgroundColor: DC.pageBg, zIndex: 10 },
+  root:   { flex: 1, backgroundColor: '#fff' },
+  frozen: { backgroundColor: '#fff', zIndex: 10 },
 
   // header
   header:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: DC.pagePadding, paddingTop: 28, paddingBottom: 14 },
@@ -332,13 +350,7 @@ const s = StyleSheet.create({
   headerDivider: { height: 1, backgroundColor: DC.cardDividerColor },
 
   // segment + filters
-  pillRow:   { flexDirection: 'row', alignItems: 'center', paddingHorizontal: DC.pagePadding, paddingTop: 10, paddingBottom: 4, gap: 8 },
-  filterRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: DC.pagePadding, paddingTop: 0, paddingBottom: 10, gap: 8, position: 'relative', zIndex: 10 },
-  segmentOuter: { flexDirection: 'row', backgroundColor: DC.pageBg, borderRadius: DC.controlRadius, overflow: 'hidden', borderWidth: 0.5, borderColor: DC.controlBorder, height: DC.controlHeight },
-  segmentInner: { width: 70, borderRadius: DC.controlRadius, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
-  segmentInnerActive: { backgroundColor: DC.circleBtn.active.borderColor },
-  segmentInnerText: { ...DC.typography.sectionBody, fontSize: 10, color: DC.circleBtn.active.borderColor },
-  segmentInnerTextActive: { color: DC.btnText },
+  pillRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: DC.pagePadding, paddingTop: 12, paddingBottom: 8, gap: 8, position: 'relative', zIndex: 10 },
   segmentWrap: { ...DC.segment.wrap },
   segmentActive: { ...DC.segment.active },
   segmentBtn: DC.segment.btn,
@@ -355,39 +367,37 @@ const s = StyleSheet.create({
   dropdownItemTextActive: { ...DC.typography.sectionBody, fontFamily: 'Poppins-SemiBold' as string, color: DC.circleBtn.active.borderColor },
 
   // toolbar
-  toolbar: { height: 0 },
-
+  toolbar:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: DC.pagePadding, paddingVertical: 8 },
+  editBtn:       { width: 28, height: 28, borderRadius: 14, backgroundColor: DC.circleBtn.active.borderColor, alignItems: 'center', justifyContent: 'center' },
   addBtn:        { ...DC.circleBtn.ghostSm },
   addBtnText:    { fontFamily: 'Poppins-Bold', fontSize: 16, color: DC.pageText, lineHeight: 20 },
-  toolbarDivider: { height: DC.rowDivider.height, backgroundColor: DC.rowDivider.backgroundColor },
+  toolbarDivider: { height: 1, backgroundColor: DC.controlBorder, marginHorizontal: DC.pagePadding },
 
   // search
-  searchWrap:  { ...DC.textbox.wrap, marginHorizontal: DC.pagePadding, marginTop: 10, marginBottom: 10 },
+  searchWrap:  { ...DC.textbox.wrap, marginHorizontal: DC.pagePadding, marginTop: 8, marginBottom: 8 },
   searchInput: DC.textbox.input,
 
   // list
   empty:         { flex: 1, alignItems: 'center', justifyContent: 'center' },
   emptyText:     { ...DC.typography.muted },
   scroll:        { paddingHorizontal: DC.pagePadding, paddingTop: 8, paddingBottom: 80 },
-  sectionHeader: { ...DC.typography.sectionHeader, paddingVertical: 10, color: '#111111' },
+  sectionHeader: { ...DC.typography.sectionHeader, paddingVertical: 10 },
 
-  row:              { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 18, borderBottomWidth: DC.rowDivider.height, borderBottomColor: DC.rowDivider.backgroundColor },
+  row:              { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, ...DC.sectionDivider },
   rowLast:          { borderBottomWidth: 0 },
   checkbox:         { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: DC.controlBorder },
   checkboxSelected: { width: 22, height: 22, borderRadius: 11, backgroundColor: DC.circleBtn.active.backgroundColor, borderColor: DC.circleBtn.active.borderColor },
-  iconWrap:     { width: 26, height: 26, alignItems: 'center', justifyContent: 'center' },
-  rowName:      { ...DC.typography.subContent, color: '#111111' },
-  rowSub:       { ...DC.typography.subContent, fontStyle: 'italic', color: '#111111' },
-  rowMeta:      { ...DC.typography.subContent, color: '#111111' },
-  rowMetaBold:  { ...DC.typography.subContent, fontFamily: 'Poppins-SemiBold' as string, color: '#111111' },
-  rowMetaReg:   { ...DC.typography.subContent, color: '#111111' },
-  rowAmount:    { ...DC.typography.sectionBody, fontFamily: 'Poppins-SemiBold' as string, flexShrink: 0, textAlign: 'right', marginLeft: 'auto', color: '#111111' },
+  rowBody:      { flex: 1, gap: 1 },
+  rowName:      { fontFamily: 'Poppins-Regular', fontSize: 11, color: '#373737' },
+  rowSub:       { fontFamily: 'Poppins-Regular', fontSize: 11, color: '#373737' },
+  rowMeta:      { fontFamily: 'Poppins-Regular', fontSize: 11, color: '#373737' },
+  rowAmount:    { fontFamily: 'Poppins-Regular', fontSize: 11, color: '#373737', flexShrink: 0 },
 
   // modal
   choiceOverlay:  { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32 },
-  choiceCard:     { backgroundColor: DC.pageBg, borderRadius: DC.cardRadius, borderWidth: DC.cardBorderWidth, borderColor: DC.controlBorder, padding: DC.modalPadding, width: '100%', maxWidth: 320 },
-  choiceTitle:    { ...DC.typography.pageTitle },
+  choiceCard:     { backgroundColor: '#fff', borderRadius: 20, borderWidth: 1, borderColor: DC.controlBorder, padding: 20, width: '100%', maxWidth: 320 },
+  choiceTitle:    { ...DC.typography.pageTitle, marginBottom: 16 },
   choiceGrid:     { flexDirection: 'row', gap: 10 },
-  choicePill:     { flex: 1, backgroundColor: DC.btnBg, borderRadius: DC.controlRadius, paddingVertical: 10, alignItems: 'center' },
+  choicePill:     { flex: 1, backgroundColor: '#3a3a34', borderRadius: 999, paddingVertical: 10, alignItems: 'center' },
   choicePillText: { ...DC.typography.sectionBody, color: '#fff' },
 });

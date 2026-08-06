@@ -42,13 +42,15 @@ export default function ReceiptDetailScreen() {
   const [linkRecordings, setLinkRecordings] = useState<any[]>([]);
   const [linkSearch, setLinkSearch] = useState('');
 
+  const [uploading, setUploading] = useState(false);
+
   useEffect(() => {
     load();
   }, []);
 
   useFocusEffect(useCallback(() => {
-    load();
-  }, [receiptId]));
+    if (!uploading) load();
+  }, [receiptId, uploading]));
 
   const load = async () => {
     const { data: e } = await supabase.from('receipt_entries').select('*').eq('id', receiptId).single();
@@ -112,6 +114,7 @@ export default function ReceiptDetailScreen() {
     if (status !== 'granted') { Alert.alert('Permission needed', 'Photo library access required.'); return; }
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsMultipleSelection: true, quality: 1 });
     if (!result.canceled) {
+      setUploading(true);
       try {
         for (const asset of result.assets) {
           const compressed = await compressImage(asset.uri);
@@ -122,6 +125,8 @@ export default function ReceiptDetailScreen() {
         if (e?.message === 'RECEIPT_LIMIT_REACHED') {
           Alert.alert('monthly limit reached', 'you\'ve used all 10 free receipt photo uploads this month. resets on the 1st.');
         }
+      } finally {
+        setUploading(false);
       }
     }
   };
@@ -131,6 +136,7 @@ export default function ReceiptDetailScreen() {
     if (status !== 'granted') { Alert.alert('Permission needed', 'Camera access required.'); return; }
     const result = await ImagePicker.launchCameraAsync({ quality: 1 });
     if (!result.canceled && result.assets[0]) {
+      setUploading(true);
       try {
         const compressed = await compressImage(result.assets[0].uri);
         const uploaded = await uploadReceiptPhoto(compressed, receiptId);
@@ -139,6 +145,8 @@ export default function ReceiptDetailScreen() {
         if (e?.message === 'RECEIPT_LIMIT_REACHED') {
           Alert.alert('monthly limit reached', 'you\'ve used all 10 free receipt photo uploads this month. resets on the 1st.');
         }
+      } finally {
+        setUploading(false);
       }
     }
   };

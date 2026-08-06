@@ -47,6 +47,32 @@ export const compressImage = async (uri: string): Promise<string> => {
   return r.uri;
 };
 
+/** Higher quality compression for OCR — larger size and less compression for better text recognition */
+export const compressImageForOcr = async (uri: string): Promise<string> => {
+  if (Platform.OS === 'web') {
+    return new Promise((resolve) => {
+      const img = new window.Image();
+      img.onload = () => {
+        const MAX = 1800;
+        const scale = img.width > MAX ? MAX / img.width : 1;
+        const canvas = document.createElement('canvas');
+        canvas.width  = Math.round(img.width  * scale);
+        canvas.height = Math.round(img.height * scale);
+        canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', 0.92));
+      };
+      img.onerror = () => resolve(uri);
+      img.src = uri;
+    });
+  }
+  const r = await ImageManipulator.manipulateAsync(
+    uri,
+    [{ resize: { width: 1800 } }],
+    { compress: 0.92, format: ImageManipulator.SaveFormat.JPEG }
+  );
+  return r.uri;
+};
+
 // HMAC-SHA256 for AWS Signature V4
 const hmacSha256 = async (key: ArrayBuffer | string, data: string): Promise<ArrayBuffer> => {
   const keyData = typeof key === 'string'
@@ -140,7 +166,16 @@ export const uploadReceiptPhoto = async (
   const fileName = `${user.id}/${entryId}/${Date.now()}_${Math.random().toString(36).slice(2)}.jpg`;
 
   let buffer: ArrayBuffer;
-  if (typeof window !== 'undefined' && uri.startsWith('blob:')) {
+  console.log('[uploadReceiptPhoto] platform:', Platform.OS, 'uri scheme:', uri.slice(0, 30));
+  if (Platform.OS !== 'web') {
+    console.log('[uploadReceiptPhoto] native: reading file via FileSystem');
+    const b64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
+    const binary = atob(b64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    buffer = bytes.buffer;
+  } else if (uri.startsWith('blob:')) {
+    console.log('[uploadReceiptPhoto] web: reading blob URI');
     buffer = await new Promise<ArrayBuffer>((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       xhr.open('GET', uri);
@@ -149,32 +184,30 @@ export const uploadReceiptPhoto = async (
       xhr.onerror = () => reject(new Error('blob read failed'));
       xhr.send();
     });
-  } else if (typeof window !== 'undefined' && uri.startsWith('data:')) {
+  } else if (uri.startsWith('data:')) {
+    console.log('[uploadReceiptPhoto] web: reading data URI');
     const base64 = uri.split(',')[1];
     if (!base64) throw new Error('blocked: malformed data URI');
     const binary = atob(base64);
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
     buffer = bytes.buffer;
-  } else if (typeof window !== 'undefined') {
-    throw new Error('blocked: unsupported URI scheme');
   } else {
-    const b64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
-    const binary = atob(b64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    buffer = bytes.buffer;
+    console.log('[uploadReceiptPhoto] ERROR: unsupported URI scheme');
+    throw new Error('blocked: unsupported URI scheme');
   }
+  console.log('[uploadReceiptPhoto] buffer size:', buffer.byteLength);
 
-  // Web: use Supabase Storage (avoids CORS issues with R2 direct upload)
-  // Native: use R2
   let publicUrl: string;
   if (Platform.OS === 'web') {
+    console.log('[uploadReceiptPhoto] web: uploading to Supabase storage');
     publicUrl = await uploadToSupabase(fileName, buffer);
   } else {
+    console.log('[uploadReceiptPhoto] native: uploading to R2, url:', `${R2_ENDPOINT}/${R2_BUCKET}/${fileName}`.slice(0, 60));
     if (!isSafeUrl(`${R2_ENDPOINT}/${R2_BUCKET}/${fileName}`)) throw new Error('blocked: untrusted URL');
     publicUrl = await uploadToR2(fileName, buffer);
   }
+  console.log('[uploadReceiptPhoto] publicUrl:', publicUrl?.slice(0, 60), 'safe:', isSafeUrl(publicUrl));
 
   if (!publicUrl || !isSafeUrl(publicUrl)) throw new Error('blocked: untrusted public URL');
 

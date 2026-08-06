@@ -12,7 +12,6 @@ export default function AppLayout() {
       <Stack.Screen name="(tabs)" options={{ animation: 'none' }} />
       <Stack.Screen name="space-detail" options={{ animation: 'none', presentation: 'transparentModal' }} />
       <Stack.Screen name="add-recording" options={{ animation: 'none', presentation: 'transparentModal', contentStyle: { backgroundColor: 'transparent' } }} />
-      <Stack.Screen name="split-bill" options={{ animation: 'none', presentation: 'transparentModal' }} />
       <Stack.Screen name="recording-detail" options={{ animation: 'none', presentation: 'transparentModal' }} />
       <Stack.Screen name="split-bill-detail" options={{ animation: 'none', presentation: 'transparentModal' }} />
       <Stack.Screen name="account-detail" options={{ animation: 'none', presentation: 'transparentModal' }} />
