@@ -1,9 +1,6 @@
 /**
  * receiptParser.ts
- * ─────────────────────────────────────────────────────────────────────────────
- * Uses Tesseract.js (web) to OCR a receipt image, then applies smart
- * post-processing to extract only line items — filtering out headers,
- * totals, taxes, and other non-item lines.
+ * Uses Tesseract.js (web) to OCR a receipt image, then extracts line items.
  */
 
 export interface ParsedItem {
@@ -26,18 +23,13 @@ function escapeHtml(str: string): string {
     .replace(/'/g, '&#039;');
 }
 
-// ── Keywords that indicate a non-item line ────────────────────────────────────
 const SKIP_KEYWORDS = [
-  // totals / summaries
   'total', 'subtotal', 'sub-total', 'sub total', 'grand total',
   'amount due', 'amount paid', 'balance due', 'balance',
-  // taxes / fees
   'vat', 'tax', 'service charge', 'service fee', 'surcharge',
   'tip', 'gratuity', 'delivery fee', 'delivery charge',
-  // payments
   'cash', 'change', 'credit card', 'debit card', 'gcash', 'maya',
   'payment', 'paid', 'tendered',
-  // receipt metadata
   'receipt', 'invoice', 'order', 'table', 'server', 'cashier',
   'thank you', 'thanks', 'welcome', 'please', 'come again',
   'address', 'tel', 'phone', 'fax', 'email', 'www', 'http',
@@ -47,22 +39,17 @@ const SKIP_KEYWORDS = [
   'discount', 'promo', 'less',
 ];
 
-// ── Price pattern: number with optional decimal, possibly preceded by currency ─
-// Matches: 149.00  1,234.50  19,00 (EU)  ₱149  P149  $12.50  $ 19,00  etc.
-const PRICE_PATTERN = /(?:₱|P|PHP|USD|\$)?\s*(\d{1,6}(?:[,\.]\d{2,3})*(?:[,\.]\d{2})?)\s*$/;
-const PRICE_ANYWHERE = /(?:₱|P|PHP|USD|\$)?\s*(\d{1,6}(?:[,\.]\d{2,3})*(?:\.\d{2})?)/g;
-
-// ── Total line detector ───────────────────────────────────────────────────────
 const TOTAL_KEYWORDS = ['total', 'amount due', 'grand total', 'balance due'];
 
+// Matches prices like: 19,00  19.00  $19.00  $ 19,00  ₱149  1,234.50
+const PRICE_PATTERN = /(?:₱|P|PHP|USD|\$)?\s*(\d{1,6}(?:[,.]\d{2,3})*(?:[,.]\d{2})?)\s*$/;
+
 function cleanPrice(raw: string): number {
-  // Remove currency symbols and leading/trailing spaces
   let s = raw.replace(/[₱P$\s]/g, '').replace('PHP', '').replace('USD', '');
-  // Handle European comma-decimal format: if ends with ,XX (2 digits) treat comma as decimal
+  // European comma-decimal: ends with ,XX
   if (/,\d{2}$/.test(s)) {
     s = s.replace(/\./g, '').replace(',', '.');
   } else {
-    // Standard: remove commas as thousand separators
     s = s.replace(/,/g, '');
   }
   return parseFloat(s);
@@ -70,15 +57,11 @@ function cleanPrice(raw: string): number {
 
 function isSkipLine(line: string): boolean {
   const lower = line.toLowerCase().trim();
-  // Empty or too short
   if (lower.length < 2) return true;
-  // Pure number lines (e.g. table numbers, order numbers)
   if (/^\d+$/.test(lower.trim())) return true;
-  // Contains skip keyword at start or as whole line
-  return SKIP_KEYWORDS.some(kw => {
-    // Match if line starts with keyword or keyword is the whole line
-    return lower.startsWith(kw) || lower === kw || new RegExp(`^${kw}[\\s:.]`).test(lower);
-  });
+  return SKIP_KEYWORDS.some(kw =>
+    lower.startsWith(kw) || lower === kw || new RegExp(`^${kw}[\\s:.]`).test(lower)
+  );
 }
 
 function isTotalLine(line: string): boolean {
@@ -95,44 +78,27 @@ function extractPrice(line: string): number | null {
 }
 
 function extractItemName(line: string, price: number): string {
-  // Remove trailing price pattern including currency symbol with optional space
   let name = line
-    .replace(/(?:₱|P|PHP|USD|\$)?\s*[\d,]+[,\.]?\d*\s*$/, '')
+    .replace(/(?:₱|P|PHP|USD|\$)?\s*[\d,]+[,.]?\d*\s*$/, '')
     .replace(/\s{2,}/g, ' ')
     .trim();
-
-  // Remove leading quantity patterns like "1x", "2x", "2 x", "x2"
   name = name.replace(/^\d+\s*[xX]\s*/, '').replace(/^[xX]\s*\d+\s*/, '').trim();
-
-  // Remove trailing dots/dashes used as price leaders
-  name = name.replace(/[\.\-_]+\s*$/, '').trim();
-
+  name = name.replace(/[.\-_]+\s*$/, '').trim();
   return name;
 }
 
 function scoreItemLine(line: string): boolean {
   const trimmed = line.trim();
   if (trimmed.length < 2) return false;
-
-  // Must have a price at the end
   const price = extractPrice(trimmed);
   if (!price) return false;
-
-  // Must not be a skip line
   if (isSkipLine(trimmed)) return false;
-
-  // Name part (after removing price) must be at least 2 chars
   const name = extractItemName(trimmed, price);
   if (name.length < 2) return false;
-
-  // Price should be reasonable for a single item (not suspiciously large)
-  // Totals tend to be larger — but we can't rely on this alone
   if (price > 50000) return false;
-
   return true;
 }
 
-// ── Main parser ───────────────────────────────────────────────────────────────
 export function parseReceiptText(rawText: string): ParsedReceipt {
   const lines = rawText
     .split('\n')
@@ -143,18 +109,14 @@ export function parseReceiptText(rawText: string): ParsedReceipt {
   let detectedTotal: number | null = null;
 
   for (const line of lines) {
-    // Check for total line first
     if (isTotalLine(line)) {
       const price = extractPrice(line);
       if (price && !detectedTotal) detectedTotal = price;
       continue;
     }
-
     if (!scoreItemLine(line)) continue;
-
     const price = extractPrice(line)!;
-    const name  = extractItemName(line, price);
-
+    const name = extractItemName(line, price);
     if (name.length >= 2) {
       items.push({ name: escapeHtml(name), price });
     }
@@ -163,20 +125,54 @@ export function parseReceiptText(rawText: string): ParsedReceipt {
   return { items, detectedTotal, rawText: escapeHtml(rawText) };
 }
 
+// ── Image preprocessing for better OCR ──────────────────────────────────────
+async function preprocessForOcr(imageUri: string): Promise<string> {
+  if (typeof document === 'undefined') return imageUri;
+  return new Promise((resolve) => {
+    const img = new window.Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      // Scale up for better OCR
+      const scale = Math.max(1, 1600 / img.width);
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      const ctx = canvas.getContext('2d')!;
+      // White background
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      // Get pixel data and apply grayscale + contrast boost
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imageData.data;
+      const contrast = 1.8;
+      const intercept = 128 * (1 - contrast);
+      for (let i = 0; i < data.length; i += 4) {
+        // Grayscale
+        const gray = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
+        // Contrast
+        const val = Math.min(255, Math.max(0, contrast * gray + intercept));
+        data[i] = data[i+1] = data[i+2] = val;
+      }
+      ctx.putImageData(imageData, 0, 0);
+      resolve(canvas.toDataURL('image/png'));
+    };
+    img.onerror = () => resolve(imageUri);
+    img.src = imageUri;
+  });
+}
+
 // ── OCR runner (web only via Tesseract.js) ────────────────────────────────────
 export async function ocrReceiptImage(imageUri: string): Promise<ParsedReceipt> {
   if (typeof window === 'undefined') {
     return { items: [], detectedTotal: null, rawText: '' };
   }
 
-  console.log('[OCR] starting, uri scheme:', imageUri.slice(0, 30));
+  console.log('[OCR] uri length:', imageUri.length, 'scheme:', imageUri.slice(0, 25));
 
   const Tesseract = await import('tesseract.js');
 
-  // If blob URI, convert to base64 first so Tesseract can read it
   let processUri = imageUri;
   if (imageUri.startsWith('blob:')) {
-    console.log('[OCR] converting blob to base64');
     processUri = await new Promise<string>((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       xhr.open('GET', imageUri);
@@ -190,13 +186,14 @@ export async function ocrReceiptImage(imageUri: string): Promise<ParsedReceipt> 
       xhr.onerror = reject;
       xhr.send();
     });
-    console.log('[OCR] converted, base64 length:', processUri.length);
+    console.log('[OCR] after blob convert, length:', processUri.length);
   }
 
-  const result = await Tesseract.recognize(processUri, 'eng', {
-    logger: () => {},
-  });
+  // Preprocess: grayscale + contrast boost for better OCR accuracy
+  const preprocessed = await preprocessForOcr(processUri);
+  console.log('[OCR] preprocessed length:', preprocessed.length);
 
+  const result = await Tesseract.recognize(preprocessed, 'eng', { logger: () => {} });
   const rawText = result.data.text;
   console.log('[OCR] raw text:', JSON.stringify(rawText));
   const parsed = parseReceiptText(rawText);

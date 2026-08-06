@@ -291,7 +291,8 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
   const [allRecordings, setAllRecordings] = useState<any[]>([]);
   // ── New unified Add Item modal state ──────────────────────────────────
   const [newItemModal, setNewItemModal] = useState(false);
-  const [newItemStep, setNewItemStep] = useState<'choice' | 'form' | 'pick-recording' | 'scan-review' | 'scanning'>('choice');
+  const [newItemStep, setNewItemStep] = useState<'choice' | 'form' | 'pick-recording' | 'scan-review' | 'scanning' | 'ocr-text'>('choice');
+  const [newItemOcrText, setNewItemOcrText] = useState('');
   const [newItemFromRecording, setNewItemFromRecording] = useState<any>(null); // null = manual
   const [newItemName, setNewItemName] = useState('');
   const [newItemAmount, setNewItemAmount] = useState('');
@@ -332,6 +333,7 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
     setNewItemRecShowMore(false);
     setNewItemScanItems([]);
     setNewItemScanError('');
+    setNewItemOcrText('');
     setAssignItem(null);
     setNewItemModal(true);
   };
@@ -341,24 +343,27 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
     if (source === 'camera') {
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       if (status !== 'granted') return;
-      const result = await ImagePicker.launchCameraAsync({ quality: 1 });
+      const result = await ImagePicker.launchCameraAsync({ quality: 1, base64: true });
       if (result.canceled || !result.assets[0]) return;
-      uri = result.assets[0].uri;
+      uri = result.assets[0].base64
+        ? `data:image/jpeg;base64,${result.assets[0].base64}`
+        : result.assets[0].uri;
     } else {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') return;
-      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 });
+      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1, base64: true });
       if (result.canceled || !result.assets[0]) return;
-      uri = result.assets[0].uri;
+      uri = result.assets[0].base64
+        ? `data:image/jpeg;base64,${result.assets[0].base64}`
+        : result.assets[0].uri;
     }
     if (!uri) return;
     setNewItemScanLoading(true);
     setNewItemScanError('');
     setNewItemStep('scanning');
     try {
-      // Use higher quality compression for OCR — larger size = better text recognition
-      const compressed = await compressImageForOcr(uri);
-      // Upload to receipt section
+      // Upload compressed version to receipt section
+      const compressed = await compressImage(uri);
       let entryId = linkedReceipt?.id;
       if (!entryId) {
         const { data: entry } = await supabase.from('receipt_entries').insert({ user_id: userId, note: String(name), split_bill_id: splitBillId }).select().maybeSingle();
@@ -368,19 +373,16 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
         await uploadReceiptPhoto(compressed, entryId);
         loadLinkedReceipt();
       }
-      // OCR
-      const parsed = await ocrReceiptImage(compressed);
-      if (parsed.items.length === 0) {
-        setNewItemScanError('no items detected — try a clearer photo or add manually');
-        setNewItemStep('choice');
-      } else {
-        setNewItemScanItems(parsed.items.map(i => ({ name: i.name, cost: String(i.price) })));
-        setNewItemStep('scan-review');
-      }
-    } catch {
-      setNewItemScanError('failed to read receipt — try again or add manually');
-      setNewItemStep('choice');
-    } finally {
+      // OCR on original URI — do NOT compress before OCR
+      const parsed = await ocrReceiptImage(uri);
+      const rawText = parsed.rawText
+        .replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#039;/g,"'");
+      setNewItemOcrText(rawText || '(no text detected)');
+      setNewItemStep('ocr-text');
+    } catch (e: any) {
+      console.error('[SCAN] error:', e);
+      setNewItemOcrText('(error: ' + String(e?.message ?? e) + ')');
+      setNewItemStep('ocr-text');
       setNewItemScanLoading(false);
     }
   };
@@ -2320,6 +2322,48 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
                   <ActivityIndicator size="large" color={DC.headerBlueBg} />
                   <Text style={{ fontFamily: 'Poppins-SemiBold', fontSize: 14, color: DC.pageText, textAlign: 'center' }}>Reading receipt...</Text>
                   <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 11, color: DC.pageTextMuted, textAlign: 'center' }}>detecting items and prices</Text>
+                </View>
+              )}
+
+              {/* ── OCR Text step ── */}
+              {newItemStep === 'ocr-text' && (
+                <View style={{ flex: 1 }}>
+                  <View style={{ paddingHorizontal: DC.pagePadding, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: DC.cardDividerColor }}>
+                    <Text style={{ ...DC.typography.sectionHeader }}>OCR Output</Text>
+                    <Text style={{ ...DC.typography.subContent, color: DC.pageTextMuted, marginTop: 2 }}>edit the text below if needed, then tap Parse</Text>
+                  </View>
+                  <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: DC.pagePadding }}>
+                    <TextInput
+                      style={{ fontFamily: 'Poppins-Regular', fontSize: 13, color: DC.pageText, borderWidth: 1, borderColor: DC.controlBorder, borderRadius: 10, padding: 12, minHeight: 200, textAlignVertical: 'top' }}
+                      multiline
+                      value={newItemOcrText}
+                      onChangeText={setNewItemOcrText}
+                      autoCorrect={false}
+                      spellCheck={false}
+                    />
+                  </ScrollView>
+                  <View style={{ paddingHorizontal: DC.pagePadding, paddingVertical: 12, borderTopWidth: 1, borderTopColor: DC.cardDividerColor, gap: 8 }}>
+                    <TouchableOpacity
+                      style={[s.doneBtn, { marginTop: 0, opacity: !newItemOcrText.trim() ? 0.4 : 1 }]}
+                      disabled={!newItemOcrText.trim()}
+                      onPress={() => {
+                        const { parseReceiptText } = require('../../src/lib/receiptParser');
+                        const parsed = parseReceiptText(newItemOcrText);
+                        if (parsed.items.length === 0) {
+                          setNewItemScanError('no items found in text — try editing the text above');
+                          setNewItemStep('ocr-text');
+                        } else {
+                          setNewItemScanItems(parsed.items.map((i: any) => ({ name: i.name, cost: String(i.price) })));
+                          setNewItemStep('scan-review');
+                        }
+                      }}
+                    >
+                      <Text style={s.doneBtnText}>Parse Items</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[s.doneBtn, { backgroundColor: Colors.surface, marginTop: 0 }]} onPress={() => setNewItemStep('choice')}>
+                      <Text style={[s.doneBtnText, { color: Colors.muted }]}>back</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               )}
 
