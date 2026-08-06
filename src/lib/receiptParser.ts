@@ -23,50 +23,46 @@ function escapeHtml(str: string): string {
     .replace(/'/g, '&#039;');
 }
 
+// Keywords that mean the line has no useful price (no amount to show)
 const SKIP_KEYWORDS = [
-  'total', 'subtotal', 'sub-total', 'sub total', 'grand total',
-  'amount due', 'amount paid', 'balance due', 'balance',
-  'vat', 'tax', 'service charge', 'service fee', 'surcharge',
-  'tip', 'gratuity', 'delivery fee', 'delivery charge',
-  'cash', 'change', 'credit card', 'debit card', 'gcash', 'maya',
-  'payment', 'paid', 'tendered',
-  'receipt', 'invoice', 'order', 'table', 'server', 'cashier',
-  'thank you', 'thanks', 'welcome', 'please', 'come again',
+  'receipt', 'invoice', 'thank you', 'thanks', 'welcome', 'please', 'come again',
   'address', 'tel', 'phone', 'fax', 'email', 'www', 'http',
   'tin', 'bir', 'vat reg', 'non-vat', 'pwdsc', 'senior',
   'date', 'time', 'transaction', 'ref', 'or no', 'official receipt',
   'qty', 'quantity', 'unit price', 'unit', 'description', 'item',
-  'discount', 'promo', 'less',
 ];
 
-const TOTAL_KEYWORDS = ['total', 'amount due', 'grand total', 'balance due'];
+// Summary lines — always include with their price (Total, Cash, Change, etc.)
+const SUMMARY_KEYWORDS = ['total', 'cash', 'change', 'subtotal', 'sub-total', 'amount due', 'grand total', 'balance due'];
 
-// Matches prices like: 19,00  19.00  $19.00  $ 19,00  ₱149  1,234.50
-const PRICE_PATTERN = /(?:₱|P|PHP|USD|\$)?\s*(\d{1,6}(?:[,.]\d{2,3})*(?:[,.]\d{2})?)\s*$/;
+// Matches a price at end of line.
+// Allows leading OCR artifacts: "$ $9.00" or "S$ 400,00"
+// Captures the raw token which may contain $ or S as misread digits.
+const PRICE_PATTERN = /(?:[\u20b1PSUSD$]+\s*)?(\$?[\d][\d$S,.]*)\s*$/;
+
+/** Fix OCR digit misreads: $ -> 5 always, S -> 5 only after a digit/dot */
+function fixOcrDigits(s: string): string {
+  let out = '';
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (c === '$') { out += '5'; }
+    else if (c === 'S' && i > 0 && /[\d.]/.test(s[i - 1])) { out += '5'; }
+    else if (c === 'O') { out += '0'; }
+    else { out += c; }
+  }
+  return out;
+}
 
 function cleanPrice(raw: string): number {
-  let s = raw.replace(/[₱P$\s]/g, '').replace('PHP', '').replace('USD', '');
-  // European comma-decimal: ends with ,XX
-  if (/,\d{2}$/.test(s)) {
-    s = s.replace(/\./g, '').replace(',', '.');
+  let s = fixOcrDigits(raw).replace(/[^\d,.]/g, '');
+  if (!s) return NaN;
+  // European comma-decimal: ends with ,XX with no dot
+  if (/,\d{2}$/.test(s) && !s.includes('.')) {
+    s = s.replace(/,/g, '.');
   } else {
     s = s.replace(/,/g, '');
   }
   return parseFloat(s);
-}
-
-function isSkipLine(line: string): boolean {
-  const lower = line.toLowerCase().trim();
-  if (lower.length < 2) return true;
-  if (/^\d+$/.test(lower.trim())) return true;
-  return SKIP_KEYWORDS.some(kw =>
-    lower.startsWith(kw) || lower === kw || new RegExp(`^${kw}[\\s:.]`).test(lower)
-  );
-}
-
-function isTotalLine(line: string): boolean {
-  const lower = line.toLowerCase().trim();
-  return TOTAL_KEYWORDS.some(kw => lower.includes(kw));
 }
 
 function extractPrice(line: string): number | null {
@@ -77,25 +73,36 @@ function extractPrice(line: string): number | null {
   return price;
 }
 
-function extractItemName(line: string, price: number): string {
+function extractItemName(line: string): string {
   let name = line
-    .replace(/(?:₱|P|PHP|USD|\$)?\s*[\d,]+[,.]?\d*\s*$/, '')
+    .replace(/(?:[\u20b1PSUSD$]+\s*)?\$?[\d][\d$S,.]*\s*$/, '')
     .replace(/\s{2,}/g, ' ')
     .trim();
-  name = name.replace(/^\d+\s*[xX]\s*/, '').replace(/^[xX]\s*\d+\s*/, '').trim();
+  // Strip quantity prefix: 1x, 2x, tx/lx/Ix (OCR misreads of 1x)
+  name = name.replace(/^[\d1lItT]+\s*[xX]\s*/i, '').replace(/^[xX]\s*[\d]+\s*/, '').trim();
   name = name.replace(/[.\-_]+\s*$/, '').trim();
   return name;
 }
 
-function scoreItemLine(line: string): boolean {
+function isSummaryLine(line: string): boolean {
+  const lower = line.toLowerCase().trim();
+  return SUMMARY_KEYWORDS.some(kw => lower.startsWith(kw) || lower === kw);
+}
+
+function isValidItemLine(line: string): boolean {
   const trimmed = line.trim();
   if (trimmed.length < 2) return false;
+  // Must have a price
   const price = extractPrice(trimmed);
-  if (!price) return false;
-  if (isSkipLine(trimmed)) return false;
-  const name = extractItemName(trimmed, price);
+  if (!price || price > 50000) return false;
+  // Must have at least one lowercase letter — filters ALL-CAPS noise/barcodes
+  if (!/[a-z]/.test(trimmed)) return false;
+  // Skip lines that are purely header/footer keywords with no price meaning
+  const lower = trimmed.toLowerCase();
+  if (SKIP_KEYWORDS.some(kw => lower.startsWith(kw) || lower === kw)) return false;
+  // Name must be non-trivial after stripping price
+  const name = extractItemName(trimmed);
   if (name.length < 2) return false;
-  if (price > 50000) return false;
   return true;
 }
 
@@ -109,31 +116,33 @@ export function parseReceiptText(rawText: string): ParsedReceipt {
   let detectedTotal: number | null = null;
 
   for (const line of lines) {
-    if (isTotalLine(line)) {
+    if (isSummaryLine(line)) {
       const price = extractPrice(line);
-      if (price && !detectedTotal) detectedTotal = price;
+      if (price) {
+        if (!detectedTotal && line.toLowerCase().includes('total')) detectedTotal = price;
+        const name = extractItemName(line) || line.split(/\s+/)[0];
+        if (name.length >= 2) items.push({ name: escapeHtml(name), price });
+      }
       continue;
     }
-    if (!scoreItemLine(line)) continue;
+    if (!isValidItemLine(line)) continue;
     const price = extractPrice(line)!;
-    const name = extractItemName(line, price);
-    if (name.length >= 2) {
-      items.push({ name: escapeHtml(name), price });
-    }
+    const name = extractItemName(line);
+    if (name.length >= 2) items.push({ name: escapeHtml(name), price });
   }
 
   return { items, detectedTotal, rawText: escapeHtml(rawText) };
 }
 
 // ── Image preprocessing for better OCR ──────────────────────────────────────
-async function preprocessForOcr(imageUri: string): Promise<string> {
+async function preprocessForOcr(imageUri: string): Promise<HTMLCanvasElement | string> {
   if (typeof document === 'undefined') return imageUri;
   return new Promise((resolve) => {
     const img = new window.Image();
     img.onload = () => {
       const canvas = document.createElement('canvas');
-      // Scale up for better OCR
-      const scale = Math.max(1, 1600 / img.width);
+      // Scale to at least 2000px wide for better OCR accuracy
+      const scale = Math.max(1, 2000 / img.width);
       canvas.width = Math.round(img.width * scale);
       canvas.height = Math.round(img.height * scale);
       const ctx = canvas.getContext('2d')!;
@@ -141,20 +150,27 @@ async function preprocessForOcr(imageUri: string): Promise<string> {
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      // Get pixel data and apply grayscale + contrast boost
+      // Grayscale + adaptive threshold (binarize) for crisp text
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const data = imageData.data;
-      const contrast = 1.8;
-      const intercept = 128 * (1 - contrast);
+      // Step 1: convert to grayscale
       for (let i = 0; i < data.length; i += 4) {
-        // Grayscale
         const gray = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
-        // Contrast
-        const val = Math.min(255, Math.max(0, contrast * gray + intercept));
+        data[i] = data[i+1] = data[i+2] = gray;
+      }
+      // Step 2: compute mean brightness for simple threshold
+      let sum = 0;
+      const pixels = data.length / 4;
+      for (let i = 0; i < data.length; i += 4) sum += data[i];
+      const mean = sum / pixels;
+      const threshold = mean * 0.85; // slightly below mean to keep light text
+      // Step 3: binarize
+      for (let i = 0; i < data.length; i += 4) {
+        const val = data[i] < threshold ? 0 : 255;
         data[i] = data[i+1] = data[i+2] = val;
       }
       ctx.putImageData(imageData, 0, 0);
-      resolve(canvas.toDataURL('image/png'));
+      resolve(canvas);
     };
     img.onerror = () => resolve(imageUri);
     img.src = imageUri;
@@ -189,11 +205,15 @@ export async function ocrReceiptImage(imageUri: string): Promise<ParsedReceipt> 
     console.log('[OCR] after blob convert, length:', processUri.length);
   }
 
-  // Preprocess: grayscale + contrast boost for better OCR accuracy
+  // Preprocess: grayscale + binarize for crisp OCR
   const preprocessed = await preprocessForOcr(processUri);
-  console.log('[OCR] preprocessed length:', preprocessed.length);
+  console.log('[OCR] preprocessed done');
 
-  const result = await Tesseract.recognize(preprocessed, 'eng', { logger: () => {} });
+  const result = await Tesseract.recognize(preprocessed as any, 'eng', {
+    logger: () => {},
+    // PSM 6 = assume a single uniform block of text (good for receipts)
+    tessedit_pageseg_mode: '6',
+  } as any);
   const rawText = result.data.text;
   console.log('[OCR] raw text:', JSON.stringify(rawText));
   const parsed = parseReceiptText(rawText);

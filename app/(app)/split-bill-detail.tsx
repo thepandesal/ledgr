@@ -304,7 +304,7 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
   const [newItemRecShowMore, setNewItemRecShowMore] = useState(false);
   const [newItemSaving, setNewItemSaving] = useState(false);
   const [newItemScanLoading, setNewItemScanLoading] = useState(false);
-  const [newItemScanItems, setNewItemScanItems] = useState<{ name: string; cost: string }[]>([]);
+  const [newItemScanItems, setNewItemScanItems] = useState<{ name: string; cost: string; selected?: boolean }[]>([]);
   const [newItemScanError, setNewItemScanError] = useState('');
   const [newItemScanSourceModal, setNewItemScanSourceModal] = useState(false);
   // All contacts + friends merged for assign people — deduplicated case-insensitively
@@ -375,19 +375,46 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
       }
       // OCR on original URI — do NOT compress before OCR
       const parsed = await ocrReceiptImage(uri);
-      const rawText = parsed.rawText
-        .replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#039;/g,"'");
-      setNewItemOcrText(rawText || '(no text detected)');
-      setNewItemStep('ocr-text');
+      if (parsed.items.length === 0) {
+        setNewItemScanError('no items detected — try a clearer photo');
+        setNewItemStep('choice');
+      } else {
+        setNewItemScanItems(parsed.items.map((i: any) => ({ name: i.name, cost: String(i.price), selected: true })));
+        setNewItemStep('scan-review');
+      }
+      setNewItemScanLoading(false);
     } catch (e: any) {
       console.error('[SCAN] error:', e);
-      setNewItemOcrText('(error: ' + String(e?.message ?? e) + ')');
-      setNewItemStep('ocr-text');
+      setNewItemScanError('failed to read receipt — try again or add manually');
+      setNewItemStep('choice');
+      setNewItemScanLoading(false);
+    }
+  };
+  const [scanFromReceiptsModal, setScanFromReceiptsModal] = useState(false);
+  const handleScanFromReceiptPhoto = async (url: string) => {
+    setScanFromReceiptsModal(false);
+    setNewItemScanSourceModal(false);
+    setNewItemScanLoading(true);
+    setNewItemScanError('');
+    setNewItemStep('scanning');
+    try {
+      const parsed = await ocrReceiptImage(url);
+      if (parsed.items.length === 0) {
+        setNewItemScanError('no items detected — try a clearer photo');
+        setNewItemStep('choice');
+      } else {
+        setNewItemScanItems(parsed.items.map((i: any) => ({ name: i.name, cost: String(i.price), selected: true })));
+        setNewItemStep('scan-review');
+      }
+      setNewItemScanLoading(false);
+    } catch (e: any) {
+      setNewItemScanError('failed to read receipt — try again or add manually');
+      setNewItemStep('choice');
       setNewItemScanLoading(false);
     }
   };
   const saveScanItems = async () => {
-    const valid = newItemScanItems.filter(r => r.name.trim() && parseFloat(r.cost) > 0);
+    const valid = newItemScanItems.filter(r => r.selected !== false && r.name.trim() && parseFloat(r.cost) > 0);
     if (!valid.length) return;
     setNewItemSaving(true);
     // Count existing receipt groups to determine counter
@@ -731,28 +758,39 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
   };
   const openAssign = (item: any) => {
     const lr = linkedRecordings.find((l: any) => l.recording?.id === item.recording_id);
-    const groupItems = items.filter((i: any) => i.recording_id === item.recording_id);
+    // For recording-linked items group by recording_id.
+    // For manual items group by parent_item_id (if a subitem) or own id (if parent/standalone).
+    const groupKey = item.recording_id
+      ? (i: any) => i.recording_id === item.recording_id
+      : item.parent_item_id
+        ? (i: any) => i.parent_item_id === item.parent_item_id || i.id === item.parent_item_id
+        : (i: any) => i.id === item.id || i.parent_item_id === item.id;
+    const groupItems = items.filter(groupKey);
+    // Always use the parent item (no parent_item_id) as the anchor for editItemTarget
+    const parentItem = item.recording_id
+      ? groupItems[0] ?? item
+      : groupItems.find((i: any) => !i.parent_item_id) ?? item;
     const recAmount = lr
       ? Number(lr.amount_contributed)
       : groupItems.reduce((s: number, i: any) => s + Number(i.cost), 0);
     setEditItemTarget({
-      item,
-      recName: lr?.recording?.name ?? item.name,
+      item: parentItem,
+      recName: lr?.recording?.name ?? parentItem.name,
       recAmount,
-      isExisting: !!item.recording_id,
+      isExisting: !!parentItem.recording_id,
       groupItems,
     });
     const hasExistingSubitems = groupItems.length > 1;
     setEditItemTab(hasExistingSubitems ? 'subitems' : 'assign');
     setEditItemSubSearch('');
     setEditItemPeopleSearch('');
-    setAssignItem(item);
-    setAssignPeople(item.people ?? []);
+    setAssignItem(parentItem);
+    setAssignPeople(parentItem.people ?? []);
     // Open newItemModal in form step pre-filled with this item
     setNewItemFromRecording(lr?.recording ?? null);
-    setNewItemName(item.name);
-    setNewItemAmount(String(item.cost));
-    setNewItemPeople(item.people ?? []);
+    setNewItemName(parentItem.name);
+    setNewItemAmount(String(parentItem.cost));
+    setNewItemPeople(parentItem.people ?? []);
     setNewItemTab(hasExistingSubitems ? 'subitems' : 'assign');
     setNewItemSubitems([]);
     setNewItemPeopleSearch('');
@@ -2088,6 +2126,48 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
                 </View>
               );
             })()}
+            {/* ── Receipts section ── */}
+            <View style={s.sectionRow}>
+              <Text style={s.sectionHeader}>Receipts</Text>
+              {billStatus === 'ongoing' && (
+                <TouchableOpacity style={s.addCircleBtn} onPress={() => setAddReceiptModal(true)} activeOpacity={0.7}>
+                  <Text style={s.addCircleBtnText}>+</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            {(() => {
+              const allPhotos: { id: string; url: string; label: string }[] = [
+                ...receiptPhotos.map(p => ({ ...p, label: 'direct' })),
+                ...recordingReceiptPhotos.map(p => ({ ...p, label: p.recordingName || 'recording' })),
+              ];
+              if (allPhotos.length === 0) return (
+                <View style={s.dottedCard}>
+                  <View style={s.emptyRow}><Text style={s.emptyText}>no receipts yet — tap + to add</Text></View>
+                </View>
+              );
+              return (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: DC.pagePadding, gap: 10, paddingBottom: 8 }}>
+                  {allPhotos.map((p, i) => (
+                    <TouchableOpacity
+                      key={p.id}
+                      onPress={() => {
+                        const isRecording = receiptPhotos.findIndex(x => x.id === p.id) === -1;
+                        setPhotoModalPool(isRecording ? 'recording' : 'direct');
+                        setPhotoModalIndex(isRecording ? recordingReceiptPhotos.findIndex(x => x.id === p.id) : receiptPhotos.findIndex(x => x.id === p.id));
+                        setPhotoModal(true);
+                      }}
+                      activeOpacity={0.85}
+                    >
+                      <Image source={{ uri: p.url }} style={{ width: 72, height: 72, borderRadius: 10, backgroundColor: Colors.surface }} resizeMode="cover" />
+                      {p.label !== 'direct' && (
+                        <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 9, color: DC.pageTextMuted, maxWidth: 72, marginTop: 3 }} numberOfLines={1}>{p.label}</Text>
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              );
+            })()}
+
             <View style={{ height: 40 }} />
           </ScrollView>
         )}
@@ -2353,7 +2433,7 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
                           setNewItemScanError('no items found in text — try editing the text above');
                           setNewItemStep('ocr-text');
                         } else {
-                          setNewItemScanItems(parsed.items.map((i: any) => ({ name: i.name, cost: String(i.price) })));
+                          setNewItemScanItems(parsed.items.map((i: any) => ({ name: i.name, cost: String(i.price), selected: true })));
                           setNewItemStep('scan-review');
                         }
                       }}
@@ -2368,53 +2448,79 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
               )}
 
               {/* ── Scan review step ── */}
-              {newItemStep === 'scan-review' && (
-                <View style={{ flex: 1 }}>
-                  <View style={{ paddingHorizontal: DC.pagePadding, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: DC.cardDividerColor }}>
-                    <Text style={{ ...DC.typography.subContent, color: DC.pageTextMuted }}>review detected items — edit or remove before saving</Text>
+              {newItemStep === 'scan-review' && (() => {
+                const validItems = newItemScanItems.filter(r => r.selected !== false && r.name.trim() && parseFloat(r.cost) > 0);
+                const selectedCount = validItems.length;
+                const selectedTotal = validItems.reduce((s, r) => s + (parseFloat(r.cost) || 0), 0);
+                return (
+                  <View style={{ flex: 1 }}>
+                    {/* Header: hint + select all */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: DC.pagePadding, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: DC.cardDividerColor }}>
+                      <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 11, color: DC.pageTextMuted }}>tap to select / deselect</Text>
+                      <TouchableOpacity
+                        onPress={() => {
+                          const allSelected = newItemScanItems.every(r => r.selected !== false);
+                          setNewItemScanItems(prev => prev.map(x => ({ ...x, selected: !allSelected })));
+                        }}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Text style={{ fontFamily: 'Poppins-SemiBold', fontSize: 11, color: DC.viewBtnText }}>
+                          {newItemScanItems.every(r => r.selected !== false) ? 'deselect all' : 'select all'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                    {/* Disclaimer */}
+                    <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 11, color: DC.pageTextMuted, fontStyle: 'italic', paddingHorizontal: DC.pagePadding, paddingTop: 10, paddingBottom: 6 }}>Please double-check the amounts — the receipt reader may not always be accurate.</Text>
+                    {/* Total bar */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: DC.pagePadding, paddingVertical: 10, backgroundColor: DC.viewBtnBg }}>
+                      <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 11, color: DC.viewBtnText }}>{selectedCount} item{selectedCount !== 1 ? 's' : ''} selected</Text>
+                      <Text style={{ fontFamily: 'Poppins-Bold', fontSize: 14, color: DC.viewBtnText }}>{selectedTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                    </View>
+                    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+                      {newItemScanItems.map((item, idx) => {
+                        const isSelected = item.selected !== false;
+                        const isLast = idx === newItemScanItems.length - 1;
+                        return (
+                          <View
+                            key={idx}
+                            style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: DC.pagePadding, borderBottomWidth: isLast ? 0 : DC.rowDivider.height, borderBottomColor: DC.rowDivider.backgroundColor, opacity: isSelected ? 1 : 0.35 }}
+                          >
+                            <TouchableOpacity
+                              onPress={() => setNewItemScanItems(prev => prev.map((x, i) => i === idx ? { ...x, selected: !isSelected } : x))}
+                              activeOpacity={0.7}
+                              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                            >
+                              <View style={{ width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: isSelected ? DC.viewBtnText : DC.controlBorder, backgroundColor: isSelected ? DC.viewBtnText : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
+                                {isSelected && <Text style={{ color: '#ffffff', fontSize: 11, fontFamily: 'Poppins-Bold', lineHeight: 14 }}>✓</Text>}
+                              </View>
+                            </TouchableOpacity>
+                            <Text style={{ flex: 1, fontFamily: 'Poppins-Regular', fontSize: 13, color: DC.pageText }} numberOfLines={1}>{item.name}</Text>
+                            <TextInput
+                              style={{ fontFamily: 'Poppins-Bold', fontSize: 13, color: DC.pageText, textAlign: 'right', width: 80, borderWidth: 1, borderColor: DC.controlBorder, borderRadius: 8, paddingVertical: 6, paddingHorizontal: 8, backgroundColor: Colors.surface }}
+                              value={item.cost}
+                              onChangeText={v => setNewItemScanItems(prev => prev.map((x, i) => i === idx ? { ...x, cost: v } : x))}
+                              keyboardType="decimal-pad"
+                              selectTextOnFocus
+                            />
+                          </View>
+                        );
+                      })}
+                    </ScrollView>
+                    <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: DC.pagePadding, paddingVertical: 12, backgroundColor: Colors.white, borderTopWidth: 1, borderTopColor: DC.cardDividerColor, flexDirection: 'row', gap: 10 }}>
+                      <TouchableOpacity style={[s.doneBtn, { flex: 1, marginTop: 0, backgroundColor: Colors.surface }]} onPress={() => setNewItemStep('choice')}>
+                        <Text style={[s.doneBtnText, { color: Colors.muted }]}>back</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[s.doneBtn, { flex: 2, marginTop: 0, opacity: newItemSaving || selectedCount === 0 ? 0.4 : 1 }]}
+                        onPress={saveScanItems}
+                        disabled={newItemSaving || selectedCount === 0}
+                      >
+                        <Text style={s.doneBtnText}>{newItemSaving ? 'saving...' : `add ${selectedCount} item${selectedCount !== 1 ? 's' : ''}`}</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
-                  <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
-                    {newItemScanItems.map((item, idx) => (
-                      <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, paddingHorizontal: DC.pagePadding, borderBottomWidth: 1, borderBottomColor: DC.controlBorder }}>
-                        <View style={{ flex: 1 }}>
-                          <TextInput
-                            style={{ ...DC.textbox.input, fontFamily: 'Poppins-Regular', fontSize: 13 }}
-                            value={item.name}
-                            onChangeText={v => setNewItemScanItems(prev => prev.map((x, i) => i === idx ? { ...x, name: v } : x))}
-                            placeholder="item name"
-                            placeholderTextColor={DC.inputPlaceholder}
-                          />
-                        </View>
-                        <View style={{ width: 90 }}>
-                          <TextInput
-                            style={{ ...DC.textbox.input, fontFamily: 'Poppins-Regular', fontSize: 13, textAlign: 'right' }}
-                            value={item.cost}
-                            onChangeText={v => setNewItemScanItems(prev => prev.map((x, i) => i === idx ? { ...x, cost: v } : x))}
-                            keyboardType="decimal-pad"
-                            placeholder="0.00"
-                            placeholderTextColor={DC.inputPlaceholder}
-                          />
-                        </View>
-                        <TouchableOpacity onPress={() => setNewItemScanItems(prev => prev.filter((_, i) => i !== idx))} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                          <SvgXml xml={SVG_CLOSE} width={18} height={18} color={DC.pageTextMuted} />
-                        </TouchableOpacity>
-                      </View>
-                    ))}
-                  </ScrollView>
-                  <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: DC.pagePadding, backgroundColor: '#ffffff', borderTopWidth: 1, borderTopColor: DC.cardDividerColor, gap: 8 }}>
-                    <TouchableOpacity
-                      style={[s.doneBtn, { opacity: newItemSaving || newItemScanItems.filter(r => r.name.trim() && parseFloat(r.cost) > 0).length === 0 ? 0.4 : 1 }]}
-                      onPress={saveScanItems}
-                      disabled={newItemSaving || newItemScanItems.filter(r => r.name.trim() && parseFloat(r.cost) > 0).length === 0}
-                    >
-                      <Text style={s.doneBtnText}>{newItemSaving ? 'saving...' : `save ${newItemScanItems.filter(r => r.name.trim() && parseFloat(r.cost) > 0).length} items`}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={[s.doneBtn, { backgroundColor: Colors.surface }]} onPress={() => setNewItemStep('choice')}>
-                      <Text style={[s.doneBtnText, { color: Colors.muted }]}>back</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              )}
+                );
+              })()}
 
               {/* ── Pick recording step ── */}
               {newItemStep === 'pick-recording' && (
@@ -2560,6 +2666,18 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
                   </TouchableOpacity>
                 )}
               </View>
+
+              {/* Total bar — shown on subitems tab */}
+              {editItemTab === 'subitems' && (() => {
+                const subitems = (editItemTarget?.groupItems ?? []).filter((i: any) => i.id !== editItemTarget?.item?.id);
+                const total = subitems.reduce((s: number, i: any) => s + Number(i.cost), 0);
+                return (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: DC.pagePadding, paddingVertical: 10, backgroundColor: DC.viewBtnBg }}>
+                    <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 11, color: DC.viewBtnText }}>{subitems.length} subitem{subitems.length !== 1 ? 's' : ''}</Text>
+                    <Text style={{ fontFamily: 'Poppins-Bold', fontSize: 14, color: DC.viewBtnText }}>{total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                  </View>
+                );
+              })()}
 
               {/* Assign People tab */}
               {editItemTab === 'assign' && (
@@ -2712,146 +2830,130 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
-      {/* Add Subitem modal — full screen */}
-      <Modal visible={addSubitemModal} animationType="fade" transparent statusBarTranslucent onRequestClose={() => setAddSubitemModal(false)}>
-        <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' }} activeOpacity={1} onPress={() => setAddSubitemModal(false)}>
-          <TouchableOpacity activeOpacity={1} onPress={() => {}} style={{ flex: 1, backgroundColor: '#ffffff' }}>
-            <SafeAreaView style={{ flex: 1 }}>
-              {/* Header */}
-              <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', paddingHorizontal: DC.pagePadding, paddingTop: 28, paddingBottom: 16 }}>
-                <Text style={{ ...DC.typography.pageTitle }}>{editingSubitemId ? 'Edit Subitem' : 'Add Subitem'}</Text>
-                <TouchableOpacity onPress={() => setAddSubitemModal(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                  <SvgXml xml={SVG_CLOSE} width={28} height={28} color={DC.pageText} />
-                </TouchableOpacity>
+      {/* Add / Edit Subitem — compact bottom sheet */}
+      <BottomSheet visible={addSubitemModal} onClose={() => setAddSubitemModal(false)} title={editingSubitemId ? 'edit subitem' : 'add subitem'}>
+        <View style={{ gap: 12 }}>
+          {/* Name + Amount side by side */}
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <View style={{ flex: 1, gap: 4 }}>
+              <Text style={{ fontFamily: 'Poppins-SemiBold', fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase' }}>name</Text>
+              <View style={DC.textbox.wrap}>
+                <TextInput
+                  style={DC.textbox.input}
+                  placeholder="item name"
+                  placeholderTextColor={DC.inputPlaceholder}
+                  value={subitemName}
+                  onChangeText={setSubitemName}
+                  autoFocus
+                />
               </View>
-              <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: DC.pagePadding, paddingBottom: 40, gap: 16 }}>
-                {/* Name */}
-                <View style={{ gap: 6 }}>
-                  <Text style={{ ...DC.typography.sectionHeader }}>Name</Text>
-                  <View style={DC.textbox.wrap}>
-                    <TextInput
-                      style={DC.textbox.input}
-                      placeholder="type a name"
-                      placeholderTextColor={DC.inputPlaceholder}
-                      value={subitemName}
-                      onChangeText={setSubitemName}
-                      autoFocus
-                    />
+            </View>
+            <View style={{ width: 100, gap: 4 }}>
+              <Text style={{ fontFamily: 'Poppins-SemiBold', fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase' }}>amount</Text>
+              <View style={DC.textbox.wrap}>
+                <TextInput
+                  style={[DC.textbox.input, { textAlign: 'right' }]}
+                  placeholder="0.00"
+                  placeholderTextColor={DC.inputPlaceholder}
+                  value={subitemCost}
+                  onChangeText={setSubitemCost}
+                  keyboardType="decimal-pad"
+                  selectTextOnFocus
+                />
+              </View>
+            </View>
+          </View>
+          {/* Assign people */}
+          <View style={{ gap: 4 }}>
+            <Text style={{ fontFamily: 'Poppins-SemiBold', fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase' }}>assign people</Text>
+            {/* Search input */}
+            <View style={DC.textbox.wrap}>
+              <TextInput
+                style={DC.textbox.input}
+                placeholder="search or type a name..."
+                placeholderTextColor={DC.inputPlaceholder}
+                value={subitemPeopleSearch}
+                onChangeText={setSubitemPeopleSearch}
+                onSubmitEditing={async () => {
+                  const val = subitemPeopleSearch.trim();
+                  if (!val) return;
+                  const match = allPeopleForAssign.find(p => p.toLowerCase() === val.toLowerCase());
+                  const name = match ?? val;
+                  if (!subitemPeople.some(p => p.toLowerCase() === name.toLowerCase())) setSubitemPeople(prev => [...prev, name]);
+                  setSubitemPeopleSearch('');
+                  if (!match && !contacts.some(c => c.toLowerCase() === name.toLowerCase())) {
+                    setContacts(prev => [...prev, name].sort());
+                    await supabase.from('contacts').insert({ user_id: userId, name });
+                  }
+                }}
+                returnKeyType="done"
+                blurOnSubmit={false}
+              />
+            </View>
+            {/* People rows — filtered by search, show first 3 when no search */}
+            <View style={{ borderWidth: 1, borderColor: DC.controlBorder, borderRadius: 10, overflow: 'hidden', marginTop: 2 }}>
+              {(() => {
+                const q = subitemPeopleSearch.trim().toLowerCase();
+                const filtered = q
+                  ? allPeopleForAssign.filter(p => p.toLowerCase().includes(q))
+                  : allPeopleForAssign.slice(0, 3);
+                const showAdd = q && !allPeopleForAssign.some(p => p.toLowerCase() === q);
+                const rows = [...filtered, ...(showAdd ? [null] : [])];
+                if (rows.length === 0) return (
+                  <View style={{ padding: 12 }}>
+                    <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 12, color: Colors.muted }}>no people found</Text>
                   </View>
-                </View>
-                {/* Amount */}
-                <View style={{ gap: 6 }}>
-                  <Text style={{ ...DC.typography.sectionHeader }}>Amount</Text>
-                  <View style={DC.textbox.wrap}>
-                    <TextInput
-                      style={DC.textbox.input}
-                      placeholder="Amount"
-                      placeholderTextColor={DC.inputPlaceholder}
-                      value={subitemCost}
-                      onChangeText={setSubitemCost}
-                      keyboardType="decimal-pad"
-                    />
-                  </View>
-                </View>
-                {/* Assign People */}
-                <View style={{ gap: 6 }}>
-                  <Text style={{ ...DC.typography.sectionHeader }}>Assign People</Text>
-                  <View style={[s.tagInputWrap, { marginBottom: 4 }]}>
-                    {subitemPeople.map(p => (
-                      <TouchableOpacity key={p} style={s.tagChip} onPress={() => setSubitemPeople(prev => prev.filter(x => x !== p))} activeOpacity={0.7}>
-                        <Text style={s.tagChipText}>{displayPersonName(p)}</Text>
-                        <Text style={{ fontFamily: 'Poppins-Bold', fontSize: 11, color: DC.pageTextMuted }}>✕</Text>
-                      </TouchableOpacity>
-                    ))}
-                    <TextInput
-                      style={s.tagInput}
-                      placeholder={subitemPeople.length === 0 ? 'type a name...' : ''}
-                      placeholderTextColor={DC.inputPlaceholder}
-                      value={subitemPeopleSearch}
-                      onChangeText={v => setSubitemPeopleSearch(v)}
-                      onSubmitEditing={async () => {
-                        const val = subitemPeopleSearch.trim();
-                        if (!val) return;
-                        const match = allPeopleForAssign.find(p => p.toLowerCase() === val.toLowerCase());
-                        const name = match ?? val;
-                        if (subitemPeople.some(p => p.toLowerCase() === name.toLowerCase())) {
-                          setSubitemPeople(prev => prev.filter(p => p.toLowerCase() !== name.toLowerCase()));
-                        } else {
-                          setSubitemPeople(prev => [...prev, name]);
-                          if (!match && !contacts.some(c => c.toLowerCase() === name.toLowerCase())) {
-                            setContacts(prev => [...prev, name].sort());
-                            await supabase.from('contacts').insert({ user_id: userId, name });
-                          }
-                        }
-                        setSubitemPeopleSearch('');
-                      }}
-                      returnKeyType="done"
-                      blurOnSubmit={false}
-                    />
-                  </View>
-                  {subitemPeopleSearch.trim() !== '' && (
-                    <View style={[s.dropdownList, { marginBottom: 8 }]}>
-                      {allPeopleForAssign.filter(p => p.toLowerCase().includes(subitemPeopleSearch.toLowerCase())).map(p => {
-                        const alreadySel = subitemPeople.some(x => x.toLowerCase() === p.toLowerCase());
-                        return (
-                          <TouchableOpacity key={p} style={[s.dropdownItem, alreadySel && { backgroundColor: DC.viewBtnBg }]} onPress={() => {
-                            if (alreadySel) {
-                              setSubitemPeople(prev => prev.filter(x => x.toLowerCase() !== p.toLowerCase()));
-                            } else {
-                              setSubitemPeople(prev => [...prev, p]);
-                            }
-                            setSubitemPeopleSearch('');
-                          }} activeOpacity={0.7}>
-                            <Text style={[s.dropdownItemText, alreadySel && { color: DC.viewBtnText, fontFamily: 'Poppins-SemiBold' }]}>{displayPersonName(p)}{alreadySel ? ' ✓' : ''}</Text>
-                          </TouchableOpacity>
-                        );
-                      })}
-                      {!allPeopleForAssign.some(p => p.toLowerCase() === subitemPeopleSearch.trim().toLowerCase()) && (
-                        <TouchableOpacity style={[s.dropdownItem, { borderBottomWidth: 0 }]} onPress={async () => {
+                );
+                return rows.map((p, idx) => {
+                  const isLast = idx === rows.length - 1;
+                  if (p === null) {
+                    return (
+                      <TouchableOpacity
+                        key="add-new"
+                        style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 14 }}
+                        onPress={async () => {
                           const name = subitemPeopleSearch.trim();
-                          if (!subitemPeople.some(p => p.toLowerCase() === name.toLowerCase())) setSubitemPeople(prev => [...prev, name]);
+                          if (!subitemPeople.some(x => x.toLowerCase() === name.toLowerCase())) setSubitemPeople(prev => [...prev, name]);
                           setSubitemPeopleSearch('');
                           if (!contacts.some(c => c.toLowerCase() === name.toLowerCase())) {
                             setContacts(prev => [...prev, name].sort());
                             await supabase.from('contacts').insert({ user_id: userId, name });
                           }
-                        }} activeOpacity={0.7}>
-                          <Text style={[s.dropdownItemText, { color: DC.viewBtnText }]}>+ Add "{subitemPeopleSearch.trim()}" to contacts</Text>
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                  )}
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
-                    {allPeopleForAssign
-                      .filter(p => !subitemPeopleSearch.trim() || p.toLowerCase().includes(subitemPeopleSearch.toLowerCase()))
-                      .map(p => {
-                        const sel = subitemPeople.includes(p);
-                        return (
-                          <TouchableOpacity
-                            key={p}
-                            style={[DC.button.base, sel && DC.button.active]}
-                            onPress={() => setSubitemPeople(prev => sel ? prev.filter(x => x !== p) : [...prev, p])}
-                            activeOpacity={0.7}
-                          >
-                            <Text style={sel ? DC.button.textActive : DC.button.textInactive}>{displayPersonName(p)}</Text>
-                          </TouchableOpacity>
-                        );
-                      })}
-                  </View>
-                </View>
-                {/* Save */}
-                <TouchableOpacity
-                  style={[s.doneBtn, { opacity: savingSubitem || !subitemName.trim() || !subitemCost ? 0.4 : 1, marginTop: 8 }]}
-                  onPress={saveSubitem}
-                  disabled={savingSubitem || !subitemName.trim() || !subitemCost}
-                >
-                  <Text style={s.doneBtnText}>{savingSubitem ? 'saving...' : 'save subitem'}</Text>
-                </TouchableOpacity>
-              </ScrollView>
-            </SafeAreaView>
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={{ fontFamily: 'Poppins-SemiBold', fontSize: 13, color: DC.viewBtnText, flex: 1 }}>+ add "{subitemPeopleSearch.trim()}"</Text>
+                      </TouchableOpacity>
+                    );
+                  }
+                  const sel = subitemPeople.some(x => x.toLowerCase() === p.toLowerCase());
+                  return (
+                    <TouchableOpacity
+                      key={p}
+                      style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 14, borderBottomWidth: isLast ? 0 : DC.rowDivider.height, borderBottomColor: DC.rowDivider.backgroundColor, backgroundColor: sel ? DC.viewBtnBg : 'transparent' }}
+                      onPress={() => setSubitemPeople(prev => sel ? prev.filter(x => x.toLowerCase() !== p.toLowerCase()) : [...prev, p])}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={{ fontFamily: sel ? 'Poppins-SemiBold' : 'Poppins-Regular', fontSize: 13, color: sel ? DC.viewBtnText : DC.pageText, flex: 1 }}>{displayPersonName(p)}</Text>
+                      {sel && <Text style={{ fontFamily: 'Poppins-Bold', fontSize: 12, color: DC.viewBtnText }}>✓</Text>}
+                    </TouchableOpacity>
+                  );
+                });
+              })()}
+            </View>
+          </View>
+          {/* Save */}
+          <TouchableOpacity
+            style={[s.doneBtn, { marginTop: 4, opacity: savingSubitem || !subitemName.trim() || !subitemCost ? 0.4 : 1 }]}
+            onPress={saveSubitem}
+            disabled={savingSubitem || !subitemName.trim() || !subitemCost}
+          >
+            <Text style={s.doneBtnText}>{savingSubitem ? 'saving...' : 'save'}</Text>
           </TouchableOpacity>
-        </TouchableOpacity>
-      </Modal>
+        </View>
+      </BottomSheet>
+
+
 
 
       {/* Share modal */}
@@ -3544,6 +3646,33 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
         >
           <Text style={[s.doneBtnText, { color: Colors.text }]}>gallery</Text>
         </TouchableOpacity>
+        {(receiptPhotos.length > 0 || recordingReceiptPhotos.length > 0) && (
+          <TouchableOpacity
+            style={[s.doneBtn, { backgroundColor: Colors.surface, marginTop: 8 }]}
+            onPress={() => { setNewItemScanSourceModal(false); setScanFromReceiptsModal(true); }}
+          >
+            <Text style={[s.doneBtnText, { color: Colors.text }]}>from receipts</Text>
+          </TouchableOpacity>
+        )}
+      </BottomSheet>
+
+      {/* Pick from existing receipt photos */}
+      <BottomSheet visible={scanFromReceiptsModal} onClose={() => setScanFromReceiptsModal(false)} title="pick a receipt photo">
+        <ScrollView style={{ maxHeight: 320 }} showsVerticalScrollIndicator={false}>
+          {[...receiptPhotos.map(p => ({ ...p, label: 'direct' })), ...recordingReceiptPhotos.map(p => ({ ...p, label: p.recordingName || 'recording' }))].map((p, i) => (
+            <TouchableOpacity
+              key={p.id}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.border }}
+              onPress={() => handleScanFromReceiptPhoto(p.url)}
+              activeOpacity={0.7}
+            >
+              <Image source={{ uri: p.url }} style={{ width: 48, height: 48, borderRadius: 8, backgroundColor: Colors.surface }} resizeMode="cover" />
+              <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 13, color: Colors.text, flex: 1 }} numberOfLines={1}>
+                {p.label === 'direct' ? 'receipt photo' : p.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
       </BottomSheet>
     </Animated.View>
   );
