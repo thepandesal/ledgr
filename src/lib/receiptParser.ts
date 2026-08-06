@@ -135,36 +135,88 @@ export function parseReceiptText(rawText: string): ParsedReceipt {
 }
 
 // ── Image preprocessing for better OCR ──────────────────────────────────────
+
+/** Read EXIF orientation from a data URI (JPEG only) */
+function getExifOrientation(dataUri: string): number {
+  try {
+    const base64 = dataUri.split(',')[1];
+    if (!base64) return 1;
+    const binary = atob(base64.slice(0, 1024)); // only need the header
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    // Check JPEG SOI marker
+    if (bytes[0] !== 0xFF || bytes[1] !== 0xD8) return 1;
+    let offset = 2;
+    while (offset < bytes.length - 4) {
+      if (bytes[offset] !== 0xFF) break;
+      const marker = bytes[offset + 1];
+      const segLen = (bytes[offset + 2] << 8) | bytes[offset + 3];
+      if (marker === 0xE1) { // APP1 = EXIF
+        // Check Exif header
+        const exifHeader = String.fromCharCode(...bytes.slice(offset + 4, offset + 10));
+        if (exifHeader.startsWith('Exif')) {
+          const tiffOffset = offset + 10;
+          const littleEndian = bytes[tiffOffset] === 0x49;
+          const read16 = (o: number) => littleEndian
+            ? (bytes[tiffOffset + o] | (bytes[tiffOffset + o + 1] << 8))
+            : ((bytes[tiffOffset + o] << 8) | bytes[tiffOffset + o + 1]);
+          const read32 = (o: number) => littleEndian
+            ? (bytes[tiffOffset + o] | (bytes[tiffOffset + o + 1] << 8) | (bytes[tiffOffset + o + 2] << 16) | (bytes[tiffOffset + o + 3] << 24))
+            : ((bytes[tiffOffset + o] << 24) | (bytes[tiffOffset + o + 1] << 16) | (bytes[tiffOffset + o + 2] << 8) | bytes[tiffOffset + o + 3]);
+          const ifdOffset = read32(4);
+          const numEntries = read16(ifdOffset);
+          for (let i = 0; i < numEntries; i++) {
+            const entryOffset = ifdOffset + 2 + i * 12;
+            const tag = read16(entryOffset);
+            if (tag === 0x0112) { // Orientation tag
+              return read16(entryOffset + 8);
+            }
+          }
+        }
+      }
+      offset += 2 + segLen;
+    }
+  } catch (_) {}
+  return 1;
+}
+
 async function preprocessForOcr(imageUri: string): Promise<HTMLCanvasElement | string> {
   if (typeof document === 'undefined') return imageUri;
   return new Promise((resolve) => {
     const img = new window.Image();
     img.onload = () => {
+      // Detect EXIF orientation for camera photos
+      const orientation = imageUri.startsWith('data:image/jpeg') ? getExifOrientation(imageUri) : 1;
+      const swap = orientation >= 5; // orientations 5-8 swap width/height
+      const scale = Math.max(1, 2000 / (swap ? img.height : img.width));
+      const srcW = Math.round(img.width * scale);
+      const srcH = Math.round(img.height * scale);
       const canvas = document.createElement('canvas');
-      // Scale to at least 2000px wide for better OCR accuracy
-      const scale = Math.max(1, 2000 / img.width);
-      canvas.width = Math.round(img.width * scale);
-      canvas.height = Math.round(img.height * scale);
+      canvas.width  = swap ? srcH : srcW;
+      canvas.height = swap ? srcW : srcH;
       const ctx = canvas.getContext('2d')!;
-      // White background
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      // Grayscale + adaptive threshold (binarize) for crisp text
+      // Apply rotation to correct EXIF orientation
+      ctx.save();
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      const rotMap: Record<number, number> = { 3: 180, 6: 90, 8: -90, 5: -90, 7: 90 };
+      const flipMap: Record<number, boolean> = { 2: true, 4: true, 5: true, 7: true };
+      if (flipMap[orientation]) ctx.scale(-1, 1);
+      ctx.rotate(((rotMap[orientation] ?? 0) * Math.PI) / 180);
+      ctx.drawImage(img, -srcW / 2, -srcH / 2, srcW, srcH);
+      ctx.restore();
+      // Grayscale + binarize
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const data = imageData.data;
-      // Step 1: convert to grayscale
       for (let i = 0; i < data.length; i += 4) {
         const gray = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
         data[i] = data[i+1] = data[i+2] = gray;
       }
-      // Step 2: compute mean brightness for simple threshold
       let sum = 0;
-      const pixels = data.length / 4;
       for (let i = 0; i < data.length; i += 4) sum += data[i];
-      const mean = sum / pixels;
-      const threshold = mean * 0.85; // slightly below mean to keep light text
-      // Step 3: binarize
+      const mean = sum / (data.length / 4);
+      const threshold = mean * 0.85;
       for (let i = 0; i < data.length; i += 4) {
         const val = data[i] < threshold ? 0 : 255;
         data[i] = data[i+1] = data[i+2] = val;
