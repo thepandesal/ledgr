@@ -23,6 +23,7 @@ import { Brand } from '../../src/lib/brand';
 import { DC } from '../../src/lib/design';
 import { AppFont } from '../../src/lib/fonts';
 import { ocrReceiptImage, parseReceiptText, type ParsedItem } from '../../src/lib/receiptParser';
+import CameraCapture from './CameraCapture';
 import { PoppinsBoldBase64, PoppinsMediumBase64, PoppinsSemiBoldBase64 } from '../../src/lib/fontBase64';
 import PaymentModal, { type PaymentItem } from './payment-modal';
 import { computeSplitTotals } from '../../src/lib/splitBillUtils';
@@ -304,9 +305,12 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
   const [newItemRecShowMore, setNewItemRecShowMore] = useState(false);
   const [newItemSaving, setNewItemSaving] = useState(false);
   const [newItemScanLoading, setNewItemScanLoading] = useState(false);
+  const [newItemScanGroups, setNewItemScanGroups] = useState<{ photoUri: string; items: { name: string; cost: string; selected?: boolean }[] }[]>([]);
   const [newItemScanItems, setNewItemScanItems] = useState<{ name: string; cost: string; selected?: boolean }[]>([]);
   const [newItemScanError, setNewItemScanError] = useState('');
   const [newItemScanSourceModal, setNewItemScanSourceModal] = useState(false);
+  const [cameraVisible, setCameraVisible] = useState(false);
+  const [viewPhotoUri, setViewPhotoUri] = useState<string | null>(null);
   // All contacts + friends merged for assign people — deduplicated case-insensitively
   // Current user goes first
   const allPeopleForAssign = [...new Map(
@@ -331,64 +335,83 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
     setNewItemPeopleSearch('');
     setNewItemRecSearch('');
     setNewItemRecShowMore(false);
+    setNewItemScanGroups([]);
     setNewItemScanItems([]);
     setNewItemScanError('');
     setNewItemOcrText('');
     setAssignItem(null);
     setNewItemModal(true);
   };
-  const handleScanReceipt = async (source: 'camera' | 'gallery') => {
-    setNewItemScanSourceModal(false);
-    let uri: string | null = null;
-    if (source === 'camera') {
-      const { status } = await ImagePicker.requestCameraPermissionsAsync();
-      if (status !== 'granted') return;
-      const result = await ImagePicker.launchCameraAsync({ quality: 1, base64: true });
-      if (result.canceled || !result.assets[0]) return;
-      uri = result.assets[0].base64
-        ? `data:image/jpeg;base64,${result.assets[0].base64}`
-        : result.assets[0].uri;
-    } else {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') return;
-      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1, base64: true });
-      if (result.canceled || !result.assets[0]) return;
-      uri = result.assets[0].base64
-        ? `data:image/jpeg;base64,${result.assets[0].base64}`
-        : result.assets[0].uri;
-    }
-    if (!uri) return;
+  const handleCameraDone = async (uris: string[]) => {
+    setCameraVisible(false);
+    if (uris.length === 0) return;
     setNewItemScanLoading(true);
     setNewItemScanError('');
     setNewItemStep('scanning');
     try {
-      // OCR with jimp xerox preprocessing
-      const parsed = await ocrReceiptImage(uri);
-      // Upload processed (xerox) image to R2 if available, else compressed original
-      const compressed = await compressImage(uri);
-      let entryId = linkedReceipt?.id;
-      if (!entryId) {
-        const { data: entry } = await supabase.from('receipt_entries').insert({ user_id: userId, note: String(name), split_bill_id: splitBillId }).select().maybeSingle();
-        entryId = entry?.id;
+      const groups: { photoUri: string; items: { name: string; cost: string; selected?: boolean }[] }[] = [];
+      for (const uri of uris) {
+        const parsed = await ocrReceiptImage(uri);
+        groups.push({ photoUri: uri, items: parsed.items.map((i: any) => ({ name: i.name, cost: String(i.price), selected: true })) });
+        let entryId = linkedReceipt?.id;
+        if (!entryId) {
+          const { data: entry } = await supabase.from('receipt_entries').insert({ user_id: userId, note: String(name), split_bill_id: splitBillId }).select().maybeSingle();
+          entryId = entry?.id;
+        }
+        if (entryId) { await uploadReceiptPhoto(uri, entryId); loadLinkedReceipt(); }
       }
-      if (entryId) {
-        await uploadReceiptPhoto(parsed.processedBase64 ?? compressed, entryId);
-        loadLinkedReceipt();
-      }
-      if (parsed.items.length === 0) {
+      const hasItems = groups.some(g => g.items.length > 0);
+      if (!hasItems) {
         setNewItemScanError('no items detected — try a clearer photo');
         setNewItemStep('choice');
       } else {
-        setNewItemScanItems(parsed.items.map((i: any) => ({ name: i.name, cost: String(i.price), selected: true })));
+        setNewItemScanGroups(groups);
         setNewItemStep('scan-review');
       }
-      setNewItemScanLoading(false);
     } catch (e: any) {
-      console.error('[SCAN] error:', e?.message ?? e, e?.stack);
       setNewItemScanError(`failed to read receipt — ${e?.message ?? 'unknown error'}`);
       setNewItemStep('choice');
-      setNewItemScanLoading(false);
     }
+    setNewItemScanLoading(false);
+  };
+  const handleScanReceipt = async (source: 'camera' | 'gallery') => {
+    setNewItemScanSourceModal(false);
+    if (source === 'camera') {
+      setCameraVisible(true);
+      return;
+    }
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') return;
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsMultipleSelection: true, quality: 1 });
+    if (result.canceled || !result.assets.length) return;
+    setNewItemScanLoading(true);
+    setNewItemScanError('');
+    setNewItemStep('scanning');
+    try {
+      const groups: { photoUri: string; items: { name: string; cost: string; selected?: boolean }[] }[] = [];
+      for (const asset of result.assets) {
+        const parsed = await ocrReceiptImage(asset.uri);
+        groups.push({ photoUri: asset.uri, items: parsed.items.map((i: any) => ({ name: i.name, cost: String(i.price), selected: true })) });
+        let entryId = linkedReceipt?.id;
+        if (!entryId) {
+          const { data: entry } = await supabase.from('receipt_entries').insert({ user_id: userId, note: String(name), split_bill_id: splitBillId }).select().maybeSingle();
+          entryId = entry?.id;
+        }
+        if (entryId) { await uploadReceiptPhoto(asset.uri, entryId); loadLinkedReceipt(); }
+      }
+      const hasItems = groups.some(g => g.items.length > 0);
+      if (!hasItems) {
+        setNewItemScanError('no items detected — try a clearer photo');
+        setNewItemStep('choice');
+      } else {
+        setNewItemScanGroups(groups);
+        setNewItemStep('scan-review');
+      }
+    } catch (e: any) {
+      setNewItemScanError(`failed to read receipt — ${e?.message ?? 'unknown error'}`);
+      setNewItemStep('choice');
+    }
+    setNewItemScanLoading(false);
   };
   const [scanFromReceiptsModal, setScanFromReceiptsModal] = useState(false);
   const handleScanFromReceiptPhoto = async (url: string) => {
@@ -414,37 +437,32 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
     }
   };
   const saveScanItems = async () => {
-    const valid = newItemScanItems.filter(r => r.selected !== false && r.name.trim() && parseFloat(r.cost) > 0);
-    if (!valid.length) return;
+    const allValid = newItemScanGroups.flatMap(g => g.items.filter(r => r.selected !== false && r.name.trim() && parseFloat(r.cost) > 0));
+    if (!allValid.length) return;
     setNewItemSaving(true);
-    // Count existing receipt groups to determine counter
-    const existingReceiptCount = items.filter((i: any) =>
-      i.name && /^receipt \d+$/i.test(i.name.trim())
-    ).length;
-    const parentName = `Receipt ${existingReceiptCount + 1}`;
-    const parentCost = valid.reduce((s, r) => s + parseFloat(r.cost), 0);
-    // Insert parent item
-    const { data: parent } = await supabase.from('split_items').insert({
-      split_bill_id: splitBillId,
-      user_id: userId,
-      name: parentName,
-      cost: parentCost,
-      recording_type: 'expense',
-      people: [],
-    }).select('id').single();
-    if (parent?.id) {
-      // Insert subitems linked to parent
-      await supabase.from('split_items').insert(
-        valid.map(r => ({
-          split_bill_id: splitBillId,
-          user_id: userId,
-          name: r.name.trim(),
-          cost: parseFloat(r.cost),
-          recording_type: 'expense',
-          parent_item_id: parent.id,
-        }))
-      );
+    const existingReceiptCount = items.filter((i: any) => i.name && /^receipt \d+$/i.test(i.name.trim())).length;
+    let receiptCounter = existingReceiptCount;
+    for (const group of newItemScanGroups) {
+      const valid = group.items.filter(r => r.selected !== false && r.name.trim() && parseFloat(r.cost) > 0);
+      if (!valid.length) continue;
+      receiptCounter++;
+      const parentCost = valid.reduce((s, r) => s + parseFloat(r.cost), 0);
+      const { data: parent } = await supabase.from('split_items').insert({
+        split_bill_id: splitBillId, user_id: userId, name: `Receipt ${receiptCounter}`,
+        cost: parentCost, recording_type: 'expense', people: [],
+      }).select('id').single();
+      if (parent?.id) {
+        await supabase.from('split_items').insert(
+          valid.map(r => ({
+            split_bill_id: splitBillId, user_id: userId,
+            name: r.name.trim(), cost: parseFloat(r.cost),
+            recording_type: 'expense', parent_item_id: parent.id,
+          }))
+        );
+      }
     }
+    setNewItemScanGroups([]);
+    setNewItemScanItems([]);
     setNewItemSaving(false);
     setNewItemModal(false);
     refetchItems();
@@ -794,6 +812,7 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
     setNewItemTab(hasExistingSubitems ? 'subitems' : 'assign');
     setNewItemSubitems([]);
     setNewItemPeopleSearch('');
+    setNewItemScanGroups([]);
     setNewItemScanItems([]);
     setNewItemScanError('');
     setNewItemStep('form');
@@ -2449,62 +2468,67 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
 
               {/* ── Scan review step ── */}
               {newItemStep === 'scan-review' && (() => {
-                const validItems = newItemScanItems.filter(r => r.selected !== false && r.name.trim() && parseFloat(r.cost) > 0);
-                const selectedCount = validItems.length;
-                const selectedTotal = validItems.reduce((s, r) => s + (parseFloat(r.cost) || 0), 0);
+                const allValid = newItemScanGroups.flatMap(g => g.items.filter(r => r.selected !== false && r.name.trim() && parseFloat(r.cost) > 0));
+                const selectedCount = allValid.length;
+                const selectedTotal = allValid.reduce((s, r) => s + (parseFloat(r.cost) || 0), 0);
                 return (
                   <View style={{ flex: 1 }}>
-                    {/* Header: hint + select all */}
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: DC.pagePadding, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: DC.cardDividerColor }}>
                       <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 11, color: DC.pageTextMuted }}>tap to select / deselect</Text>
-                      <TouchableOpacity
-                        onPress={() => {
-                          const allSelected = newItemScanItems.every(r => r.selected !== false);
-                          setNewItemScanItems(prev => prev.map(x => ({ ...x, selected: !allSelected })));
-                        }}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                      >
+                      <TouchableOpacity onPress={() => {
+                        const allSelected = newItemScanGroups.every(g => g.items.every(r => r.selected !== false));
+                        setNewItemScanGroups(prev => prev.map(g => ({ ...g, items: g.items.map(x => ({ ...x, selected: !allSelected })) })));
+                      }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                         <Text style={{ fontFamily: 'Poppins-SemiBold', fontSize: 11, color: DC.viewBtnText }}>
-                          {newItemScanItems.every(r => r.selected !== false) ? 'deselect all' : 'select all'}
+                          {newItemScanGroups.every(g => g.items.every(r => r.selected !== false)) ? 'deselect all' : 'select all'}
                         </Text>
                       </TouchableOpacity>
                     </View>
-                    {/* Disclaimer */}
                     <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 11, color: DC.pageTextMuted, fontStyle: 'italic', paddingHorizontal: DC.pagePadding, paddingTop: 10, paddingBottom: 6 }}>Please double-check the amounts — the receipt reader may not always be accurate.</Text>
-                    {/* Total bar */}
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: DC.pagePadding, paddingVertical: 10, backgroundColor: DC.viewBtnBg }}>
                       <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 11, color: DC.viewBtnText }}>{selectedCount} item{selectedCount !== 1 ? 's' : ''} selected</Text>
                       <Text style={{ fontFamily: 'Poppins-Bold', fontSize: 14, color: DC.viewBtnText }}>{selectedTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
                     </View>
                     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
-                      {newItemScanItems.map((item, idx) => {
-                        const isSelected = item.selected !== false;
-                        const isLast = idx === newItemScanItems.length - 1;
-                        return (
-                          <View
-                            key={idx}
-                            style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: DC.pagePadding, borderBottomWidth: isLast ? 0 : DC.rowDivider.height, borderBottomColor: DC.rowDivider.backgroundColor, opacity: isSelected ? 1 : 0.35 }}
+                      {newItemScanGroups.map((group, gIdx) => (
+                        <View key={gIdx}>
+                          {/* Photo header row */}
+                          <TouchableOpacity
+                            style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: DC.pagePadding, paddingVertical: 10, backgroundColor: DC.cardBg, borderBottomWidth: DC.rowDivider.height, borderBottomColor: DC.rowDivider.backgroundColor }}
+                            onPress={() => setViewPhotoUri(group.photoUri)}
+                            activeOpacity={0.8}
                           >
-                            <TouchableOpacity
-                              onPress={() => setNewItemScanItems(prev => prev.map((x, i) => i === idx ? { ...x, selected: !isSelected } : x))}
-                              activeOpacity={0.7}
-                              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                            >
-                              <View style={{ width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: isSelected ? DC.viewBtnText : DC.controlBorder, backgroundColor: isSelected ? DC.viewBtnText : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
-                                {isSelected && <Text style={{ color: '#ffffff', fontSize: 11, fontFamily: 'Poppins-Bold', lineHeight: 14 }}>✓</Text>}
+                            <Image source={{ uri: group.photoUri }} style={{ width: 36, height: 36, borderRadius: 6 }} resizeMode="cover" />
+                            <Text style={{ fontFamily: 'Poppins-SemiBold', fontSize: 12, color: DC.pageText, flex: 1 }}>Photo #{gIdx + 1}</Text>
+                            <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 11, color: DC.viewBtnText }}>view</Text>
+                          </TouchableOpacity>
+                          {group.items.length === 0 ? (
+                            <View style={{ paddingHorizontal: DC.pagePadding, paddingVertical: 12 }}>
+                              <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 11, color: DC.pageTextMuted, fontStyle: 'italic' }}>no items detected in this photo</Text>
+                            </View>
+                          ) : group.items.map((item, idx) => {
+                            const isSelected = item.selected !== false;
+                            const isLast = idx === group.items.length - 1;
+                            return (
+                              <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: DC.pagePadding, borderBottomWidth: isLast ? 0 : DC.rowDivider.height, borderBottomColor: DC.rowDivider.backgroundColor, opacity: isSelected ? 1 : 0.35 }}>
+                                <TouchableOpacity onPress={() => setNewItemScanGroups(prev => prev.map((g, gi) => gi !== gIdx ? g : { ...g, items: g.items.map((x, i) => i !== idx ? x : { ...x, selected: !isSelected }) }))} activeOpacity={0.7} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                                  <View style={{ width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: isSelected ? DC.viewBtnText : DC.controlBorder, backgroundColor: isSelected ? DC.viewBtnText : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
+                                    {isSelected && <Text style={{ color: '#ffffff', fontSize: 11, fontFamily: 'Poppins-Bold', lineHeight: 14 }}>✓</Text>}
+                                  </View>
+                                </TouchableOpacity>
+                                <Text style={{ flex: 1, fontFamily: 'Poppins-Regular', fontSize: 13, color: DC.pageText }} numberOfLines={1}>{item.name}</Text>
+                                <TextInput
+                                  style={{ fontFamily: 'Poppins-Bold', fontSize: 13, color: DC.pageText, textAlign: 'right', width: 80, borderWidth: 1, borderColor: DC.controlBorder, borderRadius: 8, paddingVertical: 6, paddingHorizontal: 8, backgroundColor: Colors.surface }}
+                                  value={item.cost}
+                                  onChangeText={v => setNewItemScanGroups(prev => prev.map((g, gi) => gi !== gIdx ? g : { ...g, items: g.items.map((x, i) => i !== idx ? x : { ...x, cost: v }) }))}
+                                  keyboardType="decimal-pad"
+                                  selectTextOnFocus
+                                />
                               </View>
-                            </TouchableOpacity>
-                            <Text style={{ flex: 1, fontFamily: 'Poppins-Regular', fontSize: 13, color: DC.pageText }} numberOfLines={1}>{item.name}</Text>
-                            <TextInput
-                              style={{ fontFamily: 'Poppins-Bold', fontSize: 13, color: DC.pageText, textAlign: 'right', width: 80, borderWidth: 1, borderColor: DC.controlBorder, borderRadius: 8, paddingVertical: 6, paddingHorizontal: 8, backgroundColor: Colors.surface }}
-                              value={item.cost}
-                              onChangeText={v => setNewItemScanItems(prev => prev.map((x, i) => i === idx ? { ...x, cost: v } : x))}
-                              keyboardType="decimal-pad"
-                              selectTextOnFocus
-                            />
-                          </View>
-                        );
-                      })}
+                            );
+                          })}
+                        </View>
+                      ))}
                     </ScrollView>
                     <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: DC.pagePadding, paddingVertical: 12, backgroundColor: Colors.white, borderTopWidth: 1, borderTopColor: DC.cardDividerColor, flexDirection: 'row', gap: 10 }}>
                       <TouchableOpacity style={[s.doneBtn, { flex: 1, marginTop: 0, backgroundColor: Colors.surface }]} onPress={() => setNewItemStep('choice')}>
@@ -3595,6 +3619,18 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
           <Text style={[s.doneBtnText, { color: Colors.muted }]}>keep payment</Text>
         </TouchableOpacity>
       </BottomSheet>
+      {/* Camera capture */}
+      <CameraCapture
+        visible={cameraVisible}
+        onDone={handleCameraDone}
+        onCancel={() => setCameraVisible(false)}
+      />
+      {/* View photo from scan review */}
+      <Modal visible={!!viewPhotoUri} transparent animationType="fade" onRequestClose={() => setViewPhotoUri(null)}>
+        <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', alignItems: 'center', justifyContent: 'center' }} activeOpacity={1} onPress={() => setViewPhotoUri(null)}>
+          {viewPhotoUri && <Image source={{ uri: viewPhotoUri }} style={{ width: width - 40, height: '80%' as any }} resizeMode="contain" />}
+        </TouchableOpacity>
+      </Modal>
       {/* Remove recording blocked modal */}
       <BottomSheet visible={removeRecordingBlockedModal} onClose={() => setRemoveRecordingBlockedModal(false)} title="cannot remove">
         <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.text, marginBottom: 8 }}>
