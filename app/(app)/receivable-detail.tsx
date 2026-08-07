@@ -16,6 +16,7 @@ import NavIcon from '@/components/ui/NavIcons';
 import { useNav } from '../../src/lib/NavContext';
 import GooeyLoader from '@/components/ui/GooeyLoader';
 import { BlurView } from 'expo-blur';
+import { useCurrencyConvert } from '../../src/lib/useCurrencyConvert';
 
 const TEAL = '#9cd7d2';
 const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -30,6 +31,7 @@ const { width } = Dimensions.get('window');
 
 export default function ReceivableDetail({ person, onClose, onBack }: Props) {
   const { userId } = useUser();
+  const { toDefault, defaultCurrency } = useCurrencyConvert();
   const insets = useSafeAreaInsets();
   const { openSplitBill, openRecording, toggleNotifDropdown } = useNav();
   const queryClient = useQueryClient();
@@ -80,7 +82,7 @@ export default function ReceivableDetail({ person, onClose, onBack }: Props) {
 
       const { data: personRecs } = await supabase
         .from('recordings')
-        .select('id, user_id, name, amount, paid_amount, status, type, is_due, transaction_date, space_id, tagged_friend_user_id, is_system_generated')
+        .select('id, user_id, name, amount, paid_amount, status, type, is_due, transaction_date, space_id, tagged_friend_user_id, is_system_generated, currency')
         .eq('user_id', userId)
         .ilike('person_name', person)
         .in('type', ['expense', 'due'])
@@ -103,6 +105,7 @@ export default function ReceivableDetail({ person, onClose, onBack }: Props) {
           createdBy: r.user_id === userId ? 'me' : person,
           ownerUserId: userId,
           taggedFriendUserId: r.tagged_friend_user_id,
+          currency: r.currency ?? null,
         };
       });
 
@@ -492,9 +495,9 @@ export default function ReceivableDetail({ person, onClose, onBack }: Props) {
         </View>
         <View style={{ alignItems: 'flex-end' }}>
           <Text style={[st.rowAmount, { color: isRedSection ? '#e74c3c' : (tab === 'pending' ? TEAL : '#111111') }]}>
-            {fmt(bill.remaining)}
+            {fmt(toDefault(bill.remaining, bill.currency))}
           </Text>
-          <Text style={st.rowSub}>Total: {fmt(bill.owed)} · Paid: {fmt(bill.paid)}</Text>
+          <Text style={st.rowSub}>Total: {fmt(toDefault(bill.owed, bill.currency))} · Paid: {fmt(toDefault(bill.paid, bill.currency))}</Text>
         </View>
       </TouchableOpacity>
     );
@@ -518,7 +521,7 @@ export default function ReceivableDetail({ person, onClose, onBack }: Props) {
   const settleBar = mode === 'settle' && selectedIds.size > 0 ? (
     <View style={{ padding: DC.pagePadding, paddingBottom: 100, borderTopWidth: 1, borderTopColor: Colors.border, backgroundColor: Colors.white }}>
       <Text style={{ fontFamily: AppFont.regular, fontSize: 12, color: Colors.muted, marginBottom: 8 }}>
-        {selectedIds.size} selected · {settleTab === 'returns' ? `total: PHP ${fmt(selectedTotal)}` : `total: PHP ${fmt(selectedTotal)}`}
+        {selectedIds.size} selected · total: {defaultCurrency} {fmt(toDefault(selectedTotal, null))}
       </Text>
       {settleTab === 'returns' ? (
         <TouchableOpacity
@@ -675,9 +678,9 @@ export default function ReceivableDetail({ person, onClose, onBack }: Props) {
                     </View>
                     <View style={{ alignItems: 'flex-end' }}>
                       <Text style={[st.rowAmount, { color: isRed ? '#e74c3c' : TEAL }]}>
-                        {fmt(secRemaining)}
+                        {fmt(toDefault(secRemaining, null))}
                       </Text>
-                      <Text style={st.rowSub}>Total: {fmt(secOwed)} · Paid: {fmt(secPaid)}</Text>
+                      <Text style={st.rowSub}>Total: {fmt(toDefault(secOwed, null))} · Paid: {fmt(toDefault(secPaid, null))}</Text>
                     </View>
                   </View>
                 </View>
@@ -695,7 +698,7 @@ export default function ReceivableDetail({ person, onClose, onBack }: Props) {
               <Text style={{ fontFamily: AppFont.bold, fontSize: 16, color: '#111' }}>Partial Payment</Text>
               <Text style={{ fontFamily: AppFont.regular, fontSize: 11, color: Colors.muted }}>Amount (max: {fmt(selectedTotal)})</Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: DC.cardBorder, borderRadius: Radius.md, paddingHorizontal: 12, paddingVertical: 10 }}>
-                <Text style={{ fontFamily: AppFont.bold, fontSize: 14, color: Colors.muted, marginRight: 6 }}>PHP</Text>
+                <Text style={{ fontFamily: AppFont.bold, fontSize: 14, color: Colors.muted, marginRight: 6 }}>{defaultCurrency}</Text>
                 <TextInput
                   style={{ flex: 1, fontFamily: AppFont.monoBold, fontSize: 16, color: '#111', padding: 0, margin: 0 }}
                   value={settleAmount}

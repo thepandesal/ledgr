@@ -18,6 +18,7 @@ import { SvgXml } from 'react-native-svg';
 import NavIcon from '@/components/ui/NavIcons';
 import { recordDirection } from '../../src/lib/recordDirection';
 import { dateFilter, MONTH_LABELS } from '../../src/lib/dateFilter';
+import { useCurrencyConvert } from '../../src/lib/useCurrencyConvert';
 
 const SVG_BACK   = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12"><path fill="currentColor" d="M10.5 6a.75.75 0 0 0-.75-.75H3.81l1.97-1.97a.75.75 0 0 0-1.06-1.06L1.47 5.47a.75.75 0 0 0 0 1.06l3.25 3.25a.75.75 0 0 0 1.06-1.06L3.81 6.75h5.94A.75.75 0 0 0 10.5 6" /></svg>`;
 const SVG_ADD    = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="currentColor" d="M12 4.75c.69 0 1.25.56 1.25 1.25v4.75H18a1.25 1.25 0 1 1 0 2.5h-4.75V18a1.25 1.25 0 1 1-2.5 0v-4.75H6a1.25 1.25 0 1 1 0-2.5h4.75V6c0-.69.56-1.25 1.25-1.25" /></svg>`;
@@ -47,6 +48,7 @@ interface Props {
 
 export default function RecordingsPanel({ onClose, categoryId, categoryName, spaceId: propSpaceId, spaceName }: Props) {
   const { userId, defaultCurrency } = useUser();
+  const { toDefault } = useCurrencyConvert();
   const insets = useSafeAreaInsets();
   const { openRecording, switchTab, toggleNotifDropdown } = useNav();
   const router = useRouter();
@@ -301,7 +303,7 @@ export default function RecordingsPanel({ onClose, categoryId, categoryName, spa
                       </Text>
                     </View>
                     {/* Amount */}
-                    <Text style={s.rowAmount} numberOfLines={1}>{isOut ? '- ' : ''}{fmt(Number(r._displayAmount ?? r.amount))}</Text>
+                    <Text style={s.rowAmount} numberOfLines={1}>{isOut ? '- ' : ''}{fmt(toDefault(Number(r._displayAmount ?? r.amount), r.currency))}</Text>
                   </TouchableOpacity>
                 );
               })}

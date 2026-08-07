@@ -14,6 +14,7 @@ import { LOADING_SPINNER_SVG_DATA_URI } from '../../../src/lib/loadingSpinnerBas
 import BottomSheet from '@/components/ui/BottomSheet';
 import { useState, useMemo, useEffect } from 'react';
 import { dateFilter } from '../../../src/lib/dateFilter';
+import { useCurrencyConvert } from '../../../src/lib/useCurrencyConvert';
 
 async function receiptActions({
   action, entry, userId, supabaseClient, onDone,
@@ -46,6 +47,7 @@ type DateMode = 'monthly' | '3months';
 export default function HomeScreen({ isActive }: { isActive?: boolean }) {
   const { userId, userName } = useUser();
   const { switchTab, openRecording, openRecordingsPanel, openReceivablesPanel, openSplitBill, openRemindersPanel } = useNav();
+  const { toDefault, defaultCurrency } = useCurrencyConvert();
   const router = useRouter();
   const queryClient = useQueryClient();
   const [dateMode, setDateMode] = useState<DateMode>('monthly');
@@ -463,7 +465,7 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
                         <Text style={s.receiptSub} numberOfLines={1}>{r.categories?.name ?? r.space?.name ?? 'No Category'}</Text>
                       </View>
                       <View style={{ alignItems: 'flex-end' }}>
-                        <Text style={[s.loanAmount, { color: isOut ? DC.btnDangerBg : DC.incomeColor }]}>{isOut ? '- ' : ''}{fmt(Number(r.amount))}</Text>
+                        <Text style={[s.loanAmount, { color: isOut ? DC.btnDangerBg : DC.incomeColor }]}>{isOut ? '- ' : ''}{fmt(toDefault(Number(r.amount), r.currency))}</Text>
                       </View>
                     </TouchableOpacity>
                   );
@@ -502,7 +504,7 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
                   <Text style={[s.loanName, p.isUnassigned && { color: DC.pageTextMuted, fontStyle: 'italic' }]} numberOfLines={1}>{p.person}</Text>
                   <View style={{ alignItems: 'flex-end' }}>
                     <Text style={s.loanLabel}>{isNegative ? 'You Owe' : 'Owes You'}</Text>
-                    <Text style={[s.loanAmount, { color: isNegative ? DC.btnDangerBg : DC.incomeColor }]}>{fmt(absNet)}</Text>
+                    <Text style={[s.loanAmount, { color: isNegative ? DC.btnDangerBg : DC.incomeColor }]}>{fmt(toDefault(absNet, null))}</Text>
                   </View>
                 </TouchableOpacity>
               );

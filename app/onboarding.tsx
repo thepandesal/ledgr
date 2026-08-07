@@ -9,9 +9,17 @@ import TopHeader from '../components/ui/TopHeader';
 import { AVATAR_SVGS } from '../src/lib/avatarSvgs';
 import { DC } from '../src/lib/design';
 
+const CURRENCIES = [
+  'USD','EUR','GBP','JPY','AUD','CAD','CHF','CNY','HKD','SGD',
+  'PHP','INR','KRW','MXN','BRL','ZAR','SEK','NOK','DKK','NZD',
+  'THB','MYR','IDR','VND','AED','SAR','TRY','PLN','CZK','HUF',
+];
+
 export default function OnboardingScreen() {
   const router = useRouter();
   const [name, setName] = useState('');
+  const [currency, setCurrency] = useState('USD');
+  const [currencySearch, setCurrencySearch] = useState('');
   const [selectedIcon, setSelectedIcon] = useState<number | null>(null);
   const [error, setError] = useState('');
 
@@ -27,10 +35,17 @@ export default function OnboardingScreen() {
     if (!name.trim()) { setError('Name is required.'); return; }
     if (selectedIcon === null) { setError('Please select an icon.'); return; }
     try {
+      const { data: { user } } = await supabase.auth.getUser();
       const { error: updateError } = await supabase.auth.updateUser({
         data: { full_name: name.trim(), onboarding_pending: true, avatar_index: selectedIcon },
       });
       if (updateError) throw updateError;
+      if (user?.id) {
+        await supabase.from('user_settings').upsert(
+          { user_id: user.id, default_currency: currency, updated_at: new Date().toISOString() },
+          { onConflict: 'user_id' }
+        );
+      }
       router.replace('/(app)/(tabs)');
     } catch (e: any) {
       setError(e.message ?? 'Something went wrong.');
@@ -51,6 +66,30 @@ export default function OnboardingScreen() {
           autoFocus
           returnKeyType="done"
         />
+
+        <Text style={s.sectionHeader}>Currency</Text>
+        <Text style={s.sectionSub}>All transactions will be displayed in this currency.</Text>
+        <TextInput
+          style={[s.input, { marginBottom: 10 }]}
+          placeholder="Search currency..."
+          placeholderTextColor="#d2d2d2"
+          value={currencySearch}
+          onChangeText={setCurrencySearch}
+          autoCapitalize="characters"
+          returnKeyType="done"
+        />
+        <View style={s.currencyGrid}>
+          {CURRENCIES.filter(c => c.includes(currencySearch.toUpperCase())).map(c => (
+            <TouchableOpacity
+              key={c}
+              style={[s.currencyChip, currency === c && s.currencyChipActive]}
+              onPress={() => { setCurrency(c); setCurrencySearch(''); }}
+              activeOpacity={0.7}
+            >
+              <Text style={[s.currencyChipText, currency === c && s.currencyChipTextActive]}>{c}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
 
         <Text style={s.sectionHeader}>Icon</Text>
         <View style={s.grid}>
@@ -158,4 +197,10 @@ const s = StyleSheet.create({
   },
   buttonDisabled: { opacity: 0.4 },
   buttonText: { fontFamily: 'Poppins-Regular', fontSize: 15, color: '#4394ff', letterSpacing: 1.5 },
+  sectionSub: { fontFamily: 'Poppins-Regular', fontSize: 11, color: '#999999', marginBottom: 12, marginTop: -6 },
+  currencyGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
+  currencyChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, borderWidth: 1, borderColor: '#d2d2d2', backgroundColor: '#ffffff' },
+  currencyChipActive: { backgroundColor: '#4394ff', borderColor: '#4394ff' },
+  currencyChipText: { fontFamily: 'Poppins-Regular', fontSize: 12, color: '#555555' },
+  currencyChipTextActive: { fontFamily: 'Poppins-SemiBold', fontSize: 12, color: '#ffffff' },
 });
