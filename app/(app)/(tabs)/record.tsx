@@ -7,7 +7,7 @@ import { supabase } from '../../../src/lib/supabase';
 import { AppFont } from '../../../src/lib/fonts';
 import { DC } from '../../../src/lib/design';
 import { SAVINGS_COIN_LOOP_URI, SAVINGS_DONE_URI } from '../../../src/lib/savingsAnimBase64';
-import { SYSTEM_CATEGORIES as CATEGORIES, CatIcon } from '../../../src/lib/systemCategories';
+import { useSystemCategories } from '../../../src/lib/systemCategories';
 
 // ── Brand tokens ─────────────────────────────────────────────────────────────
 const ACCENT      = DC.headerBlueBg;  // #4394ff
@@ -51,8 +51,9 @@ export default function RecordScreen({ isActive }: { isActive?: boolean }) {
   const [entry, setEntry] = useState('');
   const [prev, setPrev] = useState<number | null>(null);
   const [op, setOp] = useState<string | null>(null);
-  const [category, setCategory] = useState<string>('');
+  const [category, setCategory] = useState<number | null>(null);
   const [userCategories, setUserCategories] = useState<any[]>([]);
+  const systemCategories = useSystemCategories();
   const [spaceId, setSpaceId] = useState<string | null>(null);
   const [spaces, setSpaces] = useState<{ id: string; name: string }[]>([]);
   const [saving, setSaving] = useState(false);
@@ -157,11 +158,11 @@ export default function RecordScreen({ isActive }: { isActive?: boolean }) {
       const status = (isLoan && direction === 'out') ? 'unpaid'
         : (isLoan && direction === 'in') ? 'unpaid'
         : (type === 'income' ? 'received' : 'paid');
-      const cat = CATEGORIES.find(c => c.key === category);
-      const matched = userCategories.find(c => c.name.toLowerCase() === (cat?.label ?? '').toLowerCase());
+      const cat = systemCategories.find(c => c.id === category);
+      const matched = userCategories.find(c => c.name.toLowerCase() === (cat?.name ?? '').toLowerCase());
       const recordingName = useCustomName && recordName.trim()
         ? recordName.trim()
-        : cat?.label ?? (isLoan ? 'Loan' : (direction === 'in' ? 'Money In' : 'Expense'));
+        : cat?.name ?? (isLoan ? 'Loan' : (direction === 'in' ? 'Money In' : 'Expense'));
       const { error: err } = await supabase.from('recordings').insert({
         user_id: currentUser.id,
         name: recordingName,
@@ -182,7 +183,7 @@ export default function RecordScreen({ isActive }: { isActive?: boolean }) {
       queryClient.invalidateQueries({ queryKey: ['home-recent', userId] });
       queryClient.invalidateQueries({ queryKey: ['home-shared', userId] });
       queryClient.invalidateQueries({ queryKey: ['recordings-panel', userId] });
-      setEntry(''); setPrev(null); setOp(null); setIsLoan(false); setSpaceId(null); setBorrower(''); setBorrowerInput(''); setShowBorrowerDropdown(false);
+      setEntry(''); setPrev(null); setOp(null); setIsLoan(false); setSpaceId(null); setCategory(null); setBorrower(''); setBorrowerInput(''); setShowBorrowerDropdown(false);
       setShowLoader(true);
       setSaved(true);
       if (returnToPanel) {
@@ -345,17 +346,16 @@ export default function RecordScreen({ isActive }: { isActive?: boolean }) {
           Categories {!useCustomName && <Text style={s.asterisk}>*</Text>}
         </Text>
         <View style={s.catGrid}>
-          {CATEGORIES.map(c => {
-            const selected = category === c.key;
+          {systemCategories.map(c => {
+            const selected = category === c.id;
             return (
               <TouchableOpacity
-                key={c.key}
+                key={c.id}
                 style={[s.catChip, selected && s.catChipOn]}
-                onPress={() => { setCategory(selected ? '' : c.key); setError(''); setSaved(false); }}
+                onPress={() => { setCategory(selected ? null : c.id); setError(''); setSaved(false); }}
                 activeOpacity={0.8}
               >
-                <CatIcon name={c.key} color={selected ? '#ffffff' : '#000000'} size={17} />
-                <Text style={[s.catName, selected && s.catNameOn]} numberOfLines={1}>{c.label}</Text>
+                <Text style={[s.catName, selected && s.catNameOn]} numberOfLines={1}>{c.name}</Text>
               </TouchableOpacity>
             );
           })}

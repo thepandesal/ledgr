@@ -13,9 +13,6 @@ import { supabase } from '../../src/lib/supabase';
 import { DC } from '../../src/lib/design';
 import { useNav } from '../../src/lib/NavContext';
 import AddExpenseScreen from './add-expense';
-import { SYSTEM_CATEGORIES, CatIcon, catIconKeyForName } from '../../src/lib/systemCategories';
-import { SvgXml } from 'react-native-svg';
-import NavIcon from '@/components/ui/NavIcons';
 import { recordDirection } from '../../src/lib/recordDirection';
 import { dateFilter, MONTH_LABELS } from '../../src/lib/dateFilter';
 import { useCurrencyConvert } from '../../src/lib/useCurrencyConvert';
@@ -273,9 +270,6 @@ export default function RecordingsPanel({ onClose, categoryId, categoryName, spa
               </Text>
               {items.map((r, i) => {
                 const isOut    = ['expense','debt','payment'].includes(r.type);
-                const iconKey  = catIconKeyForName(r.categories?.name) ?? 'shopping';
-                const meta     = SYSTEM_CATEGORIES.find(c => c.key === iconKey);
-                const catColor = r.categories?.color ?? meta?.color ?? '#373737';
                 const nameStr  = r.name.split(' ').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
                 const isSelected = selected.has(r.id);
                 return (
@@ -291,7 +285,7 @@ export default function RecordingsPanel({ onClose, categoryId, categoryName, spa
                     </TouchableOpacity>
                     {/* Category icon */}
                     <View style={s.iconWrap}>
-                      <CatIcon name={iconKey} color={DC.pageText} size={26} />
+                      <Text style={s.iconInitial}>{(r.categories?.name ?? r.name).charAt(0).toUpperCase()}</Text>
                     </View>
                     {/* Body */}
                     <View style={s.rowBody}>
@@ -412,6 +406,8 @@ const s = StyleSheet.create({
   rowMetaBold:  { fontFamily: 'Poppins-SemiBold', fontSize: 10, color: DC.pageTextMuted },
   rowMetaReg:   { fontFamily: 'Poppins-Regular', fontSize: 10, color: DC.pageTextMuted },
   rowAmount:    { fontFamily: 'Poppins-Bold', fontSize: 13, color: DC.pageText, flexShrink: 0 },
+
+  iconInitial: { fontFamily: 'Poppins-SemiBold', fontSize: 15, color: DC.pageTextMuted },
 
   // modal
   choiceOverlay:  { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32, backgroundColor: 'rgba(0,0,0,0.2)' },

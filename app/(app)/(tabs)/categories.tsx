@@ -13,7 +13,6 @@ import NavIcon from '@/components/ui/NavIcons';
 import { Colors } from '@/components/ui/theme';
 import { DC } from '../../../src/lib/design';
 import { useNav } from '../../../src/lib/NavContext';
-import { CatIcon, catIconKeyForName } from '../../../src/lib/systemCategories';
 import { dateFilter, MONTH_LABELS } from '../../../src/lib/dateFilter';
 
 const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -133,7 +132,6 @@ export default function CategoriesScreen() {
           ) : (
             <View style={s.grid}>
               {categories.map(cat => {
-                const iconKey = catIconKeyForName(cat.name) ?? 'shopping';
                 return (
                   <TouchableOpacity
                     key={cat.id}
@@ -142,7 +140,7 @@ export default function CategoriesScreen() {
                     onPress={() => openRecordingsPanel({ categoryId: cat.id, categoryName: cat.name })}
                   >
                     <View style={s.iconCircle}>
-                      <CatIcon name={iconKey} color={DC.pageTextMuted} size={26} />
+                      <Text style={s.iconInitial}>{cat.name.charAt(0).toUpperCase()}</Text>
                     </View>
                     <Text style={s.gridLabel} numberOfLines={2}>{cat.name}</Text>
                   </TouchableOpacity>
@@ -160,7 +158,6 @@ export default function CategoriesScreen() {
           ) : (
             <View style={s.reportList}>
               {reportRows.map((row, i) => {
-                const iconKey = catIconKeyForName(row.name) ?? 'shopping';
                 const barWidth = (row.total / maxTotal) * 100;
                 return (
                   <View key={row.name} style={s.reportRow}>
@@ -168,7 +165,7 @@ export default function CategoriesScreen() {
                       <Text style={s.reportRankText}>{i + 1}</Text>
                     </View>
                     <View style={s.reportIconCircle}>
-                      <CatIcon name={iconKey} color={DC.pageTextMuted} size={20} />
+                      <Text style={s.iconInitial}>{row.name.charAt(0).toUpperCase()}</Text>
                     </View>
                     <View style={s.reportBody}>
                       <View style={s.reportTopRow}>
@@ -260,6 +257,8 @@ const s = StyleSheet.create({
   reportAmount: { fontFamily: 'Poppins-Bold', fontSize: 13, color: DC.pageText },
   reportCount:  { fontFamily: 'Poppins-Regular', fontSize: 10, color: DC.pageTextMuted },
   barTrack: { height: 4, backgroundColor: DC.controlBorder, borderRadius: 2, overflow: 'hidden' },
+  barFill:  { height: 4, backgroundColor: DC.headerBlueBg, borderRadius: 2 },
+  iconInitial: { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: DC.pageTextMuted },
   // date picker styles
   yearNavBtn:   { padding: 8 },
   yearNavArrow: { fontFamily: 'Poppins-Regular', fontSize: 22, color: DC.pageText, lineHeight: 26 },
