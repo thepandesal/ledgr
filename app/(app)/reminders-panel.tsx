@@ -1,6 +1,6 @@
 import {
-  View, Text, StyleSheet, ScrollView, SafeAreaView,
-  TouchableOpacity, RefreshControl, TextInput, Modal,
+  View, Text, StyleSheet, ScrollView,
+  TouchableOpacity, RefreshControl, TextInput,
 } from 'react-native';
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -9,40 +9,72 @@ import { supabase } from '../../src/lib/supabase';
 import { Colors, Radius } from '@/components/ui/theme';
 import { AppFont } from '../../src/lib/fonts';
 import { DC } from '../../src/lib/design';
-import PageHeader from '@/components/ui/PageHeader';
+import TopHeader from '@/components/ui/TopHeader';
+import NavIcon from '@/components/ui/NavIcons';
+import { SvgXml } from 'react-native-svg';
 import { useNav } from '../../src/lib/NavContext';
 import GooeyLoader from '@/components/ui/GooeyLoader';
 import { BlurView } from 'expo-blur';
 import { isReminderDueToday, reminderFrequencyLabel } from '../../src/lib/reminderUtils';
 import BottomSheet from '@/components/ui/BottomSheet';
-const TEAL = '#9cd7d2';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { dateFilter, MONTH_LABELS } from '../../src/lib/dateFilter';
+
+const SVG_ADD = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="currentColor" d="M12 4.75c.69 0 1.25.56 1.25 1.25v4.75H18a1.25 1.25 0 1 1 0 2.5h-4.75V18a1.25 1.25 0 1 1-2.5 0v-4.75H6a1.25 1.25 0 1 1 0-2.5h4.75V6c0-.69.56-1.25 1.25-1.25"/></svg>`;
+
 const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const todayStr = new Date().toISOString().split('T')[0];
+
 interface Props { onClose: () => void; }
+
 export default function RemindersPanel({ onClose }: Props) {
   const { userId } = useUser();
-  const { openRecording, switchTab } = useNav();
+  const insets = useSafeAreaInsets();
+  const { openRecording, toggleNotifDropdown } = useNav();
   const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'paused'>('all');
-  // Action modal state
+  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
+  const [calendarMonth, setCalendarMonth] = useState(new Date().getMonth());
+  const [calendarYear, setCalendarYear] = useState(new Date().getFullYear());
+  const [selectedCalDay, setSelectedCalDay] = useState<number | null>(null);
+
+  // Global date filter
+  const [filterMonth, setFilterMonth] = useState(dateFilter.getMonth());
+  const [filterYear,  setFilterYear]  = useState(dateFilter.getYear());
+  useEffect(() => dateFilter.subscribe(() => {
+    setFilterMonth(dateFilter.getMonth());
+    setFilterYear(dateFilter.getYear());
+  }), []);
+  const { from, to } = useMemo(() => dateFilter.getFromTo(), [filterMonth, filterYear]);
+  const dateLabel = `${MONTH_LABELS[filterMonth]} ${filterYear}`;
+  const [showDateSheet, setShowDateSheet] = useState(false);
+  const [draftMonth, setDraftMonth] = useState(filterMonth);
+  const [draftYear,  setDraftYear]  = useState(filterYear);
+
+  // Add reminder state
+  const [showAddSheet, setShowAddSheet] = useState(false);
+  const [addName, setAddName] = useState('');
+  const [addType, setAddType] = useState<'expense' | 'income'>('expense');
+  const [addDeadlineDay, setAddDeadlineDay] = useState('');
+  const [addCategoryId, setAddCategoryId] = useState<string | null>(null);
+  const [addSpaceId, setAddSpaceId] = useState<string | null>(null);
+  const [addCategories, setAddCategories] = useState<any[]>([]);
+  const [addSpaces, setAddSpaces] = useState<any[]>([]);
+  const [addSaving, setAddSaving] = useState(false);
+
+  // Action sheet state
   const [selectedReminder, setSelectedReminder] = useState<any>(null);
   const [showActions, setShowActions] = useState(false);
-  const [showFulfillModal, setShowFulfillModal] = useState(false);
+  const [showFulfillSheet, setShowFulfillSheet] = useState(false);
   const [fulfillAmount, setFulfillAmount] = useState('');
   const [fulfillSaving, setFulfillSaving] = useState(false);
   const [fulfillIsPartial, setFulfillIsPartial] = useState(false);
   const [fulfillDay, setFulfillDay] = useState(String(new Date().getDate()));
   const [fulfillMonth, setFulfillMonth] = useState(String(new Date().getMonth() + 1));
   const [fulfillYear, setFulfillYear] = useState(String(new Date().getFullYear()));
-  const [showMonthDropdown, setShowMonthDropdown] = useState(false);
-  const [showMoveModal, setShowMoveModal] = useState(false);
-  const [moveMode, setMoveMode] = useState<'copy' | 'move'>('move');
-  const [selectedSpaceId, setSelectedSpaceId] = useState('');
-  const [moveSaving, setMoveSaving] = useState(false);
+
   const now = new Date();
-  const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
-  const monthEnd   = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()}`;
+
   const { data: reminders = [], isLoading: loadingReminders } = useQuery({
     queryKey: ['reminders-panel', userId],
     queryFn: async () => {
@@ -58,8 +90,9 @@ export default function RemindersPanel({ onClose }: Props) {
     },
     enabled: !!userId,
   });
+
   const { data: fulfilledRecs = [], isLoading: loadingRecs } = useQuery({
-    queryKey: ['reminders-panel-recs', userId],
+    queryKey: ['reminders-panel-recs', userId, from, to],
     queryFn: async () => {
       const { data } = await supabase
         .from('recordings')
@@ -67,19 +100,14 @@ export default function RemindersPanel({ onClose }: Props) {
         .eq('user_id', userId)
         .not('reminder_id', 'is', null)
         .neq('status', 'voided')
+        .gte('transaction_date', from)
+        .lte('transaction_date', to)
         .order('transaction_date', { ascending: false });
       return data ?? [];
     },
     enabled: !!userId,
   });
-  const { data: spaces = [] } = useQuery({
-    queryKey: ['spaces-list', userId],
-    queryFn: async () => {
-      const { data } = await supabase.from('spaces').select('id, name').eq('user_id', userId).eq('is_active', true).order('name');
-      return data ?? [];
-    },
-    enabled: !!userId,
-  });
+
   useEffect(() => {
     if (!userId) return;
     const channel = supabase
@@ -93,6 +121,7 @@ export default function RemindersPanel({ onClose }: Props) {
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [userId, queryClient]);
+
   const onRefresh = async () => {
     setRefreshing(true);
     await Promise.all([
@@ -101,7 +130,9 @@ export default function RemindersPanel({ onClose }: Props) {
     ]);
     setRefreshing(false);
   };
+
   const isLoading = loadingReminders || loadingRecs;
+
   const fulfilledMap = useMemo(() => {
     const map: Record<string, any[]> = {};
     fulfilledRecs.forEach((r: any) => {
@@ -110,16 +141,60 @@ export default function RemindersPanel({ onClose }: Props) {
     });
     return map;
   }, [fulfilledRecs]);
+
   const filtered = reminders.filter((r: any) => statusFilter === 'all' || r.status === statusFilter);
-  // Fulfilled = has a recording with paid/received status this month
   const fulfilledFully = (id: string) => fulfilledMap[id]?.some((r: any) => r.status === 'paid' || r.status === 'received') ?? false;
-  // Partial = has recordings this month but none are fully paid/received
   const fulfilledPartially = (id: string) => !fulfilledFully(id) && (fulfilledMap[id]?.length ?? 0) > 0;
-  const fulfilled   = filtered.filter((r: any) => r.status === 'active' && fulfilledFully(r.id));
-  const ongoing     = filtered.filter((r: any) => r.status === 'active' && !fulfilledFully(r.id) && fulfilledPartially(r.id));
-  const notYet      = filtered.filter((r: any) => r.status === 'active' && !fulfilledFully(r.id) && !fulfilledPartially(r.id));
-  const paused      = filtered.filter((r: any) => r.status === 'paused');
-  const openActions = (r: any) => { setSelectedReminder(r); setShowActions(true); };
+  const fulfilled = filtered.filter((r: any) => r.status === 'active' && fulfilledFully(r.id));
+  const ongoing   = filtered.filter((r: any) => r.status === 'active' && !fulfilledFully(r.id) && fulfilledPartially(r.id));
+  const notYet    = filtered.filter((r: any) => r.status === 'active' && !fulfilledFully(r.id) && !fulfilledPartially(r.id));
+  const paused    = filtered.filter((r: any) => r.status === 'paused');
+
+  // Map day-of-month -> reminders due that day
+  const dueDaysMap = useMemo(() => {
+    const map: Record<number, any[]> = {};
+    reminders.filter((r: any) => r.status === 'active' && r.day_of_month).forEach((r: any) => {
+      const d = Number(r.day_of_month);
+      if (!map[d]) map[d] = [];
+      map[d].push(r);
+    });
+    return map;
+  }, [reminders]);
+
+  const openAddSheet = async () => {
+    setAddName(''); setAddType('expense'); setAddDeadlineDay(''); setAddCategoryId(null); setAddSpaceId(null);
+    const [{ data: cats }, { data: sps }] = await Promise.all([
+      supabase.from('categories').select('id, name').eq('user_id', userId).order('name'),
+      supabase.from('spaces').select('id, name').eq('user_id', userId).eq('is_active', true).order('name'),
+    ]);
+    setAddCategories(cats ?? []);
+    setAddSpaces(sps ?? []);
+    setShowAddSheet(true);
+  };
+  const saveReminder = async () => {
+    if (!addName.trim() || addSaving) return;
+    setAddSaving(true);
+    await supabase.from('recording_reminders').insert({
+      user_id: userId,
+      name: addName.trim(),
+      recording_type: addType,
+      frequency: 'monthly',
+      day_of_month: addDeadlineDay ? parseInt(addDeadlineDay) : null,
+      workspace_id: addSpaceId ?? null,
+      category_id: addCategoryId ?? null,
+      start_date: new Date().toISOString().split('T')[0],
+      status: 'active',
+    });
+    setAddSaving(false);
+    setAddName('');
+    setAddType('expense');
+    setAddDeadlineDay('');
+    setAddCategoryId(null);
+    setAddSpaceId(null);
+    setShowAddSheet(false);
+    queryClient.invalidateQueries({ queryKey: ['reminders-panel', userId] });
+  };
+
   const handleFulfill = async () => {
     if (!selectedReminder || !fulfillAmount) return;
     setFulfillSaving(true);
@@ -136,206 +211,335 @@ export default function RemindersPanel({ onClose }: Props) {
       reminder_id: selectedReminder.id,
     });
     setFulfillSaving(false);
-    setShowFulfillModal(false);
+    setShowFulfillSheet(false);
     setFulfillAmount('');
     setFulfillIsPartial(false);
-    setShowMonthDropdown(false);
-    const today = new Date();
-    setFulfillDay(String(today.getDate()));
-    setFulfillMonth(String(today.getMonth() + 1));
-    setFulfillYear(String(today.getFullYear()));
     queryClient.invalidateQueries({ queryKey: ['reminders-panel-recs', userId] });
   };
+
   const handleDelete = async () => {
     if (!selectedReminder) return;
     await supabase.from('recording_reminders').delete().eq('id', selectedReminder.id);
     setShowActions(false);
     queryClient.invalidateQueries({ queryKey: ['reminders-panel', userId] });
   };
-  const handleMoveOrCopy = async () => {
-    if (!selectedReminder || !selectedSpaceId) return;
-    setMoveSaving(true);
-    if (moveMode === 'move') {
-      await supabase.from('recording_reminders').update({ workspace_id: selectedSpaceId }).eq('id', selectedReminder.id);
-    } else {
-      const { id, created_at, ...rest } = selectedReminder;
-      await supabase.from('recording_reminders').insert({ ...rest, workspace_id: selectedSpaceId, user_id: userId });
-    }
-    setMoveSaving(false);
-    setShowMoveModal(false);
+
+  const handleTogglePause = async () => {
+    if (!selectedReminder) return;
+    const newStatus = selectedReminder.status === 'active' ? 'paused' : 'active';
+    await supabase.from('recording_reminders').update({ status: newStatus }).eq('id', selectedReminder.id);
+    setShowActions(false);
     queryClient.invalidateQueries({ queryKey: ['reminders-panel', userId] });
   };
-  const renderFulfilledCard = (r: any, i: number, arr: any[]) => {
+
+  const renderRow = (r: any, i: number, arr: any[]) => {
+    const isLast = i === arr.length - 1;
     const recs = fulfilledMap[r.id] ?? [];
+    const isFulfilled = fulfilledFully(r.id);
+    const isPartial = fulfilledPartially(r.id);
+    const isDueToday = isReminderDueToday(r, now);
+
     return (
-      <TouchableOpacity key={r.id} style={[st.card, i === arr.length - 1 && { marginBottom: 0 }]} activeOpacity={0.85} onLongPress={() => openActions(r)}>
-        <View style={st.cardHeader}>
-          <View style={{ flex: 1 }}>
-            <Text style={st.cardName} numberOfLines={1}>{r.name}</Text>
-            {r.space?.name && <Text style={st.spaceName}>{r.space.name}</Text>}
-            <Text style={st.cardSub}>{reminderFrequencyLabel(r)} · {r.recording_type}</Text>
-          </View>
-          <TouchableOpacity onPress={() => openActions(r)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+      <TouchableOpacity
+        key={r.id}
+        style={[st.row, isLast && st.rowLast]}
+        activeOpacity={0.7}
+        onPress={() => { setSelectedReminder(r); setShowActions(true); }}
+      >
+        <View style={{ flex: 1, gap: 2 }}>
+          <Text style={st.rowName} numberOfLines={1}>{r.name}</Text>
+          <Text style={st.rowSub}>{reminderFrequencyLabel(r)} · {r.recording_type}</Text>
+          {r.space?.name && <Text style={[st.rowSub, { color: DC.viewBtnText }]}>{r.space.name}</Text>}
+        </View>
+        <View style={{ alignItems: 'flex-end', gap: 4 }}>
+          {isFulfilled && (
             <View style={[st.badge, { backgroundColor: '#4f928922' }]}>
               <Text style={[st.badgeText, { color: '#4f9289' }]}>fulfilled</Text>
             </View>
-          </TouchableOpacity>
-        </View>
-        {recs.map((rec: any, ri: number) => (
-          <TouchableOpacity key={rec.id} style={[st.recRow, ri === recs.length - 1 && { borderBottomWidth: 0 }]} activeOpacity={0.7} onPress={() => openRecording(rec.id)}>
-            <View style={{ flex: 1 }}>
-              <Text style={st.recName} numberOfLines={1}>{rec.name}</Text>
-              <Text style={st.recMeta}>{new Date(rec.transaction_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · {rec.type}</Text>
-            </View>
-            <Text style={st.recAmount}>{fmt(Number(rec.amount))}</Text>
-          </TouchableOpacity>
-        ))}
-      </TouchableOpacity>
-    );
-  };
-  const renderSimpleRow = (r: any, i: number, arr: any[]) => {
-    const hasPartial = fulfilledPartially(r.id);
-    const partialRecs = fulfilledMap[r.id] ?? [];
-    const isLast = i === arr.length - 1;
-    if (hasPartial) {
-      return (
-        <TouchableOpacity key={r.id} style={[st.card, isLast && { marginBottom: 0 }]} activeOpacity={0.85} onPress={() => openActions(r)}>
-          <View style={st.cardHeader}>
-            <View style={{ flex: 1 }}>
-              <Text style={st.cardName} numberOfLines={1}>{r.name}</Text>
-              {r.space?.name && <Text style={st.spaceName}>{r.space.name}</Text>}
-              <Text style={st.cardSub}>{reminderFrequencyLabel(r)} · {r.recording_type}</Text>
-            </View>
+          )}
+          {isPartial && (
             <View style={[st.badge, { backgroundColor: '#FFAB9122' }]}>
-              <Text style={[st.badgeText, { color: '#FFAB91' }]}>partial</Text>
+              <Text style={[st.badgeText, { color: '#e07b50' }]}>partial</Text>
             </View>
-          </View>
-          {partialRecs.map((rec: any, ri: number) => (
-            <TouchableOpacity key={rec.id} style={[st.recRow, ri === partialRecs.length - 1 && { borderBottomWidth: 0 }]} activeOpacity={0.7} onPress={() => openRecording(rec.id)}>
-              <View style={{ flex: 1 }}>
-                <Text style={st.recName} numberOfLines={1}>{rec.name}</Text>
-                <Text style={st.recMeta}>{new Date(rec.transaction_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · {rec.type}</Text>
-              </View>
-              <Text style={st.recAmount}>{fmt(Number(rec.amount))}</Text>
-            </TouchableOpacity>
-          ))}
-        </TouchableOpacity>
-      );
-    }
-    return (
-      <TouchableOpacity key={r.id} style={[st.row, isLast && st.rowLast]} activeOpacity={0.7} onPress={() => openActions(r)}>
-        <View style={{ flex: 1, gap: 3 }}>
-          <Text style={st.rowName} numberOfLines={1}>{r.name}</Text>
-          {r.space?.name && <Text style={st.spaceName}>{r.space.name}</Text>}
-          <Text style={st.rowSub}>{reminderFrequencyLabel(r)} · {r.recording_type}</Text>
-          {isReminderDueToday(r, now) && (
-            <View style={[st.badge, { backgroundColor: TEAL + '22' }]}>
-              <Text style={[st.badgeText, { color: '#4f9289' }]}>due today</Text>
+          )}
+          {isDueToday && !isFulfilled && !isPartial && (
+            <View style={[st.badge, { backgroundColor: DC.viewBtnBg }]}>
+              <Text style={[st.badgeText, { color: DC.viewBtnText }]}>due today</Text>
+            </View>
+          )}
+          {r.status === 'paused' && (
+            <View style={[st.badge, { backgroundColor: Colors.surface }]}>
+              <Text style={[st.badgeText, { color: Colors.muted }]}>paused</Text>
             </View>
           )}
         </View>
-        <View style={[st.statusDot, { backgroundColor: r.status === 'active' ? TEAL : Colors.faint }]} />
       </TouchableOpacity>
     );
   };
+
+  const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
   return (
-    <SafeAreaView style={st.root}>
-      <PageHeader title="Reminders" onBack={onClose} titleColor={TEAL} right={
-        <TouchableOpacity onPress={() => { switchTab('reminders'); onClose(); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-        </TouchableOpacity>
-      } />
-      <View style={st.filterRow}>
-        {(['all', 'active', 'paused'] as const).map(f => (
-          <TouchableOpacity key={f} style={[st.filterBtn, statusFilter === f && st.filterBtnActive]} onPress={() => setStatusFilter(f)} activeOpacity={0.7}>
-            <Text style={[st.filterBtnText, statusFilter === f && st.filterBtnTextActive]}>{f}</Text>
+    <View style={st.root}>
+      <TopHeader
+        title="Reminders"
+        subtitle={dateLabel}
+        onSubtitlePress={() => { setDraftMonth(filterMonth); setDraftYear(filterYear); setShowDateSheet(true); }}
+        onBack={onClose}
+        centered
+        variant="blue"
+        topInset={insets.top}
+        right={
+          <TouchableOpacity onPress={toggleNotifDropdown} activeOpacity={0.7}>
+            <NavIcon name="notifications" size={22} color="#ffffff" />
           </TouchableOpacity>
-        ))}
+        }
+      />
+
+      {/* View toggle + filters */}
+      <View style={st.filterRow}>
+        <View style={st.segmentOuter}>
+          <TouchableOpacity style={[st.segmentBtn, viewMode === 'list' && st.segmentBtnActive]} onPress={() => setViewMode('list')} activeOpacity={0.8}>
+            <Text style={[st.segmentBtnText, viewMode === 'list' && st.segmentBtnTextActive]}>List</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[st.segmentBtn, viewMode === 'calendar' && st.segmentBtnActive]} onPress={() => setViewMode('calendar')} activeOpacity={0.8}>
+            <Text style={[st.segmentBtnText, viewMode === 'calendar' && st.segmentBtnTextActive]}>Calendar</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={{ marginLeft: 'auto' }}>
+          <TouchableOpacity
+            onPress={() => openAddSheet()}
+            style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: DC.viewBtnBg, alignItems: 'center', justifyContent: 'center' }}
+            activeOpacity={0.7}
+          >
+            <SvgXml xml={SVG_ADD} width={18} height={18} color={DC.viewBtnText} />
+          </TouchableOpacity>
+        </View>
       </View>
+      {viewMode === 'list' && (
+        <View style={[st.filterRow, { paddingTop: 0 }]}>
+          {(['all', 'active', 'paused'] as const).map(f => (
+            <TouchableOpacity
+              key={f}
+              style={[st.filterBtn, statusFilter === f && st.filterBtnActive]}
+              onPress={() => setStatusFilter(f)}
+              activeOpacity={0.7}
+            >
+              <Text style={[st.filterBtnText, statusFilter === f && st.filterBtnTextActive]}>
+                {f.charAt(0).toUpperCase() + f.slice(1)}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+
       {isLoading ? (
         <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill}><GooeyLoader /></BlurView>
-      ) : filtered.length === 0 ? (
-        <View style={st.empty}><Text style={st.emptyText}>no reminders found</Text></View>
+      ) : viewMode === 'calendar' ? (() => {
+        const daysInMonth = new Date(calendarYear, calendarMonth + 1, 0).getDate();
+        const firstDow = new Date(calendarYear, calendarMonth, 1).getDay();
+        const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+        const DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+        const cells: (number | null)[] = [...Array(firstDow).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
+        while (cells.length % 7 !== 0) cells.push(null);
+        const todayDay = now.getMonth() === calendarMonth && now.getFullYear() === calendarYear ? now.getDate() : -1;
+        const selectedDayReminders = selectedCalDay ? (dueDaysMap[selectedCalDay] ?? []) : [];
+        return (
+          <ScrollView contentContainerStyle={st.scroll} showsVerticalScrollIndicator={false}>
+            {/* Month nav */}
+            <View style={st.calHeader}>
+              <TouchableOpacity onPress={() => { const d = new Date(calendarYear, calendarMonth - 1, 1); setCalendarMonth(d.getMonth()); setCalendarYear(d.getFullYear()); setSelectedCalDay(null); }} activeOpacity={0.7} style={st.calNavBtn}>
+                <Text style={st.calNavText}>‹</Text>
+              </TouchableOpacity>
+              <Text style={st.calMonthLabel}>{MONTH_NAMES[calendarMonth]} {calendarYear}</Text>
+              <TouchableOpacity onPress={() => { const d = new Date(calendarYear, calendarMonth + 1, 1); setCalendarMonth(d.getMonth()); setCalendarYear(d.getFullYear()); setSelectedCalDay(null); }} activeOpacity={0.7} style={st.calNavBtn}>
+                <Text style={st.calNavText}>›</Text>
+              </TouchableOpacity>
+            </View>
+            {/* Day of week labels */}
+            <View style={st.calDowRow}>
+              {DOW.map(d => <Text key={d} style={st.calDowText}>{d}</Text>)}
+            </View>
+            {/* Day cells */}
+            {Array.from({ length: cells.length / 7 }, (_, wi) => (
+              <View key={wi} style={st.calWeekRow}>
+                {cells.slice(wi * 7, wi * 7 + 7).map((day, di) => {
+                  const hasDue = day !== null && !!dueDaysMap[day];
+                  const isToday = day === todayDay;
+                  const isSelected = day === selectedCalDay;
+                  return (
+                    <TouchableOpacity
+                      key={di}
+                      style={[st.calCell, isSelected && st.calCellSelected, isToday && !isSelected && st.calCellToday]}
+                      onPress={() => day && setSelectedCalDay(day === selectedCalDay ? null : day)}
+                      activeOpacity={day ? 0.7 : 1}
+                    >
+                      <Text style={[st.calCellText, isSelected && st.calCellTextSelected, isToday && !isSelected && st.calCellTextToday]}>
+                        {day ?? ''}
+                      </Text>
+                      {hasDue && <View style={[st.calDot, isSelected && { backgroundColor: '#fff' }]} />}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            ))}
+            {/* Selected day reminders */}
+            {selectedCalDay !== null && (
+              <View style={{ marginTop: 16 }}>
+                <Text style={st.sectionLabel}>Due on day {selectedCalDay}</Text>
+                {selectedDayReminders.length === 0 ? (
+                  <Text style={st.rowSub}>no reminders</Text>
+                ) : (
+                  <View style={st.list}>
+                    {selectedDayReminders.map((r: any, i: number) => renderRow(r, i, selectedDayReminders))}
+                  </View>
+                )}
+              </View>
+            )}
+          </ScrollView>
+        );
+      })() : filtered.length === 0 ? (
+        <View style={st.empty}>
+          <Text style={st.emptyText}>no reminders found</Text>
+          <TouchableOpacity style={st.emptyAddBtn} onPress={() => openAddSheet()} activeOpacity={0.8}>
+            <Text style={st.emptyAddBtnText}>+ Add Reminder</Text>
+          </TouchableOpacity>
+        </View>
       ) : (
-        <ScrollView contentContainerStyle={st.scroll} showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
+        <ScrollView
+          contentContainerStyle={st.scroll}
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        >
           {fulfilled.length > 0 && (
             <>
-              <Text style={st.sectionTitle}>Fulfilled</Text>
-              {fulfilled.map((r, i) => renderFulfilledCard(r, i, fulfilled))}
+              <Text style={st.sectionLabel}>Fulfilled</Text>
+              <View style={st.list}>{fulfilled.map((r, i) => renderRow(r, i, fulfilled))}</View>
             </>
           )}
           {ongoing.length > 0 && (
             <>
-              <Text style={st.sectionTitle}>Ongoing</Text>
-              <View style={st.list}>{ongoing.map((r, i) => renderSimpleRow(r, i, ongoing))}</View>
-            </>
-          )}
-          {paused.length > 0 && (
-            <>
-              <Text style={[st.sectionTitle, { color: Colors.muted }]}>Paused</Text>
-              <View style={st.list}>{paused.map((r, i) => renderSimpleRow(r, i, paused))}</View>
+              <Text style={st.sectionLabel}>Ongoing</Text>
+              <View style={st.list}>{ongoing.map((r, i) => renderRow(r, i, ongoing))}</View>
             </>
           )}
           {notYet.length > 0 && (
             <>
-              <Text style={[st.sectionTitle, { color: Colors.muted }]}>Not Yet Fulfilled</Text>
-              <View style={st.list}>{notYet.map((r, i) => renderSimpleRow(r, i, notYet))}</View>
+              <Text style={st.sectionLabel}>Not Yet Fulfilled</Text>
+              <View style={st.list}>{notYet.map((r, i) => renderRow(r, i, notYet))}</View>
+            </>
+          )}
+          {paused.length > 0 && (
+            <>
+              <Text style={[st.sectionLabel, { color: Colors.muted }]}>Paused</Text>
+              <View style={st.list}>{paused.map((r, i) => renderRow(r, i, paused))}</View>
             </>
           )}
         </ScrollView>
       )}
-      {/* ── Actions modal ── */}
+
+      {/* Add Reminder sheet */}
+      <BottomSheet visible={showAddSheet} onClose={() => setShowAddSheet(false)} title="new reminder">
+        <TextInput
+          style={st.input}
+          placeholder="reminder name"
+          placeholderTextColor={Colors.faint}
+          value={addName}
+          onChangeText={setAddName}
+          autoFocus
+        />
+        <Text style={st.sheetLabel}>Type</Text>
+        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
+          {(['expense', 'income'] as const).map(t => (
+            <TouchableOpacity
+              key={t}
+              style={[st.toggleBtn, addType === t && st.toggleBtnActive]}
+              onPress={() => setAddType(t)}
+              activeOpacity={0.7}
+            >
+              <Text style={[st.toggleBtnText, addType === t && st.toggleBtnTextActive]}>
+                {t.charAt(0).toUpperCase() + t.slice(1)}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <View style={{ flexDirection: 'row', gap: 12, marginBottom: 20 }}>
+          <View style={{ flex: 1 }}>
+            <Text style={st.sheetLabel}>Frequency</Text>
+            <View style={[st.input, { justifyContent: 'center', marginBottom: 0 }]}>
+              <Text style={{ fontFamily: AppFont.regular, fontSize: 14, color: Colors.muted }}>Monthly</Text>
+            </View>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={st.sheetLabel}>Deadline Day</Text>
+            <TextInput
+              style={[st.input, { marginBottom: 0, textAlign: 'center' }]}
+              placeholder="e.g. 15"
+              placeholderTextColor={Colors.faint}
+              value={addDeadlineDay}
+              onChangeText={v => setAddDeadlineDay(v.replace(/[^0-9]/g, '').slice(0, 2))}
+              keyboardType="number-pad"
+              maxLength={2}
+            />
+          </View>
+        </View>
+        <Text style={st.sheetLabel}>Category</Text>
+        <View style={st.catGrid}>
+          {addCategories.map((c: any) => (
+            <TouchableOpacity
+              key={c.id}
+              style={[st.catChip, addCategoryId === c.id && st.catChipActive]}
+              onPress={() => setAddCategoryId(addCategoryId === c.id ? null : c.id)}
+              activeOpacity={0.8}
+            >
+              <Text style={[st.catChipText, addCategoryId === c.id && st.catChipTextActive]} numberOfLines={1}>{c.name}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <View style={{ marginBottom: 16 }} />
+        <Text style={st.sheetLabel}>Folder</Text>
+        <View style={st.catGrid}>
+          {addSpaces.map((sp: any) => (
+            <TouchableOpacity
+              key={sp.id}
+              style={[st.catChip, addSpaceId === sp.id && st.catChipActive]}
+              onPress={() => setAddSpaceId(addSpaceId === sp.id ? null : sp.id)}
+              activeOpacity={0.8}
+            >
+              <Text style={[st.catChipText, addSpaceId === sp.id && st.catChipTextActive]} numberOfLines={1}>{sp.name}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <View style={{ marginBottom: 20 }} />
+        <TouchableOpacity
+          style={[st.saveBtn, (!addName.trim() || addSaving) && { opacity: 0.4 }]}
+          onPress={saveReminder}
+          disabled={!addName.trim() || addSaving}
+          activeOpacity={0.8}
+        >
+          <Text style={st.saveBtnText}>{addSaving ? 'saving...' : 'Save Reminder'}</Text>
+        </TouchableOpacity>
+      </BottomSheet>
+
+      {/* Actions sheet */}
       <BottomSheet visible={showActions} onClose={() => setShowActions(false)} title={selectedReminder?.name ?? 'reminder'}>
-        <TouchableOpacity style={st.actionRow} activeOpacity={0.7} onPress={() => { setShowActions(false); setFulfillAmount(''); setShowFulfillModal(true); }}>
+        <TouchableOpacity style={st.actionRow} activeOpacity={0.7} onPress={() => { setShowActions(false); setFulfillAmount(''); setFulfillIsPartial(false); setShowFulfillSheet(true); }}>
           <Text style={st.actionText}>Fulfill</Text>
           <Text style={st.actionSub}>record a transaction for this reminder</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={st.actionRow} activeOpacity={0.7} onPress={() => { setShowActions(false); setMoveMode('move'); setSelectedSpaceId(selectedReminder?.workspace_id ?? ''); setShowMoveModal(true); }}>
-          <Text style={st.actionText}>Move to Space</Text>
-          <Text style={st.actionSub}>change which space this reminder belongs to</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={st.actionRow} activeOpacity={0.7} onPress={() => { setShowActions(false); setMoveMode('copy'); setSelectedSpaceId(''); setShowMoveModal(true); }}>
-          <Text style={st.actionText}>Copy to Space</Text>
-          <Text style={st.actionSub}>duplicate this reminder in another space</Text>
+        <TouchableOpacity style={st.actionRow} activeOpacity={0.7} onPress={handleTogglePause}>
+          <Text style={st.actionText}>{selectedReminder?.status === 'active' ? 'Pause' : 'Resume'}</Text>
+          <Text style={st.actionSub}>{selectedReminder?.status === 'active' ? 'temporarily stop this reminder' : 'reactivate this reminder'}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[st.actionRow, { borderBottomWidth: 0 }]} activeOpacity={0.7} onPress={handleDelete}>
-          <Text style={[st.actionText, { color: '#FF5757' }]}>Delete</Text>
+          <Text style={[st.actionText, { color: DC.btnDangerBg }]}>Delete</Text>
           <Text style={st.actionSub}>recordings created from this reminder are kept</Text>
         </TouchableOpacity>
       </BottomSheet>
-      {/* ── Fulfill modal ── */}
-      <BottomSheet visible={showFulfillModal} onClose={() => setShowFulfillModal(false)} title="fulfill reminder">
-        {/* Info */}
-        <View style={{ gap: 4, marginBottom: 16, padding: 12, backgroundColor: Colors.surface, borderRadius: Radius.lg }}>
-          {selectedReminder?.space?.name && (
-            <View style={{ flexDirection: 'row', gap: 8 }}>
-              <Text style={{ fontFamily: AppFont.semiBold, fontSize: 12, color: Colors.muted, width: 60 }}>Space</Text>
-              <Text style={{ fontFamily: AppFont.regular, fontSize: 12, color: '#111111' }}>{selectedReminder.space.name}</Text>
-            </View>
-          )}
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <Text style={{ fontFamily: AppFont.semiBold, fontSize: 12, color: Colors.muted, width: 60 }}>Type</Text>
-            <Text style={{ fontFamily: AppFont.regular, fontSize: 12, color: '#111111' }}>{selectedReminder?.recording_type}</Text>
-          </View>
-        </View>
-        {/* Existing recordings this month */}
-        {selectedReminder && (fulfilledMap[selectedReminder.id] ?? []).length > 0 && (
-          <>
-            <Text style={[st.modalLabel, { marginBottom: 6 }]}>Recordings This Month</Text>
-            {(fulfilledMap[selectedReminder.id] ?? []).map((rec: any) => (
-              <TouchableOpacity key={rec.id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 10 }} activeOpacity={0.7} onPress={() => { setShowFulfillModal(false); openRecording(rec.id); }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: '#111111' }} numberOfLines={1}>{rec.name}</Text>
-                  <Text style={{ fontFamily: AppFont.regular, fontSize: 11, color: Colors.muted }}>{new Date(rec.transaction_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · {rec.status}</Text>
-                </View>
-                <Text style={{ fontFamily: AppFont.bold, fontSize: 13, color: '#111111' }}>{fmt(Number(rec.amount))}</Text>
-              </TouchableOpacity>
-            ))}
-            <View style={{ height: 16 }} />
-          </>
-        )}
-        {/* Partial / Complete toggle */}
-        <Text style={[st.modalLabel, { marginBottom: 8 }]}>Payment Type</Text>
+
+      {/* Fulfill sheet */}
+      <BottomSheet visible={showFulfillSheet} onClose={() => setShowFulfillSheet(false)} title="fulfill reminder">
+        <Text style={st.sheetLabel}>Payment Type</Text>
         <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
           <TouchableOpacity style={[st.toggleBtn, !fulfillIsPartial && st.toggleBtnActive]} onPress={() => setFulfillIsPartial(false)} activeOpacity={0.7}>
             <Text style={[st.toggleBtnText, !fulfillIsPartial && st.toggleBtnTextActive]}>Complete</Text>
@@ -344,46 +548,24 @@ export default function RemindersPanel({ onClose }: Props) {
             <Text style={[st.toggleBtnText, fulfillIsPartial && st.toggleBtnTextActive]}>Partial</Text>
           </TouchableOpacity>
         </View>
-        {/* Date */}
-        <Text style={[st.modalLabel, { marginBottom: 8 }]}>Transaction Date</Text>
+        <Text style={st.sheetLabel}>Date</Text>
         <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
           <View style={{ flex: 2 }}>
-            <Text style={st.datePickerLabel}>Month</Text>
-            <TouchableOpacity
-              style={st.dropdown}
-              onPress={() => setShowMonthDropdown(v => !v)}
-              activeOpacity={0.8}
-            >
-              <Text style={st.dropdownText}>{['January','February','March','April','May','June','July','August','September','October','November','December'][parseInt(fulfillMonth) - 1]}</Text>
-            </TouchableOpacity>
-            {showMonthDropdown && (
-              <View style={st.dropdownList}>
-                <ScrollView style={{ maxHeight: 180 }} showsVerticalScrollIndicator={false} nestedScrollEnabled>
-                  {['January','February','March','April','May','June','July','August','September','October','November','December'].map((m, idx) => (
-                    <TouchableOpacity
-                      key={m}
-                      style={[st.dropdownItem, parseInt(fulfillMonth) === idx + 1 && st.dropdownItemActive]}
-                      onPress={() => { setFulfillMonth(String(idx + 1)); setShowMonthDropdown(false); }}
-                    >
-                      <Text style={[st.dropdownItemText, parseInt(fulfillMonth) === idx + 1 && st.dropdownItemTextActive]}>{m}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-            )}
+            <Text style={st.dateLabel}>Month</Text>
+            <TextInput style={st.dateInput} value={MONTHS[parseInt(fulfillMonth) - 1]} editable={false} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={st.datePickerLabel}>Day</Text>
+            <Text style={st.dateLabel}>Day</Text>
             <TextInput style={st.dateInput} value={fulfillDay} onChangeText={setFulfillDay} keyboardType="number-pad" maxLength={2} placeholder="DD" placeholderTextColor={Colors.faint} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={st.datePickerLabel}>Year</Text>
+            <Text style={st.dateLabel}>Year</Text>
             <TextInput style={st.dateInput} value={fulfillYear} onChangeText={setFulfillYear} keyboardType="number-pad" maxLength={4} placeholder="YYYY" placeholderTextColor={Colors.faint} />
           </View>
         </View>
-        <Text style={st.modalLabel}>Amount</Text>
+        <Text style={st.sheetLabel}>Amount</Text>
         <TextInput
-          style={st.modalInput}
+          style={[st.input, { marginBottom: 16 }]}
           placeholder="0.00"
           placeholderTextColor={Colors.faint}
           value={fulfillAmount}
@@ -392,88 +574,115 @@ export default function RemindersPanel({ onClose }: Props) {
           autoFocus
         />
         <TouchableOpacity
-          style={[st.modalBtn, (!fulfillAmount || fulfillSaving) && { opacity: 0.4 }]}
+          style={[st.saveBtn, (!fulfillAmount || fulfillSaving) && { opacity: 0.4 }]}
           onPress={handleFulfill}
           disabled={!fulfillAmount || fulfillSaving}
           activeOpacity={0.8}
         >
-          <Text style={st.modalBtnText}>{fulfillSaving ? 'saving...' : 'Record'}</Text>
+          <Text style={st.saveBtnText}>{fulfillSaving ? 'saving...' : 'Record'}</Text>
         </TouchableOpacity>
       </BottomSheet>
-      {/* ── Move/Copy modal ── */}
-      <BottomSheet visible={showMoveModal} onClose={() => setShowMoveModal(false)} title={moveMode === 'move' ? 'Move to Space' : 'Copy to Space'}>
-        <Text style={st.modalLabel}>Select Space</Text>
-        <ScrollView style={{ maxHeight: 240 }} showsVerticalScrollIndicator={false}>
-          {(spaces as any[]).map((sp: any) => (
+      {/* Date picker sheet */}
+      <BottomSheet visible={showDateSheet} onClose={() => setShowDateSheet(false)} title="select month">
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 24, marginBottom: 16 }}>
+          <TouchableOpacity onPress={() => setDraftYear(y => y - 1)} activeOpacity={0.7} style={{ padding: 8 }}>
+            <Text style={{ fontFamily: AppFont.regular, fontSize: 22, color: DC.pageText, lineHeight: 26 }}>{'‹'}</Text>
+          </TouchableOpacity>
+          <Text style={{ fontFamily: AppFont.bold, fontSize: 16, color: DC.pageText, minWidth: 60, textAlign: 'center' }}>{draftYear}</Text>
+          <TouchableOpacity onPress={() => setDraftYear(y => y + 1)} activeOpacity={0.7} style={{ padding: 8 }}>
+            <Text style={{ fontFamily: AppFont.regular, fontSize: 22, color: DC.pageText, lineHeight: 26 }}>{'›'}</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
+          {MONTH_LABELS.map((label, i) => (
             <TouchableOpacity
-              key={sp.id}
-              style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 10 }}
-              onPress={() => setSelectedSpaceId(sp.id)}
+              key={label}
+              style={[{ width: '22%', flexGrow: 1, paddingVertical: 9, borderRadius: 999, borderWidth: 1, borderColor: DC.controlBorder, alignItems: 'center' }, draftMonth === i && { backgroundColor: '#4394ff', borderColor: '#4394ff' }]}
+              onPress={() => setDraftMonth(i)}
+              activeOpacity={0.7}
             >
-              <View style={{ width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: selectedSpaceId === sp.id ? '#4f9289' : Colors.faint, backgroundColor: selectedSpaceId === sp.id ? '#4f9289' : 'transparent' }} />
-              <Text style={{ fontFamily: AppFont.regular, fontSize: 14, color: '#111111' }}>{sp.name}</Text>
+              <Text style={[{ fontFamily: AppFont.regular, fontSize: 12, color: DC.pageTextMuted }, draftMonth === i && { fontFamily: AppFont.semiBold, color: '#ffffff' }]}>{label}</Text>
             </TouchableOpacity>
           ))}
-        </ScrollView>
+        </View>
         <TouchableOpacity
-          style={[st.modalBtn, (!selectedSpaceId || moveSaving) && { opacity: 0.4 }]}
-          onPress={handleMoveOrCopy}
-          disabled={!selectedSpaceId || moveSaving}
+          style={{ backgroundColor: '#4394ff', borderRadius: 999, paddingVertical: 14, alignItems: 'center' }}
+          onPress={() => { dateFilter.set(draftMonth, draftYear); setShowDateSheet(false); }}
           activeOpacity={0.8}
         >
-          <Text style={st.modalBtnText}>{moveSaving ? 'saving...' : moveMode === 'move' ? 'Move' : 'Copy'}</Text>
+          <Text style={{ fontFamily: AppFont.semiBold, fontSize: 13, color: '#ffffff' }}>Apply</Text>
         </TouchableOpacity>
       </BottomSheet>
-    </SafeAreaView>
+    </View>
   );
 }
+
 const st = StyleSheet.create({
   root:   { flex: 1, backgroundColor: Colors.white },
-  scroll: { paddingHorizontal: DC.pagePadding, paddingBottom: 80 },
-  filterRow: { flexDirection: 'row', gap: 8, paddingHorizontal: DC.pagePadding, paddingVertical: 12 },
-  filterBtn:           { flex: 1, paddingVertical: DC.pageActionPaddingV, borderRadius: DC.pageActionRadius, backgroundColor: DC.pageActionBg, alignItems: 'center' },
-  filterBtnActive:     { backgroundColor: '#111111' },
-  filterBtnText:       { fontFamily: AppFont.regular, fontSize: DC.dropdownFontSize, color: DC.pageActionText },
-  filterBtnTextActive: { color: '#ffffff', fontFamily: AppFont.semiBold },
-  sectionTitle: { fontFamily: AppFont.bold, fontSize: 13, color: '#111111', textTransform: 'uppercase', letterSpacing: 0.6, marginTop: 20, marginBottom: 8 },
-  list: { gap: 0 },
-  card:       { borderWidth: 1, borderColor: Colors.border, borderRadius: 12, marginBottom: 10, overflow: 'hidden' },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  cardName:   { fontFamily: AppFont.semiBold, fontSize: 14, color: '#111111' },
-  cardSub:    { fontFamily: AppFont.regular, fontSize: 11, color: Colors.muted },
-  spaceName:  { fontFamily: AppFont.regular, fontSize: 12, color: '#9cd7d2' },
-  recRow:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 10 },
-  recName:    { fontFamily: AppFont.regular, fontSize: 13, color: '#111111' },
-  recMeta:    { fontFamily: AppFont.regular, fontSize: 11, color: Colors.muted },
-  recAmount:  { fontFamily: AppFont.bold, fontSize: 13, color: '#111111' },
-  row:     { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 12 },
-  rowLast: { borderBottomWidth: 0 },
-  rowName: { fontFamily: AppFont.regular, fontSize: 14, color: '#111111' },
-  rowSub:  { fontFamily: AppFont.regular, fontSize: 11, color: Colors.muted },
-  badge:   { alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 2, borderRadius: Radius.pill },
-  badgeText: { fontFamily: AppFont.semiBold, fontSize: 10 },
-  statusDot: { width: 8, height: 8, borderRadius: 4 },
-  actionRow:  { paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  actionText: { fontFamily: AppFont.semiBold, fontSize: 15, color: '#111111' },
-  actionSub:  { fontFamily: AppFont.regular, fontSize: 11, color: Colors.muted, marginTop: 2 },
-  modalLabel: { fontFamily: AppFont.semiBold, fontSize: 11, color: DC.pageTextMuted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8 },
-  modalInput: { fontFamily: AppFont.regular, fontSize: 16, color: DC.pageText, backgroundColor: Colors.surface, borderRadius: Radius.lg, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1, borderColor: Colors.borderMid, marginBottom: 16 },
-  modalBtn:   { backgroundColor: DC.btnBg, borderRadius: Radius.pill, paddingVertical: 14, alignItems: 'center' },
-  modalBtnText: { fontFamily: AppFont.semiBold, fontSize: 15, color: DC.btnText },
-  toggleBtn:        { flex: 1, paddingVertical: 10, borderRadius: Radius.pill, backgroundColor: DC.pageActionBg, alignItems: 'center' },
-  toggleBtnActive:  { backgroundColor: '#111111' },
-  toggleBtnText:    { fontFamily: AppFont.regular, fontSize: 13, color: DC.pageActionText },
-  toggleBtnTextActive: { fontFamily: AppFont.semiBold, color: '#ffffff' },
-  datePickerLabel: { fontFamily: AppFont.semiBold, fontSize: 10, color: Colors.muted, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 6 },
-  dropdown:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: Colors.surface, borderRadius: Radius.lg, paddingHorizontal: 14, paddingVertical: 11, borderWidth: 1, borderColor: Colors.borderMid },
-  dropdownText:    { fontFamily: AppFont.regular, fontSize: 14, color: DC.pageText },
-  dropdownList:    { position: 'absolute', top: 44, left: 0, right: 0, backgroundColor: Colors.white, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.borderMid, zIndex: 100, overflow: 'hidden' },
-  dropdownItem:    { paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  dropdownItemActive: { backgroundColor: DC.pageActionBg },
-  dropdownItemText:   { fontFamily: AppFont.regular, fontSize: 14, color: DC.pageText },
-  dropdownItemTextActive: { fontFamily: AppFont.semiBold, color: '#4f9289' },
-  dateInput:       { fontFamily: AppFont.regular, fontSize: 15, color: DC.pageText, backgroundColor: Colors.surface, borderRadius: Radius.lg, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1, borderColor: Colors.borderMid, textAlign: 'center' },
-  empty:     { flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 80 },
-  emptyText: { fontFamily: AppFont.regular, fontSize: 13, color: Colors.muted },
-});
+  scroll: { paddingHorizontal: DC.pagePadding, paddingTop: 8, paddingBottom: 80 },
 
+  filterRow: { flexDirection: 'row', gap: 8, paddingHorizontal: DC.pagePadding, paddingVertical: 12 },
+  filterBtn:           { flex: 1, paddingVertical: 8, borderRadius: 999, borderWidth: 1, borderColor: DC.controlBorder, backgroundColor: DC.pageBg, alignItems: 'center' },
+  filterBtnActive:     { backgroundColor: DC.headerBlueBg, borderColor: DC.headerBlueBg },
+  filterBtnText:       { fontFamily: AppFont.regular, fontSize: 12, color: DC.pageTextMuted },
+  filterBtnTextActive: { fontFamily: AppFont.semiBold, fontSize: 12, color: '#ffffff' },
+
+  sectionLabel: { fontFamily: AppFont.semiBold, fontSize: 11, color: DC.pageTextMuted, textTransform: 'uppercase', letterSpacing: 0.6, marginTop: 16, marginBottom: 8 },
+  list: { borderRadius: 12, borderWidth: 1, borderColor: Colors.border, overflow: 'hidden', marginBottom: 4 },
+
+  row:     { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 12 },
+  rowLast: { borderBottomWidth: 0 },
+  rowName: { fontFamily: AppFont.semiBold, fontSize: 13, color: DC.pageText },
+  rowSub:  { fontFamily: AppFont.regular, fontSize: 11, color: Colors.muted },
+
+  badge:     { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 },
+  badgeText: { fontFamily: AppFont.semiBold, fontSize: 10 },
+
+  empty:        { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, paddingBottom: 80 },
+  emptyText:    { fontFamily: AppFont.regular, fontSize: 13, color: Colors.muted },
+  emptyAddBtn:  { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 999, backgroundColor: DC.viewBtnBg },
+  emptyAddBtnText: { fontFamily: AppFont.semiBold, fontSize: 13, color: DC.viewBtnText },
+
+  // Sheet styles
+  sheetLabel: { fontFamily: AppFont.semiBold, fontSize: 11, color: DC.pageTextMuted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8 },
+  input:      { fontFamily: AppFont.regular, fontSize: 16, color: DC.pageText, backgroundColor: Colors.surface, borderRadius: Radius.lg, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1, borderColor: Colors.borderMid, marginBottom: 16 },
+  toggleBtn:        { flex: 1, paddingVertical: 10, borderRadius: 999, borderWidth: 1, borderColor: DC.controlBorder, backgroundColor: DC.pageBg, alignItems: 'center' },
+  toggleBtnActive:  { backgroundColor: DC.headerBlueBg, borderColor: DC.headerBlueBg },
+  toggleBtnText:    { fontFamily: AppFont.regular, fontSize: 12, color: DC.pageTextMuted },
+  toggleBtnTextActive: { fontFamily: AppFont.semiBold, fontSize: 12, color: '#ffffff' },
+  saveBtn:     { backgroundColor: DC.btnBg, borderRadius: 999, paddingVertical: 14, alignItems: 'center' },
+  saveBtnText: { fontFamily: AppFont.semiBold, fontSize: 14, color: '#ffffff' },
+
+  actionRow:  { paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  actionText: { fontFamily: AppFont.semiBold, fontSize: 14, color: DC.pageText },
+  actionSub:  { fontFamily: AppFont.regular, fontSize: 11, color: Colors.muted, marginTop: 2 },
+
+  catGrid:           { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 4 },
+  catChip:           { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 12, borderWidth: 1, borderColor: DC.controlBorder, backgroundColor: 'transparent' },
+  catChipActive:     { backgroundColor: DC.headerBlueBg, borderColor: DC.headerBlueBg },
+  catChipText:       { fontFamily: AppFont.regular, fontSize: 12, color: DC.pageText },
+  catChipTextActive: { fontFamily: AppFont.semiBold, fontSize: 12, color: '#ffffff' },
+  // Segment toggle
+  segmentOuter:        { flexDirection: 'row', borderRadius: 999, borderWidth: 1, borderColor: DC.controlBorder, overflow: 'hidden', height: 34 },
+  segmentBtn:          { paddingHorizontal: 16, justifyContent: 'center', alignItems: 'center' },
+  segmentBtnActive:    { backgroundColor: DC.headerBlueBg },
+  segmentBtnText:      { fontFamily: AppFont.regular, fontSize: 12, color: DC.pageTextMuted },
+  segmentBtnTextActive:{ fontFamily: AppFont.semiBold, fontSize: 12, color: '#fff' },
+
+  // Calendar
+  calHeader:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  calNavBtn:      { width: 36, height: 36, borderRadius: 18, backgroundColor: DC.viewBtnBg, alignItems: 'center', justifyContent: 'center' },
+  calNavText:     { fontFamily: AppFont.bold, fontSize: 20, color: DC.viewBtnText, lineHeight: 24 },
+  calMonthLabel:  { fontFamily: AppFont.semiBold, fontSize: 15, color: DC.pageText },
+  calDowRow:      { flexDirection: 'row', marginBottom: 4 },
+  calDowText:     { flex: 1, textAlign: 'center', fontFamily: AppFont.semiBold, fontSize: 10, color: Colors.muted, textTransform: 'uppercase' },
+  calWeekRow:     { flexDirection: 'row', marginBottom: 2 },
+  calCell:        { flex: 1, aspectRatio: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 8 },
+  calCellSelected:{ backgroundColor: DC.headerBlueBg },
+  calCellToday:   { backgroundColor: DC.viewBtnBg },
+  calCellText:    { fontFamily: AppFont.regular, fontSize: 13, color: DC.pageText },
+  calCellTextSelected: { fontFamily: AppFont.semiBold, color: '#fff' },
+  calCellTextToday:    { fontFamily: AppFont.semiBold, color: DC.viewBtnText },
+  calDot:         { width: 4, height: 4, borderRadius: 2, backgroundColor: DC.headerBlueBg, marginTop: 2 },
+  dateInput: { fontFamily: AppFont.regular, fontSize: 14, color: DC.pageText, backgroundColor: Colors.surface, borderRadius: Radius.lg, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: Colors.borderMid, textAlign: 'center' },
+});

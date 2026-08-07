@@ -1,4 +1,4 @@
-﻿import { View, Text, StyleSheet, TouchableOpacity, ScrollView,
+﻿import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput,
   SafeAreaView, RefreshControl, Alert } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { Platform } from 'react-native';
@@ -13,6 +13,7 @@ import { BlurView } from 'expo-blur';
 import { LOADING_SPINNER_SVG_DATA_URI } from '../../../src/lib/loadingSpinnerBase64';
 import BottomSheet from '@/components/ui/BottomSheet';
 import { useState, useMemo, useEffect } from 'react';
+import { dateFilter } from '../../../src/lib/dateFilter';
 
 async function receiptActions({
   action, entry, userId, supabaseClient, onDone,
@@ -43,22 +44,27 @@ const YEARS = Array.from({ length: 21 }, (_, i) => 2020 + i);
 type DateMode = 'monthly' | '3months';
 
 export default function HomeScreen({ isActive }: { isActive?: boolean }) {
-  const { userId } = useUser();
-  const { switchTab, openRecording, openRecordingsPanel, openReceivablesPanel, openSplitBill } = useNav();
+  const { userId, userName } = useUser();
+  const { switchTab, openRecording, openRecordingsPanel, openReceivablesPanel, openSplitBill, openRemindersPanel } = useNav();
   const router = useRouter();
   const queryClient = useQueryClient();
   const [dateMode, setDateMode] = useState<DateMode>('monthly');
-  const [pickerMonth, setPickerMonth] = useState(new Date().getMonth());
-  const [pickerYear, setPickerYear] = useState(new Date().getFullYear());
+  const [pickerMonth, setPickerMonth] = useState(dateFilter.getMonth());
+  const [pickerYear, setPickerYear] = useState(dateFilter.getYear());
   const [rangeFromMonth, setRangeFromMonth] = useState(new Date().getMonth());
   const [rangeFromYear, setRangeFromYear] = useState(new Date().getFullYear());
   const [showDateSheet, setShowDateSheet] = useState(false);
   // draft state — only applied on Apply
   const [draftMode, setDraftMode] = useState<DateMode>('monthly');
-  const [draftPickerMonth, setDraftPickerMonth] = useState(new Date().getMonth());
-  const [draftPickerYear, setDraftPickerYear] = useState(new Date().getFullYear());
+  const [draftPickerMonth, setDraftPickerMonth] = useState(dateFilter.getMonth());
+  const [draftPickerYear, setDraftPickerYear] = useState(dateFilter.getYear());
   const [draftFromMonth, setDraftFromMonth] = useState(new Date().getMonth());
   const [draftFromYear, setDraftFromYear] = useState(new Date().getFullYear());
+  // Sync from global dateFilter store
+  useEffect(() => dateFilter.subscribe(() => {
+    setPickerMonth(dateFilter.getMonth());
+    setPickerYear(dateFilter.getYear());
+  }), []);
 
   const [refreshing, setRefreshing] = useState(false);
 
@@ -187,7 +193,7 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
 
   // ── Loans — unified loans + receivables ──────────────────────────────
   const { data: peopleData, isLoading: loadingPeople } = useQuery({
-    queryKey: ['home-people', userId],
+    queryKey: ['home-people', userId, userName],
     queryFn: async () => {
       const { data: friendships } = await supabase
         .from('friendships')
@@ -205,8 +211,6 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
         .from('recordings')
         .select('id, person_name, type, amount, paid_amount, status, is_due, source_recording_id, is_tagged')
         .eq('user_id', userId)
-        .neq('person_name', '')
-        .not('person_name', 'is', null)
         .neq('status', 'voided');
       const recs = (allRecs ?? []).filter(
         (r: any) => (r.type === 'debt' && !r.is_tagged) || r.type === 'due' || r.is_due
@@ -296,8 +300,17 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
       const net: Record<string, number> = {};
       const details: Record<string, { owedToMe: number; iOwe: number }> = {};
 
+      // Get recording IDs linked to split bills (to exclude from unassigned)
+      const { data: splitBillRecs } = billIds.length > 0
+        ? await supabase.from('split_bill_recordings').select('recording_id').in('split_bill_id', billIds)
+        : { data: [] };
+      const splitBillRecIds = new Set((splitBillRecs ?? []).map((s: any) => s.recording_id));
+
       (recs ?? []).forEach((r: any) => {
-        if (!r.person_name) return;
+        // Unassigned = no person_name AND no split bill
+        const isUnassigned = !r.person_name;
+        if (isUnassigned && splitBillRecIds.has(r.id)) return;
+        const key = r.person_name || '__unassigned__';
         if (r.status === 'paid' || r.status === 'closed') return;
         const linkedReturns = (returnSum[r.id] ?? 0) + (r.source_recording_id ? (returnSum[r.source_recording_id] ?? 0) : 0);
         const copyReturns = (copies ?? []).filter((c: any) => c.source_recording_id === r.id || c.source_recording_id === r.source_recording_id)
@@ -305,9 +318,9 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
         const paid = Math.min(linkedReturns + copyReturns, Number(r.amount));
         const remaining = Math.max(0, Number(r.amount) - paid);
         if (remaining <= 0.01) return;
-        if (!details[r.person_name]) details[r.person_name] = { owedToMe: 0, iOwe: 0 };
-        if (r.type === 'due' || r.is_due) { details[r.person_name].owedToMe += remaining; net[r.person_name] = (net[r.person_name] ?? 0) + remaining; }
-        else { details[r.person_name].iOwe += remaining; net[r.person_name] = (net[r.person_name] ?? 0) - remaining; }
+        if (!details[key]) details[key] = { owedToMe: 0, iOwe: 0 };
+        if (r.type === 'due' || r.is_due) { details[key].owedToMe += remaining; net[key] = (net[key] ?? 0) + remaining; }
+        else { details[key].iOwe += remaining; net[key] = (net[key] ?? 0) - remaining; }
       });
 
       // Combine split people (may or may not have recordings)
@@ -350,9 +363,10 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
       });
 
       const people = Object.entries(details)
-        .filter(([name]) => name)
+        .filter(([name]) => name && (!userName || name.toLowerCase() !== userName.toLowerCase()))
         .map(([name, d]) => ({
-          person: name,
+          person: name === '__unassigned__' ? 'Unassigned' : name,
+          isUnassigned: name === '__unassigned__',
           net: Math.round((net[name] ?? 0) * 100) / 100,
           isFriend: friendNameSet.has(name.toLowerCase()),
           owedToMe: Math.round(d.owedToMe * 100) / 100,
@@ -366,15 +380,56 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
     enabled: !!userId,
   });
 
-  const peopleSummary = (peopleData ?? []).slice(0, 3);
+  // ── Reminders ─────────────────────────────────────────────────────────
+  const { data: upcomingReminders = [], isLoading: loadingReminders } = useQuery({
+    queryKey: ['home-reminders', userId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('recording_reminders')
+        .select('id, name, frequency, recording_type, status')
+        .eq('user_id', userId)
+        .eq('status', 'active')
+        .order('name', { ascending: true })
+        .limit(3);
+      return data ?? [];
+    },
+    enabled: !!userId,
+  });
+
+  const [showAddReminderSheet, setShowAddReminderSheet] = useState(false);
+  const [reminderName, setReminderName] = useState('');
+  const [reminderType, setReminderType] = useState<'expense' | 'income'>('expense');
+  const [reminderFreq, setReminderFreq] = useState<'daily' | 'weekly' | 'monthly'>('monthly');
+  const [reminderSaving, setReminderSaving] = useState(false);
+
+  const saveReminder = async () => {
+    if (!reminderName.trim() || reminderSaving) return;
+    setReminderSaving(true);
+    await supabase.from('recording_reminders').insert({
+      user_id: userId,
+      name: reminderName.trim(),
+      recording_type: reminderType,
+      frequency: reminderFreq,
+      start_date: new Date().toISOString().split('T')[0],
+      status: 'active',
+    });
+    setReminderSaving(false);
+    setReminderName('');
+    setReminderType('expense');
+    setReminderFreq('monthly');
+    setShowAddReminderSheet(false);
+    queryClient.invalidateQueries({ queryKey: ['home-reminders', userId] });
+  };
 
   const [receiptActionEntry, setReceiptActionEntry] = useState<any>(null);
+
+  const peopleSummary = (peopleData ?? []).slice(0, 3);
 
   const handleReceiptAction = (action: 'delete' | 'unlink', entry: any) =>
     receiptActions({ action, entry, userId: userId!, supabaseClient: supabase, onDone: () => queryClient.invalidateQueries({ queryKey: ['home-receipts', userId] }) });
 
   const fmt = (n: number | undefined | null) => (n ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const isLoading = loadingRecent || loadingPeople || loadingSplitBills || loadingReceipts;
+  const isLoading = loadingRecent || loadingPeople || loadingSplitBills || loadingReceipts || loadingReminders;
 
   const { setHomeDateLabel } = useNav();
 
@@ -398,46 +453,37 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
         <SectionHeader title="Transactions" onArrowRight={() => openRecordingsPanel()} />
         {recent.length === 0 ? <EmptyRow label="no recordings" /> : (
           <View style={s.sectionContentLeft}>
-            <View style={s.recList}>
-              <View style={s.recTimelineCol}>
-                {recent.slice(0, 3).map((r: any, i: number) => {
-                  const count = Math.min(recent.length, 3);
-                  const isFirst = i === 0;
-                  const isLast = i === count - 1;
-                  const showDot = count > 1 && (isFirst || isLast);
-                  const showLine = count > 1 && !isFirst && !isLast;
-                  return (
-                    <View key={r.id} style={s.recDotWrap}>
-                      {showDot && (<><View style={isFirst ? s.recLineHidden : s.recLineSegment} /><View style={s.recDot} /><View style={isLast ? s.recLineHidden : s.recLineSegment} /></>)}
-                      {showLine && <View style={[s.recLineSegment, { flex: 1 }]} />}
-                    </View>
-                  );
-                })}
-              </View>
-              <View style={s.recCardsCol}>
-                {recent.slice(0, 3).map((r: any) => {
+            {recent.slice(0, 3).map((r: any) => {
                   const isOut = ['expense','debt','payment'].includes(r.type);
-                  const dateObj = new Date(r.transaction_date + 'T00:00:00');
-                  const today = new Date(); today.setHours(0,0,0,0);
-                  const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
-                  const dateLabel = dateObj.getTime() === today.getTime() ? 'Today'
-                    : dateObj.getTime() === yesterday.getTime() ? 'Yesterday'
-                    : dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
                   const nameStr = r.name.split(' ').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
                   return (
-                    <TouchableOpacity key={r.id} style={s.recCard} activeOpacity={0.7} onPress={() => openRecording(r.id)}>
-                      <View style={s.recDateCol}><Text style={s.recDateText}>{dateLabel}</Text></View>
-                      <View style={s.recCardDivider} />
-                      <View style={s.recContentCol}>
-                        <Text style={s.recAmount}>{isOut ? '- ' : ''}{fmt(Number(r.amount))}</Text>
-                        <Text style={s.recName} numberOfLines={1}>{nameStr}</Text>
-                        <Text style={s.recFolder} numberOfLines={1}>{r.space?.name ?? 'No Folder'}</Text>
+                    <TouchableOpacity key={r.id} style={[s.loanRow, r !== recent[Math.min(recent.length,3)-1] && s.loanRowBorder]} activeOpacity={0.7} onPress={() => openRecording(r.id)}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={s.loanName} numberOfLines={1}>{nameStr}</Text>
+                        <Text style={s.receiptSub} numberOfLines={1}>{r.categories?.name ?? r.space?.name ?? 'No Category'}</Text>
+                      </View>
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={[s.loanAmount, { color: isOut ? DC.btnDangerBg : DC.incomeColor }]}>{isOut ? '- ' : ''}{fmt(Number(r.amount))}</Text>
                       </View>
                     </TouchableOpacity>
                   );
                 })}
+          </View>
+        )}
+        <View style={s.divider} />
+
+        {/* Reminders */}
+        <SectionHeader title="Reminders" onArrowRight={() => openRemindersPanel()} />
+        {upcomingReminders.length === 0 ? <EmptyRow label="no active reminders" /> : (
+          <View style={s.sectionContentLeft}>
+            {upcomingReminders.map((r: any, i: number) => (
+              <View key={r.id} style={[s.loanRow, i < upcomingReminders.length - 1 && s.loanRowBorder]}>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.loanName} numberOfLines={1}>{r.name}</Text>
+                  <Text style={s.loanLabel}>{r.frequency} · {r.recording_type}</Text>
+                </View>
               </View>
-            </View>
+            ))}
           </View>
         )}
         <View style={s.divider} />
@@ -449,11 +495,11 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
             {peopleSummary.map((p: any, i: number) => {
               const isNegative = p.net < 0;
               const absNet = Math.abs(p.net);
-              const initials = p.person.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase();
+              const initials = p.isUnassigned ? '?' : p.person.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase();
               return (
-                <TouchableOpacity key={p.person} style={[s.loanRow, i < peopleSummary.length - 1 && s.loanRowBorder]} activeOpacity={0.7} onPress={() => openReceivablesPanel(p.person)}>
-                  <View style={s.loanAvatar}><Text style={s.loanAvatarText}>{initials}</Text></View>
-                  <Text style={s.loanName} numberOfLines={1}>{p.person}</Text>
+                <TouchableOpacity key={p.person} style={[s.loanRow, i < peopleSummary.length - 1 && s.loanRowBorder]} activeOpacity={0.7} onPress={() => openReceivablesPanel(p.isUnassigned ? '__unassigned__' : p.person)}>
+                  <View style={[s.loanAvatar, p.isUnassigned && { backgroundColor: '#f0f0f0' }]}><Text style={[s.loanAvatarText, p.isUnassigned && { color: '#aaa' }]}>{initials}</Text></View>
+                  <Text style={[s.loanName, p.isUnassigned && { color: DC.pageTextMuted, fontStyle: 'italic' }]} numberOfLines={1}>{p.person}</Text>
                   <View style={{ alignItems: 'flex-end' }}>
                     <Text style={s.loanLabel}>{isNegative ? 'You Owe' : 'Owes You'}</Text>
                     <Text style={[s.loanAmount, { color: isNegative ? DC.btnDangerBg : DC.incomeColor }]}>{fmt(absNet)}</Text>
@@ -527,9 +573,6 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
           <View style={s.sectionContentLeft}>
             {splitBills.map((bill: any, i: number) => (
               <TouchableOpacity key={bill.id} style={[s.loanRow, i < splitBills.length - 1 && s.loanRowBorder]} activeOpacity={0.7} onPress={() => openSplitBill(bill.id, bill.name)}>
-                <View style={[s.loanAvatar, { backgroundColor: '#e8f4f3' }]}>
-                  <Text style={[s.loanAvatarText, { color: '#4f9289' }]}>{bill.people_count}</Text>
-                </View>
                 <Text style={s.loanName} numberOfLines={1}>{bill.name}</Text>
                 <View style={{ alignItems: 'flex-end' }}>
                   <Text style={[s.loanAmount, { color: DC.pageText }]}>{fmt(bill.total_amount)}</Text>
@@ -540,6 +583,37 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
           </View>
         )}
       </ScrollView>
+
+      {/* Add Reminder sheet */}
+      <BottomSheet visible={showAddReminderSheet} onClose={() => setShowAddReminderSheet(false)} title="new reminder">
+        <TextInput
+          style={{ fontFamily: 'Poppins-Regular', fontSize: 16, color: DC.pageText, backgroundColor: '#f5f5f5', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1, borderColor: '#e0e0e0', marginBottom: 16 }}
+          placeholder="reminder name"
+          placeholderTextColor={Colors.faint}
+          value={reminderName}
+          onChangeText={setReminderName}
+          autoFocus
+        />
+        <Text style={{ fontFamily: 'Poppins-SemiBold', fontSize: 11, color: DC.pageTextMuted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8 }}>Type</Text>
+        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
+          {(['expense', 'income'] as const).map(t => (
+            <TouchableOpacity key={t} style={{ flex: 1, paddingVertical: 10, borderRadius: 999, borderWidth: 1, borderColor: reminderType === t ? '#111' : '#e0e0e0', backgroundColor: reminderType === t ? '#111' : 'transparent', alignItems: 'center' }} onPress={() => setReminderType(t)} activeOpacity={0.7}>
+              <Text style={{ fontFamily: 'Poppins-SemiBold', fontSize: 12, color: reminderType === t ? '#fff' : '#999' }}>{t === 'expense' ? 'Expense' : 'Income'}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <Text style={{ fontFamily: 'Poppins-SemiBold', fontSize: 11, color: DC.pageTextMuted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8 }}>Frequency</Text>
+        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 20 }}>
+          {(['daily', 'weekly', 'monthly'] as const).map(f => (
+            <TouchableOpacity key={f} style={{ flex: 1, paddingVertical: 10, borderRadius: 999, borderWidth: 1, borderColor: reminderFreq === f ? '#111' : '#e0e0e0', backgroundColor: reminderFreq === f ? '#111' : 'transparent', alignItems: 'center' }} onPress={() => setReminderFreq(f)} activeOpacity={0.7}>
+              <Text style={{ fontFamily: 'Poppins-SemiBold', fontSize: 12, color: reminderFreq === f ? '#fff' : '#999' }}>{f.charAt(0).toUpperCase() + f.slice(1)}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <TouchableOpacity style={[{ backgroundColor: DC.btnBg, borderRadius: 999, paddingVertical: 14, alignItems: 'center' }, (!reminderName.trim() || reminderSaving) && { opacity: 0.4 }]} onPress={saveReminder} disabled={!reminderName.trim() || reminderSaving} activeOpacity={0.8}>
+          <Text style={{ fontFamily: 'Poppins-SemiBold', fontSize: 15, color: '#fff' }}>{reminderSaving ? 'saving...' : 'Save Reminder'}</Text>
+        </TouchableOpacity>
+      </BottomSheet>
 
       {/* Loading overlay */}
       {isLoading && (
@@ -641,6 +715,7 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
             setPickerYear(draftPickerYear);
             setRangeFromMonth(draftFromMonth);
             setRangeFromYear(draftFromYear);
+            if (draftMode === 'monthly') dateFilter.set(draftPickerMonth, draftPickerYear);
             setShowDateSheet(false);
           }}
         >
@@ -652,15 +727,22 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
 }
 
 
-function SectionHeader({ title, onArrowRight }: { title: string; onArrowRight?: () => void }) {
+function SectionHeader({ title, onArrowRight, onAdd }: { title: string; onArrowRight?: () => void; onAdd?: () => void }) {
   return (
     <View style={s.sectionRow}>
       <Text style={s.sectionTitle}>{title}</Text>
-      {onArrowRight && (
-        <TouchableOpacity onPress={onArrowRight} activeOpacity={0.8} style={s.viewBtn}>
-          <Text style={s.viewBtnText}>View</Text>
-        </TouchableOpacity>
-      )}
+      <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+        {onAdd && (
+          <TouchableOpacity onPress={onAdd} activeOpacity={0.8} style={[s.viewBtn, { paddingHorizontal: 10 }]}>
+            <Text style={[s.viewBtnText, { fontSize: 16, lineHeight: 18 }]}>+</Text>
+          </TouchableOpacity>
+        )}
+        {onArrowRight && (
+          <TouchableOpacity onPress={onArrowRight} activeOpacity={0.8} style={s.viewBtn}>
+            <Text style={s.viewBtnText}>View</Text>
+          </TouchableOpacity>
+        )}
+      </View>
     </View>
   );
 }
@@ -677,7 +759,7 @@ const s = StyleSheet.create({
   // Part 14: root, scroll, divider
   root:   { flex: 1, backgroundColor: DC.pageBg },
   scroll: { paddingTop: 20, paddingBottom: 80 },
-  divider: { height: DC.rowDivider.height, backgroundColor: DC.rowDivider.backgroundColor, marginTop: 28, marginBottom: 28 },
+  divider: { height: 0, borderBottomWidth: 1, borderBottomColor: '#d8d8d8', borderStyle: 'dashed', marginTop: 36, marginBottom: 36 },
 
   // Section header
   sectionRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, paddingHorizontal: DC.pagePadding },

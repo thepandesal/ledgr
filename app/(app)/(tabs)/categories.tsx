@@ -1,120 +1,101 @@
 import {
-  View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator,
+  View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator,
 } from 'react-native';
 import { supabase } from '../../../src/lib/supabase';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useUser } from '../../../src/hooks/useUser';
 import type { Category } from '../../../src/types';
-import BottomSheet from '@/components/ui/BottomSheet';
-import ConfirmModal from '@/components/ui/ConfirmModal';
 import TopHeader from '@/components/ui/TopHeader';
+import BottomSheet from '@/components/ui/BottomSheet';
 import NavIcon from '@/components/ui/NavIcons';
-import { SvgXml } from 'react-native-svg';
-import { Colors, Radius, Spacing } from '@/components/ui/theme';
+import { Colors } from '@/components/ui/theme';
 import { DC } from '../../../src/lib/design';
-import { Brand } from '../../../src/lib/brand';
-import { AppFont } from '../../../src/lib/fonts';
 import { useNav } from '../../../src/lib/NavContext';
+import { CatIcon, catIconKeyForName } from '../../../src/lib/systemCategories';
+import { dateFilter, MONTH_LABELS } from '../../../src/lib/dateFilter';
 
-const PASTEL_COLORS = ['#FFB3B3', '#FFD9B3', '#FFFAB3', '#B3FFB3', '#B3FFE0', '#B3F0FF', '#B3C6FF', '#D9B3FF', '#FFB3F0', '#FFB3C6'];
-const SUGGESTED_ICONS = ['fast-food-outline', 'car-outline', 'flash-outline', 'home-outline', 'musical-notes-outline', 'heart-outline', 'cart-outline', 'save-outline', 'airplane-outline', 'briefcase-outline', 'cafe-outline', 'fitness-outline', 'gift-outline', 'school-outline', 'phone-portrait-outline', 'ellipsis-horizontal-outline'];
-
-const PREVIEW_LIMIT = 3;
+const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export default function CategoriesScreen() {
-  const queryClient = useQueryClient();
   const { userId, defaultCurrency } = useUser();
   const insets = useSafeAreaInsets();
-  const { switchTab, toggleNotifDropdown } = useNav();
-  const SVG_ADD = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="currentColor" d="M12 4.75c.69 0 1.25.56 1.25 1.25v4.75H18a1.25 1.25 0 1 1 0 2.5h-4.75V18a1.25 1.25 0 1 1-2.5 0v-4.75H6a1.25 1.25 0 1 1 0-2.5h4.75V6c0-.69.56-1.25 1.25-1.25" /></svg>`;
-  const [modal, setModal] = useState(false);
-  const [menuModal, setMenuModal] = useState(false);
-  const [selected, setSelected] = useState<Category | null>(null);
-  const [name, setName] = useState('');
-  const [color, setColor] = useState(PASTEL_COLORS[0]);
-  const [icon, setIcon] = useState(SUGGESTED_ICONS[0]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const { toggleNotifDropdown, openRecordingsPanel } = useNav();
+  const [tab, setTab] = useState<'categories' | 'reports'>('categories');
 
-  const toggleExpand = (id: string) => {
-    setExpanded(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  };
+  // Global date filter
+  const [filterMonth, setFilterMonth] = useState(dateFilter.getMonth());
+  const [filterYear,  setFilterYear]  = useState(dateFilter.getYear());
+  useEffect(() => dateFilter.subscribe(() => {
+    setFilterMonth(dateFilter.getMonth());
+    setFilterYear(dateFilter.getYear());
+  }), []);
+  const { from, to } = useMemo(() => dateFilter.getFromTo(), [filterMonth, filterYear]);
+  const dateLabel = `${MONTH_LABELS[filterMonth]} ${filterYear}`;
 
-  const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const [showDateSheet, setShowDateSheet] = useState(false);
+  const [draftMonth, setDraftMonth] = useState(filterMonth);
+  const [draftYear,  setDraftYear]  = useState(filterYear);
 
-  const { data: categories = [] } = useQuery<Category[]>({
+  const { data: categories = [], isLoading: loadingCats } = useQuery<Category[]>({
     queryKey: ['categories', userId],
     queryFn: async () => {
-      const { data } = await supabase.from('categories').select().eq('user_id', userId).order('created_at');
+      const { data } = await supabase.from('categories').select().eq('user_id', userId).order('name');
       return (data ?? []) as Category[];
     },
     enabled: !!userId,
   });
 
-  const now = new Date();
-  const from = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
-  const to = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()}`;
-
-  const { data: recordings = [] } = useQuery({
-    queryKey: ['categories-recordings', userId, from],
+  // All-time expenses for reports
+  const { data: allRecordings = [], isLoading: loadingRecs } = useQuery({
+    queryKey: ['categories-all-time', userId, from, to],
     queryFn: async () => {
       const { data } = await supabase
         .from('recordings')
-        .select('id, name, type, amount, transaction_date, currency, category_id, spaces:space_id(name)')
+        .select('id, name, amount, type, category_id, categories:category_id(name, color, icon)')
         .eq('user_id', userId)
+        .eq('type', 'expense')
         .neq('status', 'voided')
         .neq('is_system_generated', true)
-        .gte('transaction_date', from)
-        .lte('transaction_date', to)
         .not('category_id', 'is', null)
-        .order('transaction_date', { ascending: false });
+        .gte('transaction_date', from)
+        .lte('transaction_date', to);
       return (data ?? []).map((r: any) => ({
         ...r,
-        space: Array.isArray(r.spaces) ? r.spaces[0] : r.spaces,
+        categories: Array.isArray(r.categories) ? r.categories[0] : r.categories,
       }));
     },
     enabled: !!userId,
   });
 
-  const grouped = useMemo(() => {
-    const map: Record<string, typeof recordings> = {};
-    recordings.forEach(r => {
+  const reportRows = useMemo(() => {
+    const map: Record<string, { name: string; color: string; icon: string; total: number; count: number }> = {};
+    allRecordings.forEach((r: any) => {
       const cid = r.category_id;
-      if (!map[cid]) map[cid] = [];
-      map[cid].push(r);
+      if (!map[cid]) {
+        map[cid] = {
+          name:  r.categories?.name  ?? 'Unknown',
+          color: r.categories?.color ?? '#ccc',
+          icon:  r.categories?.icon  ?? '',
+          total: 0,
+          count: 0,
+        };
+      }
+      map[cid].total += Number(r.amount);
+      map[cid].count += 1;
     });
-    return map;
-  }, [recordings]);
+    return Object.values(map).sort((a, b) => b.total - a.total);
+  }, [allRecordings]);
 
-  const openAdd = () => { setName(''); setColor(PASTEL_COLORS[0]); setIcon(SUGGESTED_ICONS[0]); setError(''); setModal(true); };
-
-  const handleSave = async () => {
-    if (!name.trim()) { setError('Name is required.'); return; }
-    setLoading(true);
-    const { error: err } = await supabase.from('categories').insert({ user_id: userId, name: name.trim(), color, icon, is_default: false });
-    if (err) { setError(err.message); setLoading(false); return; }
-    queryClient.invalidateQueries({ queryKey: ['categories', userId] });
-    setLoading(false); setModal(false);
-  };
-
-  const handleDelete = async () => {
-    setMenuModal(false);
-    if (selected?.name === 'Loans') return;
-    await supabase.from('categories').delete().eq('id', selected!.id);
-    queryClient.invalidateQueries({ queryKey: ['categories', userId] });
-  };
+  const maxTotal = reportRows[0]?.total ?? 1;
 
   return (
-    <View style={s.container}>
+    <View style={s.root}>
       <TopHeader
         title="Categories"
+        subtitle={dateLabel}
+        onSubtitlePress={() => { setDraftMonth(filterMonth); setDraftYear(filterYear); setShowDateSheet(true); }}
         centered
         variant="blue"
         topInset={insets.top}
@@ -124,171 +105,170 @@ export default function CategoriesScreen() {
           </TouchableOpacity>
         }
       />
-      <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
-        <View style={s.actionRow}>
-          <TouchableOpacity onPress={openAdd} activeOpacity={0.7} style={s.addBtn}>
-            <SvgXml xml={SVG_ADD} width={16} height={16} color="#ffffff" />
-            <Text style={s.addBtnText}>New Category</Text>
-          </TouchableOpacity>
-        </View>
-        <View style={s.list}>
-          {categories.map(cat => {
-            const catRecordings = grouped[cat.id] ?? [];
-            const isExpanded = expanded.has(cat.id);
-            const visible = isExpanded ? catRecordings : catRecordings.slice(0, PREVIEW_LIMIT);
-            const hasMore = catRecordings.length > PREVIEW_LIMIT;
-            return (
-              <View key={cat.id} style={s.card}>
-                {/* Card header */}
-                <TouchableOpacity
-                  style={s.cardHeader}
-                  onPress={() => { setSelected(cat); setMenuModal(true); }}
-                  activeOpacity={0.7}
-                >
 
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.cardName}>{cat.name}</Text>
-                    <Text style={s.cardCount}>{catRecordings.length} recording{catRecordings.length !== 1 ? 's' : ''}</Text>
-                  </View>
-
-                </TouchableOpacity>
-
-                {/* Recordings list */}
-                {visible.map((r, i) => (
-                  <View key={r.id} style={[s.recRow, i === visible.length - 1 && !(hasMore && !isExpanded) && s.recRowLast]}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={s.recName} numberOfLines={1}>{r.name}</Text>
-                      {r.space?.name && <Text style={s.recSub}>{r.space.name}</Text>}
-                    </View>
-                    <Text style={s.recAmount}>{r.currency ?? defaultCurrency} {fmt(Number(r.amount))}</Text>
-                  </View>
-                ))}
-
-                {/* Expand / collapse */}
-                {hasMore && (
-                  <TouchableOpacity style={s.expandBtn} onPress={() => toggleExpand(cat.id)} activeOpacity={0.7}>
-                    <Text style={s.expandText}>{isExpanded ? 'show less' : `show ${catRecordings.length - PREVIEW_LIMIT} more`}</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            );
-          })}
-          {categories.length === 0 && (
-            <View style={s.emptyWrap}>
-              <Text style={Brand.type.emptyText}>no categories yet</Text>
-            </View>
-          )}
-        </View>
-
-        <Text style={[Brand.type.footer, { marginTop: 32 }]}>managed by LEDGR</Text>
-      </ScrollView>
-
-
-
-      <BottomSheet visible={modal} onClose={() => setModal(false)} title="new category">
-        {error ? <Text style={s.error}>{error}</Text> : null}
-        <Text style={s.label}>category name</Text>
-        <TextInput
-          style={s.input}
-          placeholder="e.g. Groceries"
-          placeholderTextColor={Colors.faint}
-          value={name}
-          onChangeText={v => { setName(v); setError(''); }}
-          autoFocus
-        />
-        <Text style={s.label}>color</Text>
-        <View style={s.colorRow}>
-          {PASTEL_COLORS.map(c => (
-            <TouchableOpacity key={c} style={[s.colorDot, { backgroundColor: c }, color === c && s.colorDotSelected]} onPress={() => setColor(c)} />
+      {/* Segment toggle */}
+      <View style={s.segmentWrap}>
+        <View style={s.segmentOuter}>
+          {(['categories', 'reports'] as const).map(t => (
+            <TouchableOpacity
+              key={t}
+              style={[s.segmentBtn, tab === t && s.segmentBtnActive]}
+              onPress={() => setTab(t)}
+              activeOpacity={0.8}
+            >
+              <Text style={[s.segmentText, tab === t && s.segmentTextActive]}>
+                {t.charAt(0).toUpperCase() + t.slice(1)}
+              </Text>
+            </TouchableOpacity>
           ))}
         </View>
-        <Text style={s.label}>icon</Text>
-        <Text style={s.label}>preview</Text>
-        <View style={[s.preview, { backgroundColor: color }]}>
-          <Text style={s.previewText}>{name || 'my category'}</Text>
+      </View>
+
+      {tab === 'categories' ? (
+        <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+          {loadingCats ? (
+            <ActivityIndicator color={DC.headerBlueBg} style={{ marginTop: 40 }} />
+          ) : categories.length === 0 ? (
+            <Text style={s.empty}>no categories yet</Text>
+          ) : (
+            <View style={s.grid}>
+              {categories.map(cat => {
+                const iconKey = catIconKeyForName(cat.name) ?? 'shopping';
+                return (
+                  <TouchableOpacity
+                    key={cat.id}
+                    style={s.gridItem}
+                    activeOpacity={0.75}
+                    onPress={() => openRecordingsPanel({ categoryId: cat.id, categoryName: cat.name })}
+                  >
+                    <View style={s.iconCircle}>
+                      <CatIcon name={iconKey} color={DC.pageTextMuted} size={26} />
+                    </View>
+                    <Text style={s.gridLabel} numberOfLines={2}>{cat.name}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
+        </ScrollView>
+      ) : (
+        <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+          {loadingRecs ? (
+            <ActivityIndicator color={DC.headerBlueBg} style={{ marginTop: 40 }} />
+          ) : reportRows.length === 0 ? (
+            <Text style={s.empty}>no expense data yet</Text>
+          ) : (
+            <View style={s.reportList}>
+              {reportRows.map((row, i) => {
+                const iconKey = catIconKeyForName(row.name) ?? 'shopping';
+                const barWidth = (row.total / maxTotal) * 100;
+                return (
+                  <View key={row.name} style={s.reportRow}>
+                    <View style={s.reportRank}>
+                      <Text style={s.reportRankText}>{i + 1}</Text>
+                    </View>
+                    <View style={s.reportIconCircle}>
+                      <CatIcon name={iconKey} color={DC.pageTextMuted} size={20} />
+                    </View>
+                    <View style={s.reportBody}>
+                      <View style={s.reportTopRow}>
+                        <Text style={s.reportName} numberOfLines={1}>{row.name}</Text>
+                        <Text style={s.reportAmount}>{fmt(row.total)}</Text>
+                      </View>
+                      <View style={s.barTrack}>
+                        <View style={[s.barFill, { width: `${barWidth}%` as any }]} />
+                      </View>
+                      <Text style={s.reportCount}>{row.count} recording{row.count !== 1 ? 's' : ''}</Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          )}
+        </ScrollView>
+      )}
+      {/* Date picker sheet */}
+      <BottomSheet visible={showDateSheet} onClose={() => setShowDateSheet(false)} title="select month">
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 24, marginBottom: 16 }}>
+          <TouchableOpacity onPress={() => setDraftYear(y => y - 1)} activeOpacity={0.7} style={s.yearNavBtn}>
+            <Text style={s.yearNavArrow}>{'‹'}</Text>
+          </TouchableOpacity>
+          <Text style={s.yearNavLabel}>{draftYear}</Text>
+          <TouchableOpacity onPress={() => setDraftYear(y => y + 1)} activeOpacity={0.7} style={s.yearNavBtn}>
+            <Text style={s.yearNavArrow}>{'›'}</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={s.monthGrid}>
+          {MONTH_LABELS.map((label, i) => (
+            <TouchableOpacity
+              key={label}
+              style={[s.monthGridChip, draftMonth === i && s.monthGridChipActive]}
+              onPress={() => setDraftMonth(i)}
+              activeOpacity={0.7}
+            >
+              <Text style={[s.monthGridChipText, draftMonth === i && s.monthGridChipTextActive]}>{label}</Text>
+            </TouchableOpacity>
+          ))}
         </View>
         <TouchableOpacity
-          style={[s.saveBtn, (!name.trim() || loading) && { opacity: 0.4 }]}
-          onPress={handleSave}
-          disabled={loading || !name.trim()}
+          style={s.applyBtn}
+          onPress={() => { dateFilter.set(draftMonth, draftYear); setShowDateSheet(false); }}
           activeOpacity={0.8}
         >
-          {loading ? <ActivityIndicator color={Brand.color.accentText} /> : <Text style={s.saveBtnText}>add category</Text>}
+          <Text style={s.applyBtnText}>Apply</Text>
         </TouchableOpacity>
       </BottomSheet>
-
-      <ConfirmModal
-        visible={menuModal}
-        onClose={() => setMenuModal(false)}
-        title={selected?.name?.toLowerCase() ?? 'category'}
-        actions={[
-          { label: 'cancel', onPress: () => setMenuModal(false), muted: true },
-          { label: 'delete', onPress: handleDelete, destructive: true },
-        ]}
-      />
     </View>
   );
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.white },
-  scroll:    { paddingHorizontal: Spacing.page, paddingTop: 16, paddingBottom: 80 },
-  actionRow: { flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 16 },
-  addBtn:    { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, backgroundColor: DC.headerBlueBg },
-  addBtnText:{ fontFamily: AppFont.semiBold, fontSize: 11, color: '#ffffff' },
+  root: { flex: 1, backgroundColor: Colors.white },
 
-  list:      { gap: 12 },
-  emptyWrap: { alignItems: 'center', gap: 12, paddingVertical: 48 },
+  // segment
+  segmentWrap:  { paddingHorizontal: DC.pagePadding, paddingTop: 14, paddingBottom: 10 },
+  segmentOuter: { flexDirection: 'row', borderRadius: 999, borderWidth: 1, borderColor: DC.controlBorder, overflow: 'hidden', alignSelf: 'flex-start' },
+  segmentBtn:   { paddingHorizontal: 20, paddingVertical: 8, justifyContent: 'center', alignItems: 'center' },
+  segmentBtnActive:   { backgroundColor: DC.headerBlueBg },
+  segmentText:        { fontFamily: 'Poppins-Regular', fontSize: 12, color: DC.pageTextMuted },
+  segmentTextActive:  { fontFamily: 'Poppins-SemiBold', fontSize: 12, color: '#fff' },
 
-  card: {
+  scroll: { paddingHorizontal: DC.pagePadding, paddingTop: 8, paddingBottom: 80 },
+  empty:  { fontFamily: 'Poppins-Regular', fontSize: 13, color: DC.pageTextMuted, textAlign: 'center', marginTop: 48 },
+
+  // 3-col grid
+  grid:     { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  gridItem: {
+    width: '30%', flexGrow: 1,
+    alignItems: 'center', gap: 8,
+    paddingVertical: 16, paddingHorizontal: 8,
+    borderRadius: 14, borderWidth: 1, borderColor: DC.controlBorder,
     backgroundColor: Colors.white,
-    borderRadius: Radius.lg,
-    borderWidth: 1, borderColor: Colors.border,
-    overflow: 'hidden',
   },
-  cardHeader: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    paddingVertical: 14, paddingHorizontal: 14,
-  },
-  cardIcon:  { width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
-  cardName:  { fontFamily: AppFont.incMedium, fontSize: 13, color: '#3a3a34', letterSpacing: 0.5 },
-  cardCount: { fontFamily: AppFont.regular, fontSize: 10, color: Colors.faint, marginTop: 1 },
+  iconCircle: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', backgroundColor: DC.cardBg },
+  gridLabel:  { fontFamily: 'Poppins-SemiBold', fontSize: 11, color: DC.pageText, textAlign: 'center' },
 
-  recRow: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingVertical: 10, paddingHorizontal: 14, paddingLeft: 56,
-    borderTopWidth: 1, borderTopColor: Colors.border,
-  },
-  recRowLast: { borderBottomWidth: 0 },
-  recName: { fontFamily: AppFont.regular, fontSize: 12, color: Colors.text },
-  recSub:  { fontFamily: AppFont.regular, fontSize: 10, color: Colors.faint, marginTop: 1 },
-  recAmount: { fontFamily: AppFont.bold, fontSize: 12, color: Colors.text },
-
-  expandBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4,
-    paddingVertical: 8, borderTopWidth: 1, borderTopColor: Colors.border,
-  },
-  expandText: { fontFamily: AppFont.regular, fontSize: 11, color: '#888583' },
-
-  fab: {
-    position: 'absolute', bottom: 24, right: 24,
-    width: 52, height: 52, borderRadius: 26,
-    backgroundColor: Brand.color.accent,
-    alignItems: 'center', justifyContent: 'center',
-  },
-
-  error:    { ...Brand.type.cardMeta, color: Colors.expense, marginBottom: 8 },
-  label:    { ...Brand.type.modalLabel, marginBottom: 6, marginTop: 14 },
-  input:    { ...Brand.type.modalInput, backgroundColor: Colors.white, borderRadius: Brand.radius.input, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1, borderColor: Colors.borderMid },
-  saveBtn:  { backgroundColor: Brand.color.accent, borderRadius: Brand.radius.btn, paddingVertical: 14, alignItems: 'center', marginTop: 20 },
-  saveBtnText: { ...Brand.type.modalBtn },
-
-  colorRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 4 },
-  colorDot: { width: 30, height: 30, borderRadius: 15 },
-  colorDotSelected: { borderWidth: 3, borderColor: Colors.text },
-  iconRow:  { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 4 },
-  iconBtn:  { width: 44, height: 44, borderRadius: Radius.md, backgroundColor: Colors.input, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: Colors.borderMid },
-  iconBtnSelected: { backgroundColor: Brand.color.accent, borderColor: Brand.color.accent },
-  preview:  { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: Brand.radius.btn, paddingVertical: 14, paddingHorizontal: 16, marginTop: 4 },
-  previewText: { ...Brand.type.cardTitle },
+  // reports list
+  reportList: { gap: 16 },
+  reportRow:  { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  reportRank: { width: 22, alignItems: 'center' },
+  reportRankText: { fontFamily: 'Poppins-Bold', fontSize: 12, color: DC.pageTextMuted },
+  reportIconCircle: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: DC.cardBg },
+  reportBody: { flex: 1, gap: 4 },
+  reportTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  reportName:   { fontFamily: 'Poppins-SemiBold', fontSize: 13, color: DC.pageText, flex: 1 },
+  reportAmount: { fontFamily: 'Poppins-Bold', fontSize: 13, color: DC.pageText },
+  reportCount:  { fontFamily: 'Poppins-Regular', fontSize: 10, color: DC.pageTextMuted },
+  barTrack: { height: 4, backgroundColor: DC.controlBorder, borderRadius: 2, overflow: 'hidden' },
+  // date picker styles
+  yearNavBtn:   { padding: 8 },
+  yearNavArrow: { fontFamily: 'Poppins-Regular', fontSize: 22, color: DC.pageText, lineHeight: 26 },
+  yearNavLabel: { fontFamily: 'Poppins-Bold', fontSize: 16, color: DC.pageText, minWidth: 60, textAlign: 'center' },
+  monthGrid:    { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 },
+  monthGridChip:         { width: '22%', flexGrow: 1, paddingVertical: 9, borderRadius: 999, borderWidth: 1, borderColor: DC.controlBorder, alignItems: 'center' },
+  monthGridChipActive:   { backgroundColor: '#4394ff', borderColor: '#4394ff' },
+  monthGridChipText:     { fontFamily: 'Poppins-Regular', fontSize: 12, color: DC.pageTextMuted },
+  monthGridChipTextActive: { fontFamily: 'Poppins-SemiBold', fontSize: 12, color: '#ffffff' },
+  applyBtn:     { backgroundColor: '#4394ff', borderRadius: 999, paddingVertical: 14, alignItems: 'center' },
+  applyBtnText: { fontFamily: 'Poppins-SemiBold', fontSize: 13, color: '#ffffff' },
 });

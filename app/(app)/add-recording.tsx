@@ -848,7 +848,7 @@ export default function AddRecordingScreen({ inlineProps }: {
       {/* Person picker modal */}
       <BottomSheet visible={showPersonModal} onClose={() => { setShowPersonModal(false); setPersonSearch(""); setShowAllFriends(false); setShowAllContacts(false); }} title="select person">
         <TextInput
-          style={{ fontFamily: AppFont.regular, fontSize: 14, color: Colors.text, backgroundColor: Colors.surface, borderRadius: Radius.lg, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1, borderColor: Colors.borderMid, marginBottom: 16 }}
+          style={{ fontFamily: AppFont.regular, fontSize: 16, color: Colors.text, backgroundColor: Colors.surface, borderRadius: Radius.lg, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1, borderColor: Colors.borderMid, marginBottom: 16 }}
           placeholder="search..."
           placeholderTextColor={Colors.faint}
           value={personSearch}

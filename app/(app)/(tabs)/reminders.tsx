@@ -640,7 +640,7 @@ const s = StyleSheet.create({
   rowActions: { flexDirection: 'row', gap: 10, alignItems: 'center' },
 
   label:          { fontFamily: Fonts.monoBold, fontSize: 10, color: '#1A1A1A', letterSpacing: 0.6, textTransform: 'uppercase', marginTop: 14, marginBottom: 6 },
-  input:          { fontFamily: Fonts.mono, fontSize: 14, color: Colors.text, backgroundColor: Colors.surface, borderRadius: Radius.lg, paddingHorizontal: 14, paddingVertical: 11, borderWidth: 1, borderColor: Colors.borderMid },
+  input:          { fontFamily: Fonts.mono, fontSize: 16, color: Colors.text, backgroundColor: Colors.surface, borderRadius: Radius.lg, paddingHorizontal: 14, paddingVertical: 11, borderWidth: 1, borderColor: Colors.borderMid },
   chipRow:        { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip:           { paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border },
   chipActive:     { backgroundColor: Colors.cyan, borderColor: Colors.cyan },

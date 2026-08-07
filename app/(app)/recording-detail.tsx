@@ -2144,6 +2144,22 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
   const extraCount = filledPeople.length - PREVIEW_LIMIT;
   const [overpaymentModal, setOverpaymentModal] = useState(false);
   const [overpaymentAmount, setOverpaymentAmount] = useState(0);
+  // Inline field edit modals
+  const [editNameModal, setEditNameModal] = useState(false);
+  const [editNameVal, setEditNameVal] = useState('');
+  const [editDateModal, setEditDateModal] = useState(false);
+  const [editDateMonth, setEditDateMonth] = useState(new Date().getMonth());
+  const [editDateDay, setEditDateDay] = useState(new Date().getDate() - 1);
+  const [editDateYear, setEditDateYear] = useState(new Date().getFullYear());
+  const DATE_MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const DATE_YEARS = Array.from({ length: 11 }, (_, i) => new Date().getFullYear() - 5 + i);
+  const dateMonthScrollRef = useRef<ScrollView>(null);
+  const dateDayScrollRef = useRef<ScrollView>(null);
+  const dateYearScrollRef = useRef<ScrollView>(null);
+  const ITEM_HEIGHT = 38; // paddingVertical 10 * 2 + fontSize ~18
+  const [editAmountModal, setEditAmountModal] = useState(false);
+  const [editAmountVal, setEditAmountVal] = useState('');
+  const [editStatusModal, setEditStatusModal] = useState(false);
   return (
     <Animated.View style={[{ flex: 1, backgroundColor: Colors.white }, { transform: [{ translateX: slideAnim }] }]}>
       <SafeAreaView style={{ flex: 1 }}>
@@ -2152,79 +2168,120 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
           subtitle={recording?.name ?? ''}
           onBack={handleBack}
           centered
+          variant="blue"
         />
 
         <ScrollView contentContainerStyle={rd.scroll} showsVerticalScrollIndicator={false} style={{ backgroundColor: Colors.white }}>
 
           {/* General Information */}
-          {/* General Information */}
           <View style={rd.sectionRow}>
             <Text style={rd.sectionLabel}>General Information</Text>
+            {isOwner && (
+              <TouchableOpacity style={[rd.editCircleBtn, { backgroundColor: '#fff0f0' }]} onPress={() => setDeleteConfirm(true)} activeOpacity={0.7}>
+                <SvgXml xml={`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="currentColor" d="M19 4h-3.5l-1-1h-5l-1 1H5v2h14M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6z" /></svg>`} width={14} height={14} color="#e53935" />
+              </TouchableOpacity>
+            )}
           </View>
           <View style={rd.dottedCard}>
-            <View style={rd.infoRow}>
+            {/* Name */}
+            <TouchableOpacity style={rd.infoRow} activeOpacity={isOwner ? 0.7 : 1} onPress={() => { if (!isOwner) return; setEditNameVal(recording?.name ?? ''); setEditNameModal(true); }}>
+              <Text style={rd.infoLabel}>Name</Text>
+              <Text style={rd.infoValue} numberOfLines={1}>{recording?.name ?? ''}</Text>
+            </TouchableOpacity>
+            <View style={rd.rowDivider} />
+            {/* Amount */}
+            <TouchableOpacity style={rd.infoRow} activeOpacity={isOwner ? 0.7 : 1} onPress={() => {
+              if (!isOwner) return;
+              if (editAmountLocked) { Alert.alert('Amount locked', linkedSplitBill ? 'This recording has a split bill. You cannot change the amount.' : 'This recording has payments. You cannot change the amount.'); return; }
+              setEditAmountVal(String(recording?.amount ?? '')); setEditAmountModal(true);
+            }}>
               <Text style={rd.infoLabel}>Amount</Text>
               <Text style={rd.infoValue}>{displayAmount()}</Text>
-            </View>
+            </TouchableOpacity>
             <View style={rd.rowDivider} />
-            <TouchableOpacity style={rd.infoRow} activeOpacity={isOwner ? 0.7 : 1} onPress={() => { if (isOwner) { setEditDate(recording?.transaction_date ?? ''); setEditModal(true); } }}>
+            {/* Date */}
+            <TouchableOpacity style={rd.infoRow} activeOpacity={isOwner ? 0.7 : 1} onPress={() => {
+              if (!isOwner) return;
+              const d = recording?.transaction_date ? new Date(recording.transaction_date + 'T00:00:00') : new Date();
+              const month = d.getMonth();
+              const day = d.getDate() - 1;
+              const year = d.getFullYear();
+              setEditDateMonth(month);
+              setEditDateDay(day);
+              setEditDateYear(year);
+              setEditDateModal(true);
+              setTimeout(() => {
+                dateMonthScrollRef.current?.scrollTo({ y: month * ITEM_HEIGHT, animated: false });
+                dateDayScrollRef.current?.scrollTo({ y: day * ITEM_HEIGHT, animated: false });
+                const yearIdx = DATE_YEARS.indexOf(year);
+                if (yearIdx >= 0) dateYearScrollRef.current?.scrollTo({ y: yearIdx * ITEM_HEIGHT, animated: false });
+              }, 50);
+            }}>
               <Text style={rd.infoLabel}>Date</Text>
               <Text style={rd.infoValue}>{recording ? formatDate(recording.transaction_date) : ''}</Text>
             </TouchableOpacity>
             <View style={rd.rowDivider} />
-            <View style={rd.infoRow}>
+            {/* Status */}
+            <TouchableOpacity style={rd.infoRow} activeOpacity={isOwner ? 0.7 : 1} onPress={() => { if (!isOwner) return; setEditStatusModal(true); }}>
               <Text style={rd.infoLabel}>Status</Text>
               <Text style={rd.infoValue}>{displayStatus()}</Text>
-            </View>
+            </TouchableOpacity>
             <View style={rd.rowDivider} />
             <View style={rd.infoRow}>
               <Text style={rd.infoLabel}>Created By</Text>
               <Text style={rd.infoValue}>{creatorName || ''}</Text>
             </View>
             <View style={rd.rowDivider} />
+            {/* Loan */}
             <View style={[rd.infoRow, !(recording?.is_due || recording?.type === 'due') && rd.infoRowLast]}>
               <Text style={rd.infoLabel}>Loan</Text>
               <View style={{ flexDirection: 'row', gap: 8 }}>
-                  {(['Yes', 'No'] as const).map(opt => {
-                    const isLoan = !!recording?.is_due;
-                    const isActive = opt === 'Yes' ? isLoan : !isLoan;
-                    const hasPaid = Number(recording?.paid_amount ?? 0) > 0;
-                    const locked = !isOwner;
-                    return (
-                      <TouchableOpacity
-                        key={opt}
-                        activeOpacity={locked ? 1 : 0.7}
-                        onPress={async () => {
-                          if (locked) return;
-                          const newIsLoan = opt === 'Yes';
-                          await supabase.from('recordings').update({
-                            is_due: newIsLoan,
-                            status: newIsLoan ? 'unpaid' : 'paid',
-                            paid_amount: newIsLoan ? 0 : recording?.amount,
-                          }).eq('id', recordingId);
-                          setRecording((prev: any) => ({ ...prev, is_due: newIsLoan, status: newIsLoan ? 'unpaid' : 'paid' }));
-                        }}
-                        style={[
-                          { paddingHorizontal: 14, paddingVertical: 5, borderRadius: 999, borderWidth: 1 },
-                          isActive ? { backgroundColor: '#111111', borderColor: '#111111' } : { backgroundColor: 'transparent', borderColor: '#d2d2d2' },
-                          locked && { opacity: 0.5 },
-                        ]}
-                      >
-                        <Text style={{ fontFamily: 'Poppins-SemiBold', fontSize: 11, color: isActive ? '#fff' : '#999' }}>{opt}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
+                {(['Yes', 'No'] as const).map(opt => {
+                  const isLoan = !!recording?.is_due;
+                  const isActive = opt === 'Yes' ? isLoan : !isLoan;
+                  const hasPaid = Number(recording?.paid_amount ?? 0) > 0;
+                  const locked = !isOwner || hasPaid;
+                  return (
+                    <TouchableOpacity
+                      key={opt}
+                      activeOpacity={locked ? 1 : 0.7}
+                      onPress={async () => {
+                        if (locked) { if (hasPaid) Alert.alert('Loan locked', 'This recording has payments. You cannot change the loan status.'); return; }
+                        const newIsLoan = opt === 'Yes';
+                        await supabase.from('recordings').update({ is_due: newIsLoan, status: newIsLoan ? 'unpaid' : 'paid', paid_amount: newIsLoan ? 0 : recording?.amount }).eq('id', recordingId);
+                        setRecording((prev: any) => ({ ...prev, is_due: newIsLoan, status: newIsLoan ? 'unpaid' : 'paid' }));
+                      }}
+                      style={[{ paddingHorizontal: 14, paddingVertical: 5, borderRadius: 999, borderWidth: 1 }, isActive ? { backgroundColor: '#4394ff', borderColor: '#4394ff' } : { backgroundColor: 'transparent', borderColor: '#d2d2d2' }, locked && { opacity: 0.5 }]}
+                    >
+                      <Text style={{ fontFamily: 'Poppins-SemiBold', fontSize: 11, color: isActive ? '#fff' : '#999' }}>{opt}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
             </View>
-            {(recording?.is_due || recording?.type === 'due') && (
-              <>
-                <View style={rd.rowDivider} />
-                <TouchableOpacity style={[rd.infoRow, rd.infoRowLast, !!linkedSplitBill && { opacity: 0.4 }]} activeOpacity={isOwner && !linkedSplitBill ? 0.7 : 1} onPress={() => isOwner && !linkedSplitBill && openOwesYouEdit()}>
-                  <Text style={rd.infoLabel}>Borrower</Text>
-                  <Text style={[rd.infoValue, !recording?.person_name && !linkedSplitBill && { fontStyle: 'italic' }]}>{linkedSplitBill ? 'has split bill' : (recording?.person_name || 'tap to assign')}</Text>
-                </TouchableOpacity>
-              </>
-            )}
+            {/* Borrower */}
+            {(recording?.is_due || recording?.type === 'due') && (() => {
+              const hasPaid = Number(recording?.paid_amount ?? 0) > 0;
+              const sbPayments = splitBillPayments.length > 0;
+              const borrowerLocked = !!linkedSplitBill || hasPaid || sbPayments;
+              return (
+                <>
+                  <View style={rd.rowDivider} />
+                  <TouchableOpacity
+                    style={[rd.infoRow, rd.infoRowLast, borrowerLocked && { opacity: 0.4 }]}
+                    activeOpacity={isOwner && !borrowerLocked ? 0.7 : 1}
+                    onPress={() => {
+                      if (!isOwner) return;
+                      if (borrowerLocked) { Alert.alert('Borrower locked', linkedSplitBill ? 'This recording has a split bill.' : 'Payments have been made. You cannot change the borrower.'); return; }
+                      openOwesYouEdit();
+                    }}
+                  >
+                    <Text style={rd.infoLabel}>Borrower</Text>
+                    <Text style={[rd.infoValue, !recording?.person_name && !linkedSplitBill && { fontStyle: 'italic' }]}>{linkedSplitBill ? 'has split bill' : (recording?.person_name || 'tap to assign')}</Text>
+                  </TouchableOpacity>
+                </>
+              );
+            })()}
           </View>
           <View style={rd.sectionRow}>
             <Text style={rd.sectionLabel}>Receipts</Text>
@@ -2330,6 +2387,106 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
           <View style={{ height: 40 }} />
         </ScrollView>
       </SafeAreaView>
+      {/* Edit Name modal */}
+      <BottomSheet visible={editNameModal} onClose={() => setEditNameModal(false)} title="edit name">
+        <TextInput
+          style={em.input}
+          value={editNameVal}
+          onChangeText={setEditNameVal}
+          placeholder="recording name"
+          placeholderTextColor={Colors.faint}
+          autoFocus
+        />
+        <TouchableOpacity style={[rd.doneBtn, { marginTop: 12, opacity: !editNameVal.trim() ? 0.4 : 1 }]} disabled={!editNameVal.trim()} activeOpacity={0.8} onPress={async () => {
+          await supabase.from('recordings').update({ name: editNameVal.trim() }).eq('id', recordingId).eq('user_id', userId);
+          setRecording((prev: any) => ({ ...prev, name: editNameVal.trim() }));
+          setEditNameModal(false);
+        }}>
+          <Text style={rd.doneBtnText}>save</Text>
+        </TouchableOpacity>
+      </BottomSheet>
+      {/* Edit Date modal */}
+      <BottomSheet visible={editDateModal} onClose={() => setEditDateModal(false)} title="edit date">
+        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
+          {/* Month */}
+          <View style={{ flex: 2 }}>
+            <Text style={[em.label, { marginBottom: 6 }]}>Month</Text>
+            <ScrollView ref={dateMonthScrollRef} style={{ height: 160, backgroundColor: Colors.surface, borderRadius: 8 }} showsVerticalScrollIndicator={false} nestedScrollEnabled>
+              {DATE_MONTHS.map((m, i) => (
+                <TouchableOpacity key={m} style={{ paddingVertical: 10, paddingHorizontal: 12, backgroundColor: editDateMonth === i ? '#deecff' : 'transparent', borderRadius: 6 }} onPress={() => setEditDateMonth(i)} activeOpacity={0.75}>
+                  <Text style={{ fontFamily: editDateMonth === i ? 'Poppins-SemiBold' : 'Poppins-Regular', fontSize: 13, color: editDateMonth === i ? '#4394ff' : '#666' }}>{m}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+          {/* Day */}
+          <View style={{ flex: 1 }}>
+            <Text style={[em.label, { marginBottom: 6 }]}>Day</Text>
+            <ScrollView ref={dateDayScrollRef} style={{ height: 160, backgroundColor: Colors.surface, borderRadius: 8 }} showsVerticalScrollIndicator={false} nestedScrollEnabled>
+              {Array.from({ length: new Date(editDateYear, editDateMonth + 1, 0).getDate() }, (_, i) => i).map(d => (
+                <TouchableOpacity key={d} style={{ paddingVertical: 10, paddingHorizontal: 12, backgroundColor: editDateDay === d ? '#deecff' : 'transparent', borderRadius: 6 }} onPress={() => setEditDateDay(d)} activeOpacity={0.75}>
+                  <Text style={{ fontFamily: editDateDay === d ? 'Poppins-SemiBold' : 'Poppins-Regular', fontSize: 13, color: editDateDay === d ? '#4394ff' : '#666' }}>{d + 1}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+          {/* Year */}
+          <View style={{ flex: 1 }}>
+            <Text style={[em.label, { marginBottom: 6 }]}>Year</Text>
+            <ScrollView ref={dateYearScrollRef} style={{ height: 160, backgroundColor: Colors.surface, borderRadius: 8 }} showsVerticalScrollIndicator={false} nestedScrollEnabled>
+              {DATE_YEARS.map(y => (
+                <TouchableOpacity key={y} style={{ paddingVertical: 10, paddingHorizontal: 12, backgroundColor: editDateYear === y ? '#deecff' : 'transparent', borderRadius: 6 }} onPress={() => setEditDateYear(y)} activeOpacity={0.75}>
+                  <Text style={{ fontFamily: editDateYear === y ? 'Poppins-SemiBold' : 'Poppins-Regular', fontSize: 13, color: editDateYear === y ? '#4394ff' : '#666' }}>{y}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+        <TouchableOpacity style={[rd.doneBtn, { marginTop: 4 }]} activeOpacity={0.8} onPress={async () => {
+          const maxDay = new Date(editDateYear, editDateMonth + 1, 0).getDate();
+          const safeDay = Math.min(editDateDay + 1, maxDay);
+          const dateStr = `${editDateYear}-${String(editDateMonth + 1).padStart(2, '0')}-${String(safeDay).padStart(2, '0')}`;
+          await supabase.from('recordings').update({ transaction_date: dateStr }).eq('id', recordingId).eq('user_id', userId);
+          setRecording((prev: any) => ({ ...prev, transaction_date: dateStr }));
+          setEditDateModal(false);
+        }}>
+          <Text style={rd.doneBtnText}>save</Text>
+        </TouchableOpacity>
+      </BottomSheet>
+      {/* Edit Amount modal */}
+      <BottomSheet visible={editAmountModal} onClose={() => setEditAmountModal(false)} title="edit amount">
+        <TextInput
+          style={em.input}
+          value={editAmountVal}
+          onChangeText={setEditAmountVal}
+          placeholder="0.00"
+          placeholderTextColor={Colors.faint}
+          keyboardType="decimal-pad"
+          autoFocus
+        />
+        <TouchableOpacity style={[rd.doneBtn, { marginTop: 12, opacity: !editAmountVal.trim() ? 0.4 : 1 }]} disabled={!editAmountVal.trim()} activeOpacity={0.8} onPress={async () => {
+          const amt = parseFloat(editAmountVal);
+          if (isNaN(amt) || amt <= 0) return;
+          await supabase.from('recordings').update({ amount: amt }).eq('id', recordingId).eq('user_id', userId);
+          setRecording((prev: any) => ({ ...prev, amount: amt }));
+          setEditAmountModal(false);
+        }}>
+          <Text style={rd.doneBtnText}>save</Text>
+        </TouchableOpacity>
+      </BottomSheet>
+      {/* Edit Status modal */}
+      <BottomSheet visible={editStatusModal} onClose={() => setEditStatusModal(false)} title="edit status">
+        {(['unpaid', 'partial', 'paid'] as const).map((s, i, arr) => (
+          <TouchableOpacity key={s} style={[rd.choiceRow, i === arr.length - 1 && { borderBottomWidth: 0 }]} activeOpacity={0.8} onPress={async () => {
+            if (linkedSplitBill && s === 'paid') { Alert.alert('Status locked', 'Close the split bill first before marking this as paid.'); return; }
+            await supabase.from('recordings').update({ status: s }).eq('id', recordingId).eq('user_id', userId);
+            setRecording((prev: any) => ({ ...prev, status: s }));
+            setEditStatusModal(false);
+          }}>
+            <Text style={rd.choiceTitle}>{s}</Text>
+          </TouchableOpacity>
+        ))}
+      </BottomSheet>
       {/* Actions bottom sheet */}
       <BottomSheet visible={showAddChoice} onClose={() => setShowAddChoice(false)} title="actions">
         {isOwner && recording?.type === 'expense' && !linkedPayable && !linkedReceivable && !recording?.is_due && !recording?.person_name && !linkedSplitBill && (
@@ -3056,7 +3213,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                       <>
                         <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8 }}>friends</Text>
                         {filteredFriends.map(f => (
-                          <TouchableOpacity key={f.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border }} onPress={() => saveOwesYouPerson(f.name, f.id)} activeOpacity={0.75}>
+                          <TouchableOpacity key={`friend-${f.id}`} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border }} onPress={() => saveOwesYouPerson(f.name, f.id)} activeOpacity={0.75}>
                             <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: ACCENT + '33', alignItems: 'center', justifyContent: 'center' }}>
                             </View>
                             <Text style={{ fontFamily: Brand.font.mono, fontSize: 14, color: Colors.text, flex: 1 }}>{f.name}</Text>
@@ -3069,7 +3226,7 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
                       <>
                         <Text style={{ fontFamily: Brand.font.monoBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginTop: filteredFriends.length > 0 ? 16 : 0, marginBottom: 8 }}>manual contacts</Text>
                         {filteredContacts.map(n => (
-                          <TouchableOpacity key={n} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border }} onPress={() => saveOwesYouPerson(n, null)} activeOpacity={0.75}>
+                          <TouchableOpacity key={`contact-${n}`} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border }} onPress={() => saveOwesYouPerson(n, null)} activeOpacity={0.75}>
                             <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.borderMid }}>
                             </View>
                             <Text style={{ fontFamily: Brand.font.mono, fontSize: 14, color: Colors.text, flex: 1 }}>{n}</Text>
@@ -3196,8 +3353,8 @@ const rd = StyleSheet.create({
 
   // Person rows
   personRow:       { flexDirection: 'row', alignItems: 'center', height: 52, gap: 10 },
-  personAvatar:    { width: 32, height: 32, borderRadius: 16, backgroundColor: '#efe9ff', alignItems: 'center', justifyContent: 'center' },
-  personAvatarText:{ ...DC.typography.sectionHeader, color: '#8c52ff' },
+  personAvatar:    { width: 32, height: 32, borderRadius: 16, backgroundColor: '#deecff', alignItems: 'center', justifyContent: 'center' },
+  personAvatarText:{ ...DC.typography.sectionHeader, color: '#4394ff' },
   personName:      { ...DC.typography.sectionBody, flex: 1 },
   personAmount:    { ...DC.typography.amount },
   // Info card

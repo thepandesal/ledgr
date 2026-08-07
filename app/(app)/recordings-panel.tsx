@@ -3,6 +3,7 @@ import {
   ActivityIndicator, TouchableOpacity, RefreshControl, TextInput, Modal, Animated,
 } from 'react-native';
 import TopHeader from '@/components/ui/TopHeader';
+import BottomSheet from '@/components/ui/BottomSheet';
 import { useState, useMemo, useEffect } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -15,6 +16,8 @@ import AddExpenseScreen from './add-expense';
 import { SYSTEM_CATEGORIES, CatIcon, catIconKeyForName } from '../../src/lib/systemCategories';
 import { SvgXml } from 'react-native-svg';
 import NavIcon from '@/components/ui/NavIcons';
+import { recordDirection } from '../../src/lib/recordDirection';
+import { dateFilter, MONTH_LABELS } from '../../src/lib/dateFilter';
 
 const SVG_BACK   = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12"><path fill="currentColor" d="M10.5 6a.75.75 0 0 0-.75-.75H3.81l1.97-1.97a.75.75 0 0 0-1.06-1.06L1.47 5.47a.75.75 0 0 0 0 1.06l3.25 3.25a.75.75 0 0 0 1.06-1.06L3.81 6.75h5.94A.75.75 0 0 0 10.5 6" /></svg>`;
 const SVG_ADD    = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="currentColor" d="M12 4.75c.69 0 1.25.56 1.25 1.25v4.75H18a1.25 1.25 0 1 1 0 2.5h-4.75V18a1.25 1.25 0 1 1-2.5 0v-4.75H6a1.25 1.25 0 1 1 0-2.5h4.75V6c0-.69.56-1.25 1.25-1.25" /></svg>`;
@@ -57,23 +60,27 @@ export default function RecordingsPanel({ onClose, categoryId, categoryName, spa
   const [viewMode, setViewMode]         = useState<'date' | 'category'>('date');
   const [filterOption, setFilterOption] = useState('all');
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
-  const [showAddExpense, setShowAddExpense]   = useState(false);
-  const [expenseFormType, setExpenseFormType] = useState<'expense' | 'income'>('expense');
-  const [showTypeChoice, setShowTypeChoice]   = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  // Global date filter
+  const [filterMonth, setFilterMonth] = useState(dateFilter.getMonth());
+  const [filterYear,  setFilterYear]  = useState(dateFilter.getYear());
+  useEffect(() => dateFilter.subscribe(() => {
+    setFilterMonth(dateFilter.getMonth());
+    setFilterYear(dateFilter.getYear());
+  }), []);
+  const { from, to } = useMemo(() => dateFilter.getFromTo(), [filterMonth, filterYear]);
+  const dateLabel = `${MONTH_LABELS[filterMonth]} ${filterYear}`;
+
+  const [showDateSheet, setShowDateSheet] = useState(false);
+  // draft state — only committed on Apply
+  const [draftMonth, setDraftMonth] = useState(filterMonth);
+  const [draftYear,  setDraftYear]  = useState(filterYear);
 
   const activeTypes = useMemo(() => FILTER_TYPE_MAP[filterOption], [filterOption]);
 
-  const { from, to } = useMemo(() => {
-    const now = new Date();
-    const d   = new Date(now.getFullYear(), now.getMonth(), 1);
-    const f   = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`;
-    const t   = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${new Date(d.getFullYear(),d.getMonth()+1,0).getDate()}`;
-    return { from: f, to: t };
-  }, []);
-
   const { data: recordings = [], isLoading } = useQuery({
-    queryKey: ['recordings-panel', userId, from, categoryId, propSpaceId],
+    queryKey: ['recordings-panel', userId, from, to, categoryId, propSpaceId],
     queryFn: async () => {
       let query = supabase
         .from('recordings')
@@ -112,7 +119,7 @@ export default function RecordingsPanel({ onClose, categoryId, categoryName, spa
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await queryClient.invalidateQueries({ queryKey: ['recordings-panel', userId, from] });
+    await queryClient.invalidateQueries({ queryKey: ['recordings-panel', userId] });
     setRefreshing(false);
   };
 
@@ -175,6 +182,8 @@ export default function RecordingsPanel({ onClose, categoryId, categoryName, spa
     <View style={s.root}>
       <TopHeader
         title="Transactions"
+        subtitle={dateLabel}
+        onSubtitlePress={() => { setDraftMonth(filterMonth); setDraftYear(filterYear); setShowDateSheet(true); }}
         onBack={handleBack}
         centered
         variant="blue"
@@ -199,7 +208,7 @@ export default function RecordingsPanel({ onClose, categoryId, categoryName, spa
             </TouchableOpacity>
           </View>
           <View style={{ flexDirection: 'row', gap: 8, marginLeft: 'auto', alignItems: 'center' }}>
-            <TouchableOpacity onPress={() => setShowTypeChoice(true)} activeOpacity={0.7} style={{ width: DC.circleBtn.active.width, height: DC.circleBtn.active.height, borderRadius: DC.circleBtn.active.borderRadius, backgroundColor: DC.headerBlueBg, alignItems: 'center', justifyContent: 'center' }}>
+            <TouchableOpacity onPress={() => { recordDirection.set('out', 'panel'); onClose(); switchTab('record'); }} activeOpacity={0.7} style={{ width: DC.circleBtn.active.width, height: DC.circleBtn.active.height, borderRadius: DC.circleBtn.active.borderRadius, backgroundColor: DC.headerBlueBg, alignItems: 'center', justifyContent: 'center' }}>
               <SvgXml xml={SVG_ADD} width={22} height={22} color={DC.btnText} />
             </TouchableOpacity>
           </View>
@@ -301,103 +310,116 @@ export default function RecordingsPanel({ onClose, categoryId, categoryName, spa
         </ScrollView>
       )}
 
-      {/* ── Type choice modal ── */}
-      <Modal visible={showTypeChoice} transparent animationType="fade" onRequestClose={() => setShowTypeChoice(false)}>
-        <View style={s.choiceOverlay}>
-          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setShowTypeChoice(false)} />
-          <Animated.View style={s.choiceCard}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-              <Text style={s.choiceTitle}>New Record</Text>
-              <TouchableOpacity onPress={() => setShowTypeChoice(false)} activeOpacity={0.7} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 18, color: DC.pageTextMuted, lineHeight: 20 }}>✕</Text>
-              </TouchableOpacity>
-            </View>
-            <View style={s.choiceGrid}>
-              <TouchableOpacity style={s.choicePill} activeOpacity={0.8}
-                onPress={() => { setShowTypeChoice(false); setShowAddExpense(true); setExpenseFormType('income'); }}>
-                <Text style={s.choicePillText}>Money In</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={s.choicePill} activeOpacity={0.8}
-                onPress={() => { setShowTypeChoice(false); setShowAddExpense(true); setExpenseFormType('expense'); }}>
-                <Text style={s.choicePillText}>Money Out</Text>
-              </TouchableOpacity>
-            </View>
-          </Animated.View>
+      {/* Date picker sheet */}
+      <BottomSheet visible={showDateSheet} onClose={() => setShowDateSheet(false)} title="select month">
+        {/* Year row */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 24, marginBottom: 16 }}>
+          <TouchableOpacity onPress={() => setDraftYear(y => y - 1)} activeOpacity={0.7} style={s.yearNavBtn}>
+            <Text style={s.yearNavArrow}>{'‹'}</Text>
+          </TouchableOpacity>
+          <Text style={s.yearNavLabel}>{draftYear}</Text>
+          <TouchableOpacity onPress={() => setDraftYear(y => y + 1)} activeOpacity={0.7} style={s.yearNavBtn}>
+            <Text style={s.yearNavArrow}>{'›'}</Text>
+          </TouchableOpacity>
         </View>
-      </Modal>
-
-      {showAddExpense && (
-        <AddExpenseScreen
-          type={expenseFormType}
-          onClose={() => { setShowAddExpense(false); queryClient.invalidateQueries({ queryKey: ['recordings-panel', userId, from] }); }}
-          userId={userId}
-          defaultCurrency={defaultCurrency}
-          spaceId={propSpaceId}
-          spaceName={spaceName}
-        />
-      )}
+        {/* Month grid */}
+        <View style={s.monthGrid}>
+          {MONTH_LABELS.map((label, i) => (
+            <TouchableOpacity
+              key={label}
+              style={[s.monthGridChip, draftMonth === i && s.monthGridChipActive]}
+              onPress={() => setDraftMonth(i)}
+              activeOpacity={0.7}
+            >
+              <Text style={[s.monthGridChipText, draftMonth === i && s.monthGridChipTextActive]}>{label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <TouchableOpacity
+          style={s.applyBtn}
+          onPress={() => { dateFilter.set(draftMonth, draftYear); setShowDateSheet(false); }}
+          activeOpacity={0.8}
+        >
+          <Text style={s.applyBtnText}>Apply</Text>
+        </TouchableOpacity>
+      </BottomSheet>
     </View>
   );
 }
 
 const s = StyleSheet.create({
-  root:   { flex: 1, backgroundColor: '#fff' },
-  frozen: { backgroundColor: '#fff', zIndex: 10 },
+  root:   { flex: 1, backgroundColor: DC.pageBg },
+  frozen: { backgroundColor: DC.pageBg, zIndex: 10 },
 
-  // header
-  header:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: DC.pagePadding, paddingTop: 28, paddingBottom: 14 },
-  title:         { fontFamily: 'Poppins-SemiBold', fontSize: 15, color: DC.pageText, textAlign: 'center', flex: 1 },
-  headerDivider: { height: 1, backgroundColor: DC.cardDividerColor },
+  // date picker sheet
+  yearNavBtn:   { padding: 8 },
+  yearNavArrow: { fontFamily: 'Poppins-Regular', fontSize: 22, color: DC.pageText, lineHeight: 26 },
+  yearNavLabel: { fontFamily: 'Poppins-Bold', fontSize: 16, color: DC.pageText, minWidth: 60, textAlign: 'center' },
+  monthGrid:    { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 },
+  monthGridChip:         { width: '22%', flexGrow: 1, paddingVertical: 9, borderRadius: 999, borderWidth: 1, borderColor: DC.controlBorder, alignItems: 'center' },
+  monthGridChipActive:   { backgroundColor: '#4394ff', borderColor: '#4394ff' },
+  monthGridChipText:     { fontFamily: 'Poppins-Regular', fontSize: 12, color: DC.pageTextMuted },
+  monthGridChipTextActive: { fontFamily: 'Poppins-SemiBold', fontSize: 12, color: '#ffffff' },
+  applyBtn:     { backgroundColor: '#4394ff', borderRadius: 999, paddingVertical: 14, alignItems: 'center' },
+  applyBtnText: { fontFamily: 'Poppins-SemiBold', fontSize: 13, color: '#ffffff' },
 
-  // segment + filters
-  pillRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: DC.pagePadding, paddingTop: 12, paddingBottom: 8, gap: 8, position: 'relative', zIndex: 10 },
-  segmentWrap: { ...DC.segment.wrap },
-  segmentActive: { ...DC.segment.active },
-  segmentBtn: DC.segment.btn,
-  segmentText: DC.segment.textInactive,
-  segmentTextActive: DC.segment.textActive,
+  // controls row
+  pillRow:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: DC.pagePadding, paddingTop: 12, paddingBottom: 8, gap: 8 },
+  segmentOuter: { flexDirection: 'row', borderRadius: 999, borderWidth: 1, borderColor: DC.controlBorder, overflow: 'hidden', height: 34 },
+  segmentInner: { paddingHorizontal: 16, justifyContent: 'center', alignItems: 'center' },
+  segmentInnerActive: { backgroundColor: DC.headerBlueBg },
+  segmentInnerText: { fontFamily: 'Poppins-Regular', fontSize: 12, color: DC.pageTextMuted },
+  segmentInnerTextActive: { fontFamily: 'Poppins-SemiBold', fontSize: 12, color: '#fff' },
+
+  filterRow:        { flexDirection: 'row', alignItems: 'center', paddingHorizontal: DC.pagePadding, paddingTop: 4, paddingBottom: 16, gap: 8 },
+  filterBtn:        { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: DC.controlBorder, backgroundColor: DC.pageBg },
+  filterBtnActive:  { borderColor: DC.headerBlueBg, backgroundColor: '#eef4ff' },
+  filterBtnText:    { fontFamily: 'Poppins-Regular', fontSize: 12, color: DC.pageTextMuted },
+  filterBtnTextActive: { fontFamily: 'Poppins-SemiBold', fontSize: 12, color: DC.headerBlueBg },
+  filterDot:        { width: 6, height: 6, borderRadius: 3, backgroundColor: DC.headerBlueBg },
   dropdownList: {
-    position: 'absolute', top: 52, right: DC.pagePadding, minWidth: 160,
+    position: 'absolute', top: 40, left: 0, minWidth: 160,
     borderRadius: 12, borderWidth: 1, borderColor: DC.controlBorder,
     backgroundColor: '#fff', zIndex: 20, elevation: 6,
   },
   dropdownItem:           { paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: DC.controlBorder },
-  dropdownItemActive:     { backgroundColor: '#f5f0ff' },
-  dropdownItemText:       { ...DC.typography.sectionBody },
-  dropdownItemTextActive: { ...DC.typography.sectionBody, fontFamily: 'Poppins-SemiBold' as string, color: DC.circleBtn.active.borderColor },
+  dropdownItemActive:     { backgroundColor: '#eef4ff' },
+  dropdownItemText:       { fontFamily: 'Poppins-Regular', fontSize: 13, color: DC.pageText },
+  dropdownItemTextActive: { fontFamily: 'Poppins-SemiBold', fontSize: 13, color: DC.headerBlueBg },
 
-  // toolbar
-  toolbar:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: DC.pagePadding, paddingVertical: 8 },
-  editBtn:       { width: 28, height: 28, borderRadius: 14, backgroundColor: DC.circleBtn.active.borderColor, alignItems: 'center', justifyContent: 'center' },
-  addBtn:        { ...DC.circleBtn.ghostSm },
-  addBtnText:    { fontFamily: 'Poppins-Bold', fontSize: 16, color: DC.pageText, lineHeight: 20 },
   toolbarDivider: { height: 1, backgroundColor: DC.controlBorder, marginHorizontal: DC.pagePadding },
 
   // search
-  searchWrap:  { ...DC.textbox.wrap, marginHorizontal: DC.pagePadding, marginTop: 8, marginBottom: 8 },
-  searchInput: DC.textbox.input,
+  searchWrap:  { marginHorizontal: DC.pagePadding, marginTop: 16, marginBottom: 16, height: 38, borderRadius: 999, borderWidth: 1, borderColor: DC.controlBorder, paddingHorizontal: 14, justifyContent: 'center' },
+  searchInput: { fontFamily: 'Poppins-Regular', fontSize: 14, color: DC.pageText, paddingVertical: 0 },
 
   // list
-  empty:         { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  emptyText:     { ...DC.typography.muted },
-  scroll:        { paddingHorizontal: DC.pagePadding, paddingTop: 8, paddingBottom: 80 },
-  sectionHeader: { ...DC.typography.sectionHeader, paddingVertical: 10 },
+  empty:     { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  emptyText: { fontFamily: 'Poppins-Regular', fontSize: 13, color: DC.pageTextMuted },
+  scroll:    { paddingHorizontal: DC.pagePadding, paddingTop: 8, paddingBottom: 80 },
+  sectionHeader: { fontFamily: 'Poppins-SemiBold', fontSize: 11, color: DC.pageTextMuted, textTransform: 'uppercase', letterSpacing: 0.6, paddingVertical: 10 },
 
-  row:              { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, ...DC.sectionDivider },
-  rowLast:          { borderBottomWidth: 0 },
-  checkbox:         { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: DC.controlBorder },
-  checkboxSelected: { width: 22, height: 22, borderRadius: 11, backgroundColor: DC.circleBtn.active.backgroundColor, borderColor: DC.circleBtn.active.borderColor },
+  row:     { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 18, borderBottomWidth: DC.rowDivider.height, borderBottomColor: DC.rowDivider.backgroundColor },
+  rowLast: { borderBottomWidth: 0 },
+  checkbox:         { width: 20, height: 20, borderRadius: 10, borderWidth: 1.5, borderColor: DC.controlBorder },
+  checkboxSelected: { width: 20, height: 20, borderRadius: 10, backgroundColor: DC.headerBlueBg, borderColor: DC.headerBlueBg },
+  iconWrap: { width: 36, height: 36, borderRadius: 18, backgroundColor: DC.cardBg, alignItems: 'center', justifyContent: 'center' },
   rowBody:      { flex: 1, gap: 1 },
-  rowName:      { fontFamily: 'Poppins-Regular', fontSize: 11, color: '#373737' },
-  rowSub:       { fontFamily: 'Poppins-Regular', fontSize: 11, color: '#373737' },
-  rowMeta:      { fontFamily: 'Poppins-Regular', fontSize: 11, color: '#373737' },
-  rowAmount:    { fontFamily: 'Poppins-Regular', fontSize: 11, color: '#373737', flexShrink: 0 },
+  rowName:      { fontFamily: 'Poppins-SemiBold', fontSize: 13, color: DC.pageText },
+  rowSub:       { fontFamily: 'Poppins-Regular', fontSize: 11, color: DC.pageTextMuted },
+  rowMetaBold:  { fontFamily: 'Poppins-SemiBold', fontSize: 10, color: DC.pageTextMuted },
+  rowMetaReg:   { fontFamily: 'Poppins-Regular', fontSize: 10, color: DC.pageTextMuted },
+  rowAmount:    { fontFamily: 'Poppins-Bold', fontSize: 13, color: DC.pageText, flexShrink: 0 },
 
   // modal
-  choiceOverlay:  { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32 },
+  choiceOverlay:  { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32, backgroundColor: 'rgba(0,0,0,0.2)' },
   choiceCard:     { backgroundColor: '#fff', borderRadius: 20, borderWidth: 1, borderColor: DC.controlBorder, padding: 20, width: '100%', maxWidth: 320 },
-  choiceTitle:    { ...DC.typography.pageTitle, marginBottom: 16 },
+  choiceTitle:    { fontFamily: 'Poppins-Bold', fontSize: 18, color: DC.pageText, marginBottom: 16 },
   choiceGrid:     { flexDirection: 'row', gap: 10 },
-  choicePill:     { flex: 1, backgroundColor: '#3a3a34', borderRadius: 999, paddingVertical: 10, alignItems: 'center' },
-  choicePillText: { ...DC.typography.sectionBody, color: '#fff' },
+  choicePill:     { flex: 1, backgroundColor: DC.btnBg, borderRadius: 999, paddingVertical: 12, alignItems: 'center' },
+  choicePillText: { fontFamily: 'Poppins-SemiBold', fontSize: 13, color: '#fff' },
+
+  // unused legacy
+  header: {}, title: {}, headerDivider: {}, segmentWrap: {}, segmentActive: {}, segmentBtn: {}, segmentText: {}, segmentTextActive: {},
+  toolbar: {}, editBtn: {}, addBtn: {}, addBtnText: {}, rowMeta: {},
 });

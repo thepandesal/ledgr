@@ -574,7 +574,7 @@ const st = StyleSheet.create({
   scroll: { paddingHorizontal: DC.pagePadding, paddingBottom: 80, paddingTop: 8 },
   controlRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: DC.pagePadding, paddingVertical: 8 },
   searchWrap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: DC.cardBorder, borderRadius: Radius.pill, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: DC.cardBg },
-  searchInput: { flex: 1, fontFamily: AppFont.regular, fontSize: 13, color: DC.pageText, padding: 0 },
+  searchInput: { flex: 1, fontFamily: AppFont.regular, fontSize: 16, color: DC.pageText, padding: 0 },
   rowName:     { fontFamily: AppFont.regular, fontSize: 14, color: '#111111' },
   rowSub:      { fontFamily: AppFont.regular, fontSize: 11, color: Colors.muted, fontStyle: 'italic' },
   badge:       { alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 2, borderRadius: Radius.pill },

@@ -204,7 +204,7 @@ export default function PeoplePanel({ onClose, initialPerson }: Props) {
 
         if (d.ongoingCount > 0) {
           ongoing.push(entry);
-        } else {
+        } else if (d.completedCount > 0) {
           completed.push(entry);
         }
       });
@@ -395,7 +395,7 @@ const s = StyleSheet.create({
     borderRadius: DC.controlRadius, backgroundColor: Colors.surface,
     borderWidth: 1, borderColor: Colors.borderMid,
   },
-  searchInput: { flex: 1, fontFamily: AppFont.regular, fontSize: 13, color: Colors.text, padding: 0 },
+  searchInput: { flex: 1, fontFamily: AppFont.regular, fontSize: 16, color: Colors.text, padding: 0 },
   sectionLabel: {
     fontFamily: AppFont.semiBold, fontSize: 10, color: Colors.muted,
     letterSpacing: 0.8, textTransform: 'uppercase', marginTop: 16, marginBottom: 8,

@@ -216,7 +216,7 @@ export const DC = {
   controlBorder: '#d2d2d2' as string,
   rowDivider: {
     height: 0.5,
-    backgroundColor: '#f0f0f0' as string,
+    backgroundColor: '#d8d8d8' as string,
   },
   dottedCard: {
     borderWidth: 1.5,
@@ -318,7 +318,7 @@ export const DC = {
     },
     input: {
       fontFamily: 'Poppins-Regular' as string,
-      fontSize: 11,
+      fontSize: 16,
       color: '#373737' as string,
       paddingVertical: 0,
     },

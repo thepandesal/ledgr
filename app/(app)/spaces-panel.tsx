@@ -190,68 +190,42 @@ export default function SpacesPanel({ onClose, showBack }: Props) {
 
           {/* Uncategorized */}
           <Text style={st.sectionHeader}>Uncategorized</Text>
-          <View style={st.timelineWrap}>
-            <View style={st.timelineCol}>
-              <View style={st.tlDotWrap}>
-                <View style={st.tlLineHidden} />
-                <View style={st.tlDot} />
-                <View style={st.tlLineHidden} />
+          <View style={st.cardList}>
+            <TouchableOpacity style={st.card} activeOpacity={0.7} onPress={() => openRecordingsPanel({ categoryName: 'Uncategorized' })}>
+              <View style={st.cardLeft}>
+                <Text style={st.cardName} numberOfLines={2} ellipsizeMode="tail">Uncategorized</Text>
               </View>
-            </View>
-            <View style={st.cardsCol}>
-              <TouchableOpacity style={st.card} activeOpacity={0.7} onPress={() => openRecordingsPanel({ categoryName: 'Uncategorized' })}>
-                <View style={st.cardLeft}>
-                  <Text style={st.cardName} numberOfLines={2} ellipsizeMode="tail">Uncategorized</Text>
-                </View>
-                <View style={st.cardDivider} />
-                <View style={st.cardRight}>
-                  <Text style={st.cardLabel}>Transactions</Text>
-                  <Text style={st.cardValue}>{uncategorizedCount} transaction{uncategorizedCount !== 1 ? 's' : ''}</Text>
-                </View>
-              </TouchableOpacity>
-            </View>
+              <View style={st.cardDivider} />
+              <View style={st.cardRight}>
+                <Text style={st.cardLabel}>Transactions</Text>
+                <Text style={st.cardValue}>{uncategorizedCount} transaction{uncategorizedCount !== 1 ? 's' : ''}</Text>
+              </View>
+            </TouchableOpacity>
           </View>
 
           {/* Savings */}
           {savingsSpaces.length > 0 && (
             <>
               <Text style={[st.sectionHeader, { marginTop: 28 }]}>Savings</Text>
-              <View style={st.timelineWrap}>
-                <View style={st.timelineCol}>
-                  {savingsSpaces.map((sp: any, i: number) => {
-                    const count = savingsSpaces.length;
-                    const isFirst = i === 0; const isLast = i === count - 1;
-                    const showDot = count > 1 && (isFirst || isLast);
-                    const showLine = count > 1 && !isFirst && !isLast;
-                    return (
-                      <View key={sp.id} style={st.tlDotWrap}>
-                        {showDot && (<><View style={isFirst ? st.tlLineHidden : st.tlLine} /><View style={st.tlDot} /><View style={isLast ? st.tlLineHidden : st.tlLine} /></>)}
-                        {showLine && <View style={[st.tlLine, { flex: 1 }]} />}
-                        {count === 1 && (<><View style={st.tlLineHidden} /><View style={st.tlDot} /><View style={st.tlLineHidden} /></>)}
+              <View style={st.cardList}>
+                {savingsSpaces.map((sp: any) => {
+                  const goal = sp.budget ? convert(sp.budget, sp.budget_currency ?? 'PHP', defaultCurrency) : 0;
+                  return (
+                    <TouchableOpacity key={sp.id} style={st.card} activeOpacity={0.7} onPress={() => setSpaceChoice({ id: sp.id, name: sp.name })}>
+                      <View style={st.cardLeft}>
+                        <Text style={st.cardName} numberOfLines={2} ellipsizeMode="tail">{sp.name}</Text>
                       </View>
-                    );
-                  })}
-                </View>
-                <View style={st.cardsCol}>
-                  {savingsSpaces.map((sp: any) => {
-                    const goal = sp.budget ? convert(sp.budget, sp.budget_currency ?? 'PHP', defaultCurrency) : 0;
-                    return (
-                      <TouchableOpacity key={sp.id} style={st.card} activeOpacity={0.7} onPress={() => setSpaceChoice({ id: sp.id, name: sp.name })}>
-                        <View style={st.cardLeft}>
-                          <Text style={st.cardName} numberOfLines={2} ellipsizeMode="tail">{sp.name}</Text>
-                        </View>
-                        <View style={st.cardDivider} />
-                        <View style={st.cardRight}>
-                          <Text style={st.cardLabel}>Your all time savings</Text>
-                          <Text style={st.cardValue}>
-                            <Text style={{ color: '#e6a817' }}>{fmt(sp.savedAllTime)}</Text>
-                            {goal > 0 ? <Text style={st.cardValueMuted}> / {fmt(goal)}</Text> : null}
-                          </Text>
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
+                      <View style={st.cardDivider} />
+                      <View style={st.cardRight}>
+                        <Text style={st.cardLabel}>Your all time savings</Text>
+                        <Text style={st.cardValue}>
+                          <Text style={{ color: '#e6a817' }}>{fmt(sp.savedAllTime)}</Text>
+                          {goal > 0 ? <Text style={st.cardValueMuted}> / {fmt(goal)}</Text> : null}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             </>
           )}
@@ -260,43 +234,26 @@ export default function SpacesPanel({ onClose, showBack }: Props) {
           {expenseSpaces.length > 0 && (
             <>
               <Text style={[st.sectionHeader, { marginTop: 28 }]}>Expenses</Text>
-              <View style={st.timelineWrap}>
-                <View style={st.timelineCol}>
-                  {expenseSpaces.map((sp: any, i: number) => {
-                    const count = expenseSpaces.length;
-                    const isFirst = i === 0; const isLast = i === count - 1;
-                    const showDot = count > 1 && (isFirst || isLast);
-                    const showLine = count > 1 && !isFirst && !isLast;
-                    return (
-                      <View key={sp.id} style={st.tlDotWrap}>
-                        {showDot && (<><View style={isFirst ? st.tlLineHidden : st.tlLine} /><View style={st.tlDot} /><View style={isLast ? st.tlLineHidden : st.tlLine} /></>)}
-                        {showLine && <View style={[st.tlLine, { flex: 1 }]} />}
-                        {count === 1 && (<><View style={st.tlLineHidden} /><View style={st.tlDot} /><View style={st.tlLineHidden} /></>)}
+              <View style={st.cardList}>
+                {expenseSpaces.map((sp: any) => {
+                  const budget = sp.budget ? convert(sp.budget, sp.budget_currency ?? 'PHP', defaultCurrency) : 0;
+                  const over = budget > 0 && sp.spent > budget;
+                  return (
+                    <TouchableOpacity key={sp.id} style={st.card} activeOpacity={0.7} onPress={() => setSpaceChoice({ id: sp.id, name: sp.name })}>
+                      <View style={st.cardLeft}>
+                        <Text style={st.cardName} numberOfLines={2} ellipsizeMode="tail">{sp.name}</Text>
                       </View>
-                    );
-                  })}
-                </View>
-                <View style={st.cardsCol}>
-                  {expenseSpaces.map((sp: any) => {
-                    const budget = sp.budget ? convert(sp.budget, sp.budget_currency ?? 'PHP', defaultCurrency) : 0;
-                    const over = budget > 0 && sp.spent > budget;
-                    return (
-                      <TouchableOpacity key={sp.id} style={st.card} activeOpacity={0.7} onPress={() => setSpaceChoice({ id: sp.id, name: sp.name })}>
-                        <View style={st.cardLeft}>
-                          <Text style={st.cardName} numberOfLines={2} ellipsizeMode="tail">{sp.name}</Text>
-                        </View>
-                        <View style={st.cardDivider} />
-                        <View style={st.cardRight}>
-                          <Text style={st.cardLabel}>This month's spending</Text>
-                          <Text style={st.cardValue}>
-                            <Text style={over ? { color: '#FF5757' } : {}}>{fmt(sp.spent)}</Text>
-                            {budget > 0 ? <Text style={st.cardValueMuted}> / {fmt(budget)}</Text> : null}
-                          </Text>
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
+                      <View style={st.cardDivider} />
+                      <View style={st.cardRight}>
+                        <Text style={st.cardLabel}>This month's spending</Text>
+                        <Text style={st.cardValue}>
+                          <Text style={over ? { color: '#FF5757' } : {}}>{fmt(sp.spent)}</Text>
+                          {budget > 0 ? <Text style={st.cardValueMuted}> / {fmt(budget)}</Text> : null}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             </>
           )}
@@ -389,18 +346,11 @@ const st = StyleSheet.create({
 
   sectionHeader: { fontFamily: 'Poppins-Bold', fontSize: 17, color: '#111111', marginBottom: 16 },
 
-  // Timeline
-  timelineWrap: { flexDirection: 'row', gap: 10 },
-  timelineCol:  { width: 12, alignItems: 'flex-start' },
-  tlDotWrap:    { flex: 1, alignItems: 'flex-start', justifyContent: 'center', minHeight: 100 },
-  tlDot:        { width: 10, height: 10, borderRadius: 5, backgroundColor: '#d2d2d2', zIndex: 1, marginLeft: -4.25 },
-  tlLine:       { flex: 1, width: 1.5, backgroundColor: '#d2d2d2', minHeight: 10 },
-  tlLineHidden: { flex: 1, width: 1.5, backgroundColor: 'transparent' },
-  cardsCol:     { flex: 1, gap: 10 },
+  cardList: { gap: 10 },
 
   // Card
   card:         { flexDirection: 'row', alignItems: 'stretch', borderWidth: 1.5, borderColor: '#d2d2d2', borderRadius: 12, backgroundColor: '#fff', overflow: 'hidden' },
-  cardLeft:     { width: 90, height: 90, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 8 },
+  cardLeft:     { width: 120, height: 90, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 8 },
   cardName:     { fontFamily: 'Poppins-Bold', fontSize: 11, color: '#111111', textAlign: 'center' },
   cardDivider:  { width: 0.5, backgroundColor: '#d2d2d2' },
   cardRight:    { flex: 1, paddingVertical: 14, paddingHorizontal: 14, justifyContent: 'center' },

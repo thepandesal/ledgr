@@ -313,7 +313,7 @@ const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.white },
   scroll:    { paddingHorizontal: Spacing.page, paddingTop: 20, paddingBottom: 60 },
   searchWrap: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: Colors.borderMid, borderRadius: Radius.pill, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 24, backgroundColor: Colors.surface },
-  searchInput: { flex: 1, fontFamily: Fonts.mono, fontSize: 13, color: Colors.text },
+  searchInput: { flex: 1, fontFamily: Fonts.mono, fontSize: 16, color: Colors.text },
   sectionRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   sectionHeader: { ...Brand.type.sectionHeader },
   sectionCount:  { fontFamily: Fonts.mono, fontSize: 11, color: Colors.muted },

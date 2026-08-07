@@ -32,10 +32,14 @@ const applyOp = (a: number, b: number, op: string) => {
   }
 };
 
+import { recordDirection } from '../../../src/lib/recordDirection';
+import { useNav } from '../../../src/lib/NavContext';
+
 export default function RecordScreen({ isActive }: { isActive?: boolean }) {
   const { userId, defaultCurrency } = useUser();
   const queryClient = useQueryClient();
-
+  const { switchTab, openRecordingsPanel } = useNav();
+  const [returnToPanel, setReturnToPanel] = useState(false);
   const [recordName, setRecordName] = useState('');
   const [useCustomName, setUseCustomName] = useState(false);
   const [isLoan, setIsLoan] = useState(false);
@@ -55,6 +59,17 @@ export default function RecordScreen({ isActive }: { isActive?: boolean }) {
   const [showLoader, setShowLoader] = useState(false);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    if (!isActive) return;
+    const result = recordDirection.consume();
+    if (result) {
+      setDirection(result.dir);
+      setReturnToPanel(result.returnTab === 'panel');
+    } else {
+      setReturnToPanel(false);
+    }
+  }, [isActive]);
 
   useEffect(() => {
     if (!userId) return;
@@ -170,6 +185,9 @@ export default function RecordScreen({ isActive }: { isActive?: boolean }) {
       setEntry(''); setPrev(null); setOp(null); setIsLoan(false); setSpaceId(null); setBorrower(''); setBorrowerInput(''); setShowBorrowerDropdown(false);
       setShowLoader(true);
       setSaved(true);
+      if (returnToPanel) {
+        setTimeout(() => { setSaved(false); setSaving(false); setShowLoader(false); openRecordingsPanel(); }, 1200);
+      }
     } catch (e: any) {
       await minDelay;
       setError(e?.message ?? 'something went wrong.');
@@ -410,14 +428,14 @@ const s = StyleSheet.create({
   scroll: { paddingTop: 14, paddingBottom: 150 },
 
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
-  nameInput: { flex: 1, fontFamily: AppFont.regular, fontSize: 13, color: TEXT, backgroundColor: '#f6f6f6', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: BORDER },
+  nameInput: { flex: 1, fontFamily: AppFont.regular, fontSize: 16, color: TEXT, backgroundColor: '#f6f6f6', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: BORDER },
   nameInputDisabled: { opacity: 0.4 },
 
   // ── Loan tag checkbox ──
   loanRowWrap: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14, zIndex: 10 },
   loanRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', gap: 10 },
   borrowerWrap:    { flex: 1, position: 'relative' },
-  borrowerInput:   { fontFamily: AppFont.regular, fontSize: 12, color: TEXT, backgroundColor: '#f6f6f6', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: BORDER },
+  borrowerInput:   { fontFamily: AppFont.regular, fontSize: 16, color: TEXT, backgroundColor: '#f6f6f6', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: BORDER },
   borrowerBadge:   { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: DC.viewBtnBg, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6, alignSelf: 'flex-start' },
   borrowerBadgeText: { fontFamily: AppFont.semiBold, fontSize: 12, color: DC.headerBlueBg },
   borrowerBadgeX:  { fontFamily: AppFont.bold, fontSize: 11, color: DC.headerBlueBg },

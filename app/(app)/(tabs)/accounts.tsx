@@ -552,7 +552,7 @@ const s = StyleSheet.create({
 const f = StyleSheet.create({
   error:         { fontFamily: AppFont.regular, fontSize: 12, color: Colors.expense, marginBottom: 8 },
   label:         { fontFamily: AppFont.semiBold, fontSize: 11, color: DC.pageTextMuted, marginBottom: 6, marginTop: 14, letterSpacing: 0.4, textTransform: 'uppercase' },
-  input:         { fontFamily: AppFont.regular, fontSize: 15, color: DC.pageText, backgroundColor: DC.inputBg, borderRadius: DC.inputRadius, paddingHorizontal: DC.inputPaddingH, paddingVertical: DC.inputPaddingV, borderWidth: DC.inputBorderWidth, borderColor: DC.inputBorder },
+  input:         { fontFamily: AppFont.regular, fontSize: 16, color: DC.pageText, backgroundColor: DC.inputBg, borderRadius: DC.inputRadius, paddingHorizontal: DC.inputPaddingH, paddingVertical: DC.inputPaddingV, borderWidth: DC.inputBorderWidth, borderColor: DC.inputBorder },
   typeBtn:       { flex: 1, paddingVertical: 8, borderRadius: 999, borderWidth: 1, borderColor: DC.cardBorder, alignItems: 'center' },
   typeBtnActive: { backgroundColor: '#373737', borderColor: '#373737' },
   typeBtnText:   { fontFamily: AppFont.regular, fontSize: 11, color: DC.pageTextMuted },

@@ -389,7 +389,7 @@ const m = StyleSheet.create({
   label: { fontFamily: AppFont.semiBold, fontSize: 11, color: DC.pageTextMuted, textTransform: 'uppercase', letterSpacing: 0.6 },
   input: { fontFamily: AppFont.regular, fontSize: 16, color: DC.pageText, backgroundColor: Colors.surface, borderRadius: Radius.lg, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1, borderColor: Colors.borderMid },
   searchRow:  { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: Colors.surface, borderRadius: Radius.lg, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: Colors.borderMid, marginBottom: 10 },
-  searchInput:{ flex: 1, fontFamily: AppFont.regular, fontSize: 14, color: DC.pageText },
+  searchInput:{ flex: 1, fontFamily: AppFont.regular, fontSize: 16, color: DC.pageText },
   iconGrid:   { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   iconBtn:    { borderRadius: Radius.md, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
   iconBtnActive: { backgroundColor: '#ebf7f6' },

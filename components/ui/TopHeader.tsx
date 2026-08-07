@@ -7,6 +7,7 @@ const SVG_BACK = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12"><p
 interface Props {
   title: string;
   subtitle?: string;
+  onSubtitlePress?: () => void;
   onBack?: () => void;
   right?: React.ReactNode;
   topInset?: number;
@@ -14,7 +15,7 @@ interface Props {
   variant?: 'default' | 'branded' | 'panel' | 'blue';
 }
 
-export default function TopHeader({ title, subtitle, onBack, right, topInset = 0, centered = false, variant = 'default' }: Props) {
+export default function TopHeader({ title, subtitle, onSubtitlePress, onBack, right, topInset = 0, centered = false, variant = 'default' }: Props) {
   const branded = variant === 'branded';
   const panel   = variant === 'panel';
   const blue    = variant === 'blue';
@@ -44,7 +45,11 @@ export default function TopHeader({ title, subtitle, onBack, right, topInset = 0
         {centered ? (
           <View style={{ flex: 1, alignItems: 'center' }}>
             <Text style={{ fontFamily, fontSize, color: textColor, textAlign: 'center' }}>{title}</Text>
-            {subtitle ? <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 11, color: textColor, fontStyle: 'italic', textAlign: 'center' }} numberOfLines={1}>{subtitle}</Text> : null}
+            {subtitle ? (
+              <TouchableOpacity onPress={onSubtitlePress} disabled={!onSubtitlePress} activeOpacity={onSubtitlePress ? 0.6 : 1}>
+                <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 11, color: textColor, opacity: onSubtitlePress ? 0.85 : 1, textAlign: 'center' }} numberOfLines={1}>{subtitle}</Text>
+              </TouchableOpacity>
+            ) : null}
           </View>
         ) : (
           <View style={{ flex: 1, paddingHorizontal: 8 }}>

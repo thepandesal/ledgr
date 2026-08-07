@@ -157,7 +157,7 @@ const st = StyleSheet.create({
   root:   { flex: 1, backgroundColor: Colors.white },
   scroll: { paddingHorizontal: DC.pagePadding, paddingBottom: 80 },
   searchWrap: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: DC.pagePadding, marginVertical: 8, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 99, borderWidth: 1, borderColor: DC.cardBorder, backgroundColor: DC.cardBg },
-  searchInput: { flex: 1, fontFamily: AppFont.regular, fontSize: 13, color: DC.pageText, padding: 0 },
+  searchInput: { flex: 1, fontFamily: AppFont.regular, fontSize: 16, color: DC.pageText, padding: 0 },
   sectionTitle: { fontFamily: AppFont.bold, fontSize: 13, color: '#111111', textTransform: 'uppercase', letterSpacing: 0.6, marginTop: 16, marginBottom: 2 },
   sectionDesc:  { fontFamily: AppFont.regular, fontSize: 11, color: Colors.muted, marginBottom: 8 },
   list:    { gap: 0 },

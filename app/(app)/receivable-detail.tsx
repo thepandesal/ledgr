@@ -165,78 +165,74 @@ export default function ReceivableDetail({ person, onClose, onBack }: Props) {
       }
 
       if (isUnassigned) {
-        const [{ data: billSplits }, { data: items }] = await Promise.all([
-          supabase.from('bill_splits').select('split_bill_id, person_name').in('split_bill_id', billIds),
-          supabase.from('split_items').select('split_bill_id, cost, people, recording_type').in('split_bill_id', billIds),
-        ]);
+        // Get all recording IDs linked to split bills
+        const { data: sbrAll } = await supabase
+          .from('split_bill_recordings')
+          .select('recording_id, split_bill_id')
+          .eq('user_id', userId);
+        const splitBillRecMap: Record<string, string> = {};
+        (sbrAll ?? []).forEach((s: any) => { splitBillRecMap[s.recording_id] = s.split_bill_id; });
 
-        const billsWithPeople = new Set((billSplits ?? []).map((bs: any) => bs.split_bill_id));
-        const billsWithNoItemAssignments = (bills ?? []).filter((b: any) => {
-          if (!billsWithPeople.has(b.id)) return false;
-          const billItems = (items ?? []).filter((item: any) => item.split_bill_id === b.id);
-          return billItems.every((item: any) => !item.people || item.people.length === 0);
-        });
-
-        const unassignedBillIds = new Set([
-          ...(bills ?? []).filter((b: any) => !billsWithPeople.has(b.id) && b.status !== 'closed').map((b: any) => b.id),
-          ...billsWithNoItemAssignments.filter((b: any) => b.status !== 'closed').map((b: any) => b.id),
-        ]);
-
-        const unassignedBills = (bills ?? []).filter((b: any) => unassignedBillIds.has(b.id));
-
-        const { data: expenseRecs } = await supabase
+        // Get all recordings that are is_due with no person_name
+        const { data: unassignedAllRecs } = await supabase
           .from('recordings')
-          .select('id, name, amount, paid_amount, status, transaction_date, split_bill_id, person_name, is_due')
+          .select('id, name, amount, paid_amount, status, transaction_date, is_due, split_bill_id')
           .eq('user_id', userId)
-          .eq('type', 'expense')
+          .eq('is_due', true)
+          .or('person_name.is.null,person_name.eq.')
           .neq('status', 'voided')
+          .neq('status', 'paid')
           .order('transaction_date', { ascending: false });
 
+        // Also get split bill recordings where items have no people assigned
+        const { data: splitItems } = billIds.length > 0
+          ? await supabase.from('split_items').select('split_bill_id, people').in('split_bill_id', billIds)
+          : { data: [] };
+        const billsWithNoPeople = new Set(
+          (bills ?? []).filter((b: any) => {
+            const bItems = (splitItems ?? []).filter((i: any) => i.split_bill_id === b.id);
+            return bItems.length === 0 || bItems.every((i: any) => !i.people || i.people.length === 0);
+          }).map((b: any) => b.id)
+        );
+        // Get recordings linked to those split bills
+        const { data: splitBillLinkedRecs } = billsWithNoPeople.size > 0
+          ? await supabase.from('split_bill_recordings').select('recording_id, split_bill_id').in('split_bill_id', [...billsWithNoPeople])
+          : { data: [] };
+        const splitBillLinkedRecIds = new Set((splitBillLinkedRecs ?? []).map((s: any) => s.recording_id));
+
         const seenIds = new Set<string>();
-        const unassignedRecordings: any[] = [];
-        (expenseRecs ?? []).forEach((r: any) => {
-          if (r.person_name) return;
-          const inUnassignedBill = r.split_bill_id && unassignedBillIds.has(r.split_bill_id) && billMap[r.split_bill_id]?.status !== 'closed';
-          const isDueNoSplitBill = r.is_due && !r.split_bill_id && r.status !== 'paid';
-          const isDueUnassignedBill = r.is_due && inUnassignedBill && r.status !== 'paid';
-          if ((inUnassignedBill || isDueNoSplitBill || isDueUnassignedBill) && !seenIds.has(r.id)) {
-            seenIds.add(r.id);
-            unassignedRecordings.push(r);
-          }
+        const unassignedEntries: any[] = [];
+
+        // 1. is_due recordings with no person and no split bill
+        (unassignedAllRecs ?? []).forEach((r: any) => {
+          if (seenIds.has(r.id)) return;
+          const linkedBillId = splitBillRecMap[r.id];
+          if (linkedBillId) return; // has a split bill — handled separately
+          seenIds.add(r.id);
+          unassignedEntries.push({
+            billId: r.id, billName: r.name, billStatus: r.status,
+            owed: Number(r.amount), paid: Number(r.paid_amount ?? 0),
+            remaining: Math.max(0, Number(r.amount) - Number(r.paid_amount ?? 0)),
+            isComplete: false, isRecording: true, entryType: 'receivable', createdBy: 'me',
+          });
         });
 
-        const pendingRecs = unassignedRecordings.filter((r: any) => r.status !== 'paid');
-        const pendingBills = unassignedBills.filter((b: any) => b.status !== 'closed');
-        const completedBills = unassignedBills.filter((b: any) => b.status === 'closed');
-
-        const pendingRecEntries = pendingRecs.map((r: any) => ({
-          billId: r.id, billName: r.name, billStatus: r.status,
-          owed: Number(r.amount), paid: Number(r.paid_amount ?? 0),
-          remaining: Math.max(0, Number(r.amount) - Number(r.paid_amount ?? 0)),
-          isComplete: false, isRecording: true, createdBy: 'me',
-          entryType: r.is_due ? 'receivable' : 'loan',
-        }));
-        const pendingBillEntries = pendingBills.map((b: any) => ({
-          billId: b.id, billName: b.name, billStatus: b.status,
-          owed: 0, paid: 0, remaining: 0, isComplete: false,
-          entryType: 'receivable' as const,
-        }));
-        const completedBillEntries = completedBills.map((b: any) => ({
-          billId: b.id, billName: b.name, billStatus: b.status,
-          owed: 0, paid: 0, remaining: 0, isComplete: true,
-          entryType: 'receivable' as const,
-        }));
-        const allPending = [...pendingRecEntries, ...pendingBillEntries];
+        // 2. is_due recordings linked to split bills with no people assigned
+        (unassignedAllRecs ?? []).forEach((r: any) => {
+          if (seenIds.has(r.id)) return;
+          if (!splitBillLinkedRecIds.has(r.id)) return;
+          seenIds.add(r.id);
+          unassignedEntries.push({
+            billId: r.id, billName: r.name, billStatus: r.status,
+            owed: Number(r.amount), paid: Number(r.paid_amount ?? 0),
+            remaining: Math.max(0, Number(r.amount) - Number(r.paid_amount ?? 0)),
+            isComplete: false, isRecording: true, entryType: 'receivable', createdBy: 'me',
+          });
+        });
 
         return {
-          pending: {
-            receivable: allPending.filter((b: any) => b.entryType === 'receivable'),
-            loan: allPending.filter((b: any) => b.entryType === 'loan'),
-          },
-          completed: {
-            receivable: completedBillEntries,
-            loan: [],
-          },
+          pending: { receivable: unassignedEntries, loan: [] },
+          completed: { receivable: [], loan: [] },
         };
       }
 
@@ -577,10 +573,10 @@ export default function ReceivableDetail({ person, onClose, onBack }: Props) {
         />
 
         <View style={st.personNameRow}>
-          <View style={st.avatarSmall}>
-            <Text style={st.avatarSmallText}>{person[0].toUpperCase()}</Text>
+          <View style={[st.avatarSmall, isUnassigned && { backgroundColor: '#f0f0f0' }]}>
+            <Text style={[st.avatarSmallText, isUnassigned && { color: '#aaa' }]}>{isUnassigned ? '?' : person[0].toUpperCase()}</Text>
           </View>
-          <Text style={st.personNameText} numberOfLines={1}>{person}</Text>
+          <Text style={st.personNameText} numberOfLines={1}>{isUnassigned ? 'Unassigned' : person}</Text>
         </View>
 
         <View style={st.tabRow}>
@@ -780,7 +776,7 @@ const st = StyleSheet.create({
   tabText:     { fontFamily: AppFont.regular, fontSize: 12, color: DC.pageText },
   tabTextActive: { fontFamily: AppFont.semiBold, fontSize: 12, color: DC.viewBtnText },
   searchWrap:  { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: DC.cardBorder, borderRadius: Radius.pill, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: DC.cardBg, marginHorizontal: DC.pagePadding, marginBottom: 8 },
-  searchInput: { flex: 1, fontFamily: AppFont.regular, fontSize: 13, color: DC.pageText, padding: 0 },
+  searchInput: { flex: 1, fontFamily: AppFont.regular, fontSize: 16, color: DC.pageText, padding: 0 },
   row:         { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 10 },
   rowLast:     { borderBottomWidth: 0 },
   rowName:     { fontFamily: AppFont.regular, fontSize: 14, color: '#111111' },

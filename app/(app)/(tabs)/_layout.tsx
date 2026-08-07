@@ -752,12 +752,32 @@ export default function TabsLayout() {
   }, [W]);
 
   // Per-tab navigation stack cache (Instagram-style)
-  const tabStacks = useRef<Record<string, { spaceId: string | null; spaceName: string | null; recordingId: string | null; topSpendingOpen: boolean; recordingsPanelOpen: boolean; spacesPanelOpen: boolean; loansPanelOpen: boolean; receivablesPanelOpen: boolean; remindersPanelOpen: boolean }>>({});
+  const tabStacks = useRef<Record<string, { spaceId: string | null; spaceName: string | null; recordingId: string | null; splitBillId: string | null; splitBillName: string | null; billSplitPanelOpen: boolean; topSpendingOpen: boolean; recordingsPanelOpen: boolean; spacesPanelOpen: boolean; loansPanelOpen: boolean; receivablesPanelOpen: boolean; remindersPanelOpen: boolean }>>({});
 
   const switchTab = useCallback((key: string) => {
     // receipts and bill-split are now overlay panels, not tabs
-    if (key === 'receipts') { openReceiptsPanel(); return; }
-    if (key === 'bill-split') { openBillSplitPanel(); return; }
+    if (key === 'receipts') {
+      // Save current state before opening receipts panel
+      tabStacks.current[activeTabRef.current] = {
+        spaceId: activeSpaceId, spaceName: activeSpaceName, recordingId: activeRecordingId,
+        splitBillId: activeSplitBillId, splitBillName: activeSplitBillName, billSplitPanelOpen,
+        topSpendingOpen: topSpendingOpenRef.current, recordingsPanelOpen: recordingsPanelOpenRef.current,
+        spacesPanelOpen: spacesPanelOpenRef.current, loansPanelOpen: loansPanelOpenRef.current,
+        receivablesPanelOpen: receivablesPanelOpenRef.current, remindersPanelOpen: remindersPanelOpenRef.current,
+      };
+      openReceiptsPanel(); return;
+    }
+    if (key === 'bill-split') {
+      // Save current state before opening bill split panel
+      tabStacks.current[activeTabRef.current] = {
+        spaceId: activeSpaceId, spaceName: activeSpaceName, recordingId: activeRecordingId,
+        splitBillId: activeSplitBillId, splitBillName: activeSplitBillName, billSplitPanelOpen,
+        topSpendingOpen: topSpendingOpenRef.current, recordingsPanelOpen: recordingsPanelOpenRef.current,
+        spacesPanelOpen: spacesPanelOpenRef.current, loansPanelOpen: loansPanelOpenRef.current,
+        receivablesPanelOpen: receivablesPanelOpenRef.current, remindersPanelOpen: remindersPanelOpenRef.current,
+      };
+      openBillSplitPanel(); return;
+    }
     if (key === activeTabRef.current) return;
     const prev = activeTabRef.current;
 
@@ -766,6 +786,9 @@ export default function TabsLayout() {
       spaceId: activeSpaceId,
       spaceName: activeSpaceName,
       recordingId: activeRecordingId,
+      splitBillId: activeSplitBillId,
+      splitBillName: activeSplitBillName,
+      billSplitPanelOpen,
       topSpendingOpen: topSpendingOpenRef.current,
       recordingsPanelOpen: recordingsPanelOpenRef.current,
       spacesPanelOpen: spacesPanelOpenRef.current,
@@ -780,6 +803,11 @@ export default function TabsLayout() {
     setActiveRecordingId(null);
     spaceSlideAnim.setValue(winWidthRef.current);
     recordingSlideAnim.setValue(winWidthRef.current);
+    splitBillSlideAnim.setValue(winWidthRef.current);
+    setActiveSplitBillId(null);
+    setActiveSplitBillName(null);
+    billSplitPanelAnim.setValue(winWidthRef.current);
+    setBillSplitPanelOpen(false);
     topSpendingOpenRef.current = topSpendingOpenRef.current; // preserve — panel stays mounted
     topSpendingAnim.setValue(winWidthRef.current); // hide off-screen while on other tab
     recordingsPanelOpenRef.current = recordingsPanelOpenRef.current;
@@ -825,6 +853,15 @@ export default function TabsLayout() {
 
     // Restore saved panel state for the incoming tab
     const saved = tabStacks.current[key];
+    if (saved?.splitBillId) {
+      setActiveSplitBillId(saved.splitBillId);
+      setActiveSplitBillName(saved.splitBillName ?? '');
+      splitBillSlideAnim.setValue(0);
+    }
+    if (saved?.billSplitPanelOpen) {
+      setBillSplitPanelOpen(true);
+      billSplitPanelAnim.setValue(0);
+    }
     if (saved?.spaceId) {
       setActiveSpaceId(saved.spaceId);
       setActiveSpaceName(saved.spaceName);
@@ -868,7 +905,7 @@ export default function TabsLayout() {
     setActiveTab(key);
     titleAnim.setValue(1);
     if (typeof window !== 'undefined') window.sessionStorage.setItem('activeTab', key);
-  }, [activeSpaceId, activeSpaceName, activeRecordingId]);
+  }, [activeSpaceId, activeSpaceName, activeRecordingId, activeSplitBillId, activeSplitBillName, billSplitPanelOpen]);
 
   const openOthers = useCallback(() => {
     setOthersOpen(true);
@@ -1420,7 +1457,7 @@ const p = StyleSheet.create({
   currencyCode:      { fontFamily: AppFont.bold, fontSize: 13, color: Colors.text },
   currencyLabel:     { fontFamily: AppFont.regular, fontSize: 11, color: Colors.muted },
   searchRow:         { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: Colors.surface, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: Colors.borderMid, marginBottom: 12 },
-  searchInput:       { flex: 1, fontFamily: AppFont.regular, fontSize: 13, color: Colors.text, padding: 0 },
+  searchInput:       { flex: 1, fontFamily: AppFont.regular, fontSize: 16, color: Colors.text, padding: 0 },
 
   // Delete modal
   modalOverlay:    { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center', zIndex: 200, padding: 24 },
@@ -1430,7 +1467,7 @@ const p = StyleSheet.create({
   modalCancelText: { ...DC.button.textInactive },
   deleteWarning:   { fontFamily: AppFont.regular, fontSize: 13, color: Colors.muted, lineHeight: 20, marginBottom: 16 },
   deletePrompt:    { fontFamily: AppFont.bold, fontSize: 11, color: Colors.text, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
-  deleteInput:     { fontFamily: AppFont.regular, fontSize: 15, color: Colors.text, backgroundColor: Colors.surface, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1, borderColor: Colors.borderMid },
+  deleteInput:     { fontFamily: AppFont.regular, fontSize: 16, color: Colors.text, backgroundColor: Colors.surface, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1, borderColor: Colors.borderMid },
   deleteErrorText: { fontFamily: AppFont.regular, fontSize: 12, color: PROFILE_DANGER, marginTop: 6 },
   deleteConfirmBtn:  { ...DC.button.base, flex: 1, backgroundColor: PROFILE_DANGER, borderColor: PROFILE_DANGER },
   deleteConfirmText: { ...DC.button.textActive },

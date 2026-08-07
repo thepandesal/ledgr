@@ -8,7 +8,8 @@ import TopHeader from '@/components/ui/TopHeader';
 import NavIcon from '@/components/ui/NavIcons';
 import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
+import ViewShot from 'react-native-view-shot';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '../../src/lib/supabase';
@@ -24,7 +25,6 @@ import { DC } from '../../src/lib/design';
 import { AppFont } from '../../src/lib/fonts';
 import { ocrReceiptImage, parseReceiptText, type ParsedItem } from '../../src/lib/receiptParser';
 import CameraCapture from './CameraCapture';
-import { PoppinsBoldBase64, PoppinsMediumBase64, PoppinsSemiBoldBase64 } from '../../src/lib/fontBase64';
 import PaymentModal, { type PaymentItem } from './payment-modal';
 import { computeSplitTotals } from '../../src/lib/splitBillUtils';
 const SVG_BACK   = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12"><path fill="currentColor" d="M10.5 6a.75.75 0 0 0-.75-.75H3.81l1.97-1.97a.75.75 0 0 0-1.06-1.06L1.47 5.47a.75.75 0 0 0 0 1.06l3.25 3.25a.75.75 0 0 0 1.06-1.06L3.81 6.75h5.94A.75.75 0 0 0 10.5 6" /></svg>`;
@@ -951,6 +951,7 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
   });
   const [shareModal, setShareModal]             = useState(false);
   const [shareAccounts, setShareAccounts]       = useState<any[]>([]);
+  const [shareAccountsLoaded, setShareAccountsLoaded] = useState(false);
   const [shareSelectedIds, setShareSelectedIds] = useState<string[]>([]);
   const [shareOriginalIds, setShareOriginalIds] = useState<string[]>([]);
   const [shareLink, setShareLink]               = useState('');
@@ -958,6 +959,28 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
   const [shareSaving, setShareSaving]           = useState(false);
   const [shareGenerating, setShareGenerating]   = useState(false);
   const [saveImgLoading, setSaveImgLoading]     = useState(false);
+  const [walletPickerModal, setWalletPickerModal] = useState(false);
+  const [walletSearch, setWalletSearch]           = useState('');
+
+  const [wizardStep, setWizardStep] = useState<1 | 2 | 3>(1);
+  const [actionsModal, setActionsModal] = useState(false);
+
+  // Load saved wallet selection + account details when shareRow becomes available
+  useEffect(() => {
+    if (!shareRow?.id) return;
+    const savedIds = shareRow.data?.account_ids ?? [];
+    setShareSelectedIds(savedIds);
+    setShareOriginalIds(savedIds);
+    // Restore the share link if a slug already exists
+    if (shareRow.slug && shareRow.user_id) {
+      setShareLink(`https://ledgr.art/split/${shareRow.user_id}/${shareRow.slug}`);
+    }
+    if (savedIds.length > 0 && shareAccounts.length === 0) {
+      supabase.from('accounts').select('id, account_name, bank, account_number, qr_code')
+        .eq('user_id', userId).order('account_name')
+        .then(({ data }) => { if (data) { setShareAccounts(data); setShareAccountsLoaded(true); } });
+    }
+  }, [shareRow?.id]);
   const openShareModal = async () => {
     setShareCopied(false);
     const { data: accs } = await supabase
@@ -996,180 +1019,110 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
     const baseSlug = String(name)
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '');
+      .replace(/^-|-$/g, '') || 'bill';
     // Find existing slugs for this user to determine counter
     const { data: existing } = await supabase
       .from('split_shares')
       .select('slug')
       .eq('user_id', userId)
       .like('slug', `${baseSlug}%`);
-    const usedSlugs = (existing ?? []).map((r: any) => r.slug);
+    const usedSlugs = (existing ?? []).map((r: any) => r.slug).filter(Boolean);
+    // Check if a share row already exists for this split bill
+    const { data: existingRow } = await supabase
+      .from('split_shares')
+      .select('id, slug')
+      .eq('split_bill_id', splitBillId)
+      .maybeSingle();
+    // If it already has a slug, just reuse it — no need to generate a new one
+    if (existingRow?.slug) {
+      setShareGenerating(false);
+      const link = `https://ledgr.art/split/${userId}/${existingRow.slug}`;
+      setShareLink(link);
+      await refetchShareRow();
+      return link;
+    }
     let slug = baseSlug;
     let counter = 2;
     while (usedSlugs.includes(slug)) {
       slug = `${baseSlug}-${counter}`;
       counter++;
     }
-    const { data } = await supabase.from('split_shares')
-      .upsert({ split_bill_id: splitBillId, recording_id: firstRecordingId, data: { account_ids: shareSelectedIds }, user_id: userId, slug }, { onConflict: 'split_bill_id' })
-      .select('id').single();
+    let finalSlug = slug;
+    let shareId: string | null = null;
+    if (existingRow) {
+      // Update existing row — only set slug/user_id, don't touch account_ids
+      finalSlug = existingRow.slug ?? slug;
+      if (!existingRow.slug) {
+        await supabase.from('split_shares').update({ slug, user_id: userId }).eq('id', existingRow.id);
+      }
+      shareId = existingRow.id;
+    } else {
+      // Insert new row — account_ids start empty, wallet section manages them separately
+      const payload: any = {
+        split_bill_id: splitBillId,
+        data: { account_ids: shareSelectedIds },
+        user_id: userId,
+        slug,
+      };
+      if (firstRecordingId) payload.recording_id = firstRecordingId;
+      const { data: inserted } = await supabase.from('split_shares').insert(payload).select('id').single();
+      shareId = inserted?.id ?? null;
+    }
     setShareGenerating(false);
-    if (!data) return;
-    setShareLink(`https://ledgr.art/split/${userId}/${slug}`);
+    if (!shareId) return '';
+    const link = `https://ledgr.art/split/${userId}/${finalSlug}`;
+    setShareLink(link);
     await refetchShareRow();
+    return link;
   };
-  const copyShareLink = async () => {
-    if (!shareLink) return;
+  const copyShareLink = async (linkOverride?: string) => {
+    const link = linkOverride ?? shareLink;
+    if (!link) return;
     if (Platform.OS !== 'web') {
-      await Clipboard.setStringAsync(shareLink);
+      await Clipboard.setStringAsync(link);
       setShareCopied(true);
       setTimeout(() => setShareCopied(false), 2000);
       return;
     }
     if (typeof navigator !== 'undefined' && navigator.clipboard) {
-      navigator.clipboard.writeText(shareLink)
+      navigator.clipboard.writeText(link)
         .then(() => { setShareCopied(true); setTimeout(() => setShareCopied(false), 2000); })
-        .catch(fallbackCopy);
-    } else { fallbackCopy(); }
+        .catch(() => fallbackCopy(link));
+    } else { fallbackCopy(link); }
   };
-  const fallbackCopy = () => {
+  const fallbackCopy = (link: string) => {
     if (typeof document === 'undefined') return;
     const el = document.createElement('textarea');
-    el.value = shareLink;
+    el.value = link;
     el.style.cssText = 'position:fixed;opacity:0;top:0;left:0;font-size:16px';
     document.body.appendChild(el); el.focus(); el.select();
     try { document.execCommand('copy'); setShareCopied(true); setTimeout(() => setShareCopied(false), 2000); } catch (_) {}
     document.body.removeChild(el);
   };
+  const viewShotRef = useRef<any>(null);
   const saveAsImage = async () => {
-    if (!shareLink) return;
     setSaveImgLoading(true);
     try {
-      // Build per-person totals (same logic as share page)
-      const totals: Record<string, number> = {};
-      filledPeople.forEach((p: string) => { totals[p] = 0; });
-      items.forEach((item: any) => {
-        const d = isDeductType(item.recording_type);
-        const pp = (item.people ?? []).length > 0 ? Number(item.cost) / item.people.length : 0;
-        (item.people ?? []).forEach((p: string) => { if (totals[p] !== undefined) totals[p] += d ? -pp : pp; });
-      });
-      const grandTotal = Object.values(totals).reduce((s, v) => s + v, 0);
-      const fmt2 = (n: number) => Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2 });
-      // Per-person rows — matching share page style
-      const personRowsHtml = filledPeople.map((p: string) => {
-        const total = totals[p] ?? 0;
-        const color = total < 0 ? '#d97060' : '#2A7A6F';
-        return `<div style="display:flex;align-items:center;gap:12px;padding:13px 16px;border-bottom:1px solid #eef0f0">`+
-          `<div style="width:30px;height:30px;border-radius:50%;background:#e8f5f4;display:flex;align-items:center;justify-content:center;flex-shrink:0">`+
-          `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2A7A6F" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg></div>`+
-          `<span style="font-family:'Poppins',sans-serif;font-weight:500;font-size:13px;color:#2e3d3d;flex:1">${p}</span>`+
-          `<span style="font-family:'Poppins',sans-serif;font-weight:700;font-size:14px;color:${color}">${total < 0 ? '-' : ''}${fmt2(total)}</span>`+
-          `</div>`;
-      }).join('');
-      const totalRowHtml = `<div style="display:flex;align-items:center;gap:12px;padding:13px 16px;background:#e8f5f4">`+
-        `<div style="width:30px;height:30px;border-radius:50%;background:#b6e1de;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:'Poppins',sans-serif;font-weight:700;font-size:12px;color:#2A7A6F">Σ</div>`+
-        `<span style="font-family:'Poppins',sans-serif;font-weight:700;font-size:13px;font-weight:600;color:#2A7A6F;flex:1">total</span>`+
-        `<span style="font-family:'Poppins',sans-serif;font-weight:700;font-size:14px;color:#2A7A6F">${grandTotal < 0 ? '-' : ''}${fmt2(grandTotal)}</span>`+
-        `</div>`;
-      // Item rows — matching share page style
-            // Group items by recording
-      const recGroups: { recId: string | null; recName: string; items: any[] }[] = [];
-      items.forEach((item: any) => {
-        const key = item.recording_id ?? null;
-        const existing = recGroups.find(g => g.recId === key);
-        if (existing) { existing.items.push(item); }
-        else {
-          const lr = linkedRecordings.find((l: any) => l.recording?.id === key);
-          recGroups.push({ recId: key, recName: lr?.recording?.name ?? (key ? '' : 'manual'), items: [item] });
-        }
-      });
-      const itemRowsHtml = recGroups.map((group) => {
-        const groupHeader = recGroups.length > 1
-          ? `<div style="padding:8px 16px;background:#f0f8f7;font-family:'Poppins',sans-serif;font-weight:700;font-size:10px;color:#2A7A6F;text-transform:uppercase;letter-spacing:0.8px">${group.recName}</div>`
-          : '';
-        const rows = group.items.map((item: any, ii: number) => {
-          const d = isDeductType(item.recording_type);
-          const color = d ? '#d97060' : '#2A7A6F';
-          const people: string[] = item.people ?? [];
-          const perPerson = people.length > 0 ? Number(item.cost) / people.length : 0;
-          const peopleSection = people.length > 0
-            ? `<div style="font-family:'Poppins',sans-serif;font-weight:500;font-size:11px;color:${color};margin-bottom:4px">${d ? '-' : ''}${perPerson.toLocaleString('en-US', { minimumFractionDigits: 2 })} each</div>`+
-              `<div style="display:flex;flex-wrap:wrap;gap:4px">`+
-              people.map((p: string) => `<span style="background:#e8f5f4;border-radius:99px;padding:2px 9px;font-family:'Poppins',sans-serif;font-weight:500;font-size:10px;color:#2A7A6F">${p}</span>`).join('') +
-              `</div>`
-            : '';
-          return `<div style="border-bottom:1px solid #eef0f0;padding:13px 16px;display:flex;align-items:flex-start;gap:12px">`+
-            `<div style="width:28px;height:28px;border-radius:50%;background:#e8f5f4;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:'Poppins',sans-serif;font-weight:700;font-size:12px;color:#2A7A6F;margin-top:1px">${ii + 1}</div>`+
-            `<div style="flex:1">`+
-            `<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">`+
-            `<span style="font-family:'Poppins',sans-serif;font-weight:500;font-size:13px;color:#2e3d3d;flex:1;line-height:1.4">${item.name}</span>`+
-            `<span style="font-family:'Poppins',sans-serif;font-weight:700;font-size:14px;color:${color};white-space:nowrap">${d ? '-' : ''}${Number(item.cost).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>`+
-            `</div>`+
-            (people.length > 0 ? `<div style="margin-top:6px">${peopleSection}</div>` : '') +
-            `</div></div>`;
-        }).join('');
-        return groupHeader + rows;
-      }).join('');
-      // Payment info — matching share page style
-      const selectedAccounts = shareAccounts.filter((a: any) => shareSelectedIds.includes(a.id));
-      const accountsWithBase64 = await Promise.all(selectedAccounts.map(async (a: any) => {
-        if (!a.qr_code) return { ...a, qr_base64: null };
-        try {
-          const res = await fetch(a.qr_code);
-          const blob = await res.blob();
-          const base64 = await new Promise<string>(resolve => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as string);
-            reader.readAsDataURL(blob);
-          });
-          return { ...a, qr_base64: base64 };
-        } catch { return { ...a, qr_base64: null }; }
-      }));
-      const payRowsHtml = accountsWithBase64.map((a: any) => {
-        const qrSrc = a.qr_base64 || a.qr_code;
-        const qrImg = qrSrc ? `<img src="${qrSrc}" width="72" height="72" style="border-radius:10px;object-fit:contain;flex-shrink:0"/>` : '';
-        return `<div style="display:flex;align-items:center;gap:14px;padding:14px 16px;border-bottom:1px solid #eef0f0">`+
-          `<div style="width:30px;height:30px;border-radius:50%;background:#b6e1de;display:flex;align-items:center;justify-content:center;flex-shrink:0">`+
-          `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2A7A6F" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg></div>`+
-          `<div style="flex:1;display:flex;flex-direction:column;gap:3px">`+
-          `<div style="font-family:'Poppins',sans-serif;font-weight:700;font-size:14px;color:#2e3d3d">${a.bank ?? ''}</div>`+
-          `<div style="font-family:'Poppins',sans-serif;font-weight:500;font-size:10px;color:#929090">${a.holder_name ?? a.account_name ?? ''}</div>`+
-          `<div style="font-family:'Poppins',sans-serif;font-weight:700;font-size:13px;color:#2e3d3d;letter-spacing:0.3px">${a.account_number ?? ''}</div>`+
-          `</div>${qrImg}</div>`;
-      }).join('');
-      const sectionLabel = (text: string) =>
-        `<div style="font-family:'Poppins',sans-serif;font-weight:500;font-size:11px;color:#929090;letter-spacing:0.6px;text-transform:uppercase;margin:24px 0 10px">${text}</div>`;
-      const block = (inner: string) =>
-        `<div style="border:1px solid #eef0f0;border-radius:14px;overflow:hidden">${inner}</div>`;
-      const html = `<!DOCTYPE html><html><head><meta charset="utf-8">`+
-        `<style>`+
-        `@font-face{font-family:'Poppins';font-weight:700;src:url('${PoppinsBoldBase64}') format('truetype')}`+
-        `@font-face{font-family:'Poppins';font-weight:500;src:url('${PoppinsMediumBase64}') format('truetype')}`+
-        `@font-face{font-family:'Poppins';font-weight:600;src:url('${PoppinsSemiBoldBase64}') format('truetype')}`+
-        `*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Poppins',sans-serif;font-weight:500;background:#fff;padding:36px 32px;width:480px;margin:0 auto;-webkit-font-smoothing:antialiased}</style>`+
-        `</head><body>`+
-        `<div style="font-family:'Poppins',serif;font-size:28px;font-weight:400;color:#1a2e2e;letter-spacing:-0.5px;margin-bottom:6px">${String(name).toLowerCase()}</div>`+
-        `<div style="font-family:'Poppins',sans-serif;font-weight:500;font-size:11px;color:#929090;margin-bottom:28px;letter-spacing:0.2px">${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>`+
-        sectionLabel('per person pay') + block(personRowsHtml + totalRowHtml) +
-        (items.length > 0 ? sectionLabel('item breakdown') + block(itemRowsHtml) : '') +
-        (payRowsHtml ? sectionLabel('payment information') + block(payRowsHtml) : '') +
-        `<div style="font-family:'Poppins',sans-serif;font-weight:500;font-size:10px;color:#c8d0d0;text-align:center;margin-top:32px">generated by LEDGR</div>`+
-        `</body></html>`;
       if (Platform.OS !== 'web') {
-        const Print = require('expo-print');
-        const Sharing = require('expo-sharing');
-        const { uri } = await Print.printToFileAsync({ html, width: 520 });
-        if (await Sharing.isAvailableAsync()) {
-          await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: 'Save split bill' });
+        const uri = await viewShotRef.current.capture();
+        const MediaLibrary = require('expo-media-library');
+        const { status } = await MediaLibrary.requestPermissionsAsync();
+        if (status === 'granted') {
+          await MediaLibrary.saveToLibraryAsync(uri);
+        } else {
+          const Sharing = require('expo-sharing');
+          if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(uri, { mimeType: 'image/png' });
         }
-      } else if (typeof window !== 'undefined') {
-        const win = window.open('', '_blank');
-        if (win) {
-          win.document.write(html);
-          win.document.close();
-          win.focus();
-          setTimeout(() => win.print(), 500);
-        }
+      } else {
+        const html2canvas = (await import('html2canvas')).default;
+        const el = document.getElementById('split-bill-capture');
+        if (!el) return;
+        const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+        const dataUrl = canvas.toDataURL('image/png');
+        const a = document.createElement('a');
+        a.href = dataUrl;
+        a.download = `${String(name).toLowerCase().replace(/\s+/g, '-')}-split.png`;
+        a.click();
       }
     } catch (e) { console.error('saveAsImage error:', e); }
     setSaveImgLoading(false);
@@ -1279,26 +1232,14 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
       return owed > 0 && paid < owed - 0.01;
     });
     const noRecs = linkedRecordings.length === 0;
-    if (unpaid.length > 0) {
-      setUnpaidPeopleNames(unpaid);
-      setCloseNoRecordings(noRecs);
-      setCloseCreateRecording(false);
-      setCloseSpaceId(null);
-      if (noRecs) {
-        const { data: sp } = await supabase.from('spaces').select('id, name').eq('user_id', userId).eq('is_active', true).order('name');
-        setCloseSpaces(sp ?? []);
-      }
-      setCloseConfirmModal(true);
-    } else if (noRecs) {
-      // No unpaid people and no recordings — just close
-      await supabase.from('split_bills').update({ status: 'closed' }).eq('id', splitBillId);
-      setBillStatus('closed');
-      queryClient.invalidateQueries({ queryKey: ['split-bills', userId] });
-    } else {
-      await supabase.from('split_bills').update({ status: 'closed' }).eq('id', splitBillId);
-      setBillStatus('closed');
-      queryClient.invalidateQueries({ queryKey: ['split-bills', userId] });
-    }
+    // Always show close confirm so user can optionally create a recording
+    setUnpaidPeopleNames(unpaid);
+    setCloseNoRecordings(noRecs);
+    setCloseCreateRecording(false);
+    setCloseSpaceId(null);
+    const { data: sp } = await supabase.from('spaces').select('id, name').eq('user_id', userId).eq('is_active', true).order('name');
+    setCloseSpaces(sp ?? []);
+    setCloseConfirmModal(true);
   };
   const confirmClose = async () => {
     setClosingLoading(true);
@@ -1975,8 +1916,6 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
     await Promise.all([...insertPromises, ...updatePromises]);
     await Promise.all([refetchItems(), refetchPayments(), queryClient.invalidateQueries({ queryKey: ['transactions'] })]);
   };
-  const [wizardStep, setWizardStep] = useState<1 | 2 | 3>(1);
-  const [actionsModal, setActionsModal] = useState(false);
   const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const typeColor = (type: string) => {
     if (type === 'debt') return PEACH;
@@ -2214,12 +2153,14 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
               <Text style={s.sectionHeader}>Per Person Pay</Text>
             </View>
             <View style={s.dottedCard}>
-              {filledPeopleForPayment.length === 0 ? (
+              {filledPeople.length === 0 ? (
                 <View style={s.emptyRow}><Text style={s.emptyText}>add people and items first</Text></View>
               ) : (() => {
-                const totals = computeTotals();
-                return filledPeopleForPayment.map((p, idx) => {
+                const totals = computeSplitTotals(items);
+                filledPeople.forEach(p => { if (totals[p] === undefined) totals[p] = 0; });
+                return filledPeople.map((p, idx) => {
                   const owed = totals[p] ?? 0;
+                  const isMe = userName && p.toLowerCase() === userName.toLowerCase();
                   const amtColor = owed < 0 ? Colors.expense : DC.pageText;
                   return (
                     <View key={p}>
@@ -2227,12 +2168,12 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
                         <View style={s.payAvatar}>
                           <Text style={s.payAvatarText}>{p.charAt(0).toUpperCase()}</Text>
                         </View>
-                        <Text style={s.payPersonName}>{p}</Text>
+                        <Text style={s.payPersonName}>{isMe ? `${p} (you)` : p}</Text>
                         <Text style={[s.payPersonAmount, { color: amtColor }]}>
                           {owed < 0 ? '- ' : ''}{fmt(Math.abs(owed))}
                         </Text>
                       </View>
-                      {idx < filledPeopleForPayment.length - 1 && <View style={s.divider} />}
+                      {idx < filledPeople.length - 1 && <View style={s.divider} />}
                     </View>
                   );
                 });
@@ -2273,7 +2214,10 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
                       {personPayments.map((pay: any, pi: number) => (
                         <View key={pay.id} style={s.paySubRow}>
                           <Text style={s.paySubLabel}>Payment {pi + 1}</Text>
-                          <Text style={s.paySubAmount}>{fmt(Number(pay.amount))}</Text>
+                          <Text style={[s.paySubAmount, { flex: 1, textAlign: 'right', marginRight: 8 }]}>{fmt(Number(pay.amount))}</Text>
+                          <TouchableOpacity onPress={() => openCancelPayment(pay)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                            <Text style={{ fontFamily: 'Poppins-Bold', fontSize: 13, color: Colors.expense, lineHeight: 16 }}>×</Text>
+                          </TouchableOpacity>
                         </View>
                       ))}
                       {idx < filledPeopleForPayment.length - 1 && <View style={s.divider} />}
@@ -2286,24 +2230,32 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
             {/* Wallet — payment accounts for the share link */}
             <View style={s.sectionRow}>
               <Text style={s.sectionHeader}>Wallet</Text>
-              <TouchableOpacity style={s.addCircleBtn} onPress={async () => {
-                const { data: accs } = await supabase.from('accounts').select('id, account_name, bank, account_number, qr_code').eq('user_id', userId).order('account_name');
-                setShareAccounts(accs ?? []);
-                if (shareRow) {
-                  setShareSelectedIds(shareRow.data?.account_ids ?? []);
-                }
-                openShareModal();
-              }} activeOpacity={0.7}>
+              <TouchableOpacity
+                style={s.addCircleBtn}
+                onPress={async () => {
+                  if (!shareAccountsLoaded) {
+                    const { data: accs } = await supabase.from('accounts').select('id, account_name, bank, account_number, qr_code').eq('user_id', userId).order('account_name');
+                    setShareAccounts(accs ?? []);
+                    setShareAccountsLoaded(true);
+                    if (shareRow && shareSelectedIds.length === 0) setShareSelectedIds(shareRow.data?.account_ids ?? []);
+                  }
+                  setWalletSearch('');
+                  setWalletPickerModal(true);
+                }}
+                activeOpacity={0.7}
+              >
                 <Text style={s.addCircleBtnText}>+</Text>
               </TouchableOpacity>
             </View>
-            {shareAccounts.filter((a: any) => shareSelectedIds.includes(a.id)).length === 0 ? (
+            {shareSelectedIds.length === 0 ? (
               <View style={s.dottedCard}>
-                <View style={s.emptyRow}><Text style={s.emptyText}>no accounts added — tap + to add</Text></View>
+                <View style={s.emptyRow}>
+                  <Text style={s.emptyText}>no accounts selected — tap + to add</Text>
+                </View>
               </View>
             ) : (
               <View style={s.dottedCard}>
-                {shareAccounts.filter((a: any) => shareSelectedIds.includes(a.id)).map((acc: any, idx: number) => (
+                {shareAccounts.filter((a: any) => shareSelectedIds.includes(a.id)).map((acc: any, idx: number, arr: any[]) => (
                   <View key={acc.id}>
                     <View style={s.walletRow}>
                       <View style={{ flex: 1 }}>
@@ -2314,8 +2266,24 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
                       {acc.qr_code ? (
                         <Image source={{ uri: acc.qr_code }} style={s.walletQr} resizeMode="contain" />
                       ) : null}
+                      <TouchableOpacity
+                        onPress={async () => {
+                          const next = shareSelectedIds.filter((x: string) => x !== acc.id);
+                          setShareSelectedIds(next);
+                          if (shareRow) {
+                            await supabase.from('split_shares').update({ data: { account_ids: next } }).eq('id', shareRow.id);
+                          } else {
+                            await supabase.from('split_shares').insert({ split_bill_id: splitBillId, user_id: userId, data: { account_ids: next } });
+                          }
+                          setShareOriginalIds(next);
+                          await refetchShareRow();
+                        }}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Text style={{ fontFamily: 'Poppins-Bold', fontSize: 16, color: DC.pageTextMuted, lineHeight: 18 }}>×</Text>
+                      </TouchableOpacity>
                     </View>
-                    {idx < shareAccounts.filter((a: any) => shareSelectedIds.includes(a.id)).length - 1 && <View style={s.divider} />}
+                    {idx < arr.length - 1 && <View style={s.divider} />}
                   </View>
                 ))}
               </View>
@@ -2334,24 +2302,55 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
             <View style={{ flexDirection: 'row', gap: 32, paddingHorizontal: DC.pagePadding, paddingTop: 8 }}>
               {/* Link */}
               <TouchableOpacity
-                style={{ alignItems: 'center', gap: 8 }}
+                style={{ alignItems: 'center', gap: 8, opacity: shareGenerating ? 0.5 : 1 }}
                 onPress={async () => {
-                  if (!shareRow) { await generateLink(); }
-                  await copyShareLink();
+                  let link = shareLink;
+                  if (!link) {
+                    link = await generateLink() ?? '';
+                  }
+                  await copyShareLink(link);
                 }}
+                disabled={shareGenerating}
                 activeOpacity={0.8}
               >
-                <SvgXml xml={SVG_LINK} width={32} height={32} color={DC.pageText} />
-                <Text style={s.shareLabel}>Link</Text>
+                {shareGenerating ? (
+                  <ActivityIndicator size="small" color={DC.pageText} style={{ width: 32, height: 32 }} />
+                ) : shareCopied ? (
+                  <SvgXml xml={SVG_CHECK_ONE} width={32} height={32} color={ACCENT_DARK} />
+                ) : (
+                  <SvgXml xml={SVG_LINK} width={32} height={32} color={DC.pageText} />
+                )}
+                <Text style={[s.shareLabel, shareCopied && { color: ACCENT_DARK }]}>
+                  {shareGenerating ? 'generating...' : shareCopied ? 'copied!' : 'Link'}
+                </Text>
               </TouchableOpacity>
               {/* Image */}
-              <TouchableOpacity style={{ alignItems: 'center', gap: 8 }} onPress={saveAsImage} activeOpacity={0.8}>
-                <SvgXml xml={SVG_IMAGE} width={32} height={32} color={DC.pageText} />
-                <Text style={s.shareLabel}>Image</Text>
+              <TouchableOpacity
+                style={{ alignItems: 'center', gap: 8, opacity: saveImgLoading ? 0.5 : 1 }}
+                onPress={async () => {
+                  if (shareAccounts.length === 0) {
+                    const { data: accs } = await supabase.from('accounts').select('id, account_name, bank, account_number, qr_code').eq('user_id', userId).order('account_name');
+                    setShareAccounts(accs ?? []);
+                    if (shareRow) setShareSelectedIds(shareRow.data?.account_ids ?? []);
+                  }
+                  saveAsImage();
+                }}
+                disabled={saveImgLoading}
+                activeOpacity={0.8}
+              >
+                {saveImgLoading ? (
+                  <ActivityIndicator size="small" color={DC.pageText} style={{ width: 32, height: 32 }} />
+                ) : (
+                  <SvgXml xml={SVG_IMAGE} width={32} height={32} color={DC.pageText} />
+                )}
+                <Text style={s.shareLabel}>{saveImgLoading ? 'generating...' : 'Image'}</Text>
               </TouchableOpacity>
             </View>
-            {shareCopied && (
-              <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 11, color: DC.headerBlueBg, paddingHorizontal: DC.pagePadding, marginTop: 8 }}>link copied!</Text>
+            {shareGenerating && (
+              <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 11, color: DC.pageTextMuted, paddingHorizontal: DC.pagePadding, marginTop: 8 }}>generating link...</Text>
+            )}
+            {shareCopied && !shareGenerating && (
+              <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 11, color: ACCENT_DARK, paddingHorizontal: DC.pagePadding, marginTop: 8 }}>✓ link copied to clipboard</Text>
             )}
             <View style={{ height: 40 }} />
           </ScrollView>
@@ -2359,7 +2358,109 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
 
       </View>
 
-      {/* ── Actions bottom sheet (ellipsis) ── */}
+      {/* ── Hidden capture view for image export ── */}
+      <ViewShot ref={viewShotRef} options={{ format: 'png', quality: 1 }} style={{ position: 'absolute', left: -9999, top: 0, width: 380, backgroundColor: '#ffffff' }}>
+        <View nativeID="split-bill-capture" style={{ padding: 28, backgroundColor: '#ffffff' }}>
+          <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 24, color: '#1a2e2e', letterSpacing: -0.5, marginBottom: 4 }}>{String(name).toLowerCase()}</Text>
+          <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 11, color: '#929090', marginBottom: 24 }}>{new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</Text>
+
+          {/* Per person */}
+          <Text style={{ fontFamily: 'Poppins-SemiBold', fontSize: 10, color: '#929090', letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8 }}>per person pay</Text>
+          <View style={{ borderRadius: 12, borderWidth: 1, borderColor: '#eef0f0', overflow: 'hidden', marginBottom: 20 }}>
+            {(() => {
+              const totals: Record<string, number> = {};
+              filledPeople.forEach((p: string) => { totals[p] = 0; });
+              items.forEach((item: any) => {
+                const d = isDeductType(item.recording_type);
+                const pp = (item.people ?? []).length > 0 ? Number(item.cost) / item.people.length : 0;
+                (item.people ?? []).forEach((p: string) => { if (totals[p] !== undefined) totals[p] += d ? -pp : pp; });
+              });
+              const grandTotal = Object.values(totals).reduce((s, v) => s + v, 0);
+              return (
+                <>
+                  {filledPeople.map((p: string, i: number) => {
+                    const total = totals[p] ?? 0;
+                    return (
+                      <View key={p} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderBottomWidth: 1, borderBottomColor: '#eef0f0' }}>
+                        <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: '#e8f5f4', alignItems: 'center', justifyContent: 'center' }}>
+                          <Text style={{ fontFamily: 'Poppins-Bold', fontSize: 11, color: '#2A7A6F' }}>{p.charAt(0).toUpperCase()}</Text>
+                        </View>
+                        <Text style={{ flex: 1, fontFamily: 'Poppins-Regular', fontSize: 13, color: '#2e3d3d' }}>{p}</Text>
+                        <Text style={{ fontFamily: 'Poppins-Bold', fontSize: 13, color: total < 0 ? '#d97060' : '#2A7A6F' }}>{total < 0 ? '-' : ''}{fmt(Math.abs(total))}</Text>
+                      </View>
+                    );
+                  })}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, backgroundColor: '#e8f5f4' }}>
+                    <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: '#b6e1de', alignItems: 'center', justifyContent: 'center' }}>
+                      <Text style={{ fontFamily: 'Poppins-Bold', fontSize: 11, color: '#2A7A6F' }}>Σ</Text>
+                    </View>
+                    <Text style={{ flex: 1, fontFamily: 'Poppins-Bold', fontSize: 13, color: '#2A7A6F' }}>total</Text>
+                    <Text style={{ fontFamily: 'Poppins-Bold', fontSize: 13, color: '#2A7A6F' }}>{fmt(grandTotal)}</Text>
+                  </View>
+                </>
+              );
+            })()}
+          </View>
+
+          {/* Items */}
+          {items.length > 0 && (
+            <>
+              <Text style={{ fontFamily: 'Poppins-SemiBold', fontSize: 10, color: '#929090', letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8 }}>item breakdown</Text>
+              <View style={{ borderRadius: 12, borderWidth: 1, borderColor: '#eef0f0', overflow: 'hidden', marginBottom: 20 }}>
+                {items.map((item: any, ii: number) => {
+                  const d = isDeductType(item.recording_type);
+                  const people: string[] = item.people ?? [];
+                  return (
+                    <View key={item.id} style={{ padding: 12, borderBottomWidth: 1, borderBottomColor: '#eef0f0' }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
+                        <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: '#e8f5f4', alignItems: 'center', justifyContent: 'center' }}>
+                          <Text style={{ fontFamily: 'Poppins-Bold', fontSize: 10, color: '#2A7A6F' }}>{ii + 1}</Text>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8 }}>
+                            <Text style={{ flex: 1, fontFamily: 'Poppins-Regular', fontSize: 12, color: '#2e3d3d' }}>{item.name}</Text>
+                            <Text style={{ fontFamily: 'Poppins-Bold', fontSize: 12, color: d ? '#d97060' : '#2A7A6F' }}>{d ? '-' : ''}{fmt(Number(item.cost))}</Text>
+                          </View>
+                          {people.length > 0 && (
+                            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
+                              {people.map((p: string) => (
+                                <View key={p} style={{ backgroundColor: '#e8f5f4', borderRadius: 99, paddingHorizontal: 8, paddingVertical: 2 }}>
+                                  <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 10, color: '#2A7A6F' }}>{p}</Text>
+                                </View>
+                              ))}
+                            </View>
+                          )}
+                        </View>
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            </>
+          )}
+
+          {/* Wallet accounts */}
+          {shareAccounts.filter((a: any) => shareSelectedIds.includes(a.id)).length > 0 && (
+            <>
+              <Text style={{ fontFamily: 'Poppins-SemiBold', fontSize: 10, color: '#929090', letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8 }}>payment information</Text>
+              <View style={{ borderRadius: 12, borderWidth: 1, borderColor: '#eef0f0', overflow: 'hidden', marginBottom: 20 }}>
+                {shareAccounts.filter((a: any) => shareSelectedIds.includes(a.id)).map((acc: any, i: number, arr: any[]) => (
+                  <View key={acc.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderBottomWidth: i < arr.length - 1 ? 1 : 0, borderBottomColor: '#eef0f0' }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontFamily: 'Poppins-Bold', fontSize: 13, color: '#2e3d3d' }}>{acc.bank}</Text>
+                      <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 10, color: '#929090' }}>{acc.account_name}</Text>
+                      <Text style={{ fontFamily: 'Poppins-Bold', fontSize: 12, color: '#2e3d3d' }}>{acc.account_number}</Text>
+                    </View>
+                    {acc.qr_code ? <Image source={{ uri: acc.qr_code }} style={{ width: 56, height: 56, borderRadius: 8 }} resizeMode="contain" /> : null}
+                  </View>
+                ))}
+              </View>
+            </>
+          )}
+
+          <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 10, color: '#c8d0d0', textAlign: 'center', marginTop: 8 }}>generated by LEDGR</Text>
+        </View>
+      </ViewShot>
       <BottomSheet visible={actionsModal} onClose={() => setActionsModal(false)} title="actions">
         <TouchableOpacity style={s.actionSheetRow} onPress={() => { setActionsModal(false); handleToggleStatus(); }} activeOpacity={0.8}>
           <Text style={s.actionSheetText}>{billStatus === 'closed' ? 'reopen bill' : 'close bill'}</Text>
@@ -2994,6 +3095,82 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
 
 
 
+      {/* Wallet picker modal */}
+      <Modal visible={walletPickerModal} animationType="slide" transparent statusBarTranslucent onRequestClose={() => setWalletPickerModal(false)}>
+        <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' }} activeOpacity={1} onPress={() => setWalletPickerModal(false)}>
+          <TouchableOpacity activeOpacity={1} onPress={() => {}} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '75%' as any }}>
+            <SafeAreaView style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: DC.pagePadding, paddingTop: 20, paddingBottom: 12 }}>
+                <Text style={{ fontFamily: 'Poppins-Bold', fontSize: 16, color: DC.pageText }}>Select Accounts</Text>
+                <TouchableOpacity onPress={() => setWalletPickerModal(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <SvgXml xml={SVG_CLOSE} width={22} height={22} color={DC.pageText} />
+                </TouchableOpacity>
+              </View>
+              {/* Search */}
+              <View style={{ ...DC.textbox.wrap, marginHorizontal: DC.pagePadding, marginBottom: 12 }}>
+                <TextInput
+                  style={DC.textbox.input}
+                  placeholder="search accounts..."
+                  placeholderTextColor={DC.inputPlaceholder}
+                  value={walletSearch}
+                  onChangeText={setWalletSearch}
+                  autoFocus
+                />
+              </View>
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+                {shareAccounts.length === 0 ? (
+                  <View style={{ paddingHorizontal: DC.pagePadding, paddingVertical: 20 }}>
+                    <Text style={{ ...DC.typography.muted }}>no accounts found — add one in the Accounts tab</Text>
+                  </View>
+                ) : (
+                  shareAccounts
+                    .filter((a: any) => !walletSearch.trim() ||
+                      a.bank?.toLowerCase().includes(walletSearch.toLowerCase()) ||
+                      a.account_name?.toLowerCase().includes(walletSearch.toLowerCase()) ||
+                      a.account_number?.includes(walletSearch)
+                    )
+                    .map((acc: any, idx: number, arr: any[]) => {
+                      const sel = shareSelectedIds.includes(acc.id);
+                      return (
+                        <TouchableOpacity
+                          key={acc.id}
+                          style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: DC.pagePadding, paddingVertical: 14, borderBottomWidth: idx < arr.length - 1 ? DC.rowDivider.height : 0, borderBottomColor: DC.rowDivider.backgroundColor, backgroundColor: sel ? ACCENT + '10' : 'transparent' }}
+                          onPress={async () => {
+                            const next = sel
+                              ? shareSelectedIds.filter((x: string) => x !== acc.id)
+                              : [...shareSelectedIds, acc.id];
+                            setShareSelectedIds(next);
+                            if (shareRow) {
+                              await supabase.from('split_shares').update({ data: { account_ids: next } }).eq('id', shareRow.id);
+                            } else {
+                              await supabase.from('split_shares').insert({ split_bill_id: splitBillId, user_id: userId, data: { account_ids: next } });
+                            }
+                            setShareOriginalIds(next);
+                            await refetchShareRow();
+                          }}
+                          activeOpacity={0.7}
+                        >
+                          <View style={{ width: 24, height: 24, borderRadius: 12, borderWidth: 1.5, borderColor: sel ? ACCENT_DARK : DC.controlBorder, backgroundColor: sel ? ACCENT_DARK : 'transparent', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            {sel && <Text style={{ color: '#fff', fontSize: 12, fontFamily: 'Poppins-Bold', lineHeight: 15 }}>✓</Text>}
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={s.walletBank}>{acc.bank}</Text>
+                            <Text style={s.walletHolder}>{acc.account_name}</Text>
+                            <Text style={s.walletNumber}>{acc.account_number}</Text>
+                          </View>
+                          {acc.qr_code ? (
+                            <Image source={{ uri: acc.qr_code }} style={{ width: 44, height: 44, borderRadius: 6 }} resizeMode="contain" />
+                          ) : null}
+                        </TouchableOpacity>
+                      );
+                    })
+                )}
+              </ScrollView>
+            </SafeAreaView>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
       {/* Share modal */}
       <BottomSheet visible={shareModal} onClose={() => setShareModal(false)} title="share split bill" maxHeight="72%">
         {/* Accounts */}
@@ -3068,7 +3245,7 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
           onPress={saveAsImage}
           disabled={saveImgLoading || !shareLink}
         >
-          <Text style={[s.doneBtnText, { color: Colors.text }]}>{saveImgLoading ? 'generating...' : 'export as pdf'}</Text>
+          <Text style={[s.doneBtnText, { color: Colors.text }]}>{saveImgLoading ? 'generating...' : 'save as image'}</Text>
         </TouchableOpacity>
       </BottomSheet>
       {/* Mark as paid modal */}
@@ -3205,7 +3382,8 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
               {paymentMode === 'full' && (
                 <Text style={{ fontFamily: AppFont.semiBold, fontSize: 15, color: ACCENT_DARK, marginBottom: 8 }}>{fmt(remaining)}</Text>
               )}
-              {/* Charge to space */}
+              {/* Charge to space — only when all items for this person are recording-linked */}
+              {getPersonRecordingRows(paymentPerson).length > 0 && getPersonManualOwed(paymentPerson) === 0 && (
               <TouchableOpacity
                 style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, borderTopWidth: 1, borderTopColor: Colors.border, marginTop: 4 }}
                 onPress={() => setChargeToSpace(v => !v)}
@@ -3216,6 +3394,7 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
                   <Text style={{ fontFamily: AppFont.regular, fontSize: 10, color: Colors.muted }}>creates an expense on the selected space</Text>
                 </View>
               </TouchableOpacity>
+              )}
               {chargeToSpace && (
                 <View style={{ gap: 10, marginBottom: 8 }}>
                   <Text style={{ fontFamily: AppFont.semiBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.8, textTransform: 'uppercase' }}>space</Text>
@@ -3514,55 +3693,47 @@ export default function SplitBillDetailScreen({ splitBillId: propSplitBillId, na
       </BottomSheet>
       {/* Close confirm modal */}
       <BottomSheet visible={closeConfirmModal} onClose={() => setCloseConfirmModal(false)} title="close split bill?" maxHeight="50%">
-        <Text style={{ fontFamily: AppFont.regular, fontSize: 12, color: Colors.muted, marginBottom: 12 }}>
-          these people haven't paid yet:
-        </Text>
-        <View style={{ gap: 8, marginBottom: 16 }}>
-          {unpaidPeopleNames.map((name, i) => (
-            <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Text style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.text }}>{name}</Text>
-            </View>
-          ))}
-        </View>
-        {closeNoRecordings ? (
+        {unpaidPeopleNames.length > 0 && (
           <>
-            <Text style={{ fontFamily: AppFont.regular, fontSize: 11, color: Colors.muted, marginBottom: 12 }}>
-              no recordings linked to this split bill. you can create one now.
+            <Text style={{ fontFamily: AppFont.regular, fontSize: 12, color: Colors.muted, marginBottom: 8 }}>
+              these people haven't fully paid yet:
             </Text>
-            <TouchableOpacity
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10 }}
-              onPress={() => setCloseCreateRecording(v => !v)}
-            >
-              <Text style={{ fontFamily: AppFont.regular, fontSize: 12, color: Colors.text, flex: 1 }}>
-                create an expense and return recordings
-              </Text>
-            </TouchableOpacity>
-            {closeCreateRecording && (
-              <View style={{ marginBottom: 12 }}>
-                <Text style={{ fontFamily: AppFont.semiBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 6 }}>space</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
-                  {closeSpaces.map(sp => (
-                    <TouchableOpacity
-                      key={sp.id}
-                      style={{
-                        paddingHorizontal: 14, paddingVertical: 10, borderRadius: 999, borderWidth: 1,
-                        borderColor: closeSpaceId === sp.id ? ACCENT_DARK : Colors.borderMid,
-                        backgroundColor: closeSpaceId === sp.id ? ACCENT + '22' : Colors.surface,
-                      }}
-                      onPress={() => setCloseSpaceId(sp.id)}
-                    >
-                      <Text style={{
-                        fontFamily: AppFont.semiBold, fontSize: 12,
-                        color: closeSpaceId === sp.id ? ACCENT_DARK : Colors.text,
-                      }}>{sp.name}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-            )}
+            <View style={{ gap: 6, marginBottom: 12 }}>
+              {unpaidPeopleNames.map((name, i) => (
+                <Text key={i} style={{ fontFamily: AppFont.regular, fontSize: 13, color: Colors.text }}>{name}</Text>
+              ))}
+            </View>
           </>
-        ) : (
-          <Text style={{ fontFamily: AppFont.regular, fontSize: 11, color: Colors.muted, marginBottom: 16 }}>
+        )}
+        <TouchableOpacity
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10 }}
+          onPress={() => setCloseCreateRecording(v => !v)}
+        >
+          <View style={{ width: 20, height: 20, borderRadius: 10, borderWidth: 1.5, borderColor: closeCreateRecording ? ACCENT_DARK : Colors.borderMid, backgroundColor: closeCreateRecording ? ACCENT_DARK : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
+            {closeCreateRecording && <Text style={{ color: '#fff', fontSize: 10, fontFamily: 'Poppins-Bold', lineHeight: 13 }}>✓</Text>}
+          </View>
+          <Text style={{ fontFamily: AppFont.regular, fontSize: 12, color: Colors.text, flex: 1 }}>
+            create an expense &amp; return recordings
+          </Text>
+        </TouchableOpacity>
+        {closeCreateRecording && (
+          <View style={{ marginBottom: 12 }}>
+            <Text style={{ fontFamily: AppFont.semiBold, fontSize: 10, color: Colors.muted, letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 6 }}>space</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+              {closeSpaces.map(sp => (
+                <TouchableOpacity
+                  key={sp.id}
+                  style={{ paddingHorizontal: 14, paddingVertical: 10, borderRadius: 999, borderWidth: 1, borderColor: closeSpaceId === sp.id ? ACCENT_DARK : Colors.borderMid, backgroundColor: closeSpaceId === sp.id ? ACCENT + '22' : Colors.surface }}
+                  onPress={() => setCloseSpaceId(sp.id)}
+                >
+                  <Text style={{ fontFamily: AppFont.semiBold, fontSize: 12, color: closeSpaceId === sp.id ? ACCENT_DARK : Colors.text }}>{sp.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+        {!closeCreateRecording && linkedRecordings.length > 0 && (
+          <Text style={{ fontFamily: AppFont.regular, fontSize: 11, color: Colors.muted, marginBottom: 8 }}>
             closing will mark all linked recordings as paid.
           </Text>
         )}
@@ -3840,7 +4011,7 @@ const s = StyleSheet.create({
   payPersonAmount: { fontFamily: 'Poppins-Bold', fontSize: 13, color: DC.pageText },
   addPayBtn:      { width: 28, height: 28, borderRadius: 14, backgroundColor: DC.headerBlueBg, alignItems: 'center', justifyContent: 'center' },
   addPayBtnText:  { fontFamily: 'Poppins-Bold', fontSize: 16, color: '#ffffff', lineHeight: 20 },
-  paySubRow:      { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, paddingLeft: 48 },
+  paySubRow:      { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, paddingLeft: 48 },
   paySubLabel:    { ...DC.typography.subContent },
   paySubAmount:   { fontFamily: 'Poppins-Bold', fontSize: 11, color: DC.pageText },
 
