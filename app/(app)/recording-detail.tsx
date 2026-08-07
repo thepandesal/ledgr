@@ -2199,6 +2199,12 @@ const truncate = (str: string, max: number) => str && str.length > max ? str.sli
               <Text style={rd.infoValue}>{displayAmount()}</Text>
             </TouchableOpacity>
             <View style={rd.rowDivider} />
+            {/* Category */}
+            <View style={rd.infoRow}>
+              <Text style={rd.infoLabel}>Category</Text>
+              <Text style={rd.infoValue}>{recording?.categories?.name ?? '—'}</Text>
+            </View>
+            <View style={rd.rowDivider} />
             {/* Date */}
             <TouchableOpacity style={rd.infoRow} activeOpacity={isOwner ? 0.7 : 1} onPress={() => {
               if (!isOwner) return;

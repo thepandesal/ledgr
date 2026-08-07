@@ -7,7 +7,7 @@ import { supabase } from '../../../src/lib/supabase';
 import { AppFont } from '../../../src/lib/fonts';
 import { DC } from '../../../src/lib/design';
 import { SAVINGS_COIN_LOOP_URI, SAVINGS_DONE_URI } from '../../../src/lib/savingsAnimBase64';
-import { useSystemCategories } from '../../../src/lib/systemCategories';
+import { useSystemCategories, getCatEmoji } from '../../../src/lib/systemCategories';
 
 // ── Brand tokens ─────────────────────────────────────────────────────────────
 const ACCENT      = DC.headerBlueBg;  // #4394ff
@@ -206,7 +206,8 @@ export default function RecordScreen({ isActive }: { isActive?: boolean }) {
       <ScrollView contentContainerStyle={[s.scroll, { paddingHorizontal: DC.pagePadding }]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
         {/* ── Add a name ── */}
-        <View style={s.nameRow}>
+        <View style={{ width: '100%' }}>
+          <View style={s.nameRow}>
           <TouchableOpacity style={s.loanRow} onPress={() => setUseCustomName(v => !v)} activeOpacity={0.8}>
             <View style={[s.check, useCustomName && s.checkOn]}>
               {useCustomName && <Text style={s.checkMark}>✓</Text>}
@@ -221,9 +222,8 @@ export default function RecordScreen({ isActive }: { isActive?: boolean }) {
             onChangeText={setRecordName}
             editable={useCustomName}
           />
+          </View>
         </View>
-
-        {/* ── Tag as loan checkbox ── */}
         <View style={s.loanRowWrap}>
           <TouchableOpacity style={s.loanRow} onPress={() => { setIsLoan(v => !v); setShowBorrowerDropdown(false); }} activeOpacity={0.8}>
             <View style={[s.check, isLoan && s.checkOn]}>
@@ -355,7 +355,7 @@ export default function RecordScreen({ isActive }: { isActive?: boolean }) {
                 onPress={() => { setCategory(selected ? null : c.id); setError(''); setSaved(false); }}
                 activeOpacity={0.8}
               >
-                <Text style={[s.catName, selected && s.catNameOn]} numberOfLines={1}>{c.name}</Text>
+                <Text style={[s.catName, selected && s.catNameOn]} numberOfLines={1}>{getCatEmoji(c.icon)}  {c.name}</Text>
               </TouchableOpacity>
             );
           })}
@@ -427,7 +427,7 @@ const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#ffffff' },
   scroll: { paddingTop: 14, paddingBottom: 150 },
 
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10, flex: 1 },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
   nameInput: { flex: 1, fontFamily: AppFont.regular, fontSize: 16, color: TEXT, backgroundColor: '#f6f6f6', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: BORDER },
   nameInputDisabled: { opacity: 0.4 },
 

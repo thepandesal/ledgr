@@ -7,6 +7,22 @@ export interface SystemCategory {
   icon: string;
 }
 
+const ICON_EMOJI: Record<string, string> = {
+  food:           '🍽️',
+  fitness:        '💪',
+  travel:         '✈️',
+  entertainment:  '🎬',
+  savings:        '🐷',
+  utilities:      '⚡',
+  shopping:       '🛍️',
+  health:         '❤️',
+  transportation: '🚗',
+};
+
+export function getCatEmoji(icon: string): string {
+  return ICON_EMOJI[icon] ?? '📁';
+}
+
 export function useSystemCategories() {
   const [categories, setCategories] = useState<SystemCategory[]>([]);
   useEffect(() => {

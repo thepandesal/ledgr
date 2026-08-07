@@ -124,7 +124,7 @@ export default function HomeScreen({ isActive }: { isActive?: boolean }) {
     queryFn: async () => {
       const { data } = await supabase
         .from('recordings')
-        .select('id, name, type, amount, transaction_date, space_id, category_id, categories:category_id(icon), space:space_id(name)')
+        .select('id, name, type, amount, transaction_date, currency, space_id, category_id, categories:category_id(name), space:space_id(name)')
         .eq('user_id', userId)
         .neq('status', 'voided')
         .neq('is_tagged', true)

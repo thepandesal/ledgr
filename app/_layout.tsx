@@ -36,6 +36,7 @@ export default function RootLayout() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const readyRef = useRef(false);
   const navigatedRef = useRef(false);
+  const wasAuthenticatedRef = useRef(false);
 
   useEffect(() => {
     if (typeof document === 'undefined') return;
@@ -73,14 +74,17 @@ export default function RootLayout() {
       if (path.startsWith('/split/')) { if (!readyRef.current) { readyRef.current = true; setReady(true); } return; }
 
       if (event === 'SIGNED_OUT') {
-        if (initialEventReceived) {
+        if (initialEventReceived && wasAuthenticatedRef.current) {
           setIsAuthenticated(false);
+          wasAuthenticatedRef.current = false;
           if (!readyRef.current) { readyRef.current = true; setReady(true); }
           if (typeof window !== 'undefined') {
             window.location.href = '/';
           } else {
             router.replace('/');
           }
+        } else if (!initialEventReceived) {
+          initialEventReceived = true;
         }
         return;
       }
@@ -96,6 +100,7 @@ export default function RootLayout() {
         router.replace('/onboarding');
       } else if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') {
         setIsAuthenticated(true);
+        wasAuthenticatedRef.current = true;
         if (!readyRef.current) { readyRef.current = true; setReady(true); }
         if (!navigatedRef.current && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')) {
           navigatedRef.current = true;
