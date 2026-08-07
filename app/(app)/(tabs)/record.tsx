@@ -427,7 +427,7 @@ const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#ffffff' },
   scroll: { paddingTop: 14, paddingBottom: 150 },
 
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10, flex: 1 },
   nameInput: { flex: 1, fontFamily: AppFont.regular, fontSize: 16, color: TEXT, backgroundColor: '#f6f6f6', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: BORDER },
   nameInputDisabled: { opacity: 0.4 },
 
