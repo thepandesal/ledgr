@@ -44,7 +44,6 @@ import { LOADING_SPINNER_SVG_DATA_URI } from '../../../src/lib/loadingSpinnerBas
 import type { RefObject } from 'react';
 import type { View as RNView } from 'react-native';
 
-export { BlurContext } from '../../../src/lib/BlurContext';
 import { BlurContext } from '../../../src/lib/BlurContext';
 
 // ── Brand tokens ─────────────────────────────────────────────────────────────

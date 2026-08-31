@@ -110,11 +110,12 @@ export default function LoginScreen() {
     if (Platform.OS === 'web') {
       await supabase.auth.signInWithOAuth({
         provider,
-        options: { redirectTo: window.location.origin },
+        options: {
+          redirectTo: window.location.origin,
+          queryParams: { prompt: 'select_account' },
+        },
       });
-      authDone.current = true;
-      clearTimeout(introTimer);
-      showSuccess();
+      // signInWithOAuth redirects the page — code below won't run
       return;
     }
 
