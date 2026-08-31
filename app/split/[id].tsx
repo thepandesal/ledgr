@@ -22,6 +22,7 @@ export default function SplitSharePage() {
   const [receiptId, setReceiptId]           = useState<string | null>(null);
   const [receiptPhotos, setReceiptPhotos]   = useState<string[]>([]);
   const [receiptLoading, setReceiptLoading] = useState(false);
+  const [receiptModal, setReceiptModal]     = useState(false);
   const [zoomPhoto, setZoomPhoto]           = useState<string | null>(null);
   const [showUrlBar, setShowUrlBar]         = useState(false);
   const [copiedAccIdx, setCopiedAccIdx]     = useState<number | null>(null);
