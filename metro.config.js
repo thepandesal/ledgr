@@ -6,12 +6,14 @@ const config = getDefaultConfig(__dirname);
 // Enable package.json `exports` field resolution (needed for ppu-paddle-ocr subpaths)
 config.resolver.unstable_enablePackageExports = true;
 
-// Force single instances to prevent duplicate module TDZ/M_ID errors on web
-config.resolver.extraNodeModules = {
-  ...config.resolver.extraNodeModules,
-  'react': path.resolve(__dirname, 'node_modules/react'),
-  'react-dom': path.resolve(__dirname, 'node_modules/react-dom'),
-  '@tanstack/react-query': path.resolve(__dirname, 'node_modules/@tanstack/react-query'),
+// Resolve @/ alias to project root so Metro uses consistent module IDs
+// (prevents duplicate instances of react-query, BlurContext, NavContext etc.)
+config.resolver.resolveRequest = (context, moduleName, platform) => {
+  if (moduleName.startsWith('@/')) {
+    const resolved = path.resolve(__dirname, moduleName.slice(2));
+    return context.resolveRequest(context, resolved, platform);
+  }
+  return context.resolveRequest(context, moduleName, platform);
 };
 
 module.exports = config;
