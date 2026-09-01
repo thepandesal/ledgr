@@ -2,10 +2,10 @@ import { View, Text, TouchableOpacity, StyleSheet, Modal, Platform, TextInput, A
 import { WebView } from 'react-native-webview';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { AppFont } from '@/src/lib/fonts';
-import { useNav } from '@/src/lib/NavContext';
-import { useUser } from '@/src/hooks/useUser';
-import { supabase } from '@/src/lib/supabase';
+import { AppFont } from '../../src/lib/fonts';
+import { useNav } from '../../src/lib/NavContext';
+import { useUser } from '../../src/hooks/useUser';
+import { supabase } from '../../src/lib/supabase';
 import NavIcon from './NavIcons';
 import { useState } from 'react';
 import {
@@ -14,7 +14,7 @@ import {
   NAV_ICON_SOLAR__WALLET_BOLD,
   NAV_ICON_MINGCUTE__FOLDERS_FILL,
   NAV_ICON_DUO_ICONS__DASHBOARD,
-} from '@/src/lib/navIconSvgs';
+} from '../../src/lib/navIconSvgs';
 
 const TABS = [
   { key: 'home',       label: 'Dashboard',  svgUri: NAV_ICON_DUO_ICONS__DASHBOARD },
