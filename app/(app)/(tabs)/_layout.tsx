@@ -461,7 +461,7 @@ export default function TabsLayout() {
 
   const setBlur = (v: boolean) => {
     setBlurActive(v);
-    Animated.timing(blurAnim, { toValue: v ? 1 : 0, duration: 250, useNativeDriver: true }).start();
+    Animated.timing(blurAnim, { toValue: v ? 1 : 0, duration: 250, useNativeDriver: Platform.OS !== 'web' }).start();
   };
 
   const registerAdd = (tab: string, fn: () => void) => {
