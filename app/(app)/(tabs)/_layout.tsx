@@ -248,9 +248,9 @@ function ProfileScreen() {
   const showToast = () => {
     setToastVisible(true);
     Animated.sequence([
-      Animated.timing(toastAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
+      Animated.timing(toastAnim, { toValue: 1, duration: 200, useNativeDriver: Platform.OS !== 'web' }),
       Animated.delay(1500),
-      Animated.timing(toastAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
+      Animated.timing(toastAnim, { toValue: 0, duration: 200, useNativeDriver: Platform.OS !== 'web' }),
     ]).start(() => setToastVisible(false));
   };
 
@@ -491,11 +491,11 @@ export default function TabsLayout() {
     setActiveSpaceName(name);
     setActiveSpaceOpenEdit(edit);
     spaceSlideAnim.setValue(winWidthRef.current);
-    Animated.timing(spaceSlideAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start();
+    Animated.timing(spaceSlideAnim, { toValue: 0, duration: 300, useNativeDriver: Platform.OS !== 'web' }).start();
   }, []);
 
   const closeSpace = useCallback(() => {
-    Animated.timing(spaceSlideAnim, { toValue: winWidthRef.current, duration: 260, useNativeDriver: true }).start(() => {
+    Animated.timing(spaceSlideAnim, { toValue: winWidthRef.current, duration: 260, useNativeDriver: Platform.OS !== 'web' }).start(() => {
       setActiveSpaceId(null);
       setActiveSpaceName(null);
       setActiveSpaceOpenEdit(false);
@@ -508,11 +508,11 @@ export default function TabsLayout() {
   const openRecording = useCallback((recordingId: string) => {
     setActiveRecordingId(recordingId);
     recordingSlideAnim.setValue(winWidthRef.current);
-    Animated.timing(recordingSlideAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start();
+    Animated.timing(recordingSlideAnim, { toValue: 0, duration: 300, useNativeDriver: Platform.OS !== 'web' }).start();
   }, []);
 
   const closeRecording = useCallback(() => {
-    Animated.timing(recordingSlideAnim, { toValue: winWidthRef.current, duration: 260, useNativeDriver: true }).start(() => {
+    Animated.timing(recordingSlideAnim, { toValue: winWidthRef.current, duration: 260, useNativeDriver: Platform.OS !== 'web' }).start(() => {
       setActiveRecordingId(null);
     });
   }, []);
@@ -525,11 +525,11 @@ export default function TabsLayout() {
     setActiveSplitBillId(splitBillId);
     setActiveSplitBillName(name);
     splitBillSlideAnim.setValue(winWidthRef.current);
-    Animated.timing(splitBillSlideAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start();
+    Animated.timing(splitBillSlideAnim, { toValue: 0, duration: 300, useNativeDriver: Platform.OS !== 'web' }).start();
   }, []);
 
   const closeSplitBill = useCallback(() => {
-    Animated.timing(splitBillSlideAnim, { toValue: winWidthRef.current, duration: 260, useNativeDriver: true }).start(() => {
+    Animated.timing(splitBillSlideAnim, { toValue: winWidthRef.current, duration: 260, useNativeDriver: Platform.OS !== 'web' }).start(() => {
       setActiveSplitBillId(null);
       setActiveSplitBillName(null);
     });
@@ -564,13 +564,13 @@ export default function TabsLayout() {
     topSpendingOpenRef.current = true;
     setTopSpendingOpen(true);
     topSpendingAnim.setValue(winWidthRef.current);
-    Animated.timing(topSpendingAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start();
+    Animated.timing(topSpendingAnim, { toValue: 0, duration: 300, useNativeDriver: Platform.OS !== 'web' }).start();
     savePanelState();
   }, [savePanelState]);
 
   const closeTopSpending = useCallback(() => {
     topSpendingOpenRef.current = false;
-    Animated.timing(topSpendingAnim, { toValue: winWidthRef.current, duration: 260, useNativeDriver: true }).start(() => {
+    Animated.timing(topSpendingAnim, { toValue: winWidthRef.current, duration: 260, useNativeDriver: Platform.OS !== 'web' }).start(() => {
       setTopSpendingOpen(false);
     });
     savePanelState();
@@ -593,14 +593,14 @@ export default function TabsLayout() {
     recordingsPanelAnim.setValue(winWidthRef.current);
     setRecordingsPanelOpen(true);
     requestAnimationFrame(() => {
-      Animated.timing(recordingsPanelAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start();
+      Animated.timing(recordingsPanelAnim, { toValue: 0, duration: 300, useNativeDriver: Platform.OS !== 'web' }).start();
     });
     savePanelState();
   }, [savePanelState]);
 
   const closeRecordingsPanel = useCallback(() => {
     recordingsPanelOpenRef.current = false;
-    Animated.timing(recordingsPanelAnim, { toValue: winWidthRef.current, duration: 260, useNativeDriver: true }).start(() => {
+    Animated.timing(recordingsPanelAnim, { toValue: winWidthRef.current, duration: 260, useNativeDriver: Platform.OS !== 'web' }).start(() => {
       setRecordingsPanelOpen(false);
     });
     savePanelState();
@@ -615,14 +615,14 @@ export default function TabsLayout() {
     setSpacesPanelOpen(true);
     spacesPanelAnim.setValue(winWidthRef.current);
     requestAnimationFrame(() => {
-      Animated.timing(spacesPanelAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start();
+      Animated.timing(spacesPanelAnim, { toValue: 0, duration: 300, useNativeDriver: Platform.OS !== 'web' }).start();
     });
     savePanelState();
   }, [savePanelState]);
 
   const closeSpacesPanel = useCallback(() => {
     spacesPanelOpenRef.current = false;
-    Animated.timing(spacesPanelAnim, { toValue: winWidthRef.current, duration: 260, useNativeDriver: true }).start(() => {
+    Animated.timing(spacesPanelAnim, { toValue: winWidthRef.current, duration: 260, useNativeDriver: Platform.OS !== 'web' }).start(() => {
       setSpacesPanelOpen(false);
     });
     savePanelState();
@@ -631,41 +631,41 @@ export default function TabsLayout() {
   const [loansPanelOpen, setLoansPanelOpen] = useState(false);
   const loansPanelOpenRef = useRef(false);
   const loansPanelAnim = useRef(new Animated.Value(winWidthRef.current)).current;
-  const openLoansPanel = useCallback(() => { loansPanelOpenRef.current = true; setLoansPanelOpen(true); loansPanelAnim.setValue(winWidthRef.current); requestAnimationFrame(() => { Animated.timing(loansPanelAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start(); }); savePanelState(); }, [savePanelState]);
-  const closeLoansPanel = useCallback(() => { loansPanelOpenRef.current = false; Animated.timing(loansPanelAnim, { toValue: winWidthRef.current, duration: 260, useNativeDriver: true }).start(() => { setLoansPanelOpen(false); }); savePanelState(); }, [savePanelState]);
+  const openLoansPanel = useCallback(() => { loansPanelOpenRef.current = true; setLoansPanelOpen(true); loansPanelAnim.setValue(winWidthRef.current); requestAnimationFrame(() => { Animated.timing(loansPanelAnim, { toValue: 0, duration: 300, useNativeDriver: Platform.OS !== 'web' }).start(); }); savePanelState(); }, [savePanelState]);
+  const closeLoansPanel = useCallback(() => { loansPanelOpenRef.current = false; Animated.timing(loansPanelAnim, { toValue: winWidthRef.current, duration: 260, useNativeDriver: Platform.OS !== 'web' }).start(() => { setLoansPanelOpen(false); }); savePanelState(); }, [savePanelState]);
 
   const [receivablesPanelOpen, setReceivablesPanelOpen] = useState(false);
   const receivablesPanelOpenRef = useRef(false);
   const receivablesPanelAnim = useRef(new Animated.Value(winWidthRef.current)).current;
   const [receivablesInitialPerson, setReceivablesInitialPerson] = useState<string | null>(null);
-  const openReceivablesPanel = useCallback((person?: string) => { showPanelLoader(); setReceivablesInitialPerson(person ?? null); receivablesPanelOpenRef.current = true; setReceivablesPanelOpen(true); receivablesPanelAnim.setValue(winWidthRef.current); requestAnimationFrame(() => { Animated.timing(receivablesPanelAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start(); }); savePanelState(); }, [savePanelState]);
-  const closeReceivablesPanel = useCallback(() => { receivablesPanelOpenRef.current = false; setReceivablesInitialPerson(null); Animated.timing(receivablesPanelAnim, { toValue: winWidthRef.current, duration: 260, useNativeDriver: true }).start(() => { setReceivablesPanelOpen(false); }); savePanelState(); }, [savePanelState]);
+  const openReceivablesPanel = useCallback((person?: string) => { showPanelLoader(); setReceivablesInitialPerson(person ?? null); receivablesPanelOpenRef.current = true; setReceivablesPanelOpen(true); receivablesPanelAnim.setValue(winWidthRef.current); requestAnimationFrame(() => { Animated.timing(receivablesPanelAnim, { toValue: 0, duration: 300, useNativeDriver: Platform.OS !== 'web' }).start(); }); savePanelState(); }, [savePanelState]);
+  const closeReceivablesPanel = useCallback(() => { receivablesPanelOpenRef.current = false; setReceivablesInitialPerson(null); Animated.timing(receivablesPanelAnim, { toValue: winWidthRef.current, duration: 260, useNativeDriver: Platform.OS !== 'web' }).start(() => { setReceivablesPanelOpen(false); }); savePanelState(); }, [savePanelState]);
 
   const [remindersPanelOpen, setRemindersPanelOpen] = useState(false);
   const remindersPanelOpenRef = useRef(false);
   const remindersPanelAnim = useRef(new Animated.Value(winWidthRef.current)).current;
-  const openRemindersPanel = useCallback(() => { remindersPanelOpenRef.current = true; setRemindersPanelOpen(true); remindersPanelAnim.setValue(winWidthRef.current); requestAnimationFrame(() => { Animated.timing(remindersPanelAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start(); }); savePanelState(); }, [savePanelState]);
-  const closeRemindersPanel = useCallback(() => { remindersPanelOpenRef.current = false; Animated.timing(remindersPanelAnim, { toValue: winWidthRef.current, duration: 260, useNativeDriver: true }).start(() => { setRemindersPanelOpen(false); }); savePanelState(); }, [savePanelState]);
+  const openRemindersPanel = useCallback(() => { remindersPanelOpenRef.current = true; setRemindersPanelOpen(true); remindersPanelAnim.setValue(winWidthRef.current); requestAnimationFrame(() => { Animated.timing(remindersPanelAnim, { toValue: 0, duration: 300, useNativeDriver: Platform.OS !== 'web' }).start(); }); savePanelState(); }, [savePanelState]);
+  const closeRemindersPanel = useCallback(() => { remindersPanelOpenRef.current = false; Animated.timing(remindersPanelAnim, { toValue: winWidthRef.current, duration: 260, useNativeDriver: Platform.OS !== 'web' }).start(() => { setRemindersPanelOpen(false); }); savePanelState(); }, [savePanelState]);
 
   const [contactsPanelOpen, setContactsPanelOpen] = useState(false);
   const contactsPanelAnim = useRef(new Animated.Value(winWidthRef.current)).current;
-  const openContactsPanel = useCallback(() => { setContactsPanelOpen(true); contactsPanelAnim.setValue(winWidthRef.current); requestAnimationFrame(() => { Animated.timing(contactsPanelAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start(); }); }, []);
-  const closeContactsPanel = useCallback(() => { Animated.timing(contactsPanelAnim, { toValue: winWidthRef.current, duration: 260, useNativeDriver: true }).start(() => { setContactsPanelOpen(false); }); }, []);
+  const openContactsPanel = useCallback(() => { setContactsPanelOpen(true); contactsPanelAnim.setValue(winWidthRef.current); requestAnimationFrame(() => { Animated.timing(contactsPanelAnim, { toValue: 0, duration: 300, useNativeDriver: Platform.OS !== 'web' }).start(); }); }, []);
+  const closeContactsPanel = useCallback(() => { Animated.timing(contactsPanelAnim, { toValue: winWidthRef.current, duration: 260, useNativeDriver: Platform.OS !== 'web' }).start(() => { setContactsPanelOpen(false); }); }, []);
 
   const [friendsPanelOpen, setFriendsPanelOpen] = useState(false);
   const friendsPanelAnim = useRef(new Animated.Value(winWidthRef.current)).current;
-  const openFriendsPanel = useCallback(() => { setFriendsPanelOpen(true); friendsPanelAnim.setValue(winWidthRef.current); requestAnimationFrame(() => { Animated.timing(friendsPanelAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start(); }); }, []);
-  const closeFriendsPanel = useCallback(() => { Animated.timing(friendsPanelAnim, { toValue: winWidthRef.current, duration: 260, useNativeDriver: true }).start(() => { setFriendsPanelOpen(false); }); }, []);
+  const openFriendsPanel = useCallback(() => { setFriendsPanelOpen(true); friendsPanelAnim.setValue(winWidthRef.current); requestAnimationFrame(() => { Animated.timing(friendsPanelAnim, { toValue: 0, duration: 300, useNativeDriver: Platform.OS !== 'web' }).start(); }); }, []);
+  const closeFriendsPanel = useCallback(() => { Animated.timing(friendsPanelAnim, { toValue: winWidthRef.current, duration: 260, useNativeDriver: Platform.OS !== 'web' }).start(() => { setFriendsPanelOpen(false); }); }, []);
 
   const [receiptsPanelOpen, setReceiptsPanelOpen] = useState(false);
   const receiptsPanelAnim = useRef(new Animated.Value(winWidthRef.current)).current;
-  const openReceiptsPanel = useCallback(() => { setReceiptsPanelOpen(true); receiptsPanelAnim.setValue(winWidthRef.current); requestAnimationFrame(() => { Animated.timing(receiptsPanelAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start(); }); }, []);
-  const closeReceiptsPanel = useCallback(() => { Animated.timing(receiptsPanelAnim, { toValue: winWidthRef.current, duration: 260, useNativeDriver: true }).start(() => { setReceiptsPanelOpen(false); }); }, []);
+  const openReceiptsPanel = useCallback(() => { setReceiptsPanelOpen(true); receiptsPanelAnim.setValue(winWidthRef.current); requestAnimationFrame(() => { Animated.timing(receiptsPanelAnim, { toValue: 0, duration: 300, useNativeDriver: Platform.OS !== 'web' }).start(); }); }, []);
+  const closeReceiptsPanel = useCallback(() => { Animated.timing(receiptsPanelAnim, { toValue: winWidthRef.current, duration: 260, useNativeDriver: Platform.OS !== 'web' }).start(() => { setReceiptsPanelOpen(false); }); }, []);
 
   const [billSplitPanelOpen, setBillSplitPanelOpen] = useState(false);
   const billSplitPanelAnim = useRef(new Animated.Value(winWidthRef.current)).current;
-  const openBillSplitPanel = useCallback(() => { setBillSplitPanelOpen(true); billSplitPanelAnim.setValue(winWidthRef.current); requestAnimationFrame(() => { Animated.timing(billSplitPanelAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start(); }); }, []);
-  const closeBillSplitPanel = useCallback(() => { Animated.timing(billSplitPanelAnim, { toValue: winWidthRef.current, duration: 260, useNativeDriver: true }).start(() => { setBillSplitPanelOpen(false); }); }, []);
+  const openBillSplitPanel = useCallback(() => { setBillSplitPanelOpen(true); billSplitPanelAnim.setValue(winWidthRef.current); requestAnimationFrame(() => { Animated.timing(billSplitPanelAnim, { toValue: 0, duration: 300, useNativeDriver: Platform.OS !== 'web' }).start(); }); }, []);
+  const closeBillSplitPanel = useCallback(() => { Animated.timing(billSplitPanelAnim, { toValue: winWidthRef.current, duration: 260, useNativeDriver: Platform.OS !== 'web' }).start(() => { setBillSplitPanelOpen(false); }); }, []);
 
   const [homeDateLabel, setHomeDateLabel] = useState('');
   const visited = useVisited(activeTab);
@@ -838,13 +838,13 @@ export default function TabsLayout() {
     // Slide animation for profile; instant swap for other tabs
     if (prev === 'profile') {
       outgoing?.setValue(0);
-      Animated.timing(outgoing!, { toValue: winWidthRef.current, duration: 260, useNativeDriver: true }).start();
+      Animated.timing(outgoing!, { toValue: winWidthRef.current, duration: 260, useNativeDriver: Platform.OS !== 'web' }).start();
       incoming?.setValue(0);
     } else {
       outgoing?.setValue(winWidthRef.current);
       if (key === 'profile') {
         incoming?.setValue(winWidthRef.current);
-        Animated.timing(incoming!, { toValue: 0, duration: 300, useNativeDriver: true }).start();
+        Animated.timing(incoming!, { toValue: 0, duration: 300, useNativeDriver: Platform.OS !== 'web' }).start();
       } else {
         incoming?.setValue(0);
       }
@@ -909,15 +909,15 @@ export default function TabsLayout() {
   const openOthers = useCallback(() => {
     setOthersOpen(true);
     Animated.parallel([
-      Animated.spring(bubbleAnim,  { toValue: 1, useNativeDriver: true, tension: 70, friction: 10 }),
-      Animated.spring(bubbleScale, { toValue: 1, useNativeDriver: true, tension: 70, friction: 10 }),
+      Animated.spring(bubbleAnim,  { toValue: 1, useNativeDriver: Platform.OS !== 'web', tension: 70, friction: 10 }),
+      Animated.spring(bubbleScale, { toValue: 1, useNativeDriver: Platform.OS !== 'web', tension: 70, friction: 10 }),
     ]).start();
   }, []);
 
   const closeOthers = useCallback(() => {
     Animated.parallel([
-      Animated.timing(bubbleAnim,  { toValue: 0, duration: 180, useNativeDriver: true }),
-      Animated.timing(bubbleScale, { toValue: 0.92, duration: 180, useNativeDriver: true }),
+      Animated.timing(bubbleAnim,  { toValue: 0, duration: 180, useNativeDriver: Platform.OS !== 'web' }),
+      Animated.timing(bubbleScale, { toValue: 0.92, duration: 180, useNativeDriver: Platform.OS !== 'web' }),
     ]).start(() => setOthersOpen(false));
   }, []);
 
@@ -1473,5 +1473,6 @@ const p = StyleSheet.create({
   toast:    { position: 'absolute', bottom: 24, right: 20, backgroundColor: '#111', borderRadius: 999, paddingHorizontal: 16, paddingVertical: 10 },
   toastText:{ fontFamily: AppFont.regular, fontSize: 12, color: '#fff' },
 });
+
 
 
